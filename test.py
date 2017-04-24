@@ -7,6 +7,7 @@ import logging.config
 import numpy as np
 from common.arg_command_line import myargparse
 from slf import Serafin
+from slf.SerafinVariables import get_additional_computations, do_calculations_in_frame, filter_necessary_equations
 
 
 if not os.path.exists('log'):
@@ -72,22 +73,29 @@ with Serafin.Read('testdata\\r2d_malpasset-small_SERAFIND.slf', args.lang) as re
 
     print(resin.time)
     print(resin.header.var_IDs)
-    print(resin.read_var_in_frame(2, 'U')[1:10])
+    print(resin.read_var_in_frame(2, 'U')[1:5])
+    print(resin.read_var_in_frame(2, 'V')[1:5])
+
+    selected_var_IDs = ['U', 'V', 'H', 'Q']
+    additional_computations = get_additional_computations(resin.header.var_IDs)
+    necessary_equations = filter_necessary_equations(additional_computations, selected_var_IDs)
+    print('Need to do %d additional computation' % len(necessary_equations))
 
     with Serafin.Write('out\\r2d_malpasset-small_SERAFIND_UVM.slf', args.lang, args.force) as resout:
-        header = resin.header.copy()
+        output_header = resin.header.copy()
+        output_header.nb_var = len(selected_var_IDs)
+        output_header.var_IDs = selected_var_IDs
+        output_header.var_names, output_header.var_units = [], []
+        for var_ID in selected_var_IDs:
+            name, unit = resin.header.specifications.ID_to_name_unit(var_ID)
+            output_header.var_names.append(name)
+            output_header.var_units.append(unit)
 
-        header.nb_var = 3
-        header.var_IDs = ['U', 'V', 'M']
-        header.var_names = [b'VITESSE U       ', b'VITESSE V       ', b'VITESSE SCALAIRE']
-        header.var_units = [b'M/S             ', b'M/S             ', b'M/S             ']
+        resout.write_header(output_header)
 
-        resout.write_header(header)
-
-        for i in range(len(resin.time)):
-            vals = resin.read_vars_in_frame(i, ['U', 'V'])
-            vals = np.vstack([vals, np.sqrt(np.square(vals[0]) + np.square(vals[1]))])
-            resout.write_entire_frame(header, resin.time[i], vals)
+        for index in range(len(resin.time)):
+            vals = do_calculations_in_frame(necessary_equations, resin, index, selected_var_IDs)
+            resout.write_entire_frame(output_header, resin.time[index], vals)
 
 
 with Serafin.Read('out\\r2d_malpasset-small_SERAFIND_UVM.slf', args.lang) as resin:
@@ -97,7 +105,7 @@ with Serafin.Read('out\\r2d_malpasset-small_SERAFIND_UVM.slf', args.lang) as res
     print(resin.header.var_IDs)
     print(resin.read_var_in_frame(2, 'U')[1:5])
     print(resin.read_var_in_frame(2, 'V')[1:5])
-    print(resin.read_var_in_frame(2, 'M')[1:5])
+    print(resin.read_var_in_frame(2, 'Q')[1:5])
 
 
 

@@ -41,7 +41,7 @@ class SerafinVariableNames:
 
     def ID_to_name_unit(self, var_ID):
         var_row = self.var_table.loc[var_ID]
-        return bytes(var_row[self.language], 'utf-8'), bytes(var_row['unit'], 'utf-8')
+        return bytes(var_row[self.language], 'utf-8').ljust(16), bytes(var_row['unit'], 'utf-8').ljust(16)
 
 
 

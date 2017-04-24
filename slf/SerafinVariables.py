@@ -5,6 +5,8 @@ Handle variables and their relationships in .slf files
 
 import numpy as np
 
+KARMAN = 0.4
+RHO_EAU = 1000.
 
 class Variable():
     """
@@ -70,18 +72,22 @@ ordered_IDs = ['H', 'U', 'V', 'M', 'S', 'B', 'I', 'J', 'Q']
 # construct the variable types as constants
 build_basic_variables()
 H, U, V, M, S, B, I, J, Q = [BASIC_VARIABLES[var] for var in ordered_IDs]
-
+US = Variable('US', bytes('VITESSE DE FROT.', 'utf-8').ljust(16), bytes('FRICTION VEL.   ', 'utf-8').ljust(16), bytes('M/S             ', 'utf-8').ljust(16))
+TAU = Variable('TAU', bytes('CONTRAINTE', 'utf-8').ljust(16), bytes('CONSTRAINT', 'utf-8').ljust(16), bytes('PA', 'utf-8').ljust(16))
 
 # construct the equations (relations between variables) as constants
 MINUS, TIMES, NORM2 = 0, 1, 2
+COMPUTE_TAU = 3
 OPERATIONS = {MINUS: lambda a, b: a-b,
               TIMES: lambda a, b: a*b,
-              NORM2: lambda a, b: np.sqrt(np.square(a) + np.square(b))}
+              NORM2: lambda a, b: np.sqrt(np.square(a) + np.square(b)),
+              COMPUTE_TAU: lambda x: RHO_EAU * np.square(x)}
 
 
 EQUATIONS = [Equation((S, B), H, (MINUS,)), Equation((H, B), S, (MINUS,)),
-             Equation((U, V), M, (NORM2,)), Equation((H, U), I, (TIMES,)),
-             Equation((H, V), J, (TIMES,)), Equation((I, J), Q, (NORM2,))]
+             Equation((H, U), I, (TIMES,)), Equation((H, V), J, (TIMES,)),
+             Equation((I, J), Q, (NORM2,)), Equation((U, V), M, (NORM2,)),
+             Equation((US,), TAU, (COMPUTE_TAU,))]
 
 
 def is_basic_variable(var_ID):
@@ -113,3 +119,43 @@ def get_additional_computations(input_var_IDs):
     return computations
 
 
+def filter_necessary_equations(all_equations, selected_output_IDs):
+    necessary_equations = []
+    can_compute = {var: False for var in selected_output_IDs}
+    for equation in all_equations:
+        for input_var in equation.input:
+            can_compute[input_var.ID()] = True
+        necessary_equations.append(equation)
+        can_compute[equation.output.ID()] = True
+        if all(can_compute.values()):
+            break
+    return necessary_equations
+
+
+def do_binary_calculation_in_frame(equation, input_values):
+    operation = OPERATIONS[equation.operators[0]]  # extract the operation from the equation
+    return operation(input_values[0], input_values[1])
+
+
+def do_calculations_in_frame(equations, input_serafin, time_index, selected_output_IDs):
+    all_values = {}
+    for equation in equations:
+        input_var_IDs = map(lambda x: x.ID(), equation.input)
+        input_values = []
+
+        # read (if needed) input variables values
+        for input_var_ID in input_var_IDs:
+            if input_var_ID not in all_values:
+                all_values[input_var_ID] = input_serafin.read_var_in_frame(time_index, input_var_ID)
+            input_values.append(all_values[input_var_ID])
+
+        # do calculation for the output variable
+        output_values = do_binary_calculation_in_frame(equation, input_values)
+        all_values[equation.output.ID()] = output_values
+
+    nb_selected_vars = len(selected_output_IDs)
+    output_values = np.empty((nb_selected_vars, input_serafin.header.nb_nodes),
+                             dtype=input_serafin.header.float_type)
+    for i in range(nb_selected_vars):
+        output_values[i] = all_values[selected_output_IDs[i]]
+    return output_values

@@ -299,7 +299,7 @@ class Read(Serafin):
         nb_values = '>%i%s' % (self.header.nb_nodes, self.header.float_type)
         pos_var = self.var_ID_to_index(var_ID)
         self.file.seek(self.header.header_size + time_index * self.header.frame_size
-                                               + 8 + self.header.float_size + pos_var * (8 + 4 * self.header.nb_nodes), 0)
+                       + 8 + self.header.float_size + pos_var * (8 + self.header.float_size * self.header.nb_nodes), 0)
         self.file.read(4)
         return np.array(struct.unpack(nb_values, self.file.read(self.header.float_size * self.header.nb_nodes)),
                         dtype=self.header.np_float_type)
@@ -324,7 +324,7 @@ class Read(Serafin):
                            + 8 + self.header.float_size + pos_var * (8 + self.header.float_size * self.header.nb_nodes),
                            0)
             self.file.read(4)
-            var[i] = struct.unpack(nb_values, self.file.read(self.header.float_size * self.header.nb_nodes))
+            var[i, :] = struct.unpack(nb_values, self.file.read(self.header.float_size * self.header.nb_nodes))
         return var
 
 
@@ -429,6 +429,6 @@ class Write(Serafin):
         else:
             for i in range(header.nb_var):
                 self.file.write(struct.pack('>i', header.float_size * header.nb_nodes))
-                self.file.write(struct.pack(nb_values, *values[i]))
+                self.file.write(struct.pack(nb_values, *values[i, :]))
                 self.file.write(struct.pack('>i', header.float_size * header.nb_nodes))
 

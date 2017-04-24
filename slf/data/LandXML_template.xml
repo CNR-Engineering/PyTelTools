@@ -1,0 +1,20 @@
+<?xml version="1.0" ?>
+<!-- This file contains x and y reversed in purpose (because arcpy is buggy...) -->
+<LandXML version="1.2" xmlns="http://www.landxml.org/schema/LandXML-1.2" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.landxml.org/schema/LandXML-1.2 http://www.landxml.org/schema/LandXML-1.2/LandXML-1.2.xsd">
+  <Surfaces>
+    <Surface name="My TIN">
+      <Definition surfType="TIN">
+        <Pnts>
+{% set count = 1 %}
+{%- for (x, y, z) in nodes %}          <P id="{{ count }}">{{ y }} {{ x }} {{ z }}</P>{% set count = count + 1 %}
+{% endfor %}
+        </Pnts>
+        <Faces>
+{% set count = 1 %}
+{%- for e1, e2, e3 in ikle %}          <F id="{{ count }}">{{ e1 }} {{ e2 }} {{ e3 }}</F>{% set count = count + 1 %}
+{% endfor %}
+        </Faces>
+      </Definition>
+    </Surface>
+  </Surfaces>
+</LandXML>
