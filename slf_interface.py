@@ -9,8 +9,8 @@ import logging
 import copy
 import numpy as np
 from slf import Serafin
-from slf.SerafinVariables import get_additional_computations, \
-    do_calculations_in_frame, filter_necessary_equations, get_US_equation
+from slf.SerafinVariables import get_available_variables, \
+    do_calculations_in_frame, get_necessary_equations, get_US_equation
 
 _YELLOW = QColor(245, 255, 207)
 _GREEN = QColor(200, 255, 180)
@@ -86,24 +86,43 @@ class TableWidgetDragRows(QTableWidget):
         return selectedRows
 
 
-class FrictionLawMessage:
-   def __init__(self):
-        self.msg = QMessageBox.question('Select', 'Select a friction law',
-                                        QMessageBox.Ok | QMessageBox.Cancel, QMessageBox.Ok)
+class FrictionLawMessage(QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
 
-        self.chezy = QPushButton('Chezy')
-        self.strickler = QPushButton('Strickler')
-        self.manning = QPushButton('Manning')
-        self.nikuradse = QPushButton('Nikuradse')
-        # hlayout = QHBoxLayout()
-        # hlayout.addWidget(self.chezy)
-        # hlayout.addWidget(self.strickler)
-        # hlayout.addWidget(self.manning)
-        # hlayout.addWidget(self.nikuradse)
-        # self.setLayout(hlayout)
+        self.chezy = QRadioButton('Chezy')
+        self.chezy.setChecked(True)
+        self.strickler = QRadioButton('Strickler')
+        self.manning = QRadioButton('Manning')
+        self.nikuradse = QRadioButton('Nikuradse')
+        hlayout = QHBoxLayout()
+        hlayout.addWidget(self.chezy)
+        hlayout.addWidget(self.strickler)
+        hlayout.addWidget(self.manning)
+        hlayout.addWidget(self.nikuradse)
 
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel,
+                                   Qt.Horizontal, self)
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        vlayout = QVBoxLayout()
+        vlayout.addLayout(hlayout)
+        vlayout.addWidget(buttons)
+        self.setLayout(vlayout)
+
+        self.resize(self.sizeHint())
         self.setWindowTitle('Select a friction law')
-        self.setText('Please select a friction law')
+
+    def getChoice(self):
+        if self.chezy.isChecked():
+            return 0
+        elif self.strickler.isChecked():
+            return 1
+        elif self.manning.isChecked():
+            return 2
+        elif self.nikuradse.isChecked():
+            return 3
+        return -1
 
 
 class SerafinToolInterface(QWidget):
@@ -118,7 +137,7 @@ class SerafinToolInterface(QWidget):
         # some attributes to store the input file info
         self.header = None
         self.time = []
-        self.additional_computations = []
+        self.available_vars = []
 
         self._initWidgets()  # some instance attributes will be set there
         self._setLayout()
@@ -268,14 +287,14 @@ class SerafinToolInterface(QWidget):
         offset = self.firstTable.rowCount()
 
         # find new computable variables (stored as Equation object)
-        self.additional_computations = get_additional_computations(self.header.var_IDs)
+        self.available_vars = get_available_variables(self.header.var_IDs)
 
         # add new variables to the table
-        for i, equation in enumerate(self.additional_computations):
+        for i, var in enumerate(self.available_vars):
             self.firstTable.insertRow(self.firstTable.rowCount())
-            id_item = QTableWidgetItem(equation.output.ID().strip())
-            name_item = QTableWidgetItem(equation.output.name(self.language).decode('utf-8').strip())
-            unit_item = QTableWidgetItem(equation.output.unit().decode('utf-8').strip())
+            id_item = QTableWidgetItem(var.ID().strip())
+            name_item = QTableWidgetItem(var.name(self.language).decode('utf-8').strip())
+            unit_item = QTableWidgetItem(var.unit().decode('utf-8').strip())
             self.firstTable.setItem(offset+i, 0, QTableWidgetItem(id_item))
             self.firstTable.setItem(offset+i, 1, QTableWidgetItem(name_item))
             self.firstTable.setItem(offset+i, 2, QTableWidgetItem(unit_item))
@@ -288,7 +307,7 @@ class SerafinToolInterface(QWidget):
         @brief: (Used in btnOpenEvent) Reinitialize input file data before reading a new file
         """
         self.summaryTextBox.clear()
-        self.additional_computations = []
+        self.available_vars = []
         self.header = None
         self.time = []
 
@@ -333,18 +352,10 @@ class SerafinToolInterface(QWidget):
     def btnAddUSEvent(self):
         msg = FrictionLawMessage()
         value = msg.exec_()
-
-        if value == QMessageBox.AcceptRole:
-            friction_law = 0
-        elif value == QMessageBox.YesRole:
-            friction_law = 1
-        elif value == QMessageBox.ActionRole:
-            friction_law = 2
-        elif value == QMessageBox.HelpRole:
-            friction_law = 3
+        if value == QDialog.Accepted:
+            friction_law = msg.getChoice()
         else:
             return
-        print(friction_law)
 
         self.additional_computations.append(get_US_equation(friction_law))
         us = self.additional_computations[-1].output
@@ -361,7 +372,6 @@ class SerafinToolInterface(QWidget):
         self.firstTable.item(offset, 0).setBackground(_GREEN)  # set new US color to green
         self.firstTable.item(offset, 1).setBackground(_GREEN)
         self.firstTable.item(offset, 2).setBackground(_GREEN)
-
 
     def btnOpenEvent(self):
         options = QFileDialog.Options()
@@ -409,7 +419,7 @@ class SerafinToolInterface(QWidget):
         selected_vars = self._getSelectedVariables()
 
         # check if everything is ready to submit
-        if self.header is None:  # TODO
+        if self.header is None:
             return
         if not selected_vars:
             return
@@ -434,19 +444,18 @@ class SerafinToolInterface(QWidget):
         with Serafin.Read(self.filename, self.language) as resin:
             resin.header = self.header
             resin.time = self.time
-            # print('U', resin.read_var_in_frame(2, 'U')[1:5])
-            # print('US', resin.read_var_in_frame(2, 'US')[1:5])
+            print('U', resin.read_var_in_frame(2, 'U')[1:5])
+            print('US', resin.read_var_in_frame(2, 'US')[1:5])
 
             with Serafin.Write(filename, self.language, overwrite) as resout:
                 # deduce header from selected variable IDs and write header
                 output_header = self._getOuputHeader(selected_vars)
-                # logging.info('Writing the output with variables %s' % str(output_header.var_IDs))
+                logging.info('Writing the output with variables %s' % str(output_header.var_IDs))
 
                 resout.write_header(output_header)
 
                 # do some additional computations
-                necessary_equations = filter_necessary_equations(self.additional_computations, self.header.var_IDs,
-                                                                 output_header.var_IDs)
+                necessary_equations = get_necessary_equations(self.header.var_IDs, output_header.var_IDs)
 
                 for i, time_i in enumerate(self.time):
                     vals = do_calculations_in_frame(necessary_equations, resin, i, output_header.var_IDs)
@@ -458,9 +467,9 @@ class SerafinToolInterface(QWidget):
             resin.read_header()
             resin.get_time()
             print('output file has variables', resin.header.var_IDs)
-            # print('U', resin.read_var_in_frame(2, 'U')[1:5])
-            # print('TAU', resin.read_var_in_frame(2, 'TAU')[1:5])
-            # print('DMAX', resin.read_var_in_frame(2, 'DIAMETRE')[1:5])
+            print('U', resin.read_var_in_frame(2, 'U')[1:5])
+            print('TAU', resin.read_var_in_frame(2, 'TAU')[1:5])
+            print('DMAX', resin.read_var_in_frame(2, 'DIAMETRE')[1:5])
 
 
 

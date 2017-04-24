@@ -79,13 +79,14 @@ TAU = Variable('TAU', bytes('CONTRAINTE', 'utf-8').ljust(16), bytes('CONSTRAINT'
 DMAX = Variable('DMAX', bytes('DIAMETRE', 'utf-8').ljust(16), bytes('DIAMETER', 'utf-8').ljust(16), bytes('MM', 'utf-8').ljust(16))
 W = Variable('W', bytes('FROTTEMEN', 'utf-8').ljust(16), bytes('BOTTOM FRICTION', 'utf-8').ljust(16), bytes('  ', 'utf-8').ljust(16))
 
+
 # define a special operator
 def compute_DMAX(tau):
     return np.where(tau > 0.34, 1.4593 * np.power(tau, 0.979),
                                 np.where(tau > 0.1, 1.2912 * np.power(tau, 2) + 1.3572 * tau - 0.1154,
                                                     0.9055 * np.power(tau, 1.3178)))
 
-# construct the equations (relations between variables) as constants
+# define the operators (relations between variables) as constants
 MINUS, TIMES, NORM2 = 0, 1, 2
 COMPUTE_TAU, COMPUTE_DMAX = 3, 4
 COMPUTE_CHEZY, COMPUTE_STRICKLER, COMPUTE_MANNING, COMPUTE_NIKURADSE = 5, 6, 7, 8
@@ -100,9 +101,9 @@ OPERATIONS = {MINUS: lambda a, b: a-b,
               COMPUTE_NIKURADSE: lambda w, h, m: np.sqrt(np.power(m, 2) * KARMAN**2 / np.power(np.log(30 * h / np.exp(1) / w), 2))}
 
 # define basic equations (binary) and special equations (unary and ternary)
-BASIC_EQUATIONS = [Equation((S, B), H, MINUS), Equation((H, B), S, MINUS),
-             Equation((U, V), M, NORM2), Equation((H, U), I, TIMES),
-             Equation((H, V), J, TIMES), Equation((I, J), Q, NORM2)]
+BASIC_EQUATIONS = {'H': Equation((S, B), H, MINUS), 'S': Equation((H, B), S, MINUS),
+                   'M': Equation((U, V), M, NORM2), 'I': Equation((H, U), I, TIMES),
+                   'J': Equation((H, V), J, TIMES), 'Q': Equation((I, J), Q, NORM2)}
 TAU_EQUATION = Equation((US,), TAU, COMPUTE_TAU)
 DMAX_EQUATION = Equation((TAU,), DMAX, COMPUTE_DMAX)
 
@@ -122,27 +123,50 @@ def is_basic_variable(var_ID):
 
 
 def do_unary_calculation(equation, input_values):
+    """
+    @brief: Apply explicitly a unary operator on input values
+    @param equation <Equation>: an equation containing a unary operator
+    @param input_values <numpy 1D-array>: the values of the input variable
+    @return <numpy 1D-array>: the values of the output variable
+    """
     operation = OPERATIONS[equation.operator]
     return operation(input_values)
 
+
 def do_binary_calculation(equation, input_values):
+    """
+    @brief: Apply explicitly a binary operator on input values
+    @param equation <Equation>: an equation containing a binary operator
+    @param input_values <list of 2 numpy 1D-array>: the values of the input variables
+    @return <numpy 1D-array>: the values of the output variable
+    """
     operation = OPERATIONS[equation.operator]
     return operation(input_values[0], input_values[1])
 
 
-def do_terary_calculation(equation, input_values):
+def do_ternary_calculation(equation, input_values):
+    """
+    @brief: Apply explicitly a ternary operator on input values
+    @param equation <Equation>: an equation containing a ternary operator
+    @param input_values <list of 3 numpy 1D-array>: the values of the input variables
+    @return <numpy 1D-array>: the values of the output variable
+    """
     operation = OPERATIONS[equation.operator]
     return operation(input_values[0], input_values[1], input_values[2])
 
 
-
-def get_additional_computations(input_var_IDs):
-    computations = []
+def get_available_variables(input_var_IDs):
+    """
+    @brief: Determine the list of new variables computable from the input variables by basic relations
+    @param input_var_IDs <list of str>: the list of variable IDs contained in the input file
+    @return <list of Variable>: the list of variables computable from the input variables by basic relations
+    """
+    available_vars = []
     computables = list(map(BASIC_VARIABLES.get, filter(is_basic_variable, input_var_IDs)))
 
     while True:
         found_new_computable = False
-        for equation in BASIC_EQUATIONS:
+        for equation in BASIC_EQUATIONS.values():
             unknown = equation.output
             needed_variables = equation.input
             if unknown in computables:  # not a new variable
@@ -151,32 +175,49 @@ def get_additional_computations(input_var_IDs):
             if is_solvable:
                 found_new_computable = True
                 computables.append(unknown)
-                computations.append(equation)
+                available_vars.append(equation.output)
         if not found_new_computable:
             break
-
     # handle the special case for TAU and DMAX
     if 'US' in input_var_IDs:
-        computations.append(TAU_EQUATION)
-        computations.append(DMAX_EQUATION)
+        available_vars.append(TAU)
+        available_vars.append(DMAX)
+    return available_vars
 
-    return computations
 
-
-def filter_necessary_equations(all_equations, available_IDs, selected_output_IDs):
+def get_necessary_equations(known_var_IDs, needed_var_IDs):
+    """
+    @brief: Determine the list of equations needed to compute all user-selected variables
+    @param known_var_IDs <list of str>: the list of variable IDs contained in the input file
+    @param needed_var_IDs <list of str>: the list of variable IDs selected by the user
+    @return <list of Equation>: the list of equations needed to compute all user-selected variables
+    """
+    unknown_var_IDs = list(filter(lambda x: x not in known_var_IDs, needed_var_IDs))
     necessary_equations = []
-    can_compute = {var: False for var in selected_output_IDs}
-    for var_ID in available_IDs:
-        can_compute[var_ID] = True
-    if all(can_compute.values()):
-        return []
-    for equation in all_equations:
-        for input_var in equation.input:
-            can_compute[input_var.ID()] = True
-        can_compute[equation.output.ID()] = True
-        necessary_equations.append(equation)
-        if all(can_compute.values()):
-            break
+    if 'H' in unknown_var_IDs:
+        necessary_equations.append(BASIC_EQUATIONS['H'])
+    if 'S' in unknown_var_IDs:
+        necessary_equations.append(BASIC_EQUATIONS['S'])
+    if 'M' in unknown_var_IDs:
+        necessary_equations.append(BASIC_EQUATIONS['M'])
+
+    if 'Q' in unknown_var_IDs:
+        if 'I' not in known_var_IDs:
+            necessary_equations.append(BASIC_EQUATIONS['I'])
+        if 'J' not in known_var_IDs:
+            necessary_equations.append(BASIC_EQUATIONS['J'])
+        necessary_equations.append(BASIC_EQUATIONS['Q'])
+    else:
+        if 'I' in unknown_var_IDs:
+            necessary_equations.append(BASIC_EQUATIONS['I'])
+        if 'J' in unknown_var_IDs:
+            necessary_equations.append(BASIC_EQUATIONS['J'])
+
+    if 'US' in known_var_IDs:
+        if 'TAU' in unknown_var_IDs:
+            necessary_equations.append(TAU_EQUATION)
+        if 'DMAX' in unknown_var_IDs:
+            necessary_equations.append(DMAX_EQUATION)
     return necessary_equations
 
 
@@ -202,7 +243,7 @@ def do_calculations_in_frame(equations, input_serafin, time_index, selected_outp
             computed_values['DMAX'] = do_unary_calculation(DMAX_EQUATION, computed_values['TAU'])
             continue
 
-        # handle other cases (binary operation)
+        # handle the normal case (binary operation)
         input_var_IDs = map(lambda x: x.ID(), equation.input)
         input_values = []
 
@@ -216,6 +257,7 @@ def do_calculations_in_frame(equations, input_serafin, time_index, selected_outp
         output_values = do_binary_calculation(equation, input_values)
         computed_values[equation.output.ID()] = output_values
 
+    # reconstruct the output values array in the order of the selected IDs
     nb_selected_vars = len(selected_output_IDs)
     output_values = np.empty((nb_selected_vars, input_serafin.header.nb_nodes),
                              dtype=input_serafin.header.float_type)
