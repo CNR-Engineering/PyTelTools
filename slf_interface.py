@@ -7,7 +7,7 @@ import logging
 import copy
 import numpy as np
 from slf import Serafin
-from slf.SerafinBasicVariables import get_new_var_IDs
+from slf.SerafinVariables import get_additional_computations
 
 _YELLOW = QColor(245, 255, 207)
 
@@ -82,7 +82,6 @@ class TableWidgetDragRows(QTableWidget):
         return selectedRows
 
 
-
 class SerafinToolInterface(QWidget):
     """
     @brief: A graphical interface for extracting and computing variables from .slf file
@@ -95,9 +94,11 @@ class SerafinToolInterface(QWidget):
         # some attributes to store the input file info
         self.header = None
         self.time = []
-        self.addition_vars = []
+        self.additional_computations = []
 
-        self.initWidgets()  # some instance attributes will be set there
+        self._initWidgets()  # some instance attributes will be set there
+        self._setLayout()
+        self._bindEvents()
 
         self.setFixedSize(900, 900)
         self.setWindowTitle('Serafin Tool')
@@ -105,7 +106,10 @@ class SerafinToolInterface(QWidget):
         self.show()
 
 
-    def initWidgets(self):
+    def _initWidgets(self):
+        """
+        @brief: (Used in __init__) Create widgets
+        """
         # create the button open
         self.btnOpen = QPushButton('Open', self)
         self.btnOpen.setToolTip('<b>Open</b> a .slf file')
@@ -149,18 +153,17 @@ class SerafinToolInterface(QWidget):
         self.btnSubmit.setToolTip('<b>Submit</b> to write a .slf output')
         self.btnSubmit.resize(self.btnSubmit.sizeHint())
 
-        # putting the widgets together and bind event handlers
-        self._setLayout()
-        self._bindEvents()
-
-
     def _bindEvents(self):
-        # binding widget events
+        """
+        @brief: (Used in __init__) Bind events to widgets
+        """
         self.btnOpen.clicked.connect(self.btnOpenEvent)
         self.btnSubmit.clicked.connect(self.btnSubmitEvent)
 
     def _setLayout(self):
-        # setting the layout
+        """
+        @brief: (Used in __init__) Set up layout
+        """
         glayout = QGridLayout()
         glayout.setHorizontalSpacing(30)
         glayout.addWidget(self.langBox, 1, 1)
@@ -191,13 +194,18 @@ class SerafinToolInterface(QWidget):
         self.setLayout(vlayout)
 
     def _center(self):
+        """
+        @brief: (Used in __init__) Center the window with respect to the screen
+        """
         qr = self.frameGeometry()
         cp = QDesktopWidget().availableGeometry().center()
         qr.moveCenter(cp)
         self.move(qr.topLeft())
 
     def _initVarTables(self):
-        self.addition_vars = []
+        """
+        @brief: (Used in btnOpenEvent) Put available variables ID-name-unit in the table display
+        """
         self.firstTable.setRowCount(0)
         self.secondTable.setRowCount(0)
 
@@ -212,18 +220,15 @@ class SerafinToolInterface(QWidget):
             self.firstTable.setItem(i, 2, QTableWidgetItem(unit_item))
         offset = self.firstTable.rowCount()
 
-        # find new computable variables
-        new_vars = get_new_var_IDs(self.header.var_IDs)
-        for var_ID in new_vars:
-            var_name, var_unit = self.header.specifications.ID_to_name_unit(var_ID)
-            self.addition_vars.append((var_ID, var_name, var_unit))
+        # find new computable variables (stored as Equation object)
+        self.additional_computations = get_additional_computations(self.header.var_IDs)
 
         # add new variables to the table
-        for i, (id, name, unit) in enumerate(self.addition_vars):
+        for i, equation in enumerate(self.additional_computations):
             self.firstTable.insertRow(self.firstTable.rowCount())
-            id_item = QTableWidgetItem(id.strip())
-            name_item = QTableWidgetItem(name.decode('utf-8').strip())
-            unit_item = QTableWidgetItem(unit.decode('utf-8').strip())
+            id_item = QTableWidgetItem(equation.output.ID().strip())
+            name_item = QTableWidgetItem(equation.output.name(self.language).decode('utf-8').strip())
+            unit_item = QTableWidgetItem(equation.output.unit().decode('utf-8').strip())
             self.firstTable.setItem(offset+i, 0, QTableWidgetItem(id_item))
             self.firstTable.setItem(offset+i, 1, QTableWidgetItem(name_item))
             self.firstTable.setItem(offset+i, 2, QTableWidgetItem(unit_item))
@@ -231,14 +236,37 @@ class SerafinToolInterface(QWidget):
             self.firstTable.item(offset+i, 1).setBackground(_YELLOW)
             self.firstTable.item(offset+i, 2).setBackground(_YELLOW)
 
-    def btnOpenEvent(self):
+    def _reinitInput(self):
+        """
+        @brief: (Used in btnOpenEvent) Reinitialize input file data before reading a new file
+        """
+        self.summaryTextBox.clear()
+        self.additional_computations = []
+        self.header = None
+        self.time = []
+
         if not self.frenchButton.isChecked():
             self.language = 'en'
         else:
             self.language = 'fr'
 
-        self.summaryTextBox.clear()
 
+    def _handleOverwrite(self, filename):
+        """
+        @brief: (Used in btnSubmitEvent) Handle manually the overwrite option when saving output file
+        """
+        if os.path.exists(filename):
+            msg = QMessageBox.warning(self, 'Confirm overwrite',
+                                      'The file already exists. Do you want to replace it ?',
+                                      QMessageBox.Ok | QMessageBox.Cancel,
+                                      QMessageBox.Ok)
+            if msg == QMessageBox.Cancel:
+                logging.info('Output canceled')
+                return False
+            return True
+        return False
+
+    def btnOpenEvent(self):
         options = QFileDialog.Options()
         options |= QFileDialog.DontUseNativeDialog
         filename, _ = QFileDialog.getOpenFileName(self, 'Open a .slf file', '',
@@ -246,9 +274,11 @@ class SerafinToolInterface(QWidget):
         if not filename:
             return
 
-        self.filename = filename
-        self.inNameBox.setText(self.filename)
+        # reinitialize input file data
+        self._reinitInput()
 
+        self.filename = filename
+        self.inNameBox.setText(filename)
 
         with Serafin.Read(self.filename, self.language) as resin:
             resin.read_header()
@@ -268,6 +298,7 @@ class SerafinToolInterface(QWidget):
             # copy to avoid reading the same data in the future
             self.header = copy.deepcopy(resin.header)
             self.time = resin.time[:]
+
         logging.info('File closed')
 
         # displaying the available variables
@@ -275,7 +306,7 @@ class SerafinToolInterface(QWidget):
 
     def btnSubmitEvent(self):
         # check if everything is ready to submit
-        if self.header is None:
+        if self.header is None:  # TODO
             return
 
         # create the save file dialog
@@ -291,17 +322,8 @@ class SerafinToolInterface(QWidget):
         if len(filename) < 5 or filename[-4:] != '.slf':
             filename += '.slf'
 
-        # handle overwrite
-        overwrite = False
-        if os.path.exists(filename):
-            msg = QMessageBox.warning(self, 'Confirm overwrite',
-                                      'The file already exists. Do you want to replace it ?',
-                                      QMessageBox.Ok | QMessageBox.Cancel,
-                                      QMessageBox.Ok)
-            if msg == QMessageBox.Cancel:
-                logging.info('Output canceled')
-                return
-            overwrite = True
+        # handle overwrite manually
+        overwrite = self._handleOverwrite(filename)
 
         # do some calculations
         with Serafin.Read(self.filename, self.language) as resin:
