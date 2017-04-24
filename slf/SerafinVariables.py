@@ -7,6 +7,8 @@ import numpy as np
 
 KARMAN = 0.4
 RHO_EAU = 1000.
+GRAVITY = 9.80665
+
 
 class Variable():
     """
@@ -75,7 +77,7 @@ H, U, V, M, S, B, I, J, Q = [BASIC_VARIABLES[var] for var in ordered_IDs]
 US = Variable('US', bytes('VITESSE DE FROT.', 'utf-8').ljust(16), bytes('FRICTION VEL.', 'utf-8').ljust(16), bytes('M/S', 'utf-8').ljust(16))
 TAU = Variable('TAU', bytes('CONTRAINTE', 'utf-8').ljust(16), bytes('CONSTRAINT', 'utf-8').ljust(16), bytes('PA', 'utf-8').ljust(16))
 DMAX = Variable('DMAX', bytes('DIAMETRE', 'utf-8').ljust(16), bytes('DIAMETER', 'utf-8').ljust(16), bytes('MM', 'utf-8').ljust(16))
-
+W = Variable('W', bytes('FROTTEMEN', 'utf-8').ljust(16), bytes('BOTTOM FRICTION', 'utf-8').ljust(16), bytes('  ', 'utf-8').ljust(16))
 
 # define a special operator
 def compute_DMAX(tau):
@@ -86,18 +88,29 @@ def compute_DMAX(tau):
 # construct the equations (relations between variables) as constants
 MINUS, TIMES, NORM2 = 0, 1, 2
 COMPUTE_TAU, COMPUTE_DMAX = 3, 4
+COMPUTE_CHEZY, COMPUTE_STRICKLER, COMPUTE_MANNING, COMPUTE_NIKURADSE = 5, 6, 7, 8
 OPERATIONS = {MINUS: lambda a, b: a-b,
               TIMES: lambda a, b: a*b,
               NORM2: lambda a, b: np.sqrt(np.square(a) + np.square(b)),
               COMPUTE_TAU: lambda x: RHO_EAU * np.square(x),
-              COMPUTE_DMAX: compute_DMAX}
+              COMPUTE_DMAX: compute_DMAX,
+              COMPUTE_CHEZY: lambda w, h, m: np.sqrt(np.power(m, 2) * GRAVITY / np.square(w)),
+              COMPUTE_STRICKLER: lambda w, h, m: np.sqrt(np.power(m, 2) * GRAVITY / np.square(w) / np.power(h, 1/3.)),
+              COMPUTE_MANNING: lambda w, h, m: np.sqrt(np.power(m, 2) * GRAVITY * np.power(w, 2) / np.power(h, 1/3.)),
+              COMPUTE_NIKURADSE: lambda w, h, m: np.sqrt(np.power(m, 2) * KARMAN**2 / np.power(np.log(30 * h / np.exp(1) / w), 2))}
 
 # define basic equations (binary) and special equations (unary and ternary)
-EQUATIONS = [Equation((S, B), H, MINUS), Equation((H, B), S, MINUS),
+BASIC_EQUATIONS = [Equation((S, B), H, MINUS), Equation((H, B), S, MINUS),
              Equation((U, V), M, NORM2), Equation((H, U), I, TIMES),
              Equation((H, V), J, TIMES), Equation((I, J), Q, NORM2)]
 TAU_EQUATION = Equation((US,), TAU, COMPUTE_TAU)
 DMAX_EQUATION = Equation((TAU,), DMAX, COMPUTE_DMAX)
+
+CHEZY_EQUATION = Equation((W, H, M), US, COMPUTE_CHEZY)
+STRICKLER_EQUATION = Equation((W, H, M), US, COMPUTE_STRICKLER)
+MANNING_EQUATION = Equation((W, H, M), US, COMPUTE_MANNING)
+NIKURADSE_EQUATION = Equation((W, H, M), US, COMPUTE_NIKURADSE)
+
 
 def is_basic_variable(var_ID):
     """
@@ -108,13 +121,28 @@ def is_basic_variable(var_ID):
     return var_ID in ordered_IDs
 
 
+def do_unary_calculation(equation, input_values):
+    operation = OPERATIONS[equation.operator]
+    return operation(input_values)
+
+def do_binary_calculation(equation, input_values):
+    operation = OPERATIONS[equation.operator]
+    return operation(input_values[0], input_values[1])
+
+
+def do_terary_calculation(equation, input_values):
+    operation = OPERATIONS[equation.operator]
+    return operation(input_values[0], input_values[1], input_values[2])
+
+
+
 def get_additional_computations(input_var_IDs):
     computations = []
     computables = list(map(BASIC_VARIABLES.get, filter(is_basic_variable, input_var_IDs)))
 
     while True:
         found_new_computable = False
-        for equation in EQUATIONS:
+        for equation in BASIC_EQUATIONS:
             unknown = equation.output
             needed_variables = equation.input
             if unknown in computables:  # not a new variable
@@ -131,6 +159,7 @@ def get_additional_computations(input_var_IDs):
     if 'US' in input_var_IDs:
         computations.append(TAU_EQUATION)
         computations.append(DMAX_EQUATION)
+
     return computations
 
 
@@ -145,20 +174,20 @@ def filter_necessary_equations(all_equations, available_IDs, selected_output_IDs
         for input_var in equation.input:
             can_compute[input_var.ID()] = True
         can_compute[equation.output.ID()] = True
+        necessary_equations.append(equation)
         if all(can_compute.values()):
             break
-        necessary_equations.append(equation)
     return necessary_equations
 
 
-def do_binary_calculation(equation, input_values):
-    operation = OPERATIONS[equation.operator]
-    return operation(input_values[0], input_values[1])
-
-
-def do_unary_calculation(equation, input_values):
-    operation = OPERATIONS[equation.operator]
-    return operation(input_values)
+def get_US_equation(friction_law):
+    if friction_law == 0:
+        return CHEZY_EQUATION
+    elif friction_law == 1:
+        return STRICKLER_EQUATION
+    elif friction_law == 2:
+        return MANNING_EQUATION
+    return NIKURADSE_EQUATION
 
 
 def do_calculations_in_frame(equations, input_serafin, time_index, selected_output_IDs):

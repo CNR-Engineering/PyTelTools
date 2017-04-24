@@ -9,9 +9,11 @@ import logging
 import copy
 import numpy as np
 from slf import Serafin
-from slf.SerafinVariables import get_additional_computations, do_calculations_in_frame, filter_necessary_equations
+from slf.SerafinVariables import get_additional_computations, \
+    do_calculations_in_frame, filter_necessary_equations, get_US_equation
 
 _YELLOW = QColor(245, 255, 207)
+_GREEN = QColor(200, 255, 180)
 
 class QPlainTextEditLogger(logging.Handler):
     """
@@ -82,6 +84,26 @@ class TableWidgetDragRows(QTableWidget):
                 selectedRows.append(item.row())
         selectedRows.sort()
         return selectedRows
+
+
+class FrictionLawMessage:
+   def __init__(self):
+        self.msg = QMessageBox.question('Select', 'Select a friction law',
+                                        QMessageBox.Ok | QMessageBox.Cancel, QMessageBox.Ok)
+
+        self.chezy = QPushButton('Chezy')
+        self.strickler = QPushButton('Strickler')
+        self.manning = QPushButton('Manning')
+        self.nikuradse = QPushButton('Nikuradse')
+        # hlayout = QHBoxLayout()
+        # hlayout.addWidget(self.chezy)
+        # hlayout.addWidget(self.strickler)
+        # hlayout.addWidget(self.manning)
+        # hlayout.addWidget(self.nikuradse)
+        # self.setLayout(hlayout)
+
+        self.setWindowTitle('Select a friction law')
+        self.setText('Please select a friction law')
 
 
 class SerafinToolInterface(QWidget):
@@ -168,6 +190,7 @@ class SerafinToolInterface(QWidget):
         """
         self.btnOpen.clicked.connect(self.btnOpenEvent)
         self.btnSubmit.clicked.connect(self.btnSubmitEvent)
+        self.btnAddUS.clicked.connect(self.btnAddUSEvent)
 
     def _setLayout(self):
         """
@@ -274,7 +297,6 @@ class SerafinToolInterface(QWidget):
         else:
             self.language = 'fr'
 
-
     def _handleOverwrite(self, filename):
         """
         @brief: (Used in btnSubmitEvent) Handle manually the overwrite option when saving output file
@@ -307,6 +329,39 @@ class SerafinToolInterface(QWidget):
             output_header.var_names.append(var_name)
             output_header.var_units.append(var_unit)
         return output_header
+
+    def btnAddUSEvent(self):
+        msg = FrictionLawMessage()
+        value = msg.exec_()
+
+        if value == QMessageBox.AcceptRole:
+            friction_law = 0
+        elif value == QMessageBox.YesRole:
+            friction_law = 1
+        elif value == QMessageBox.ActionRole:
+            friction_law = 2
+        elif value == QMessageBox.HelpRole:
+            friction_law = 3
+        else:
+            return
+        print(friction_law)
+
+        self.additional_computations.append(get_US_equation(friction_law))
+        us = self.additional_computations[-1].output
+
+        # add US to available variable
+        offset = self.firstTable.rowCount()
+        self.firstTable.insertRow(self.firstTable.rowCount())
+        id_item = QTableWidgetItem(us.ID().strip())
+        name_item = QTableWidgetItem(us.name(self.language).decode('utf-8').strip())
+        unit_item = QTableWidgetItem(us.unit().decode('utf-8').strip())
+        self.firstTable.setItem(offset, 0, QTableWidgetItem(id_item))
+        self.firstTable.setItem(offset, 1, QTableWidgetItem(name_item))
+        self.firstTable.setItem(offset, 2, QTableWidgetItem(unit_item))
+        self.firstTable.item(offset, 0).setBackground(_GREEN)  # set new US color to green
+        self.firstTable.item(offset, 1).setBackground(_GREEN)
+        self.firstTable.item(offset, 2).setBackground(_GREEN)
+
 
     def btnOpenEvent(self):
         options = QFileDialog.Options()
@@ -342,7 +397,7 @@ class SerafinToolInterface(QWidget):
             self.time = resin.time[:]
 
             # unlock some operation
-            if 'W' in self.header.var_IDs:
+            if 'W' in self.header.var_IDs and 'US' not in self.header.var_IDs:
                 self.btnAddUS.setEnabled(True)
 
         logging.info('File closed')
@@ -385,7 +440,10 @@ class SerafinToolInterface(QWidget):
             with Serafin.Write(filename, self.language, overwrite) as resout:
                 # deduce header from selected variable IDs and write header
                 output_header = self._getOuputHeader(selected_vars)
+                # logging.info('Writing the output with variables %s' % str(output_header.var_IDs))
+
                 resout.write_header(output_header)
+
                 # do some additional computations
                 necessary_equations = filter_necessary_equations(self.additional_computations, self.header.var_IDs,
                                                                  output_header.var_IDs)
@@ -396,18 +454,27 @@ class SerafinToolInterface(QWidget):
         logging.info('Finished writing the output')
 
         # do some tests on the results
-        # with Serafin.Read(filename, self.language) as resin:
-        #     resin.read_header()
-        #     resin.get_time()
-        #     print('output file has variables', resin.header.var_IDs)
-        #     print('U', resin.read_var_in_frame(2, 'U')[1:5])
-        #     print('TAU', resin.read_var_in_frame(2, 'TAU')[1:5])
-        #     print('DMAX', resin.read_var_in_frame(2, 'DIAMETRE')[1:5])
+        with Serafin.Read(filename, self.language) as resin:
+            resin.read_header()
+            resin.get_time()
+            print('output file has variables', resin.header.var_IDs)
+            # print('U', resin.read_var_in_frame(2, 'U')[1:5])
+            # print('TAU', resin.read_var_in_frame(2, 'TAU')[1:5])
+            # print('DMAX', resin.read_var_in_frame(2, 'DIAMETRE')[1:5])
 
 
 
+sys._excepthook = sys.excepthook
+def exception_hook(exctype, value, traceback):
+    sys._excepthook(exctype, value, traceback)
+    sys.exit(1)
+sys.excepthook = exception_hook
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
     widget = SerafinToolInterface()
-    sys.exit(app.exec_())
+    try:
+        app.exec_()
+    except:
+        print('exiting')
+
