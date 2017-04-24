@@ -167,7 +167,7 @@ class SerafinHeader:
             if var_id is None:
                 module_logger.warn('WARNING: The variable name "%s" is not known. The complete name will be used as ID' % name)
                 self.specifications.add_new_var(var_name, var_unit)
-                var_id = name
+                var_id = name.strip()
             self.var_IDs.append(var_id)
 
         # Build ikle2d

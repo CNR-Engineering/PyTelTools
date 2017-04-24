@@ -38,10 +38,10 @@ class Equation():
     """
     @brief: Data type for an equation consisting of N input variables, 1 output variables and (N-1) operators
     """
-    def __init__(self, input_variables, output_variable, operators):
+    def __init__(self, input_variables, output_variable, operator):
         self.input = input_variables
         self.output = output_variable
-        self.operators = operators
+        self.operator = operator
 
 
 def build_basic_variables():
@@ -72,23 +72,32 @@ ordered_IDs = ['H', 'U', 'V', 'M', 'S', 'B', 'I', 'J', 'Q']
 # construct the variable types as constants
 build_basic_variables()
 H, U, V, M, S, B, I, J, Q = [BASIC_VARIABLES[var] for var in ordered_IDs]
-US = Variable('US', bytes('VITESSE DE FROT.', 'utf-8').ljust(16), bytes('FRICTION VEL.   ', 'utf-8').ljust(16), bytes('M/S             ', 'utf-8').ljust(16))
+US = Variable('US', bytes('VITESSE DE FROT.', 'utf-8').ljust(16), bytes('FRICTION VEL.', 'utf-8').ljust(16), bytes('M/S', 'utf-8').ljust(16))
 TAU = Variable('TAU', bytes('CONTRAINTE', 'utf-8').ljust(16), bytes('CONSTRAINT', 'utf-8').ljust(16), bytes('PA', 'utf-8').ljust(16))
+DMAX = Variable('DMAX', bytes('DIAMETRE', 'utf-8').ljust(16), bytes('DIAMETER', 'utf-8').ljust(16), bytes('MM', 'utf-8').ljust(16))
+
+
+# define a special operator
+def compute_DMAX(tau):
+    return np.where(tau > 0.34, 1.4593 * np.power(tau, 0.979),
+                                np.where(tau > 0.1, 1.2912 * np.power(tau, 2) + 1.3572 * tau - 0.1154,
+                                                    0.9055 * np.power(tau, 1.3178)))
 
 # construct the equations (relations between variables) as constants
 MINUS, TIMES, NORM2 = 0, 1, 2
-COMPUTE_TAU = 3
+COMPUTE_TAU, COMPUTE_DMAX = 3, 4
 OPERATIONS = {MINUS: lambda a, b: a-b,
               TIMES: lambda a, b: a*b,
               NORM2: lambda a, b: np.sqrt(np.square(a) + np.square(b)),
-              COMPUTE_TAU: lambda x: RHO_EAU * np.square(x)}
+              COMPUTE_TAU: lambda x: RHO_EAU * np.square(x),
+              COMPUTE_DMAX: compute_DMAX}
 
-
-EQUATIONS = [Equation((S, B), H, (MINUS,)), Equation((H, B), S, (MINUS,)),
-             Equation((H, U), I, (TIMES,)), Equation((H, V), J, (TIMES,)),
-             Equation((I, J), Q, (NORM2,)), Equation((U, V), M, (NORM2,)),
-             Equation((US,), TAU, (COMPUTE_TAU,))]
-
+# define basic equations (binary) and special equations (unary and ternary)
+EQUATIONS = [Equation((S, B), H, MINUS), Equation((H, B), S, MINUS),
+             Equation((U, V), M, NORM2), Equation((H, U), I, TIMES),
+             Equation((H, V), J, TIMES), Equation((I, J), Q, NORM2)]
+TAU_EQUATION = Equation((US,), TAU, COMPUTE_TAU)
+DMAX_EQUATION = Equation((TAU,), DMAX, COMPUTE_DMAX)
 
 def is_basic_variable(var_ID):
     """
@@ -100,8 +109,9 @@ def is_basic_variable(var_ID):
 
 
 def get_additional_computations(input_var_IDs):
-    computables = list(map(BASIC_VARIABLES.get, filter(is_basic_variable, input_var_IDs)))
     computations = []
+    computables = list(map(BASIC_VARIABLES.get, filter(is_basic_variable, input_var_IDs)))
+
     while True:
         found_new_computable = False
         for equation in EQUATIONS:
@@ -116,46 +126,76 @@ def get_additional_computations(input_var_IDs):
                 computations.append(equation)
         if not found_new_computable:
             break
+
+    # handle the special case for TAU and DMAX
+    if 'US' in input_var_IDs:
+        computations.append(TAU_EQUATION)
+        computations.append(DMAX_EQUATION)
     return computations
 
 
-def filter_necessary_equations(all_equations, selected_output_IDs):
+def filter_necessary_equations(all_equations, available_IDs, selected_output_IDs):
     necessary_equations = []
     can_compute = {var: False for var in selected_output_IDs}
+    for var_ID in available_IDs:
+        can_compute[var_ID] = True
+    if all(can_compute.values()):
+        return []
     for equation in all_equations:
         for input_var in equation.input:
             can_compute[input_var.ID()] = True
-        necessary_equations.append(equation)
         can_compute[equation.output.ID()] = True
         if all(can_compute.values()):
             break
+        necessary_equations.append(equation)
     return necessary_equations
 
 
-def do_binary_calculation_in_frame(equation, input_values):
-    operation = OPERATIONS[equation.operators[0]]  # extract the operation from the equation
+def do_binary_calculation(equation, input_values):
+    operation = OPERATIONS[equation.operator]
     return operation(input_values[0], input_values[1])
 
 
+def do_unary_calculation(equation, input_values):
+    operation = OPERATIONS[equation.operator]
+    return operation(input_values)
+
+
 def do_calculations_in_frame(equations, input_serafin, time_index, selected_output_IDs):
-    all_values = {}
+    computed_values = {}
     for equation in equations:
+        # handle the special case for TAU and DMAX
+        if equation.output.ID() == 'TAU':
+            computed_values['US'] = input_serafin.read_var_in_frame(time_index, 'US')
+            computed_values['TAU'] = do_unary_calculation(TAU_EQUATION, computed_values['US'])
+            continue
+        elif equation.output.ID() == 'DMAX':
+            computed_values['DMAX'] = do_unary_calculation(DMAX_EQUATION, computed_values['TAU'])
+            continue
+
+        # handle other cases (binary operation)
         input_var_IDs = map(lambda x: x.ID(), equation.input)
         input_values = []
 
         # read (if needed) input variables values
         for input_var_ID in input_var_IDs:
-            if input_var_ID not in all_values:
-                all_values[input_var_ID] = input_serafin.read_var_in_frame(time_index, input_var_ID)
-            input_values.append(all_values[input_var_ID])
+            if input_var_ID not in computed_values:
+                computed_values[input_var_ID] = input_serafin.read_var_in_frame(time_index, input_var_ID)
+            input_values.append(computed_values[input_var_ID])
 
         # do calculation for the output variable
-        output_values = do_binary_calculation_in_frame(equation, input_values)
-        all_values[equation.output.ID()] = output_values
+        output_values = do_binary_calculation(equation, input_values)
+        computed_values[equation.output.ID()] = output_values
 
     nb_selected_vars = len(selected_output_IDs)
     output_values = np.empty((nb_selected_vars, input_serafin.header.nb_nodes),
                              dtype=input_serafin.header.float_type)
     for i in range(nb_selected_vars):
-        output_values[i] = all_values[selected_output_IDs[i]]
+        var_ID = selected_output_IDs[i]
+        if var_ID not in computed_values:
+            output_values[i, :] = input_serafin.read_var_in_frame(time_index, var_ID)
+        else:
+            output_values[i, :] = computed_values[var_ID]
     return output_values
+
+

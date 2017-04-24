@@ -3,6 +3,8 @@ import os
 import sys
 from PyQt5.QtWidgets import *
 from PyQt5.QtGui import *
+from PyQt5.QtCore import *
+
 import logging
 import copy
 import numpy as np
@@ -136,11 +138,18 @@ class SerafinToolInterface(QWidget):
         self.secondTable = TableWidgetDragRows()
         for tw in [self.firstTable, self.secondTable]:
             tw.setColumnCount(3)
-            tw.setFixedHeight(300)
             tw.setHorizontalHeaderLabels(['ID', 'Name', 'Unit'])
+            tw.setFixedWidth(300)
             vh = tw.verticalHeader()
             vh.setSectionResizeMode(QHeaderView.Fixed)
             vh.setDefaultSectionSize(20)
+        self.secondTable.setFixedHeight(500)
+
+        # create a button for interpreting W from user-defined friction law
+        self.btnAddUS = QPushButton('Add US from friction law', self)
+        self.btnAddUS.setToolTip('<b>Compute</b> US based on a friction law')
+        self.btnAddUS.resize(self.btnAddUS.sizeHint())
+        self.btnAddUS.setEnabled(False)
 
         # create the widget displaying message logs
         self.logTextBox = QPlainTextEditLogger(self)
@@ -165,6 +174,7 @@ class SerafinToolInterface(QWidget):
         @brief: (Used in __init__) Set up layout
         """
         glayout = QGridLayout()
+        glayout.setHorizontalSpacing(20)
         glayout.setHorizontalSpacing(30)
         glayout.addWidget(self.langBox, 1, 1)
         glayout.addWidget(QLabel('Input file'), 1, 2)
@@ -173,17 +183,31 @@ class SerafinToolInterface(QWidget):
         glayout.addWidget(QLabel('Summary'), 2, 2)
         glayout.addWidget(self.summaryTextBox, 2, 3)
 
-        glayout.addWidget(QLabel('Variables'), 3, 2)
+        glayout.addItem(QSpacerItem(1, 30), 3, 2)
+        glayout.addWidget(QLabel('Variables'), 4, 2)
         hlayout = QHBoxLayout()
-        hlayout.addWidget(self.firstTable)
-        hlayout.addWidget(self.secondTable)
-        glayout.addLayout(hlayout, 3, 3)
+
+        vlayout = QVBoxLayout()
+        vlayout.addWidget(QLabel('                                 Available variables'))
+        vlayout.addWidget(self.firstTable)
+        vlayout.addItem(QSpacerItem(1, 50))
+        vlayout.addWidget(self.btnAddUS)
+        hlayout.addLayout(vlayout)
+        hlayout.addItem(QSpacerItem(15, 1))
+
+        vlayout = QVBoxLayout()
+        vlayout.addWidget(QLabel('                                 Output variables'))
+        vlayout.addWidget(self.secondTable)
+        hlayout.addLayout(vlayout)
+        hlayout.setAlignment(Qt.AlignTop)
+
+        glayout.addLayout(hlayout, 4, 3)
 
         glayout.addWidget(QLabel('   Drag and drop \n   available variables (left) to\n   '
-                                 'output variables (right)'), 3, 1)
+                                 'output variables (right)'), 4, 1)
 
-        glayout.addItem(QSpacerItem(10, 100), 4, 1)
-        glayout.addWidget(self.btnSubmit, 5, 1)
+        glayout.addItem(QSpacerItem(10, 100), 5, 1)
+        glayout.addWidget(self.btnSubmit, 6, 1)
 
         vlayout = QVBoxLayout()
         vlayout.addLayout(glayout)
@@ -269,18 +293,19 @@ class SerafinToolInterface(QWidget):
     def _getSelectedVariables(self):
         selected = []
         for i in range(self.secondTable.rowCount()):
-            selected.append(self.secondTable.item(i, 0).text())
+            selected.append((self.secondTable.item(i, 0).text(),
+                            bytes(self.secondTable.item(i, 1).text(), 'utf-8').ljust(16),
+                            bytes(self.secondTable.item(i, 2).text(), 'utf-8').ljust(16)))
         return selected
 
-    def _getOuputHeader(self, selected_var_IDs):
+    def _getOuputHeader(self, selected_vars):
         output_header = self.header.copy()
-        output_header.nb_var = len(selected_var_IDs)
-        output_header.var_IDs = selected_var_IDs
-        output_header.var_names, output_header.var_units = [], []
-        for var_ID in selected_var_IDs:
-            name, unit = self.header.specifications.ID_to_name_unit(var_ID)
-            output_header.var_names.append(name)
-            output_header.var_units.append(unit)
+        output_header.nb_var = len(selected_vars)
+        output_header.var_IDs, output_header.var_names, output_header.var_units = [], [], []
+        for var_ID, var_name, var_unit in selected_vars:
+            output_header.var_IDs.append(var_ID)
+            output_header.var_names.append(var_name)
+            output_header.var_units.append(var_unit)
         return output_header
 
     def btnOpenEvent(self):
@@ -316,18 +341,22 @@ class SerafinToolInterface(QWidget):
             self.header = copy.deepcopy(resin.header)
             self.time = resin.time[:]
 
+            # unlock some operation
+            if 'W' in self.header.var_IDs:
+                self.btnAddUS.setEnabled(True)
+
         logging.info('File closed')
 
         # displaying the available variables
         self._initVarTables()
 
     def btnSubmitEvent(self):
-        selected_var_IDs = self._getSelectedVariables()
+        selected_vars = self._getSelectedVariables()
 
         # check if everything is ready to submit
         if self.header is None:  # TODO
             return
-        if not selected_var_IDs:
+        if not selected_vars:
             return
 
         # create the save file dialog
@@ -350,30 +379,30 @@ class SerafinToolInterface(QWidget):
         with Serafin.Read(self.filename, self.language) as resin:
             resin.header = self.header
             resin.time = self.time
-            print('U', resin.read_var_in_frame(2, 'U')[1:5])
-            print('V', resin.read_var_in_frame(2, 'V')[1:5])
+            # print('U', resin.read_var_in_frame(2, 'U')[1:5])
+            # print('US', resin.read_var_in_frame(2, 'US')[1:5])
 
             with Serafin.Write(filename, self.language, overwrite) as resout:
                 # deduce header from selected variable IDs and write header
-                output_header = self._getOuputHeader(selected_var_IDs)
+                output_header = self._getOuputHeader(selected_vars)
                 resout.write_header(output_header)
-
                 # do some additional computations
-                necessary_equations = filter_necessary_equations(self.additional_computations, selected_var_IDs)
+                necessary_equations = filter_necessary_equations(self.additional_computations, self.header.var_IDs,
+                                                                 output_header.var_IDs)
 
                 for i, time_i in enumerate(self.time):
-                    vals = do_calculations_in_frame(necessary_equations, resin, i, selected_var_IDs)
+                    vals = do_calculations_in_frame(necessary_equations, resin, i, output_header.var_IDs)
                     resout.write_entire_frame(output_header, time_i, vals)
         logging.info('Finished writing the output')
 
         # do some tests on the results
-        with Serafin.Read(filename, self.language) as resin:
-            resin.read_header()
-            resin.get_time()
-            print('output file has variablees', resin.header.var_IDs)
-            print('U', resin.read_var_in_frame(2, 'U')[1:5])
-            print('M', resin.read_var_in_frame(2, 'V')[1:5])
-            print('M', resin.read_var_in_frame(2, 'M')[1:5])
+        # with Serafin.Read(filename, self.language) as resin:
+        #     resin.read_header()
+        #     resin.get_time()
+        #     print('output file has variables', resin.header.var_IDs)
+        #     print('U', resin.read_var_in_frame(2, 'U')[1:5])
+        #     print('TAU', resin.read_var_in_frame(2, 'TAU')[1:5])
+        #     print('DMAX', resin.read_var_in_frame(2, 'DIAMETRE')[1:5])
 
 
 
