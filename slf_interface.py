@@ -1,6 +1,7 @@
 
 import os
 import sys
+import datetime
 from PyQt5.QtWidgets import *
 from PyQt5.QtGui import *
 from PyQt5.QtCore import *
@@ -125,43 +126,239 @@ class FrictionLawMessage(QDialog):
         return -1
 
 
-class DoubleSlider(QSlider):
-    def __init__(self, parent=None):
-        super().__init__(Qt.Horizontal, parent)
+class TimeRangeSlider(QSlider):
+    """ A slider for ranges.
 
-        # Set integer max and min on parent. These stay constant
-        super().setMinimum(0)
-        self._max_int = 10000
-        super().setMaximum(self._max_int)
+        This class provides a dual-slider for ranges, where there is a defined
+        maximum and minimum, as is a normal slider, but instead of having a
+        single slider value, there are 2 slider values.
+    """
+    def __init__(self):
+        super().__init__()
+        self.setOrientation(Qt.Horizontal)
+        self.setFixedSize(600, 30)
 
-        # The min and max values seen by user
-        self._min_value = 0.0
-        self._max_value = 100.0
+        self.start_time = None
+        self.time_frames = None
+        self.nb_frames = 1000
 
-        def setMinimum(self, value):
-            self.setRange(value, self._max_value)
+        self.setMinimum(0)
+        self.setMaximum(self.nb_frames-1)
+        self._low = 0
+        self._high = self.nb_frames-1
+        self.setTickPosition(QSlider.TicksBelow)
 
-        def setMaximum(self, value):
-            self.setRange(self._min_value, value)
+        self.pressed_control = QStyle.SC_None
+        self.hover_control = QStyle.SC_None
+        self.click_offset = 0
 
-        def setRange(self, minimum, maximum):
-            old_value = self.value()
-            self._min_value = minimum
-            self._max_value = maximum
-            self.setValue(old_value)  # Put slider in correct position
+        # 0 for the low, 1 for the high, -1 for both
+        self.active_slider = 0
 
-        def proportion(self):
-            return (self.value() - self._min_value) / self._value_range
+        self.info = None
 
-    @property
-    def _value_range(self):
-        return self._max_value - self._min_value
+    def reinit(self, start_time, time_frames, info_text):
+        self.start_time = start_time
+        self.time_frames = time_frames
+        self.nb_frames = len(time_frames)
+        self.setMinimum(0)
+        self.setMaximum(self.nb_frames-1)
+        self._low = 0
+        self._high = self.nb_frames-1
+        self.click_offset = 0
+        self.info = info_text
+        self.info.updateText(self.time_frames[self._low].total_seconds(), self.low(),
+                             self.time_frames[self._high].total_seconds(), self.high())
 
-    def value(self):
-        return float(super().value()) / self._max_int * self._value_range
+    def low(self):
+        return self.start_time + self.time_frames[self._low]
 
-    def setValue(self, value):
-        super().setValue(int(value / self._value_range * self._max_int))
+    def setLow(self, low):
+        self._low = low
+        self.update()
+
+    def high(self):
+        return self.start_time + self.time_frames[self._high]
+
+    def setHigh(self, high):
+        self._high = high
+        self.update()
+
+    def paintEvent(self, event):
+        # based on http://qt.gitorious.org/qt/qt/blobs/master/src/gui/widgets/qslider.cpp
+
+        painter = QPainter(self)
+        style = QApplication.style()
+
+        for i, position in enumerate([self._low, self._high]):
+            opt = QStyleOptionSlider()
+            self.initStyleOption(opt)
+
+            # Only draw the groove for the first slider so it doesn't get drawn
+            # on top of the existing ones every time
+            if i == 0:
+                opt.subControls = QStyle.SC_SliderHandle
+            else:
+                opt.subControls = QStyle.SC_SliderHandle
+
+            if self.tickPosition() != self.NoTicks:
+                opt.subControls |= QStyle.SC_SliderTickmarks
+
+            if self.pressed_control:
+                opt.activeSubControls = self.pressed_control
+                opt.state |= QStyle.State_Sunken
+            else:
+                opt.activeSubControls = self.hover_control
+
+            opt.sliderPosition = position
+            opt.sliderValue = position
+            style.drawComplexControl(QStyle.CC_Slider, opt, painter, self)
+
+    def mousePressEvent(self, event):
+        event.accept()
+
+        style = QApplication.style()
+        button = event.button()
+
+        # In a normal slider control, when the user clicks on a point in the
+        # slider's total range, but not on the slider part of the control the
+        # control would jump the slider value to where the user clicked.
+        # For this control, clicks which are not direct hits will slide both
+        # slider parts
+
+        if button:
+            opt = QStyleOptionSlider()
+            self.initStyleOption(opt)
+
+            self.active_slider = -1
+
+            for i, value in enumerate([self._low, self._high]):
+                opt.sliderPosition = value
+                hit = style.hitTestComplexControl(style.CC_Slider, opt, event.pos(), self)
+                if hit == style.SC_SliderHandle:
+                    self.active_slider = i
+                    self.pressed_control = hit
+
+                    self.triggerAction(self.SliderMove)
+                    self.setRepeatAction(self.SliderNoAction)
+                    self.setSliderDown(True)
+                    break
+
+            if self.active_slider < 0:
+                self.pressed_control = QStyle.SC_SliderHandle
+                self.click_offset = self.__pixelPosToRangeValue(self.__pick(event.pos()))
+                self.triggerAction(self.SliderMove)
+                self.setRepeatAction(self.SliderNoAction)
+        else:
+            event.ignore()
+
+    def mouseMoveEvent(self, event):
+        if self.pressed_control != QStyle.SC_SliderHandle:
+            event.ignore()
+            return
+
+        event.accept()
+        new_pos = self.__pixelPosToRangeValue(self.__pick(event.pos()))
+        opt = QStyleOptionSlider()
+        self.initStyleOption(opt)
+
+        if self.active_slider < 0:
+            offset = new_pos - self.click_offset
+            self._high += offset
+            self._low += offset
+            if self._low < self.minimum():
+                diff = self.minimum() - self._low
+                self._low += diff
+                self._high += diff
+            if self._high > self.maximum():
+                diff = self.maximum() - self._high
+                self._low += diff
+                self._high += diff
+        elif self.active_slider == 0:
+            if new_pos >= self._high:
+                new_pos = self._high - 1
+            self._low = new_pos
+        else:
+            if new_pos <= self._low:
+                new_pos = self._low + 1
+            self._high = new_pos
+
+        self.click_offset = new_pos
+
+         # update the tip
+        style = QApplication.style()
+
+        rectHandle = style.subControlRect(style.CC_Slider, opt, style.SC_SliderHandle)
+
+        if self.active_slider == 0:
+            pos_low = rectHandle.topLeft()
+            pos_low.setX(pos_low.x() + self._low)
+            pos_low = self.mapToGlobal(pos_low)
+            QToolTip.showText(pos_low, str(self.low()), self)
+        elif self.active_slider == 1:
+            pos_high = rectHandle.topLeft()
+            pos_high.setX(pos_high.x() + self._high)
+            pos_high = self.mapToGlobal(pos_high)
+            QToolTip.showText(pos_high, str(self.high()), self)
+
+        self.update()
+
+    def mouseReleaseEvent(self, event):
+        self.info.updateText(self.time_frames[self._low].total_seconds(), self.low(),
+                             self.time_frames[self._high].total_seconds(), self.high())
+
+    def __pick(self, pt):
+        return pt.x()
+
+    def __pixelPosToRangeValue(self, pos):
+        opt = QStyleOptionSlider()
+        self.initStyleOption(opt)
+        style = QApplication.style()
+
+        gr = style.subControlRect(style.CC_Slider, opt, style.SC_SliderGroove, self)
+        sr = style.subControlRect(style.CC_Slider, opt, style.SC_SliderHandle, self)
+
+        slider_length = sr.width()
+        slider_min = gr.x()
+        slider_max = gr.right() - slider_length + 1
+
+        return style.sliderValueFromPosition(self.minimum(), self.maximum(),
+                                             pos-slider_min, slider_max-slider_min,
+                                             opt.upsideDown)
+
+
+class SelectedTimeINFO(QWidget):
+    def __init__(self):
+        super().__init__()
+
+        self.startIndex = QLineEdit('', self)
+        self.endIndex = QLineEdit('', self)
+        self.startValue = QLineEdit('', self)
+        self.endValue = QLineEdit('', self)
+        self.startIndex.setReadOnly(True)
+        self.endIndex.setReadOnly(True)
+        self.startValue.setReadOnly(True)
+        self.endValue.setReadOnly(True)
+        self.startValue.setFixedWidth(150)
+        self.endValue.setFixedWidth(150)
+
+        glayout = QGridLayout()
+        glayout.addWidget(QLabel('Start time value'), 1, 1)
+        glayout.addWidget(self.startIndex, 1, 2)
+        glayout.addWidget(QLabel('date'), 1, 3)
+        glayout.addWidget(self.startValue, 1, 4)
+
+        glayout.addWidget(QLabel('End time value'), 2, 1)
+        glayout.addWidget(self.endIndex, 2, 2)
+        glayout.addWidget(QLabel('date'), 2, 3)
+        glayout.addWidget(self.endValue, 2, 4)
+        self.setLayout(glayout)
+
+    def updateText(self, start_index, start_value, end_index, end_value):
+        self.startIndex.setText(str(start_index))
+        self.endIndex.setText((str(end_index)))
+        self.startValue.setText(str(start_value))
+        self.endValue.setText(str(end_value))
 
 
 class SerafinToolInterface(QWidget):
@@ -187,7 +384,6 @@ class SerafinToolInterface(QWidget):
         self.setWindowTitle('Serafin Tool')
         self._center()
         self.show()
-
 
     def _initWidgets(self):
         """
@@ -242,12 +438,17 @@ class SerafinToolInterface(QWidget):
         self.singlePrecisionBox.setEnabled(False)
 
         # create a slider for time selection
-        self.timeSlider = DoubleSlider(self)
+        self.timeSlider = TimeRangeSlider()
+        self.timeSlider.setEnabled(False)
+
+        # create a text box for displaying the time selection
+        self.timeSelection = SelectedTimeINFO()
 
         # create the submit button
         self.btnSubmit = QPushButton('Submit', self)
         self.btnSubmit.setToolTip('<b>Submit</b> to write a .slf output')
         self.btnSubmit.setFixedSize(85, 50)
+
 
     def _bindEvents(self):
         """
@@ -311,7 +512,7 @@ class SerafinToolInterface(QWidget):
 
         mainLayout.addLayout(hlayout)
         hlayout = QHBoxLayout()
-        mainLayout.addItem(QSpacerItem(10, 50))
+        mainLayout.addItem(QSpacerItem(10, 10))
         hlayout.addItem(QSpacerItem(30, 1))
         hlayout.addWidget(self.timeSlider)
         hlayout.addItem(QSpacerItem(30, 1))
@@ -323,6 +524,9 @@ class SerafinToolInterface(QWidget):
         hlayout.addWidget(self.btnSubmit)
         hlayout.addItem(QSpacerItem(30, 1))
         hlayout.addWidget(self.singlePrecisionBox)
+        hlayout.addItem(QSpacerItem(50, 1))
+        hlayout.addWidget(self.timeSelection)
+        hlayout.addItem(QSpacerItem(50, 1))
         hlayout.setAlignment(Qt.AlignLeft)
         mainLayout.addLayout(hlayout)
 
@@ -386,6 +590,7 @@ class SerafinToolInterface(QWidget):
         self.singlePrecisionBox.setEnabled(False)
         self.firstTable.setRowCount(0)
         self.secondTable.setRowCount(0)
+        self.timeSlider.setEnabled(False)
 
         if not self.frenchButton.isChecked():
             self.language = 'en'
@@ -502,6 +707,15 @@ class SerafinToolInterface(QWidget):
             available_var_IDs.extend(self.header.var_IDs)
             if 'H' in available_var_IDs and 'M' in available_var_IDs:
                 self.btnAddUS.setEnabled(True)
+
+        # unlock the time slider
+        if resin.header.date is not None:
+            year, month, day, hour, minute, second = resin.header.date
+            start_time = datetime.datetime(year, month, day, hour, minute, second)
+            time_frames = list(map(lambda x: datetime.timedelta(seconds=x), resin.time))
+
+            self.timeSlider.reinit(start_time, time_frames, self.timeSelection)
+            self.timeSlider.setEnabled(True)
 
     def btnSubmitEvent(self):
         selected_vars = self._getSelectedVariables()
