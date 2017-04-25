@@ -214,8 +214,11 @@ def get_necessary_equations(known_var_IDs, needed_var_IDs, us_equation):
             necessary_equations.append(BASIC_EQUATIONS['H'])
         elif 'US' in selected_unknown_var_IDs:
             necessary_equations.append(BASIC_EQUATIONS['H'])
-        elif ('TAU' in selected_unknown_var_IDs or 'DMAX' in selected_unknown_var_IDs) and 'US' not in known_var_IDs:
-            necessary_equations.append(BASIC_EQUATIONS['H'])
+        elif 'US' not in known_var_IDs:
+             if 'TAU' in selected_unknown_var_IDs:
+                necessary_equations.append(BASIC_EQUATIONS['H'])
+             elif 'DMAX' in selected_unknown_var_IDs and 'TAU' not in known_var_IDs:
+                necessary_equations.append(BASIC_EQUATIONS['H'])
 
     # add M
     if 'M' in selected_unknown_var_IDs:
@@ -223,8 +226,11 @@ def get_necessary_equations(known_var_IDs, needed_var_IDs, us_equation):
     elif 'M' not in known_var_IDs:
         if 'US' in selected_unknown_var_IDs:
             necessary_equations.append(BASIC_EQUATIONS['M'])
-        elif ('TAU' in selected_unknown_var_IDs or 'DMAX' in selected_unknown_var_IDs) and 'US' not in known_var_IDs:
-            necessary_equations.append(BASIC_EQUATIONS['M'])
+        elif 'US' not in known_var_IDs:
+             if 'TAU' in selected_unknown_var_IDs:
+                necessary_equations.append(BASIC_EQUATIONS['M'])
+             elif 'DMAX' in selected_unknown_var_IDs and 'TAU' not in known_var_IDs:
+                necessary_equations.append(BASIC_EQUATIONS['M'])
 
     # add I and J
     if 'I' in selected_unknown_var_IDs:
@@ -245,12 +251,20 @@ def get_necessary_equations(known_var_IDs, needed_var_IDs, us_equation):
     # add US
     if 'US' in selected_unknown_var_IDs:
         necessary_equations.append(us_equation)
-    elif ('TAU' in selected_unknown_var_IDs or 'DMAX' in selected_unknown_var_IDs) and 'US' not in known_var_IDs:
-        necessary_equations.append(us_equation)
+    elif 'US' not in known_var_IDs:
+        if 'TAU' in selected_unknown_var_IDs:
+            necessary_equations.append(us_equation)
+        elif 'DMAX' in selected_unknown_var_IDs and 'TAU' not in known_var_IDs:
+            necessary_equations.append(us_equation)
 
-    # add TAU and DMAX
+
+    # add TAU
     if 'TAU' in selected_unknown_var_IDs:
         necessary_equations.append(TAU_EQUATION)
+    elif 'DMAX' in selected_unknown_var_IDs and 'TAU' not in known_var_IDs:
+        necessary_equations.append(TAU_EQUATION)
+
+    # add DMAX
     if 'DMAX' in selected_unknown_var_IDs:
         necessary_equations.append(DMAX_EQUATION)
 
