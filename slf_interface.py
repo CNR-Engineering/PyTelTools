@@ -326,6 +326,18 @@ class TimeRangeSlider(QSlider):
                                              pos-slider_min, slider_max-slider_min,
                                              opt.upsideDown)
 
+    def enterIndexEvent(self):
+        try:
+            start_index = int(self.info.startIndex.text())
+            end_index = int(self.info.endIndex.text())
+        except ValueError:
+            return
+        if start_index <= 0 or end_index > self.nb_frames or start_index > end_index:
+            return
+        self.setLow(start_index-1)
+        self.setHigh(end_index-1)
+        self.info.updateText(self._low, self.time_frames[self._low].total_seconds(), self.low(),
+                             self._high, self.time_frames[self._high].total_seconds(), self.high())
 
 class SelectedTimeINFO(QWidget):
     def __init__(self):
@@ -337,7 +349,7 @@ class SelectedTimeINFO(QWidget):
         self.endValue = QLineEdit('', self)
         self.startDate = QLineEdit('', self)
         self.endDate = QLineEdit('', self)
-        for w in [self.startIndex, self.endIndex, self.startValue, self.endValue, self.startDate, self.endDate]:
+        for w in [self.startValue, self.endValue, self.startDate, self.endDate]:
             w.setReadOnly(True)
 
         self.startIndex.setFixedWidth(30)
@@ -399,7 +411,7 @@ class SerafinToolInterface(QWidget):
         self._setLayout()
         self._bindEvents()
 
-        self.setFixedSize(800, 900)
+        self.setFixedSize(800, 750)
         self.setWindowTitle('Serafin Tool')
         self._center()
         self.show()
@@ -462,6 +474,8 @@ class SerafinToolInterface(QWidget):
 
         # create text boxes for displaying the time selection and sampling
         self.timeSelection = SelectedTimeINFO()
+        self.timeSelection.startIndex.setEnabled(False)
+        self.timeSelection.endIndex.setEnabled(False)
 
         # create the submit button
         self.btnSubmit = QPushButton('Submit', self)
@@ -476,6 +490,8 @@ class SerafinToolInterface(QWidget):
         self.btnOpen.clicked.connect(self.btnOpenEvent)
         self.btnSubmit.clicked.connect(self.btnSubmitEvent)
         self.btnAddUS.clicked.connect(self.btnAddUSEvent)
+        self.timeSelection.startIndex.returnPressed.connect(self.timeSlider.enterIndexEvent)
+        self.timeSelection.endIndex.returnPressed.connect(self.timeSlider.enterIndexEvent)
 
     def _setLayout(self):
         """
@@ -489,7 +505,7 @@ class SerafinToolInterface(QWidget):
         hlayout.addItem(QSpacerItem(30, 1))
         hlayout.addWidget(self.langBox)
         mainLayout.addLayout(hlayout)
-        mainLayout.addItem(QSpacerItem(10, 20))
+        mainLayout.addItem(QSpacerItem(10, 10))
 
         hlayout = QHBoxLayout()
         hlayout.addWidget(QLabel('Input file'))
@@ -502,7 +518,7 @@ class SerafinToolInterface(QWidget):
         hlayout.addWidget(self.summaryTextBox)
         mainLayout.addLayout(hlayout)
 
-        mainLayout.addItem(QSpacerItem(1, 30))
+        mainLayout.addItem(QSpacerItem(1, 10))
         hlayout = QHBoxLayout()
         hlayout.addItem(QSpacerItem(30, 1))
         vlayout = QVBoxLayout()
@@ -510,13 +526,13 @@ class SerafinToolInterface(QWidget):
 
         vlayout.addWidget(QLabel('                                         Available variables'))
         vlayout.addWidget(self.firstTable)
-        vlayout.addItem(QSpacerItem(1, 10))
+        vlayout.addItem(QSpacerItem(1, 5))
         hlayout2 = QHBoxLayout()
         hlayout2.addItem(QSpacerItem(30, 1))
         hlayout2.addWidget(self.btnAddUS)
         hlayout2.addItem(QSpacerItem(30, 1))
         vlayout.addLayout(hlayout2)
-        vlayout.addItem(QSpacerItem(1, 10))
+        vlayout.addItem(QSpacerItem(1, 5))
         vlayout.setAlignment(Qt.AlignLeft)
 
         hlayout.addLayout(vlayout)
@@ -531,12 +547,11 @@ class SerafinToolInterface(QWidget):
 
         mainLayout.addLayout(hlayout)
         hlayout = QHBoxLayout()
-        mainLayout.addItem(QSpacerItem(10, 10))
+        mainLayout.addItem(QSpacerItem(10, 5))
         hlayout.addItem(QSpacerItem(30, 1))
         hlayout.addWidget(self.timeSlider)
         hlayout.addItem(QSpacerItem(30, 1))
         mainLayout.addLayout(hlayout)
-        mainLayout.addItem(QSpacerItem(10, 30))
 
         hlayout = QHBoxLayout()
         hlayout.addItem(QSpacerItem(50, 1))
@@ -551,7 +566,7 @@ class SerafinToolInterface(QWidget):
         hlayout.setAlignment(Qt.AlignLeft)
         mainLayout.addLayout(hlayout)
 
-        mainLayout.addItem(QSpacerItem(800, 30))
+        mainLayout.addItem(QSpacerItem(800, 10))
         mainLayout.addWidget(QLabel('   Message logs'))
         mainLayout.addWidget(self.logTextBox.widget)
         self.setLayout(mainLayout)
@@ -613,6 +628,8 @@ class SerafinToolInterface(QWidget):
         self.secondTable.setRowCount(0)
         self.timeSlider.setEnabled(False)
         self.timeSelection.clearText()
+        self.timeSelection.startIndex.setEnabled(False)
+        self.timeSelection.endIndex.setEnabled(False)
         self.timeSelection.timeSamplig.setText('1')
         self.btnSubmit.setEnabled(False)
 
@@ -758,6 +775,8 @@ class SerafinToolInterface(QWidget):
         self.timeSlider.reinit(start_time, time_frames, self.timeSelection)
         if self.header.nb_frames > 1:
             self.timeSlider.setEnabled(True)
+            self.timeSelection.startIndex.setEnabled(True)
+            self.timeSelection.endIndex.setEnabled(True)
 
         # finally unlock the submit button
         self.btnSubmit.setEnabled(True)
