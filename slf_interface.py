@@ -524,8 +524,9 @@ class SerafinToolInterface(QWidget):
         hlayout.addItem(QSpacerItem(30, 1))
         vlayout = QVBoxLayout()
         vlayout.setAlignment(Qt.AlignHCenter)
-
-        vlayout.addWidget(QLabel('                                         Available variables'))
+        lb = QLabel('Available variables')
+        vlayout.addWidget(lb)
+        vlayout.setAlignment(lb, Qt.AlignHCenter)
         vlayout.addWidget(self.firstTable)
         vlayout.addItem(QSpacerItem(1, 5))
         hlayout2 = QHBoxLayout()
@@ -540,9 +541,11 @@ class SerafinToolInterface(QWidget):
         hlayout.addItem(QSpacerItem(15, 1))
 
         vlayout = QVBoxLayout()
-        vlayout.setAlignment(Qt.AlignHCenter)
-        vlayout.addWidget(QLabel('                                         Output variables'))
+        lb = QLabel('Output variables')
+        vlayout.addWidget(lb)
+        vlayout.setAlignment(lb, Qt.AlignHCenter)
         vlayout.addWidget(self.secondTable)
+
         hlayout.addLayout(vlayout)
         hlayout.addItem(QSpacerItem(30, 1))
 
