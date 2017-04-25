@@ -87,6 +87,8 @@ class SerafinHeader:
             file.read(4)
             self.date = struct.unpack('>6i', file.read(6 * 4))
             file.read(4)
+        else:
+            self.date = None
 
         # 4 very important integers
         file.read(4)

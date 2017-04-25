@@ -167,8 +167,8 @@ class TimeRangeSlider(QSlider):
         self._high = self.nb_frames-1
         self.click_offset = 0
         self.info = info_text
-        self.info.updateText(self.time_frames[self._low].total_seconds(), self.low(),
-                             self.time_frames[self._high].total_seconds(), self.high())
+        self.info.updateText(self._low, self.time_frames[self._low].total_seconds(), self.low(),
+                             self._high, self.time_frames[self._high].total_seconds(), self.high())
 
     def low(self):
         return self.start_time + self.time_frames[self._low]
@@ -276,11 +276,11 @@ class TimeRangeSlider(QSlider):
                 self._high += diff
         elif self.active_slider == 0:
             if new_pos >= self._high:
-                new_pos = self._high - 1
+                new_pos = self._high
             self._low = new_pos
         else:
             if new_pos <= self._low:
-                new_pos = self._low + 1
+                new_pos = self._low
             self._high = new_pos
 
         self.click_offset = new_pos
@@ -304,8 +304,8 @@ class TimeRangeSlider(QSlider):
         self.update()
 
     def mouseReleaseEvent(self, event):
-        self.info.updateText(self.time_frames[self._low].total_seconds(), self.low(),
-                             self.time_frames[self._high].total_seconds(), self.high())
+        self.info.updateText(self._low, self.time_frames[self._low].total_seconds(), self.low(),
+                             self._high, self.time_frames[self._high].total_seconds(), self.high())
 
     def __pick(self, pt):
         return pt.x()
@@ -335,30 +335,49 @@ class SelectedTimeINFO(QWidget):
         self.endIndex = QLineEdit('', self)
         self.startValue = QLineEdit('', self)
         self.endValue = QLineEdit('', self)
-        self.startIndex.setReadOnly(True)
-        self.endIndex.setReadOnly(True)
-        self.startValue.setReadOnly(True)
-        self.endValue.setReadOnly(True)
-        self.startValue.setFixedWidth(150)
-        self.endValue.setFixedWidth(150)
+        self.startDate = QLineEdit('', self)
+        self.endDate = QLineEdit('', self)
+        for w in [self.startIndex, self.endIndex, self.startValue, self.endValue, self.startDate, self.endDate]:
+            w.setReadOnly(True)
+
+        self.startIndex.setFixedWidth(30)
+        self.endIndex.setFixedWidth(30)
+        self.startDate.setFixedWidth(110)
+        self.endDate.setFixedWidth(110)
+
+        self.timeSamplig = QLineEdit('1', self)
+        self.timeSamplig.setFixedWidth(30)
 
         glayout = QGridLayout()
-        glayout.addWidget(QLabel('Start time value'), 1, 1)
-        glayout.addWidget(self.startIndex, 1, 2)
-        glayout.addWidget(QLabel('date'), 1, 3)
-        glayout.addWidget(self.startValue, 1, 4)
+        glayout.addWidget(QLabel('Sampling frequency'), 1, 1)
+        glayout.addWidget(self.timeSamplig, 1, 2)
+        glayout.addWidget(QLabel('Start time index'), 2, 1)
+        glayout.addWidget(self.startIndex, 2, 2)
+        glayout.addWidget(QLabel('value'), 2, 3)
+        glayout.addWidget(self.startValue, 2, 4)
+        glayout.addWidget(QLabel('date'), 2, 5)
+        glayout.addWidget(self.startDate, 2, 6)
 
-        glayout.addWidget(QLabel('End time value'), 2, 1)
-        glayout.addWidget(self.endIndex, 2, 2)
-        glayout.addWidget(QLabel('date'), 2, 3)
-        glayout.addWidget(self.endValue, 2, 4)
+        glayout.addWidget(QLabel('End time index'), 3, 1)
+        glayout.addWidget(self.endIndex, 3, 2)
+        glayout.addWidget(QLabel('value'), 3, 3)
+        glayout.addWidget(self.endValue, 3, 4)
+        glayout.addWidget(QLabel('date'), 3, 5)
+        glayout.addWidget(self.endDate, 3, 6)
+
         self.setLayout(glayout)
 
-    def updateText(self, start_index, start_value, end_index, end_value):
-        self.startIndex.setText(str(start_index))
-        self.endIndex.setText((str(end_index)))
+    def updateText(self, start_index, start_value, start_date, end_index, end_value, end_date):
+        self.startIndex.setText(str(start_index+1))
+        self.endIndex.setText((str(end_index+1)))
         self.startValue.setText(str(start_value))
         self.endValue.setText(str(end_value))
+        self.startDate.setText(str(start_date))
+        self.endDate.setText(str(end_date))
+
+    def clearText(self):
+        for w in [self.startIndex, self.endIndex, self.startValue, self.endValue, self.startDate, self.endDate]:
+            w.clear()
 
 
 class SerafinToolInterface(QWidget):
@@ -441,14 +460,14 @@ class SerafinToolInterface(QWidget):
         self.timeSlider = TimeRangeSlider()
         self.timeSlider.setEnabled(False)
 
-        # create a text box for displaying the time selection
+        # create text boxes for displaying the time selection and sampling
         self.timeSelection = SelectedTimeINFO()
 
         # create the submit button
         self.btnSubmit = QPushButton('Submit', self)
         self.btnSubmit.setToolTip('<b>Submit</b> to write a .slf output')
         self.btnSubmit.setFixedSize(85, 50)
-
+        self.btnSubmit.setEnabled(False)
 
     def _bindEvents(self):
         """
@@ -524,7 +543,9 @@ class SerafinToolInterface(QWidget):
         hlayout.addWidget(self.btnSubmit)
         hlayout.addItem(QSpacerItem(30, 1))
         hlayout.addWidget(self.singlePrecisionBox)
-        hlayout.addItem(QSpacerItem(50, 1))
+        hlayout.addLayout(vlayout)
+
+        hlayout.addItem(QSpacerItem(30, 1))
         hlayout.addWidget(self.timeSelection)
         hlayout.addItem(QSpacerItem(50, 1))
         hlayout.setAlignment(Qt.AlignLeft)
@@ -591,6 +612,9 @@ class SerafinToolInterface(QWidget):
         self.firstTable.setRowCount(0)
         self.secondTable.setRowCount(0)
         self.timeSlider.setEnabled(False)
+        self.timeSelection.clearText()
+        self.timeSelection.timeSamplig.setText('1')
+        self.btnSubmit.setEnabled(False)
 
         if not self.frenchButton.isChecked():
             self.language = 'en'
@@ -608,9 +632,24 @@ class SerafinToolInterface(QWidget):
                                       QMessageBox.Ok)
             if msg == QMessageBox.Cancel:
                 logging.info('Output canceled')
-                return False
+                return None
             return True
         return False
+
+    def _getOuputTime(self):
+        start_index = int(self.timeSelection.startIndex.text())
+        end_index = int(self.timeSelection.endIndex.text())
+        try:
+            sampling_frequency = int(self.timeSelection.timeSamplig.text())
+        except ValueError:
+            QMessageBox.critical(self, 'Error', 'The sampling frequency must be a number!',
+                                 QMessageBox.Ok)
+            return []
+        if sampling_frequency < 1 or sampling_frequency > end_index:
+            QMessageBox.critical(self, 'Error', 'The sampling frequency must be in the range [1; nbFrames]!',
+                                 QMessageBox.Ok)
+            return []
+        return list(range(start_index-1, end_index, sampling_frequency))
 
     def _getSelectedVariables(self):
         selected = []
@@ -712,18 +751,26 @@ class SerafinToolInterface(QWidget):
         if resin.header.date is not None:
             year, month, day, hour, minute, second = resin.header.date
             start_time = datetime.datetime(year, month, day, hour, minute, second)
-            time_frames = list(map(lambda x: datetime.timedelta(seconds=x), resin.time))
+        else:
+            start_time = datetime.datetime(1900, 1, 1, 0, 0, 0)
 
-            self.timeSlider.reinit(start_time, time_frames, self.timeSelection)
+        time_frames = list(map(lambda x: datetime.timedelta(seconds=x), resin.time))
+        self.timeSlider.reinit(start_time, time_frames, self.timeSelection)
+        if self.header.nb_frames > 1:
             self.timeSlider.setEnabled(True)
 
-    def btnSubmitEvent(self):
-        selected_vars = self._getSelectedVariables()
+        # finally unlock the submit button
+        self.btnSubmit.setEnabled(True)
 
-        # check if everything is ready to submit
-        if self.header is None:
+    def btnSubmitEvent(self):
+        output_time_indices = self._getOuputTime()
+        if not output_time_indices:
             return
+
+        selected_vars = self._getSelectedVariables()
         if not selected_vars:
+            QMessageBox.critical(self, 'Error', 'Choose at least one output variable before submit!',
+                                 QMessageBox.Ok)
             return
 
         # create the save file dialog
@@ -741,16 +788,13 @@ class SerafinToolInterface(QWidget):
 
         # handle overwrite manually
         overwrite = self._handleOverwrite(filename)
+        if overwrite is None:
+            return
 
         # do some calculations
         with Serafin.Read(self.filename, self.language) as resin:
             resin.header = self.header
             resin.time = self.time
-
-            # print('U', resin.read_var_in_frame(0, 'U')[1:10])
-            # print('W', resin.read_var_in_frame(0, 'W')[1:10])
-            # print('H', resin.read_var_in_frame(0, 'H')[1:10])
-            # print('M', resin.read_var_in_frame(0, 'M')[1:10])
 
             with Serafin.Write(filename, self.language, overwrite) as resout:
                 # deduce header from selected variable IDs and write header
@@ -763,18 +807,11 @@ class SerafinToolInterface(QWidget):
                 necessary_equations = get_necessary_equations(self.header.var_IDs, output_header.var_IDs,
                                                               self.us_equation)
 
-                for i, time_i in enumerate(self.time):
+                for i in output_time_indices:
                     vals = do_calculations_in_frame(necessary_equations, self.us_equation, resin, i,
                                                     output_header.var_IDs, output_header.np_float_type)
-                    resout.write_entire_frame(output_header, time_i, vals)
+                    resout.write_entire_frame(output_header, self.time[i], vals)
         logging.info('Finished writing the output')
-
-        # do some tests on the results
-        # with Serafin.Read(filename, self.language) as resin:
-        #     resin.read_header()
-        #     resin.get_time()
-        #     print('output file has variables', resin.header.var_IDs)
-        #     print('US', resin.read_var_in_frame(0, 'US')[1:10])
 
 
 def exception_hook(exctype, value, traceback):
