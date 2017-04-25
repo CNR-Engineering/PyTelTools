@@ -257,7 +257,6 @@ def get_necessary_equations(known_var_IDs, needed_var_IDs, us_equation):
         elif 'DMAX' in selected_unknown_var_IDs and 'TAU' not in known_var_IDs:
             necessary_equations.append(us_equation)
 
-
     # add TAU
     if 'TAU' in selected_unknown_var_IDs:
         necessary_equations.append(TAU_EQUATION)

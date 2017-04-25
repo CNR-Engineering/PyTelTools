@@ -339,6 +339,7 @@ class TimeRangeSlider(QSlider):
         self.info.updateText(self._low, self.time_frames[self._low].total_seconds(), self.low(),
                              self._high, self.time_frames[self._high].total_seconds(), self.high())
 
+
 class SelectedTimeINFO(QWidget):
     def __init__(self):
         super().__init__()
@@ -451,6 +452,8 @@ class SerafinToolInterface(QWidget):
             vh = tw.verticalHeader()
             vh.setSectionResizeMode(QHeaderView.Fixed)
             vh.setDefaultSectionSize(20)
+            tw.setEditTriggers(QAbstractItemView.NoEditTriggers)
+
         self.secondTable.setFixedHeight(300)
 
         # create a button for interpreting W from user-defined friction law
