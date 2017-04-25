@@ -80,11 +80,15 @@ DMAX = Variable('DMAX', bytes('DIAMETRE', 'utf-8').ljust(16), bytes('DIAMETER', 
 W = Variable('W', bytes('FROTTEMEN', 'utf-8').ljust(16), bytes('BOTTOM FRICTION', 'utf-8').ljust(16), bytes('  ', 'utf-8').ljust(16))
 
 
-# define a special operator
+# define some special operators
 def compute_DMAX(tau):
     return np.where(tau > 0.34, 1.4593 * np.power(tau, 0.979),
                                 np.where(tau > 0.1, 1.2912 * np.power(tau, 2) + 1.3572 * tau - 0.1154,
                                                     0.9055 * np.power(tau, 1.3178)))
+
+def cubic_root(x):
+    with np.errstate(invalid='ignore'):
+        return np.where(x < 0, np.power(-x, 1/3.), np.power(x, 1/3.))
 
 # define the operators (relations between variables) as constants
 MINUS, TIMES, NORM2 = 0, 1, 2
@@ -96,8 +100,8 @@ OPERATIONS = {MINUS: lambda a, b: a-b,
               COMPUTE_TAU: lambda x: RHO_EAU * np.square(x),
               COMPUTE_DMAX: compute_DMAX,
               COMPUTE_CHEZY: lambda w, h, m: np.sqrt(np.power(m, 2) * GRAVITY / np.square(w)),
-              COMPUTE_STRICKLER: lambda w, h, m: np.sqrt(np.power(m, 2) * GRAVITY / np.square(w) / np.power(h, 1/3.)),
-              COMPUTE_MANNING: lambda w, h, m: np.sqrt(np.power(m, 2) * GRAVITY * np.power(w, 2) / np.power(h, 1/3.)),
+              COMPUTE_STRICKLER: lambda w, h, m: np.sqrt(np.power(m, 2) * GRAVITY / np.square(w) / cubic_root(h)),
+              COMPUTE_MANNING: lambda w, h, m: np.sqrt(np.power(m, 2) * GRAVITY * np.power(w, 2) / cubic_root(h)),
               COMPUTE_NIKURADSE: lambda w, h, m: np.sqrt(np.power(m, 2) * KARMAN**2 / np.power(np.log(30 * h / np.exp(1) / w), 2))}
 
 # define basic equations (binary) and special equations (unary and ternary)
@@ -185,39 +189,69 @@ def get_available_variables(input_var_IDs):
     return available_vars
 
 
-def get_necessary_equations(known_var_IDs, needed_var_IDs):
+def get_necessary_equations(known_var_IDs, needed_var_IDs, us_equation):
     """
-    @brief: Determine the list of equations needed to compute all user-selected variables
+    @brief: Determine the list of equations needed to compute all user-selected variables, with precedence handling
     @param known_var_IDs <list of str>: the list of variable IDs contained in the input file
     @param needed_var_IDs <list of str>: the list of variable IDs selected by the user
     @return <list of Equation>: the list of equations needed to compute all user-selected variables
     """
-    unknown_var_IDs = list(filter(lambda x: x not in known_var_IDs, needed_var_IDs))
+    selected_unknown_var_IDs = list(filter(lambda x: x not in known_var_IDs, needed_var_IDs))
     necessary_equations = []
-    if 'H' in unknown_var_IDs:
-        necessary_equations.append(BASIC_EQUATIONS['H'])
-    if 'S' in unknown_var_IDs:
+
+    # add S
+    if 'S' in selected_unknown_var_IDs:
         necessary_equations.append(BASIC_EQUATIONS['S'])
-    if 'M' in unknown_var_IDs:
+
+    # add H
+    if 'H' in selected_unknown_var_IDs:
+        necessary_equations.append(BASIC_EQUATIONS['H'])
+    elif 'H' not in known_var_IDs:
+        if 'I' in selected_unknown_var_IDs \
+                or 'J' in selected_unknown_var_IDs or 'Q' in selected_unknown_var_IDs:
+            necessary_equations.append(BASIC_EQUATIONS['H'])
+        elif 'US' in selected_unknown_var_IDs:
+            necessary_equations.append(BASIC_EQUATIONS['H'])
+        elif ('TAU' in selected_unknown_var_IDs or 'DMAX' in selected_unknown_var_IDs) and 'US' not in known_var_IDs:
+            necessary_equations.append(BASIC_EQUATIONS['H'])
+
+    # add M
+    if 'M' in selected_unknown_var_IDs:
         necessary_equations.append(BASIC_EQUATIONS['M'])
+    elif 'M' not in known_var_IDs:
+        if 'US' in selected_unknown_var_IDs:
+            necessary_equations.append(BASIC_EQUATIONS['M'])
+        elif ('TAU' in selected_unknown_var_IDs or 'DMAX' in selected_unknown_var_IDs) and 'US' not in known_var_IDs:
+            necessary_equations.append(BASIC_EQUATIONS['M'])
 
-    if 'Q' in unknown_var_IDs:
-        if 'I' not in known_var_IDs:
-            necessary_equations.append(BASIC_EQUATIONS['I'])
-        if 'J' not in known_var_IDs:
-            necessary_equations.append(BASIC_EQUATIONS['J'])
-        necessary_equations.append(BASIC_EQUATIONS['Q'])
+    # add I and J
+    if 'I' in selected_unknown_var_IDs:
+        necessary_equations.append(BASIC_EQUATIONS['I'])
     else:
-        if 'I' in unknown_var_IDs:
+        if 'Q' in selected_unknown_var_IDs and 'I' not in known_var_IDs:
             necessary_equations.append(BASIC_EQUATIONS['I'])
-        if 'J' in unknown_var_IDs:
+    if 'J' in selected_unknown_var_IDs:
+        necessary_equations.append(BASIC_EQUATIONS['J'])
+    else:
+        if 'Q' in selected_unknown_var_IDs and 'J' not in known_var_IDs:
             necessary_equations.append(BASIC_EQUATIONS['J'])
 
-    if 'US' in known_var_IDs:
-        if 'TAU' in unknown_var_IDs:
-            necessary_equations.append(TAU_EQUATION)
-        if 'DMAX' in unknown_var_IDs:
-            necessary_equations.append(DMAX_EQUATION)
+    # add Q
+    if 'Q' in selected_unknown_var_IDs:
+        necessary_equations.append(BASIC_EQUATIONS['Q'])
+
+    # add US
+    if 'US' in selected_unknown_var_IDs:
+        necessary_equations.append(us_equation)
+    elif ('TAU' in selected_unknown_var_IDs or 'DMAX' in selected_unknown_var_IDs) and 'US' not in known_var_IDs:
+        necessary_equations.append(us_equation)
+
+    # add TAU and DMAX
+    if 'TAU' in selected_unknown_var_IDs:
+        necessary_equations.append(TAU_EQUATION)
+    if 'DMAX' in selected_unknown_var_IDs:
+        necessary_equations.append(DMAX_EQUATION)
+
     return necessary_equations
 
 
@@ -231,12 +265,30 @@ def get_US_equation(friction_law):
     return NIKURADSE_EQUATION
 
 
-def do_calculations_in_frame(equations, input_serafin, time_index, selected_output_IDs):
+def add_US(available_vars):
+    available_vars.append(US)
+    available_vars.append(TAU)
+    available_vars.append(DMAX)
+
+
+def do_calculations_in_frame(equations, input_serafin, time_index, selected_output_IDs, us_equation):
     computed_values = {}
     for equation in equations:
-        # handle the special case for TAU and DMAX
-        if equation.output.ID() == 'TAU':
-            computed_values['US'] = input_serafin.read_var_in_frame(time_index, 'US')
+        print('computing', equation.output.ID())
+        input_var_IDs = list(map(lambda x: x.ID(), equation.input))
+
+        # read (if needed) input variables values
+        for input_var_ID in input_var_IDs:
+            if input_var_ID not in computed_values:
+                computed_values[input_var_ID] = input_serafin.read_var_in_frame(time_index, input_var_ID)
+
+        # handle the special case for TAU, DMAX and US
+        if equation.output.ID() == 'US':
+            computed_values['US'] = do_ternary_calculation(us_equation, [computed_values['W'],
+                                                                         computed_values['H'],
+                                                                         computed_values['M']])
+            continue
+        elif equation.output.ID() == 'TAU':
             computed_values['TAU'] = do_unary_calculation(TAU_EQUATION, computed_values['US'])
             continue
         elif equation.output.ID() == 'DMAX':
@@ -244,17 +296,7 @@ def do_calculations_in_frame(equations, input_serafin, time_index, selected_outp
             continue
 
         # handle the normal case (binary operation)
-        input_var_IDs = map(lambda x: x.ID(), equation.input)
-        input_values = []
-
-        # read (if needed) input variables values
-        for input_var_ID in input_var_IDs:
-            if input_var_ID not in computed_values:
-                computed_values[input_var_ID] = input_serafin.read_var_in_frame(time_index, input_var_ID)
-            input_values.append(computed_values[input_var_ID])
-
-        # do calculation for the output variable
-        output_values = do_binary_calculation(equation, input_values)
+        output_values = do_binary_calculation(equation, [computed_values[var_ID] for var_ID in input_var_IDs])
         computed_values[equation.output.ID()] = output_values
 
     # reconstruct the output values array in the order of the selected IDs

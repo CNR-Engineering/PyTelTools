@@ -10,7 +10,7 @@ import copy
 import numpy as np
 from slf import Serafin
 from slf.SerafinVariables import get_available_variables, \
-    do_calculations_in_frame, get_necessary_equations, get_US_equation
+    do_calculations_in_frame, get_necessary_equations, get_US_equation, add_US
 
 _YELLOW = QColor(245, 255, 207)
 _GREEN = QColor(200, 255, 180)
@@ -138,6 +138,7 @@ class SerafinToolInterface(QWidget):
         self.header = None
         self.time = []
         self.available_vars = []
+        self.us_equation = None
 
         self._initWidgets()  # some instance attributes will be set there
         self._setLayout()
@@ -310,6 +311,7 @@ class SerafinToolInterface(QWidget):
         self.available_vars = []
         self.header = None
         self.time = []
+        self.btnAddUS.setEnabled(False)
 
         if not self.frenchButton.isChecked():
             self.language = 'en'
@@ -357,21 +359,23 @@ class SerafinToolInterface(QWidget):
         else:
             return
 
-        self.additional_computations.append(get_US_equation(friction_law))
-        us = self.additional_computations[-1].output
+        self.us_equation = get_US_equation(friction_law)
+        add_US(self.available_vars)
 
-        # add US to available variable
+        # add US, TAU and DMAX to available variable
         offset = self.firstTable.rowCount()
-        self.firstTable.insertRow(self.firstTable.rowCount())
-        id_item = QTableWidgetItem(us.ID().strip())
-        name_item = QTableWidgetItem(us.name(self.language).decode('utf-8').strip())
-        unit_item = QTableWidgetItem(us.unit().decode('utf-8').strip())
-        self.firstTable.setItem(offset, 0, QTableWidgetItem(id_item))
-        self.firstTable.setItem(offset, 1, QTableWidgetItem(name_item))
-        self.firstTable.setItem(offset, 2, QTableWidgetItem(unit_item))
-        self.firstTable.item(offset, 0).setBackground(_GREEN)  # set new US color to green
-        self.firstTable.item(offset, 1).setBackground(_GREEN)
-        self.firstTable.item(offset, 2).setBackground(_GREEN)
+        for i in range(3):
+            var = self.available_vars[-3+i]
+            self.firstTable.insertRow(self.firstTable.rowCount())
+            id_item = QTableWidgetItem(var.ID().strip())
+            name_item = QTableWidgetItem(var.name(self.language).decode('utf-8').strip())
+            unit_item = QTableWidgetItem(var.unit().decode('utf-8').strip())
+            self.firstTable.setItem(offset+i, 0, QTableWidgetItem(id_item))
+            self.firstTable.setItem(offset+i, 1, QTableWidgetItem(name_item))
+            self.firstTable.setItem(offset+i, 2, QTableWidgetItem(unit_item))
+            self.firstTable.item(offset+i, 0).setBackground(_GREEN)  # set new US color to green
+            self.firstTable.item(offset+i, 1).setBackground(_GREEN)
+            self.firstTable.item(offset+i, 2).setBackground(_GREEN)
 
     def btnOpenEvent(self):
         options = QFileDialog.Options()
@@ -406,14 +410,18 @@ class SerafinToolInterface(QWidget):
             self.header = copy.deepcopy(resin.header)
             self.time = resin.time[:]
 
-            # unlock some operation
-            if 'W' in self.header.var_IDs and 'US' not in self.header.var_IDs:
-                self.btnAddUS.setEnabled(True)
 
         logging.info('File closed')
 
         # displaying the available variables
         self._initVarTables()
+
+        # unlock add US button under precise condition
+        if 'US' not in self.header.var_IDs and 'W' in self.header.var_IDs:
+            available_var_IDs = list(map(lambda x: x.ID(), self.available_vars))
+            available_var_IDs.extend(self.header.var_IDs)
+            if 'H' in available_var_IDs and 'M' in available_var_IDs:
+                self.btnAddUS.setEnabled(True)
 
     def btnSubmitEvent(self):
         selected_vars = self._getSelectedVariables()
@@ -444,8 +452,11 @@ class SerafinToolInterface(QWidget):
         with Serafin.Read(self.filename, self.language) as resin:
             resin.header = self.header
             resin.time = self.time
-            print('U', resin.read_var_in_frame(2, 'U')[1:5])
-            print('US', resin.read_var_in_frame(2, 'US')[1:5])
+            # print('U', resin.read_var_in_frame(2, 'U')[1:5])
+            print('U', resin.read_var_in_frame(0, 'U')[1:10])
+            print('W', resin.read_var_in_frame(0, 'W')[1:10])
+            print('H', resin.read_var_in_frame(0, 'H')[1:10])
+            print('M', resin.read_var_in_frame(0, 'M')[1:10])
 
             with Serafin.Write(filename, self.language, overwrite) as resout:
                 # deduce header from selected variable IDs and write header
@@ -455,10 +466,12 @@ class SerafinToolInterface(QWidget):
                 resout.write_header(output_header)
 
                 # do some additional computations
-                necessary_equations = get_necessary_equations(self.header.var_IDs, output_header.var_IDs)
+                necessary_equations = get_necessary_equations(self.header.var_IDs, output_header.var_IDs,
+                                                              self.us_equation)
 
                 for i, time_i in enumerate(self.time):
-                    vals = do_calculations_in_frame(necessary_equations, resin, i, output_header.var_IDs)
+                    vals = do_calculations_in_frame(necessary_equations, resin, i, output_header.var_IDs,
+                                                    self.us_equation)
                     resout.write_entire_frame(output_header, time_i, vals)
         logging.info('Finished writing the output')
 
@@ -467,19 +480,20 @@ class SerafinToolInterface(QWidget):
             resin.read_header()
             resin.get_time()
             print('output file has variables', resin.header.var_IDs)
-            print('U', resin.read_var_in_frame(2, 'U')[1:5])
-            print('TAU', resin.read_var_in_frame(2, 'TAU')[1:5])
-            print('DMAX', resin.read_var_in_frame(2, 'DIAMETRE')[1:5])
+            print('U', resin.read_var_in_frame(0, 'U')[1:10])
+            print('US', resin.read_var_in_frame(0, 'US')[1:10])
 
 
-
-sys._excepthook = sys.excepthook
 def exception_hook(exctype, value, traceback):
     sys._excepthook(exctype, value, traceback)
     sys.exit(1)
-sys.excepthook = exception_hook
+
 
 if __name__ == '__main__':
+    # suppress explicitly traceback silencing
+    sys._excepthook = sys.excepthook
+    sys.excepthook = exception_hook
+
     app = QApplication(sys.argv)
     widget = SerafinToolInterface()
     try:
