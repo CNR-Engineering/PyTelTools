@@ -256,6 +256,11 @@ def get_necessary_equations(known_var_IDs, needed_var_IDs, us_equation):
 
 
 def get_US_equation(friction_law):
+    """
+    @brief: Convert integer code to friction law equation
+    @param friction_law <int>: an integer specifying the friction law to use
+    @return <Equation>: the corresponding friction law equation
+    """
     if friction_law == 0:
         return CHEZY_EQUATION
     elif friction_law == 1:
@@ -266,15 +271,28 @@ def get_US_equation(friction_law):
 
 
 def add_US(available_vars):
+    """
+    @brief: Add US, TAU and DMAX Variable objects to the list
+    @param available_vars <list of Variable>: the target list
+    """
     available_vars.append(US)
     available_vars.append(TAU)
     available_vars.append(DMAX)
 
 
-def do_calculations_in_frame(equations, input_serafin, time_index, selected_output_IDs, us_equation):
+def do_calculations_in_frame(equations, us_equation, input_serafin, time_index, selected_output_IDs, output_float_type):
+    """
+    @brief: Return the selected variables values in a single time frame
+    @param equations <list of Equation>: list of all equations necessary to compute selected variables
+    @param us_equation <Equation>: user-specified friction law equation
+    @param input_serafin <Serafin Read>: input stream for reading necessary variables
+    @param time_index <int>: the position of time frame to read
+    @param selected_output_IDs <list of str>: the short names of the selected output variables
+    @param output_float_type <numpy dtype>: float32 or float64 according to the output file type
+    @return <numpy ndarray>: the values of the selected output variables
+    """
     computed_values = {}
     for equation in equations:
-        print('computing', equation.output.ID())
         input_var_IDs = list(map(lambda x: x.ID(), equation.input))
 
         # read (if needed) input variables values
@@ -301,8 +319,16 @@ def do_calculations_in_frame(equations, input_serafin, time_index, selected_outp
 
     # reconstruct the output values array in the order of the selected IDs
     nb_selected_vars = len(selected_output_IDs)
+
+    # handle the special case when only one output variable selected (numpy 1D-array)
+    if nb_selected_vars == 1:
+        var_ID = selected_output_IDs[0]
+        if var_ID not in computed_values:
+            return np.array(input_serafin.read_var_in_frame(time_index, var_ID), dtype=output_float_type)
+        return np.array(computed_values[var_ID], dtype=output_float_type)
+    # handle the general case
     output_values = np.empty((nb_selected_vars, input_serafin.header.nb_nodes),
-                             dtype=input_serafin.header.float_type)
+                             dtype=output_float_type)
     for i in range(nb_selected_vars):
         var_ID = selected_output_IDs[i]
         if var_ID not in computed_values:

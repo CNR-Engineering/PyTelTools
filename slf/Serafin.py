@@ -194,6 +194,21 @@ class SerafinHeader:
     def copy(self):
         return copy.deepcopy(self)
 
+    def to_single_precision(self):
+        self.file_type = bytes('SERAFIN', 'utf-8').ljust(8)
+        self.float_type = 'f'
+        self.float_size = 4
+        self.np_float_type = FLOAT_TYPE[self.float_type]
+
+        nb_ikle_values = self.nb_elements * self.nb_nodes_per_elem
+        coord_size = self.nb_nodes * self.float_size
+
+        self.header_size = (80 + 8) + (8 + 8) + (self.nb_var * (8 + 32)) \
+                                    + (40 + 8) + (self.params[-1] * ((6 * 4) + 8)) + (16 + 8) \
+                                    + (nb_ikle_values * 4 + 8) + (self.nb_nodes * 4 + 8) + 2 * (coord_size + 8)
+        self.frame_size = 8 + self.float_size + (self.nb_var * (8 + self.nb_nodes * self.float_size))
+        self.file_size = self.header_size + self.nb_frames * self.frame_size
+
 
 class Serafin:
     """
@@ -215,6 +230,7 @@ class Serafin:
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.file.close()
         return False
+
     def get_summary(self):
         if self.header is None:
             module_logger.error('ERROR: (forgot read_header ?) header is None')
@@ -304,28 +320,28 @@ class Read(Serafin):
         return np.array(struct.unpack(nb_values, self.file.read(self.header.float_size * self.header.nb_nodes)),
                         dtype=self.header.np_float_type)
 
-    def read_vars_in_frame(self, time_index, var_IDs):
-        """
-        @brief: read multiple variables in a frame
-        @param time_index <float>: 0-based index of simulation time from the target frame
-        @param var_IDs <str>: variable IDs
-        @return var <numpy 2D-array>: values of variables of shape = (nb target vars, nb nodes)
-        """
-        # appropriate warning when trying to exact a single variable
-        nb_target_vars = len(var_IDs)
-        if nb_target_vars == 1:
-            module_logger.warn('WARNING: (use read_var_in_frame instead?) Trying to extract a single variable')
-
-        nb_values = '>%i%s' % (self.header.nb_nodes, self.header.float_type)
-        pos_target_vars = map(self.var_ID_to_index, var_IDs)
-        var = np.empty([nb_target_vars, self.header.nb_nodes], dtype=self.header.np_float_type)
-        for i, pos_var in enumerate(pos_target_vars):
-            self.file.seek(self.header.header_size + time_index * self.header.frame_size
-                           + 8 + self.header.float_size + pos_var * (8 + self.header.float_size * self.header.nb_nodes),
-                           0)
-            self.file.read(4)
-            var[i, :] = struct.unpack(nb_values, self.file.read(self.header.float_size * self.header.nb_nodes))
-        return var
+    # def read_vars_in_frame(self, time_index, var_IDs):
+    #     """
+    #     @brief: read multiple variables in a frame
+    #     @param time_index <float>: 0-based index of simulation time from the target frame
+    #     @param var_IDs <str>: variable IDs
+    #     @return var <numpy 2D-array>: values of variables of shape = (nb target vars, nb nodes)
+    #     """
+    #     # appropriate warning when trying to exact a single variable
+    #     nb_target_vars = len(var_IDs)
+    #     if nb_target_vars == 1:
+    #         module_logger.warn('WARNING: (use read_var_in_frame instead?) Trying to extract a single variable')
+    #
+    #     nb_values = '>%i%s' % (self.header.nb_nodes, self.header.float_type)
+    #     pos_target_vars = map(self.var_ID_to_index, var_IDs)
+    #     var = np.empty([nb_target_vars, self.header.nb_nodes], dtype=self.header.np_float_type)
+    #     for i, pos_var in enumerate(pos_target_vars):
+    #         self.file.seek(self.header.header_size + time_index * self.header.frame_size
+    #                        + 8 + self.header.float_size + pos_var * (8 + self.header.float_size * self.header.nb_nodes),
+    #                        0)
+    #         self.file.read(4)
+    #         var[i, :] = struct.unpack(nb_values, self.file.read(self.header.float_size * self.header.nb_nodes))
+    #     return var
 
 
 class Write(Serafin):

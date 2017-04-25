@@ -199,6 +199,10 @@ class SerafinToolInterface(QWidget):
         logging.getLogger().addHandler(self.logTextBox)
         logging.getLogger().setLevel(logging.INFO)
 
+        # create a check box for output file format (simple or double precision)
+        self.singlePrecisionBox = QCheckBox('Convert to SERAFIN \n(single precision)', self)
+        self.singlePrecisionBox.setEnabled(False)
+
         # create the submit button
         self.btnSubmit = QPushButton('Submit', self)
         self.btnSubmit.setToolTip('<b>Submit</b> to write a .slf output')
@@ -250,7 +254,8 @@ class SerafinToolInterface(QWidget):
                                  'output variables (right)'), 4, 1)
 
         glayout.addItem(QSpacerItem(10, 100), 5, 1)
-        glayout.addWidget(self.btnSubmit, 6, 1)
+        glayout.addWidget(self.singlePrecisionBox, 6, 1)
+        glayout.addWidget(self.btnSubmit, 7, 1)
 
         vlayout = QVBoxLayout()
         vlayout.addLayout(glayout)
@@ -273,8 +278,6 @@ class SerafinToolInterface(QWidget):
         """
         @brief: (Used in btnOpenEvent) Put available variables ID-name-unit in the table display
         """
-        self.firstTable.setRowCount(0)
-        self.secondTable.setRowCount(0)
 
         # add original variables to the table
         for i, (id, name, unit) in enumerate(zip(self.header.var_IDs, self.header.var_names, self.header.var_units)):
@@ -311,7 +314,12 @@ class SerafinToolInterface(QWidget):
         self.available_vars = []
         self.header = None
         self.time = []
+        self.us_equation = None
         self.btnAddUS.setEnabled(False)
+        self.singlePrecisionBox.setChecked(False)
+        self.singlePrecisionBox.setEnabled(False)
+        self.firstTable.setRowCount(0)
+        self.secondTable.setRowCount(0)
 
         if not self.frenchButton.isChecked():
             self.language = 'en'
@@ -349,6 +357,8 @@ class SerafinToolInterface(QWidget):
             output_header.var_IDs.append(var_ID)
             output_header.var_names.append(var_name)
             output_header.var_units.append(var_unit)
+        if self.singlePrecisionBox.isChecked():
+            output_header.to_single_precision()
         return output_header
 
     def btnAddUSEvent(self):
@@ -416,7 +426,11 @@ class SerafinToolInterface(QWidget):
         # displaying the available variables
         self._initVarTables()
 
-        # unlock add US button under precise condition
+        # unlock convert to single precision
+        if self.header.float_type == 'd':
+            self.singlePrecisionBox.setEnabled(True)
+
+        # unlock add US button
         if 'US' not in self.header.var_IDs and 'W' in self.header.var_IDs:
             available_var_IDs = list(map(lambda x: x.ID(), self.available_vars))
             available_var_IDs.extend(self.header.var_IDs)
@@ -452,11 +466,11 @@ class SerafinToolInterface(QWidget):
         with Serafin.Read(self.filename, self.language) as resin:
             resin.header = self.header
             resin.time = self.time
-            # print('U', resin.read_var_in_frame(2, 'U')[1:5])
-            print('U', resin.read_var_in_frame(0, 'U')[1:10])
-            print('W', resin.read_var_in_frame(0, 'W')[1:10])
-            print('H', resin.read_var_in_frame(0, 'H')[1:10])
-            print('M', resin.read_var_in_frame(0, 'M')[1:10])
+
+            # print('U', resin.read_var_in_frame(0, 'U')[1:10])
+            # print('W', resin.read_var_in_frame(0, 'W')[1:10])
+            # print('H', resin.read_var_in_frame(0, 'H')[1:10])
+            # print('M', resin.read_var_in_frame(0, 'M')[1:10])
 
             with Serafin.Write(filename, self.language, overwrite) as resout:
                 # deduce header from selected variable IDs and write header
@@ -470,18 +484,17 @@ class SerafinToolInterface(QWidget):
                                                               self.us_equation)
 
                 for i, time_i in enumerate(self.time):
-                    vals = do_calculations_in_frame(necessary_equations, resin, i, output_header.var_IDs,
-                                                    self.us_equation)
+                    vals = do_calculations_in_frame(necessary_equations, self.us_equation, resin, i,
+                                                    output_header.var_IDs, output_header.np_float_type)
                     resout.write_entire_frame(output_header, time_i, vals)
         logging.info('Finished writing the output')
 
         # do some tests on the results
-        with Serafin.Read(filename, self.language) as resin:
-            resin.read_header()
-            resin.get_time()
-            print('output file has variables', resin.header.var_IDs)
-            print('U', resin.read_var_in_frame(0, 'U')[1:10])
-            print('US', resin.read_var_in_frame(0, 'US')[1:10])
+        # with Serafin.Read(filename, self.language) as resin:
+        #     resin.read_header()
+        #     resin.get_time()
+        #     print('output file has variables', resin.header.var_IDs)
+        #     print('US', resin.read_var_in_frame(0, 'US')[1:10])
 
 
 def exception_hook(exctype, value, traceback):
