@@ -184,8 +184,10 @@ def get_available_variables(input_var_IDs):
             break
     # handle the special case for TAU and DMAX
     if 'US' in input_var_IDs:
-        available_vars.append(TAU)
-        available_vars.append(DMAX)
+        if 'TAU' not in input_var_IDs:
+            available_vars.append(TAU)
+        if 'DIAMETRE' not in input_var_IDs and 'DIAMETER' not in input_var_IDs:
+            available_vars.append(DMAX)
     return available_vars
 
 

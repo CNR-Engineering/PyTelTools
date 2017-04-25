@@ -125,6 +125,45 @@ class FrictionLawMessage(QDialog):
         return -1
 
 
+class DoubleSlider(QSlider):
+    def __init__(self, parent=None):
+        super().__init__(Qt.Horizontal, parent)
+
+        # Set integer max and min on parent. These stay constant
+        super().setMinimum(0)
+        self._max_int = 10000
+        super().setMaximum(self._max_int)
+
+        # The min and max values seen by user
+        self._min_value = 0.0
+        self._max_value = 100.0
+
+        def setMinimum(self, value):
+            self.setRange(value, self._max_value)
+
+        def setMaximum(self, value):
+            self.setRange(self._min_value, value)
+
+        def setRange(self, minimum, maximum):
+            old_value = self.value()
+            self._min_value = minimum
+            self._max_value = maximum
+            self.setValue(old_value)  # Put slider in correct position
+
+        def proportion(self):
+            return (self.value() - self._min_value) / self._value_range
+
+    @property
+    def _value_range(self):
+        return self._max_value - self._min_value
+
+    def value(self):
+        return float(super().value()) / self._max_int * self._value_range
+
+    def setValue(self, value):
+        super().setValue(int(value / self._value_range * self._max_int))
+
+
 class SerafinToolInterface(QWidget):
     """
     @brief: A graphical interface for extracting and computing variables from .slf file
@@ -144,7 +183,7 @@ class SerafinToolInterface(QWidget):
         self._setLayout()
         self._bindEvents()
 
-        self.setFixedSize(900, 900)
+        self.setFixedSize(800, 900)
         self.setWindowTitle('Serafin Tool')
         self._center()
         self.show()
@@ -157,7 +196,7 @@ class SerafinToolInterface(QWidget):
         # create the button open
         self.btnOpen = QPushButton('Open', self)
         self.btnOpen.setToolTip('<b>Open</b> a .slf file')
-        self.btnOpen.resize(self.btnOpen.sizeHint())
+        self.btnOpen.setFixedSize(85, 50)
 
         # create some text fields displaying the IO files info
         self.inNameBox = QLineEdit()
@@ -181,17 +220,16 @@ class SerafinToolInterface(QWidget):
         for tw in [self.firstTable, self.secondTable]:
             tw.setColumnCount(3)
             tw.setHorizontalHeaderLabels(['ID', 'Name', 'Unit'])
-            tw.setFixedWidth(300)
             vh = tw.verticalHeader()
             vh.setSectionResizeMode(QHeaderView.Fixed)
             vh.setDefaultSectionSize(20)
-        self.secondTable.setFixedHeight(500)
+        self.secondTable.setFixedHeight(300)
 
         # create a button for interpreting W from user-defined friction law
         self.btnAddUS = QPushButton('Add US from friction law', self)
-        self.btnAddUS.setToolTip('<b>Compute</b> US based on a friction law')
-        self.btnAddUS.resize(self.btnAddUS.sizeHint())
+        self.btnAddUS.setToolTip('Compute <b>US</b> based on a friction law')
         self.btnAddUS.setEnabled(False)
+        self.btnAddUS.setFixedWidth(200)
 
         # create the widget displaying message logs
         self.logTextBox = QPlainTextEditLogger(self)
@@ -203,10 +241,13 @@ class SerafinToolInterface(QWidget):
         self.singlePrecisionBox = QCheckBox('Convert to SERAFIN \n(single precision)', self)
         self.singlePrecisionBox.setEnabled(False)
 
+        # create a slider for time selection
+        self.timeSlider = DoubleSlider(self)
+
         # create the submit button
         self.btnSubmit = QPushButton('Submit', self)
         self.btnSubmit.setToolTip('<b>Submit</b> to write a .slf output')
-        self.btnSubmit.resize(self.btnSubmit.sizeHint())
+        self.btnSubmit.setFixedSize(85, 50)
 
     def _bindEvents(self):
         """
@@ -220,50 +261,75 @@ class SerafinToolInterface(QWidget):
         """
         @brief: (Used in __init__) Set up layout
         """
-        glayout = QGridLayout()
-        glayout.setHorizontalSpacing(20)
-        glayout.setHorizontalSpacing(30)
-        glayout.addWidget(self.langBox, 1, 1)
-        glayout.addWidget(QLabel('Input file'), 1, 2)
-        glayout.addWidget(self.inNameBox, 1, 3)
-        glayout.addWidget(self.btnOpen, 2, 1)
-        glayout.addWidget(QLabel('Summary'), 2, 2)
-        glayout.addWidget(self.summaryTextBox, 2, 3)
-
-        glayout.addItem(QSpacerItem(1, 30), 3, 2)
-        glayout.addWidget(QLabel('Variables'), 4, 2)
+        mainLayout = QVBoxLayout()
         hlayout = QHBoxLayout()
+        hlayout.setAlignment(Qt.AlignLeft)
+        hlayout.addItem(QSpacerItem(50, 1))
+        hlayout.addWidget(self.btnOpen)
+        hlayout.addItem(QSpacerItem(30, 1))
+        hlayout.addWidget(self.langBox)
+        mainLayout.addLayout(hlayout)
+        mainLayout.addItem(QSpacerItem(10, 20))
 
+        hlayout = QHBoxLayout()
+        hlayout.addWidget(QLabel('Input file'))
+        hlayout.addWidget(self.inNameBox)
+
+        mainLayout.addLayout(hlayout)
+
+        hlayout = QHBoxLayout()
+        hlayout.addWidget(QLabel('Summary'))
+        hlayout.addWidget(self.summaryTextBox)
+        mainLayout.addLayout(hlayout)
+
+        mainLayout.addItem(QSpacerItem(1, 30))
+        hlayout = QHBoxLayout()
+        hlayout.addItem(QSpacerItem(30, 1))
         vlayout = QVBoxLayout()
-        vlayout.addWidget(QLabel('                                 Available variables'))
+        vlayout.setAlignment(Qt.AlignHCenter)
+
+        vlayout.addWidget(QLabel('                                         Available variables'))
         vlayout.addWidget(self.firstTable)
-        vlayout.addItem(QSpacerItem(1, 50))
-        vlayout.addWidget(self.btnAddUS)
+        vlayout.addItem(QSpacerItem(1, 10))
+        hlayout2 = QHBoxLayout()
+        hlayout2.addItem(QSpacerItem(30, 1))
+        hlayout2.addWidget(self.btnAddUS)
+        hlayout2.addItem(QSpacerItem(30, 1))
+        vlayout.addLayout(hlayout2)
+        vlayout.addItem(QSpacerItem(1, 10))
+        vlayout.setAlignment(Qt.AlignLeft)
+
         hlayout.addLayout(vlayout)
         hlayout.addItem(QSpacerItem(15, 1))
 
         vlayout = QVBoxLayout()
-        vlayout.addWidget(QLabel('                                 Output variables'))
+        vlayout.setAlignment(Qt.AlignHCenter)
+        vlayout.addWidget(QLabel('                                         Output variables'))
         vlayout.addWidget(self.secondTable)
         hlayout.addLayout(vlayout)
-        hlayout.setAlignment(Qt.AlignTop)
+        hlayout.addItem(QSpacerItem(30, 1))
 
-        glayout.addLayout(hlayout, 4, 3)
+        mainLayout.addLayout(hlayout)
+        hlayout = QHBoxLayout()
+        mainLayout.addItem(QSpacerItem(10, 50))
+        hlayout.addItem(QSpacerItem(30, 1))
+        hlayout.addWidget(self.timeSlider)
+        hlayout.addItem(QSpacerItem(30, 1))
+        mainLayout.addLayout(hlayout)
+        mainLayout.addItem(QSpacerItem(10, 30))
 
-        glayout.addWidget(QLabel('   Drag and drop \n   available variables (left) to\n   '
-                                 'output variables (right)'), 4, 1)
+        hlayout = QHBoxLayout()
+        hlayout.addItem(QSpacerItem(50, 1))
+        hlayout.addWidget(self.btnSubmit)
+        hlayout.addItem(QSpacerItem(30, 1))
+        hlayout.addWidget(self.singlePrecisionBox)
+        hlayout.setAlignment(Qt.AlignLeft)
+        mainLayout.addLayout(hlayout)
 
-        glayout.addItem(QSpacerItem(10, 100), 5, 1)
-        glayout.addWidget(self.singlePrecisionBox, 6, 1)
-        glayout.addWidget(self.btnSubmit, 7, 1)
-
-        vlayout = QVBoxLayout()
-        vlayout.addLayout(glayout)
-        vlayout.addItem(QSpacerItem(800, 100))
-
-        vlayout.addWidget(QLabel('   Message logs'))
-        vlayout.addWidget(self.logTextBox.widget)
-        self.setLayout(vlayout)
+        mainLayout.addItem(QSpacerItem(800, 30))
+        mainLayout.addWidget(QLabel('   Message logs'))
+        mainLayout.addWidget(self.logTextBox.widget)
+        self.setLayout(mainLayout)
 
     def _center(self):
         """
