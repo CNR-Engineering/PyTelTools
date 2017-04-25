@@ -411,7 +411,8 @@ class SerafinToolInterface(QWidget):
         self._setLayout()
         self._bindEvents()
 
-        self.setFixedSize(800, 750)
+        self.setFixedWidth(800)
+        self.setMaximumHeight(750)
         self.setWindowTitle('Serafin Tool')
         self._center()
         self.show()
