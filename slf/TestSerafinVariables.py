@@ -1,3 +1,8 @@
+"""!
+Unittest for SerafinVariables module
+"""
+
+
 import unittest
 from SerafinVariables import *
 

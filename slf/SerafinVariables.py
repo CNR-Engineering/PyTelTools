@@ -1,4 +1,4 @@
-"""
+"""!
 Handle variables and their relationships in .slf files
 """
 
@@ -11,8 +11,8 @@ GRAVITY = 9.80665
 
 
 class Variable():
-    """
-    @brief: Data type for a single variable with ID (short name), Name (fr or en) and Unit
+    """!
+    @brief Data type for a single variable with ID (short name), Name (fr or en) and Unit
     """
     def __init__(self, ID, name_fr, name_en, unit):
         self._ID = ID
@@ -37,8 +37,8 @@ class Variable():
 
 
 class Equation():
-    """
-    @brief: Data type for an equation consisting of N input variables, 1 output variables and (N-1) operators
+    """!
+    @brief Data type for an equation consisting of N input variables, 1 output variables and (N-1) operators
     """
     def __init__(self, input_variables, output_variable, operator):
         self.input = input_variables
@@ -47,8 +47,8 @@ class Equation():
 
 
 def build_basic_variables():
-    """
-    @brief: Initialize the BASIC_VARIABLES constant
+    """!
+    @brief Initialize the BASIC_VARIABLES constant
     """
     spec = """U,VITESSE U,VELOCITY U,M/S
 V,VITESSE V,VELOCITY V,M/S
@@ -118,8 +118,8 @@ NIKURADSE_EQUATION = Equation((W, H, M), US, COMPUTE_NIKURADSE)
 
 
 def is_basic_variable(var_ID):
-    """
-    @brief: determine if the input variable is a basic variable
+    """!
+    @brief Determine if the input variable is a basic variable
     @param var_ID <str>: the ID (short name) of the variable
     @return <bool>: True if the variable is one of the nine basic variables
     """
@@ -127,10 +127,10 @@ def is_basic_variable(var_ID):
 
 
 def do_unary_calculation(equation, input_values):
-    """
-    @brief: Apply explicitly a unary operator on input values
+    """!
+    @brief Apply explicitly a unary operator on input values
     @param equation <Equation>: an equation containing a unary operator
-    @param input_values <numpy 1D-array>: the values of the input variable
+    @param input_values <[numpy 1D-array]>: the values of the input variable
     @return <numpy 1D-array>: the values of the output variable
     """
     operation = OPERATIONS[equation.operator]
@@ -138,10 +138,10 @@ def do_unary_calculation(equation, input_values):
 
 
 def do_binary_calculation(equation, input_values):
-    """
-    @brief: Apply explicitly a binary operator on input values
+    """!
+    @brief Apply explicitly a binary operator on input values
     @param equation <Equation>: an equation containing a binary operator
-    @param input_values <list of 2 numpy 1D-array>: the values of the input variables
+    @param input_values <[numpy 1D-array]>: the values of the input variables
     @return <numpy 1D-array>: the values of the output variable
     """
     operation = OPERATIONS[equation.operator]
@@ -149,10 +149,10 @@ def do_binary_calculation(equation, input_values):
 
 
 def do_ternary_calculation(equation, input_values):
-    """
-    @brief: Apply explicitly a ternary operator on input values
+    """!
+    @brief Apply explicitly a ternary operator on input values
     @param equation <Equation>: an equation containing a ternary operator
-    @param input_values <list of 3 numpy 1D-array>: the values of the input variables
+    @param input_values <[numpy 1D-array]>: the values of the input variables
     @return <numpy 1D-array>: the values of the output variable
     """
     operation = OPERATIONS[equation.operator]
@@ -160,10 +160,10 @@ def do_ternary_calculation(equation, input_values):
 
 
 def get_available_variables(input_var_IDs):
-    """
-    @brief: Determine the list of new variables computable from the input variables by basic relations
-    @param input_var_IDs <list of str>: the list of variable IDs contained in the input file
-    @return <list of Variable>: the list of variables computable from the input variables by basic relations
+    """!
+    @brief Determine the list of new variables computable from the input variables by basic relations
+    @param input_var_IDs <[str]>: the list of variable IDs contained in the input file
+    @return <[Variable]>: the list of variables computable from the input variables by basic relations
     """
     available_vars = []
     computables = list(map(BASIC_VARIABLES.get, filter(is_basic_variable, input_var_IDs)))
@@ -192,11 +192,11 @@ def get_available_variables(input_var_IDs):
 
 
 def get_necessary_equations(known_var_IDs, needed_var_IDs, us_equation):
-    """
-    @brief: Determine the list of equations needed to compute all user-selected variables, with precedence handling
-    @param known_var_IDs <list of str>: the list of variable IDs contained in the input file
-    @param needed_var_IDs <list of str>: the list of variable IDs selected by the user
-    @return <list of Equation>: the list of equations needed to compute all user-selected variables
+    """!
+    @brief Determine the list of equations needed to compute all user-selected variables, with precedence handling
+    @param known_var_IDs <[str]>: the list of variable IDs contained in the input file
+    @param needed_var_IDs <[str]>: the list of variable IDs selected by the user
+    @return <[Equation]>: the list of equations needed to compute all user-selected variables
     """
     selected_unknown_var_IDs = list(filter(lambda x: x not in known_var_IDs, needed_var_IDs))
     necessary_equations = []
@@ -271,8 +271,8 @@ def get_necessary_equations(known_var_IDs, needed_var_IDs, us_equation):
 
 
 def get_US_equation(friction_law):
-    """
-    @brief: Convert integer code to friction law equation
+    """!
+    @brief Convert integer code to friction law equation
     @param friction_law <int>: an integer specifying the friction law to use
     @return <Equation>: the corresponding friction law equation
     """
@@ -286,9 +286,9 @@ def get_US_equation(friction_law):
 
 
 def add_US(available_vars):
-    """
-    @brief: Add US, TAU and DMAX Variable objects to the list
-    @param available_vars <list of Variable>: the target list
+    """!
+    @brief Add US, TAU and DMAX Variable objects to the list
+    @param available_vars <[Variable]>: the target list
     """
     available_vars.append(US)
     available_vars.append(TAU)
@@ -296,15 +296,15 @@ def add_US(available_vars):
 
 
 def do_calculations_in_frame(equations, us_equation, input_serafin, time_index, selected_output_IDs, output_float_type):
-    """
-    @brief: Return the selected variables values in a single time frame
-    @param equations <list of Equation>: list of all equations necessary to compute selected variables
+    """!
+    @brief Return the selected variables values in a single time frame
+    @param equations <[Equation]>: list of all equations necessary to compute selected variables
     @param us_equation <Equation>: user-specified friction law equation
-    @param input_serafin <Serafin Read>: input stream for reading necessary variables
+    @param input_serafin <Serafin.Read>: input stream for reading necessary variables
     @param time_index <int>: the position of time frame to read
-    @param selected_output_IDs <list of str>: the short names of the selected output variables
-    @param output_float_type <numpy dtype>: float32 or float64 according to the output file type
-    @return <numpy ndarray>: the values of the selected output variables
+    @param selected_output_IDs <[str]>: the short names of the selected output variables
+    @param output_float_type <numpy.dtype>: float32 or float64 according to the output file type
+    @return <numpy.ndarray>: the values of the selected output variables
     """
     computed_values = {}
     for equation in equations:

@@ -1,7 +1,4 @@
-# -*- coding: utf-8 -*-
-
-"""
-Revised version of Serafin.py (under heavy construction)
+"""!
 Read/Write Serafin files and manipulate associated data
 """
 
@@ -11,7 +8,7 @@ import numpy as np
 import os
 import logging
 import copy
-from .SerafinSpecifications import SerafinVariableNames
+import pandas as pd
 
 
 FLOAT_TYPE = {'f': np.float32, 'd': np.float64}
@@ -19,23 +16,60 @@ FLOAT_TYPE = {'f': np.float32, 'd': np.float64}
 module_logger = logging.getLogger(__name__)
 
 
-class SerafinValidationError(Exception):
+class SerafinVariableNames:
+    """!
+    @brief Manage variables names (fr/eng): loading, adding and removing
     """
-    @brief: Custom exception for .slf file content check
+    def __init__(self, is_2d, language):
+        self.language = language
+        base_folder = os.path.dirname(os.path.realpath(__file__))
+        if is_2d:
+            self.var_table = pd.read_csv(os.path.join(base_folder, 'data', 'Serafin_var2D.csv'),
+                                         index_col=0, header=0, sep=',')
+        else:
+            self.var_table = pd.read_csv(os.path.join(base_folder, 'data', 'Serafin_var3D.csv'),
+                                         index_col=0, header=0, sep=',')
+
+    def name_to_ID(self, var_name):
+        """!
+        @brief Assign an ID to variable name
+        @param var_name <bytes>: the name of the new variable
+        @return <bytes>: the unit of the new variable
+        """
+        try:
+            var_index = self.var_table[self.language].tolist().index(var_name)
+        except ValueError:
+            return  # handled in Serafin.Read
+        var_ID = self.var_table.index.values[var_index]
+        return var_ID
+
+    def add_new_var(self, var_name, var_unit):
+        """!
+        @brief Add new variable specification in the table
+        @param var_name <bytes>: the name of the new variable
+        @param var_unit <bytes>: the unit of the new variable
+        """
+        self.var_table.append({var_name.decode('utf-8'): [var_name, var_name, var_unit]}, ignore_index=True)
+
+
+
+class SerafinValidationError(Exception):
+    """!
+    @brief Custom exception for .slf file content check
     """
     pass
 
 
 class SerafinRequestError(Exception):
-    """
-    @brief: Custom exception for requesting invalid values from .slf object
+    """!
+    @brief Custom exception for requesting invalid values from .slf object
     """
     pass
 
 
 class SerafinHeader:
-    """
-    @brief: A data type for reading and storing the .slf file header
+    """!
+    @brief A data type for reading and storing the .slf file header
     """
 
     def __init__(self, file, file_size, language):
@@ -213,8 +247,8 @@ class SerafinHeader:
 
 
 class Serafin:
-    """
-    @brief: A Serafin object corresponds to a single .slf in file IO stream
+    """!
+    @brief A Serafin object corresponds to a single .slf in file IO stream
     """
     def __init__(self, filename, mode, language):
         self.language = language
@@ -240,14 +274,14 @@ class Serafin:
         return self.header.summary()
 
     def read_header(self):
-        """
-        @brief: Read the file header and check the file consistency
+        """!
+        @brief Read the file header and check the file consistency
         """
         self.header = SerafinHeader(self.file, self.file_size, self.language)
 
     def var_ID_to_index(self, var_ID):
-        """
-        @brief: Handle data request by variable ID
+        """!
+        @brief Handle data request by variable ID
         @param var_ID <str>: the ID of the requested variable
         @return index <int> the index of the requested variable
         """
@@ -262,8 +296,8 @@ class Serafin:
         return index
 
     def time_to_index(self, time_request):
-        """
-        @brief: Handle data request by time value
+        """!
+        @brief Handle data request by time value
         @param time_request <str>: the ID of the requested time
         @return index <int> the index of the requested time in the time series
         """
@@ -279,8 +313,8 @@ class Serafin:
 
 
 class Read(Serafin):
-    """
-    @brief: .slf file input stream
+    """!
+    @brief .slf file input stream
     """
     def __init__(self, filename, language):
         super().__init__(filename, 'rb', language)
@@ -291,8 +325,8 @@ class Read(Serafin):
         module_logger.info('Reading the input file: "%s" of size %d bytes' % (filename, self.file_size))
 
     def get_time(self):
-        """
-        @brief: read the time in the .slf file
+        """!
+        @brief Read the time in the .slf file
         """
         module_logger.debug('Reading the time series from the file')
         self.file.seek(self.header.header_size, 0)
@@ -303,11 +337,11 @@ class Read(Serafin):
             self.file.seek(self.header.frame_size - 8 - self.header.float_size, 1)
 
     def read_var_in_frame(self, time_index, var_ID):
-        """
-        @brief: read a single variable in a frame
+        """!
+        @brief Read a single variable in a frame
         @param time_index <float>: 0-based index of simulation time from the target frame
         @param var_ID <str>: variable ID
-        @return var <numpy 1D-array>: values of the variables, of length equal to the number of nodes
+        @return <numpy 1D-array>: values of the variables, of length equal to the number of nodes
         """
         # appropriate warning when trying to exact a single variable
         if not isinstance(var_ID, str):
@@ -322,33 +356,10 @@ class Read(Serafin):
         return np.array(struct.unpack(nb_values, self.file.read(self.header.float_size * self.header.nb_nodes)),
                         dtype=self.header.np_float_type)
 
-    # def read_vars_in_frame(self, time_index, var_IDs):
-    #     """
-    #     @brief: read multiple variables in a frame
-    #     @param time_index <float>: 0-based index of simulation time from the target frame
-    #     @param var_IDs <str>: variable IDs
-    #     @return var <numpy 2D-array>: values of variables of shape = (nb target vars, nb nodes)
-    #     """
-    #     # appropriate warning when trying to exact a single variable
-    #     nb_target_vars = len(var_IDs)
-    #     if nb_target_vars == 1:
-    #         module_logger.warn('WARNING: (use read_var_in_frame instead?) Trying to extract a single variable')
-    #
-    #     nb_values = '>%i%s' % (self.header.nb_nodes, self.header.float_type)
-    #     pos_target_vars = map(self.var_ID_to_index, var_IDs)
-    #     var = np.empty([nb_target_vars, self.header.nb_nodes], dtype=self.header.np_float_type)
-    #     for i, pos_var in enumerate(pos_target_vars):
-    #         self.file.seek(self.header.header_size + time_index * self.header.frame_size
-    #                        + 8 + self.header.float_size + pos_var * (8 + self.header.float_size * self.header.nb_nodes),
-    #                        0)
-    #         self.file.read(4)
-    #         var[i, :] = struct.unpack(nb_values, self.file.read(self.header.float_size * self.header.nb_nodes))
-    #     return var
-
 
 class Write(Serafin):
-    """
-    @brief: .slf file output stream
+    """!
+    @brief .slf file output stream
     """
     def __init__(self, filename, language, overwrite):
         mode = 'wb' if overwrite else 'xb'
@@ -364,8 +375,8 @@ class Write(Serafin):
                                   'and then re-run the program)'.format(self.filename))
 
     def write_header(self, header):
-        """
-        @brief: Write Serafin header from attributes
+        """!
+        @brief Write Serafin header from attributes
         """
         # Title and file type
         self.file.write(struct.pack('>i', 80))
@@ -429,8 +440,8 @@ class Write(Serafin):
         self.file.write(struct.pack('>i', 4 * header.nb_nodes))
 
     def write_entire_frame(self, header, time_to_write, values):
-        """
-        @brief: write all variables/nodes values
+        """!
+        @brief write all variables/nodes values
         @param time_to_write <float>: time in second
         @param values <numpy 2D-array>: values to write
         """

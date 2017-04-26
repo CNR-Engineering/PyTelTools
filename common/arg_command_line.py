@@ -1,8 +1,7 @@
-"""
+"""!
 Custom argparse with a custom formatter_class and optional arguments
 """
 
-import logging
 import argparse
 import sys
 
@@ -12,8 +11,8 @@ class CustomFormatter(argparse.ArgumentDefaultsHelpFormatter, argparse.RawDescri
 
 
 class myargparse(argparse.ArgumentParser):
-    """
-    force and verbose are optional arguments
+    """!
+    @brief force and verbose are optional arguments
     """
     def __init__(self, add_args=[], *args, **kwargs):
         kwargs['formatter_class'] = CustomFormatter

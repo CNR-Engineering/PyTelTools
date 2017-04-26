@@ -1,3 +1,6 @@
+"""!
+A GUI for extracting variables and time frames from .slf file
+"""
 
 import os
 import sys
@@ -16,9 +19,10 @@ from slf.SerafinVariables import get_available_variables, \
 _YELLOW = QColor(245, 255, 207)
 _GREEN = QColor(200, 255, 180)
 
+
 class QPlainTextEditLogger(logging.Handler):
-    """
-    @brief: A text edit box displaying the message logs
+    """!
+    @brief A text edit box displaying the message logs
     """
     def __init__(self, parent):
         super().__init__()
@@ -31,6 +35,9 @@ class QPlainTextEditLogger(logging.Handler):
 
 
 class TableWidgetDragRows(QTableWidget):
+    """!
+    @brief Table widget enabling drag-and-drop of rows
+    """
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -88,6 +95,9 @@ class TableWidgetDragRows(QTableWidget):
 
 
 class FrictionLawMessage(QDialog):
+    """!
+    @brief Message dialog for chosing one of the friction laws
+    """
     def __init__(self, parent=None):
         super().__init__(parent)
 
@@ -127,8 +137,8 @@ class FrictionLawMessage(QDialog):
 
 
 class TimeRangeSlider(QSlider):
-    """ A slider for ranges.
-
+    """!
+    @brief A slider for ranges.
         This class provides a dual-slider for ranges, where there is a defined
         maximum and minimum, as is a normal slider, but instead of having a
         single slider value, there are 2 slider values.
@@ -341,6 +351,9 @@ class TimeRangeSlider(QSlider):
 
 
 class SelectedTimeINFO(QWidget):
+    """!
+    @brief Text fields for time selection display (with slider)
+    """
     def __init__(self):
         super().__init__()
 
@@ -394,8 +407,8 @@ class SelectedTimeINFO(QWidget):
 
 
 class SerafinToolInterface(QWidget):
-    """
-    @brief: A graphical interface for extracting and computing variables from .slf file
+    """!
+    @brief A graphical interface for extracting and computing variables from .slf file
     """
     def __init__(self):
         super().__init__()
@@ -419,8 +432,8 @@ class SerafinToolInterface(QWidget):
         self.show()
 
     def _initWidgets(self):
-        """
-        @brief: (Used in __init__) Create widgets
+        """!
+        @brief (Used in __init__) Create widgets
         """
         # create the button open
         self.btnOpen = QPushButton('Open', self)
@@ -488,8 +501,8 @@ class SerafinToolInterface(QWidget):
         self.btnSubmit.setEnabled(False)
 
     def _bindEvents(self):
-        """
-        @brief: (Used in __init__) Bind events to widgets
+        """!
+        @brief (Used in __init__) Bind events to widgets
         """
         self.btnOpen.clicked.connect(self.btnOpenEvent)
         self.btnSubmit.clicked.connect(self.btnSubmitEvent)
@@ -579,8 +592,8 @@ class SerafinToolInterface(QWidget):
         self.setLayout(mainLayout)
 
     def _center(self):
-        """
-        @brief: (Used in __init__) Center the window with respect to the screen
+        """!
+        @brief (Used in __init__) Center the window with respect to the screen
         """
         qr = self.frameGeometry()
         cp = QDesktopWidget().availableGeometry().center()
@@ -588,8 +601,8 @@ class SerafinToolInterface(QWidget):
         self.move(qr.topLeft())
 
     def _initVarTables(self):
-        """
-        @brief: (Used in btnOpenEvent) Put available variables ID-name-unit in the table display
+        """!
+        @brief (Used in btnOpenEvent) Put available variables ID-name-unit in the table display
         """
 
         # add original variables to the table
@@ -620,8 +633,8 @@ class SerafinToolInterface(QWidget):
             self.firstTable.item(offset+i, 2).setBackground(_YELLOW)
 
     def _reinitInput(self):
-        """
-        @brief: (Used in btnOpenEvent) Reinitialize input file data before reading a new file
+        """!
+        @brief (Used in btnOpenEvent) Reinitialize input file data before reading a new file
         """
         self.summaryTextBox.clear()
         self.available_vars = []
@@ -646,8 +659,8 @@ class SerafinToolInterface(QWidget):
             self.language = 'fr'
 
     def _handleOverwrite(self, filename):
-        """
-        @brief: (Used in btnSubmitEvent) Handle manually the overwrite option when saving output file
+        """!
+        @brief (Used in btnSubmitEvent) Handle manually the overwrite option when saving output file
         """
         if os.path.exists(filename):
             msg = QMessageBox.warning(self, 'Confirm overwrite',
@@ -841,6 +854,9 @@ class SerafinToolInterface(QWidget):
 
 
 def exception_hook(exctype, value, traceback):
+    """!
+    @brief Needed for supressing traceback silencing in newer vesion of PyQt5
+    """
     sys._excepthook(exctype, value, traceback)
     sys.exit(1)
 
