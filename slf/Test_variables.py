@@ -1,5 +1,5 @@
 """!
-Unittest for SerafinVariables module
+Unittest for slf.variables module
 """
 
 

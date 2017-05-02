@@ -1,7 +1,14 @@
+"""!
+Geometrical objects
+"""
+
 from shapely.geometry import LineString as OpenPolyline, Polygon as ClosedPolyline
 
 
 class Polyline:
+    """!
+    @brief Custom (open or closed) polyline class
+    """
     def __init__(self, coordinates):
         self._nb_points = len(coordinates)
         if coordinates[0] == coordinates[-1]:
@@ -31,25 +38,27 @@ class Polyline:
     def contains(self, item):
         return self._polyline.contains(item)
 
-    def polygon_intersection(self, other):
-        # Polygon-Polygon can have polygon or multipolygon intersection
-        inter = self._polyline.intersection(other)
-        if inter.geom_type == 'Polygon':
-            return True, [inter]
-        elif inter.geom_type == 'MultiPolygon':
-            return True, list(inter.geoms)
+    def polygon_intersection(self, triangle):
+        """!
+        @brief (Used in volume calculation) Return the polygon or multipolygon intersection with the triangle
+        @param <shapely.geometry.Polygon> triangle: A triangle
+        @return <bool, shapely.geometry.Polygon or shapely.geometry.Multipolygon>: The intersection with the triangle
+        """
+        inter = self._polyline.intersection(triangle)
+        if inter.geom_type == 'Polygon' or inter.geom_type == 'MultiPolygon':
+            return True, inter
         return False, None
 
     @staticmethod
     def triangle_difference(triangle, polygon):
         """!
-        returned the part in triangle but not in polygon, used in volume calculation
+        @brief (Used in volume calculation) Return the polygon or multipolygon in triangle but not in polygon
+        @param <shapely.geometry.Polygon> triangle: A triangle
+        @param <Polyline> polygon: A polygon
+        @return <bool, shapely.geometry.Polygon or shapely.geometry.Multipolygon>: The difference between triangle and polygon
         """
-        # Polygon-Polygon can have polygon or multipolygon difference
         diff = triangle.difference(polygon.polyline())
-        if diff.geom_type == 'Polygon':
-            return True, [diff]
-        elif diff.geom_type == 'MultiPolygon':
-            return True, list(diff.geoms)
+        if diff.geom_type == 'Polygon' or diff.geom_type == 'MultiPolygon':
+            return True, diff
         return False, None
 
