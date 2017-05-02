@@ -4,7 +4,7 @@ Unittest for SerafinVariables module
 
 
 import unittest
-from SerafinVariables import *
+from slf.variables import *
 
 equation_name = lambda eqs: list(map(lambda x: x.output.ID(), eqs))
 

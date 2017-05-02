@@ -13,7 +13,7 @@ import logging
 import copy
 import numpy as np
 from slf import Serafin
-from slf.SerafinVariables import get_available_variables, \
+from slf.variables import get_available_variables, \
     do_calculations_in_frame, get_necessary_equations, get_US_equation, add_US
 
 _YELLOW = QColor(245, 255, 207)

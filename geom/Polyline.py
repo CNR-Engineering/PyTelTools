@@ -22,6 +22,9 @@ class Polyline:
             return self._polyline.exterior.coords
         return self._polyline.coords
 
+    def polyline(self):
+        return self._polyline
+
     def __str__(self):
         return ['Open', 'Closed'][self.is_closed()] + ' polyline with coordinates %s' % str(list(self.coords()))
 
@@ -29,11 +32,24 @@ class Polyline:
         return self._polyline.contains(item)
 
     def polygon_intersection(self, other):
-        # only Polygon-Polygon can have polygon intersection
+        # Polygon-Polygon can have polygon or multipolygon intersection
         inter = self._polyline.intersection(other)
-        if inter.is_empty:  # no intersection
-            return False, None
-        if inter.geom_type != 'Polygon':  # not polygon intersection
-            return False, None
-        return True, inter
+        if inter.geom_type == 'Polygon':
+            return True, [inter]
+        elif inter.geom_type == 'MultiPolygon':
+            return True, list(inter.geoms)
+        return False, None
+
+    @staticmethod
+    def triangle_difference(triangle, polygon):
+        """!
+        returned the part in triangle but not in polygon, used in volume calculation
+        """
+        # Polygon-Polygon can have polygon or multipolygon difference
+        diff = triangle.difference(polygon.polyline())
+        if diff.geom_type == 'Polygon':
+            return True, [diff]
+        elif diff.geom_type == 'MultiPolygon':
+            return True, list(diff.geoms)
+        return False, None
 
