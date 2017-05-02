@@ -6,7 +6,7 @@ Volume calculations in polygons
 import numpy as np
 import shapely.geometry as geom
 from slf.interpolation import Interpolator
-from slf.Mesh2D import Mesh2D
+from slf.mesh2D import Mesh2D
 from geom import Polyline
 
 
