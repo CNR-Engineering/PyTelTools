@@ -1,6 +1,5 @@
 """!
-The general representation of mesh in serafin 2D
-basis for interpolation, volume calculations etc.
+The general representation of mesh in serafin 2D. The basis for interpolation, volume calculations etc.
 """
 
 import numpy as np
