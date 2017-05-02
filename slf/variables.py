@@ -86,14 +86,20 @@ def compute_DMAX(tau):
                                 np.where(tau > 0.1, 1.2912 * np.power(tau, 2) + 1.3572 * tau - 0.1154,
                                                     0.9055 * np.power(tau, 1.3178)))
 
+
 def cubic_root(x):
     with np.errstate(invalid='ignore'):
         return np.where(x < 0, np.power(-x, 1/3.), np.power(x, 1/3.))
 
+
+def compute_ROUSE(us, ws):
+    with np.errstate(divide='ignore'):
+        return np.where(us != 0, ws / us / KARMAN, float('Inf'))
+
 # define the operators (relations between variables) as constants
 MINUS, TIMES, NORM2 = 0, 1, 2
 COMPUTE_TAU, COMPUTE_DMAX = 3, 4
-COMPUTE_CHEZY, COMPUTE_STRICKLER, COMPUTE_MANNING, COMPUTE_NIKURADSE = 5, 6, 7, 8
+COMPUTE_CHEZY, COMPUTE_STRICKLER, COMPUTE_MANNING, COMPUTE_NIKURADSE, COMPUTE_ROUSE = 5, 6, 7, 8, 9
 OPERATIONS = {MINUS: lambda a, b: a-b,
               TIMES: lambda a, b: a*b,
               NORM2: lambda a, b: np.sqrt(np.square(a) + np.square(b)),
@@ -102,7 +108,8 @@ OPERATIONS = {MINUS: lambda a, b: a-b,
               COMPUTE_CHEZY: lambda w, h, m: np.sqrt(np.power(m, 2) * GRAVITY / np.square(w)),
               COMPUTE_STRICKLER: lambda w, h, m: np.sqrt(np.power(m, 2) * GRAVITY / np.square(w) / cubic_root(h)),
               COMPUTE_MANNING: lambda w, h, m: np.sqrt(np.power(m, 2) * GRAVITY * np.power(w, 2) / cubic_root(h)),
-              COMPUTE_NIKURADSE: lambda w, h, m: np.sqrt(np.power(m, 2) * KARMAN**2 / np.power(np.log(30 * h / np.exp(1) / w), 2))}
+              COMPUTE_NIKURADSE: lambda w, h, m: np.sqrt(np.power(m, 2) * KARMAN**2 / np.power(np.log(30 * h / np.exp(1) / w), 2)),
+              COMPUTE_ROUSE: compute_ROUSE}
 
 # define basic equations (binary) and special equations (unary and ternary)
 BASIC_EQUATIONS = {'H': Equation((S, B), H, MINUS), 'S': Equation((H, B), S, MINUS),
@@ -115,6 +122,7 @@ CHEZY_EQUATION = Equation((W, H, M), US, COMPUTE_CHEZY)
 STRICKLER_EQUATION = Equation((W, H, M), US, COMPUTE_STRICKLER)
 MANNING_EQUATION = Equation((W, H, M), US, COMPUTE_MANNING)
 NIKURADSE_EQUATION = Equation((W, H, M), US, COMPUTE_NIKURADSE)
+
 
 
 def is_basic_variable(var_ID):

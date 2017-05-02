@@ -18,6 +18,7 @@ from slf.variables import get_available_variables, \
 
 _YELLOW = QColor(245, 255, 207)
 _GREEN = QColor(200, 255, 180)
+_BLUE = QColor(200, 230, 250)
 
 
 class QPlainTextEditLogger(logging.Handler):
@@ -96,7 +97,7 @@ class TableWidgetDragRows(QTableWidget):
 
 class FrictionLawMessage(QDialog):
     """!
-    @brief Message dialog for chosing one of the friction laws
+    @brief Message dialog for choosing one of the friction laws
     """
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -134,6 +135,97 @@ class FrictionLawMessage(QDialog):
         elif self.nikuradse.isChecked():
             return 3
         return -1
+
+
+class FallVelocityMessage(QDialog):
+    """!
+    @brief Message dialog for adding fall velocities
+    """
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.values = []
+        self.names = []
+
+        self.table = TableWidgetDragRows(self)
+        self.table.setDragEnabled(False)
+        self.table.setColumnCount(3)
+        self.table.setHorizontalHeaderLabels(['ID', 'Name', 'Unit'])
+        vh = self.table.verticalHeader()
+        vh.setSectionResizeMode(QHeaderView.Fixed)
+        vh.setDefaultSectionSize(50)
+
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel,
+                                   Qt.Horizontal, self)
+        buttons.accepted.connect(self.check)
+        buttons.rejected.connect(self.reject)
+
+        self.buttonAdd = QPushButton('Add a fall velocity', self)
+        self.buttonAdd.clicked.connect(self.btnAddEvent)
+
+        vlayout = QVBoxLayout()
+        vlayout.addWidget(QLabel('Click on the cell to edit name'))
+        vlayout.addWidget(self.table)
+        vlayout.addWidget(self.buttonAdd)
+        vlayout.addItem(QSpacerItem(10, 20))
+        vlayout.addWidget(buttons)
+        self.setLayout(vlayout)
+
+        self.setFixedSize(350, 400)
+        self.setWindowTitle('Add fall velocities')
+
+    def check_name_length(self):
+        for name in self.names:
+            if len(name) < 2 or len(name) > 16:
+                return False
+        return True
+
+    def check(self):
+        if self.table.rowCount() == 0:
+            return
+        for i in range(self.table.rowCount()):
+            self.names.append(self.table.item(i, 1).text())
+
+        if not self.check_name_length():
+            QMessageBox.critical(self, 'Error', 'The variable names should be between 2 and 16 characters!',
+                                 QMessageBox.Ok)
+            return
+        elif len(set(self.names)) != len(self.names):
+            QMessageBox.critical(self, 'Error', 'Two variables cannot share the same name!',
+                                 QMessageBox.Ok)
+            return
+        else:
+            self.accept()
+
+    def get_table(self):
+        return [[self.table.item(i, j).text() for j in range(3)] for i in range(self.table.rowCount())]
+
+    def btnAddEvent(self):
+        value, ok = QInputDialog.getText(self, 'New value',
+                                         'Fall velocity value:', text='1e-5')
+        if not ok:
+            return
+        try:
+            value = float(value)
+        except ValueError:
+             QMessageBox.critical(self, 'Error', 'You must enter a number!',
+                                 QMessageBox.Ok)
+             return
+        if value in self.values:
+            QMessageBox.critical(self, 'Error', 'The value %.4E is already added!' % value,
+                                 QMessageBox.Ok)
+            return
+        self.values.append(value)
+        value_ID = 'ROUSE %.4E' % value
+        nb_row = self.table.rowCount()
+        self.table.insertRow(nb_row)
+        id_item = QTableWidgetItem(value_ID)
+        name_item = QTableWidgetItem(value_ID)
+        unit_item = QTableWidgetItem('')
+        self.table.setItem(nb_row, 0, QTableWidgetItem(id_item))
+        self.table.setItem(nb_row, 1, QTableWidgetItem(name_item))
+        self.table.setItem(nb_row, 2, QTableWidgetItem(unit_item))
+        self.table.item(nb_row, 0).setFlags(Qt.ItemIsEditable)
+        self.table.item(nb_row, 2).setFlags(Qt.ItemIsEditable)
 
 
 class TimeRangeSlider(QSlider):
@@ -465,6 +557,8 @@ class SerafinToolInterface(QWidget):
             vh = tw.verticalHeader()
             vh.setSectionResizeMode(QHeaderView.Fixed)
             vh.setDefaultSectionSize(20)
+            hh = tw.horizontalHeader()
+            hh.setDefaultSectionSize(110)
             tw.setEditTriggers(QAbstractItemView.NoEditTriggers)
 
         self.secondTable.setFixedHeight(300)
@@ -474,6 +568,13 @@ class SerafinToolInterface(QWidget):
         self.btnAddUS.setToolTip('Compute <b>US</b> based on a friction law')
         self.btnAddUS.setEnabled(False)
         self.btnAddUS.setFixedWidth(200)
+
+        # create a button for adding Rouse number from user-defined fall velocity
+        self.btnAddWs = QPushButton('Add Rouse from fall velocity', self)
+        self.btnAddWs.setToolTip('Compute <b>Rouse</b> for specific fall velocity')
+        self.btnAddWs.setEnabled(False)
+        self.btnAddWs.setFixedWidth(200)
+
 
         # create the widget displaying message logs
         self.logTextBox = QPlainTextEditLogger(self)
@@ -507,6 +608,7 @@ class SerafinToolInterface(QWidget):
         self.btnOpen.clicked.connect(self.btnOpenEvent)
         self.btnSubmit.clicked.connect(self.btnSubmitEvent)
         self.btnAddUS.clicked.connect(self.btnAddUSEvent)
+        self.btnAddWs.clicked.connect(self.btnAddWsEvent)
         self.timeSelection.startIndex.returnPressed.connect(self.timeSlider.enterIndexEvent)
         self.timeSelection.endIndex.returnPressed.connect(self.timeSlider.enterIndexEvent)
 
@@ -548,6 +650,11 @@ class SerafinToolInterface(QWidget):
         hlayout2 = QHBoxLayout()
         hlayout2.addItem(QSpacerItem(30, 1))
         hlayout2.addWidget(self.btnAddUS)
+        hlayout2.addItem(QSpacerItem(30, 1))
+        vlayout.addLayout(hlayout2)
+        hlayout2 = QHBoxLayout()
+        hlayout2.addItem(QSpacerItem(30, 1))
+        hlayout2.addWidget(self.btnAddWs)
         hlayout2.addItem(QSpacerItem(30, 1))
         vlayout.addLayout(hlayout2)
         vlayout.addItem(QSpacerItem(1, 5))
@@ -642,6 +749,7 @@ class SerafinToolInterface(QWidget):
         self.time = []
         self.us_equation = None
         self.btnAddUS.setEnabled(False)
+        self.btnAddWs.setEnabled(False)
         self.singlePrecisionBox.setChecked(False)
         self.singlePrecisionBox.setEnabled(False)
         self.firstTable.setRowCount(0)
@@ -673,7 +781,7 @@ class SerafinToolInterface(QWidget):
             return True
         return False
 
-    def _getOuputTime(self):
+    def _getOutputTime(self):
         start_index = int(self.timeSelection.startIndex.text())
         end_index = int(self.timeSelection.endIndex.text())
         try:
@@ -696,7 +804,7 @@ class SerafinToolInterface(QWidget):
                             bytes(self.secondTable.item(i, 2).text(), 'utf-8').ljust(16)))
         return selected
 
-    def _getOuputHeader(self, selected_vars):
+    def _getOutputHeader(self, selected_vars):
         output_header = self.header.copy()
         output_header.nb_var = len(selected_vars)
         output_header.var_IDs, output_header.var_names, output_header.var_units = [], [], []
@@ -711,11 +819,10 @@ class SerafinToolInterface(QWidget):
     def btnAddUSEvent(self):
         msg = FrictionLawMessage()
         value = msg.exec_()
-        if value == QDialog.Accepted:
-            friction_law = msg.getChoice()
-        else:
+        if value != QDialog.Accepted:
             return
 
+        friction_law = msg.getChoice()
         self.us_equation = get_US_equation(friction_law)
         add_US(self.available_vars)
 
@@ -733,6 +840,23 @@ class SerafinToolInterface(QWidget):
             self.firstTable.item(offset+i, 0).setBackground(_GREEN)  # set new US color to green
             self.firstTable.item(offset+i, 1).setBackground(_GREEN)
             self.firstTable.item(offset+i, 2).setBackground(_GREEN)
+
+        # unlock add Ws button
+        self.btnAddWs.setEnabled(True)
+
+    def btnAddWsEvent(self):
+        msg = FallVelocityMessage()
+        value = msg.exec_()
+        if value != QDialog.Accepted:
+            return
+        table = msg.get_table()
+        offset = self.secondTable.rowCount()
+        for i in range(len(table)):
+            self.secondTable.insertRow(offset+i)
+            for j in range(3):
+                item = QTableWidgetItem(table[i][j])
+                self.secondTable.setItem(offset+i, j, item)
+                self.secondTable.item(offset+i, j).setBackground(_BLUE)
 
     def btnOpenEvent(self):
         options = QFileDialog.Options()
@@ -784,6 +908,10 @@ class SerafinToolInterface(QWidget):
             if 'H' in available_var_IDs and 'M' in available_var_IDs:
                 self.btnAddUS.setEnabled(True)
 
+        # unlock add Ws button
+        if 'US' in self.header.var_IDs:
+            self.btnAddWs.setEnabled(True)
+
         # unlock the time slider
         if resin.header.date is not None:
             year, month, day, hour, minute, second = resin.header.date
@@ -802,7 +930,7 @@ class SerafinToolInterface(QWidget):
         self.btnSubmit.setEnabled(True)
 
     def btnSubmitEvent(self):
-        output_time_indices = self._getOuputTime()
+        output_time_indices = self._getOutputTime()
         if not output_time_indices:
             return
 
@@ -837,7 +965,7 @@ class SerafinToolInterface(QWidget):
 
             with Serafin.Write(filename, self.language, overwrite) as resout:
                 # deduce header from selected variable IDs and write header
-                output_header = self._getOuputHeader(selected_vars)
+                output_header = self._getOutputHeader(selected_vars)
                 logging.info('Writing the output with variables %s' % str(output_header.var_IDs))
 
                 resout.write_header(output_header)
@@ -868,8 +996,4 @@ if __name__ == '__main__':
 
     app = QApplication(sys.argv)
     widget = SerafinToolInterface()
-    try:
-        app.exec_()
-    except:
-        print('exiting')
-
+    app.exec_()
