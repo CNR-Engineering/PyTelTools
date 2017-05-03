@@ -78,7 +78,7 @@ US = Variable('US', bytes('VITESSE DE FROT.', 'utf-8').ljust(16), bytes('FRICTIO
 TAU = Variable('TAU', bytes('CONTRAINTE', 'utf-8').ljust(16), bytes('CONSTRAINT', 'utf-8').ljust(16), bytes('PA', 'utf-8').ljust(16))
 DMAX = Variable('DMAX', bytes('DIAMETRE', 'utf-8').ljust(16), bytes('DIAMETER', 'utf-8').ljust(16), bytes('MM', 'utf-8').ljust(16))
 W = Variable('W', bytes('FROTTEMEN', 'utf-8').ljust(16), bytes('BOTTOM FRICTION', 'utf-8').ljust(16), bytes('  ', 'utf-8').ljust(16))
-
+ROUSE = Variable('ROUSE', bytes('NOMBRE DE ROUSE', 'utf-8').ljust(16), bytes('ROUSE NUMBER', 'utf-8').ljust(16), bytes('  ', 'utf-8').ljust(16))  # just a dummy
 
 # define some special operators
 def compute_DMAX(tau):
@@ -92,14 +92,16 @@ def cubic_root(x):
         return np.where(x < 0, np.power(-x, 1/3.), np.power(x, 1/3.))
 
 
-def compute_ROUSE(us, ws):
-    with np.errstate(divide='ignore'):
-        return np.where(us != 0, ws / us / KARMAN, float('Inf'))
+def compute_ROUSE(ws):
+    def _compute_ROUSE(us):
+        with np.errstate(divide='ignore'):
+            return np.where(us != 0, ws / us / KARMAN, float('Inf'))
+    return _compute_ROUSE
 
 # define the operators (relations between variables) as constants
 MINUS, TIMES, NORM2 = 0, 1, 2
 COMPUTE_TAU, COMPUTE_DMAX = 3, 4
-COMPUTE_CHEZY, COMPUTE_STRICKLER, COMPUTE_MANNING, COMPUTE_NIKURADSE, COMPUTE_ROUSE = 5, 6, 7, 8, 9
+COMPUTE_CHEZY, COMPUTE_STRICKLER, COMPUTE_MANNING, COMPUTE_NIKURADSE = 5, 6, 7, 8
 OPERATIONS = {MINUS: lambda a, b: a-b,
               TIMES: lambda a, b: a*b,
               NORM2: lambda a, b: np.sqrt(np.square(a) + np.square(b)),
@@ -108,8 +110,7 @@ OPERATIONS = {MINUS: lambda a, b: a-b,
               COMPUTE_CHEZY: lambda w, h, m: np.sqrt(np.power(m, 2) * GRAVITY / np.square(w)),
               COMPUTE_STRICKLER: lambda w, h, m: np.sqrt(np.power(m, 2) * GRAVITY / np.square(w) / cubic_root(h)),
               COMPUTE_MANNING: lambda w, h, m: np.sqrt(np.power(m, 2) * GRAVITY * np.power(w, 2) / cubic_root(h)),
-              COMPUTE_NIKURADSE: lambda w, h, m: np.sqrt(np.power(m, 2) * KARMAN**2 / np.power(np.log(30 * h / np.exp(1) / w), 2)),
-              COMPUTE_ROUSE: compute_ROUSE}
+              COMPUTE_NIKURADSE: lambda w, h, m: np.sqrt(np.power(m, 2) * KARMAN**2 / np.power(np.log(30 * h / np.exp(1) / w), 2))}
 
 # define basic equations (binary) and special equations (unary and ternary)
 BASIC_EQUATIONS = {'H': Equation((S, B), H, MINUS), 'S': Equation((H, B), S, MINUS),
@@ -123,6 +124,8 @@ STRICKLER_EQUATION = Equation((W, H, M), US, COMPUTE_STRICKLER)
 MANNING_EQUATION = Equation((W, H, M), US, COMPUTE_MANNING)
 NIKURADSE_EQUATION = Equation((W, H, M), US, COMPUTE_NIKURADSE)
 
+# a very special equation
+rouse_equation = lambda ws_id, ws: Equation((Variable(ws_id, None, None, None), US), ROUSE, compute_ROUSE(ws))
 
 
 def is_basic_variable(var_ID):
@@ -207,6 +210,7 @@ def get_necessary_equations(known_var_IDs, needed_var_IDs, us_equation):
     @return <[Equation]>: the list of equations needed to compute all user-selected variables
     """
     selected_unknown_var_IDs = list(filter(lambda x: x not in known_var_IDs, needed_var_IDs))
+    is_rouse = any(map(lambda x: x[:5] == 'ROUSE', selected_unknown_var_IDs))
     necessary_equations = []
 
     # add S
@@ -227,6 +231,8 @@ def get_necessary_equations(known_var_IDs, needed_var_IDs, us_equation):
                 necessary_equations.append(BASIC_EQUATIONS['H'])
              elif 'DMAX' in selected_unknown_var_IDs and 'TAU' not in known_var_IDs:
                 necessary_equations.append(BASIC_EQUATIONS['H'])
+             elif is_rouse:
+                 necessary_equations.append(BASIC_EQUATIONS['H'])
 
     # add M
     if 'M' in selected_unknown_var_IDs:
@@ -239,6 +245,8 @@ def get_necessary_equations(known_var_IDs, needed_var_IDs, us_equation):
                 necessary_equations.append(BASIC_EQUATIONS['M'])
              elif 'DMAX' in selected_unknown_var_IDs and 'TAU' not in known_var_IDs:
                 necessary_equations.append(BASIC_EQUATIONS['M'])
+             elif is_rouse:
+                 necessary_equations.append(BASIC_EQUATIONS['M'])
 
     # add I and J
     if 'I' in selected_unknown_var_IDs:
@@ -264,6 +272,8 @@ def get_necessary_equations(known_var_IDs, needed_var_IDs, us_equation):
             necessary_equations.append(us_equation)
         elif 'DMAX' in selected_unknown_var_IDs and 'TAU' not in known_var_IDs:
             necessary_equations.append(us_equation)
+        elif is_rouse:
+            necessary_equations.append(us_equation)
 
     # add TAU
     if 'TAU' in selected_unknown_var_IDs:
@@ -274,6 +284,12 @@ def get_necessary_equations(known_var_IDs, needed_var_IDs, us_equation):
     # add DMAX
     if 'DMAX' in selected_unknown_var_IDs:
         necessary_equations.append(DMAX_EQUATION)
+
+    # add ROUSE
+    for var_ID in selected_unknown_var_IDs:
+        if var_ID[:5] == 'ROUSE':
+            rouse_value = float(var_ID[6:])
+            necessary_equations.append(rouse_equation(var_ID, rouse_value))
 
     return necessary_equations
 
@@ -320,7 +336,7 @@ def do_calculations_in_frame(equations, us_equation, input_serafin, time_index, 
 
         # read (if needed) input variables values
         for input_var_ID in input_var_IDs:
-            if input_var_ID not in computed_values:
+            if input_var_ID not in computed_values and input_var_ID[:5] != 'ROUSE':
                 computed_values[input_var_ID] = input_serafin.read_var_in_frame(time_index, input_var_ID)
 
         # handle the special case for TAU, DMAX and US
@@ -334,6 +350,10 @@ def do_calculations_in_frame(equations, us_equation, input_serafin, time_index, 
             continue
         elif equation.output.ID() == 'DMAX':
             computed_values['DMAX'] = do_unary_calculation(DMAX_EQUATION, computed_values['TAU'])
+            continue
+        # handle the very special case for ROUSE
+        elif equation.output.ID() == 'ROUSE':
+            computed_values[equation.input[0].ID()] = equation.operator(computed_values['US'])
             continue
 
         # handle the normal case (binary operation)

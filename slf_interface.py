@@ -141,9 +141,9 @@ class FallVelocityMessage(QDialog):
     """!
     @brief Message dialog for adding fall velocities
     """
-    def __init__(self, parent=None):
+    def __init__(self, old_velocities, parent=None):
         super().__init__(parent)
-        self.values = []
+        self.values = old_velocities[:]
         self.names = []
 
         self.table = TableWidgetDragRows(self)
@@ -182,6 +182,7 @@ class FallVelocityMessage(QDialog):
     def check(self):
         if self.table.rowCount() == 0:
             return
+        self.names = []
         for i in range(self.table.rowCount()):
             self.names.append(self.table.item(i, 1).text())
 
@@ -201,7 +202,7 @@ class FallVelocityMessage(QDialog):
 
     def btnAddEvent(self):
         value, ok = QInputDialog.getText(self, 'New value',
-                                         'Fall velocity value:', text='1e-5')
+                                         'Fall velocity value (up to 5 significant figures):', text='1e-5')
         if not ok:
             return
         try:
@@ -498,6 +499,23 @@ class SelectedTimeINFO(QWidget):
             w.clear()
 
 
+class OutputProgressDialog(QProgressDialog):
+    def __init__(self, parent=None):
+        super().__init__('Output in progress', 'OK', 0, 100, parent)
+
+        self.cancelButton = QPushButton('OK')
+        self.setCancelButton(self.cancelButton)
+        self.cancelButton.setEnabled(False)
+
+        self.setAutoReset(False)
+        self.setAutoClose(False)
+
+        self.setWindowTitle('Writing the output...')
+        self.setWindowFlags(Qt.WindowTitleHint)
+        self.setFixedSize(300, 150)
+
+        self.open()
+
 class SerafinToolInterface(QWidget):
     """!
     @brief A graphical interface for extracting and computing variables from .slf file
@@ -512,6 +530,7 @@ class SerafinToolInterface(QWidget):
         self.time = []
         self.available_vars = []
         self.us_equation = None
+        self.fall_velocities = []
 
         self._initWidgets()  # some instance attributes will be set there
         self._setLayout()
@@ -705,7 +724,6 @@ class SerafinToolInterface(QWidget):
         qr = self.frameGeometry()
         cp = QDesktopWidget().availableGeometry().center()
         qr.moveCenter(cp)
-        self.move(qr.topLeft())
 
     def _initVarTables(self):
         """!
@@ -748,6 +766,7 @@ class SerafinToolInterface(QWidget):
         self.header = None
         self.time = []
         self.us_equation = None
+        self.fall_velocities = []
         self.btnAddUS.setEnabled(False)
         self.btnAddWs.setEnabled(False)
         self.singlePrecisionBox.setChecked(False)
@@ -841,11 +860,14 @@ class SerafinToolInterface(QWidget):
             self.firstTable.item(offset+i, 1).setBackground(_GREEN)
             self.firstTable.item(offset+i, 2).setBackground(_GREEN)
 
+        # lock the add US button again
+        self.btnAddUS.setEnabled(False)
+
         # unlock add Ws button
         self.btnAddWs.setEnabled(True)
 
     def btnAddWsEvent(self):
-        msg = FallVelocityMessage()
+        msg = FallVelocityMessage(self.fall_velocities)
         value = msg.exec_()
         if value != QDialog.Accepted:
             return
@@ -857,6 +879,8 @@ class SerafinToolInterface(QWidget):
                 item = QTableWidgetItem(table[i][j])
                 self.secondTable.setItem(offset+i, j, item)
                 self.secondTable.item(offset+i, j).setBackground(_BLUE)
+        for i in range(len(table)):
+            self.fall_velocities.append(float(table[i][0][6:]))
 
     def btnOpenEvent(self):
         options = QFileDialog.Options()
@@ -890,7 +914,6 @@ class SerafinToolInterface(QWidget):
             # copy to avoid reading the same data in the future
             self.header = copy.deepcopy(resin.header)
             self.time = resin.time[:]
-
 
         logging.info('File closed')
 
@@ -958,10 +981,16 @@ class SerafinToolInterface(QWidget):
         if overwrite is None:
             return
 
+        self.setEnabled(False)
+        progressBar = OutputProgressDialog()
+        progressBar.setValue(0)
+
         # do some calculations
         with Serafin.Read(self.filename, self.language) as resin:
+            # instead of re-reading the header and the time, just do a copy
             resin.header = self.header
             resin.time = self.time
+            progressBar.setValue(5)
 
             with Serafin.Write(filename, self.language, overwrite) as resout:
                 # deduce header from selected variable IDs and write header
@@ -975,10 +1004,16 @@ class SerafinToolInterface(QWidget):
                                                               self.us_equation)
 
                 for i in output_time_indices:
+                    progressBar.setValue(4 + int(95 * (i+1) / len(output_time_indices)))
                     vals = do_calculations_in_frame(necessary_equations, self.us_equation, resin, i,
                                                     output_header.var_IDs, output_header.np_float_type)
                     resout.write_entire_frame(output_header, self.time[i], vals)
+
         logging.info('Finished writing the output')
+        progressBar.setValue(100)
+        progressBar.cancelButton.setEnabled(True)
+        progressBar.exec_()
+        self.setEnabled(True)
 
 
 def exception_hook(exctype, value, traceback):
@@ -997,3 +1032,5 @@ if __name__ == '__main__':
     app = QApplication(sys.argv)
     widget = SerafinToolInterface()
     app.exec_()
+
+
