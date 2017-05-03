@@ -126,7 +126,8 @@ class ComputeVolumeGUI(QWidget):
         self.serafinNameBox.setText(filename)
         self.header = None
         self.time = []
-
+        self.firstVarBox.clear()
+        self.secondVarBox.clear()
 
         with Serafin.Read(self.filename, 'fr') as resin:
             resin.read_header()
@@ -145,7 +146,7 @@ class ComputeVolumeGUI(QWidget):
 
         for var_ID in self.header.var_IDs:
             self.firstVarBox.addItem(var_ID)
-
+        self.secondVarBox.addItem('0')
 
     def btnOpenPolygonEvent(self):
         options = QFileDialog.Options()
