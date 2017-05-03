@@ -11,7 +11,6 @@ from PyQt5.QtCore import *
 
 import logging
 import copy
-import numpy as np
 from slf import Serafin
 from slf.variables import get_available_variables, \
     do_calculations_in_frame, get_necessary_equations, get_US_equation, add_US
@@ -516,12 +515,15 @@ class OutputProgressDialog(QProgressDialog):
 
         self.open()
 
-class SerafinToolInterface(QWidget):
+
+class ExtractVariablesGUI(QWidget):
     """!
     @brief A graphical interface for extracting and computing variables from .slf file
     """
-    def __init__(self):
+    def __init__(self, parent=None):
         super().__init__()
+        self.parent = parent
+
         self.filename = None
         self.language = None
 
@@ -538,9 +540,13 @@ class SerafinToolInterface(QWidget):
 
         self.setFixedWidth(800)
         self.setMaximumHeight(750)
-        self.setWindowTitle('Serafin Tool')
+        self.setWindowTitle('Extract variables and frames from Serafin file')
         self._center()
-        self.show()
+
+    def closeEvent(self, event):
+        if self.parent is not None:
+            self.parent.closeSerafin()
+        event.accept()
 
     def _initWidgets(self):
         """!
@@ -593,7 +599,6 @@ class SerafinToolInterface(QWidget):
         self.btnAddWs.setToolTip('Compute <b>Rouse</b> for specific fall velocity')
         self.btnAddWs.setEnabled(False)
         self.btnAddWs.setFixedWidth(200)
-
 
         # create the widget displaying message logs
         self.logTextBox = QPlainTextEditLogger(self)
@@ -1030,7 +1035,7 @@ if __name__ == '__main__':
     sys.excepthook = exception_hook
 
     app = QApplication(sys.argv)
-    widget = SerafinToolInterface()
+    widget = ExtractVariablesGUI()
     app.exec_()
 
 
