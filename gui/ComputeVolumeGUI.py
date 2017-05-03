@@ -26,8 +26,7 @@ class ComputeVolumeGUI(QWidget):
         self.polygonNameBox = QLineEdit()
         self.polygonNameBox.setReadOnly(True)
 
-
-
+        # bind events
         self.btnOpenSerafin.clicked.connect(self.btnOpenSerafinEvent)
         self.btnOpenPolygon.clicked.connect(self.btnOpenPolygonEvent)
 

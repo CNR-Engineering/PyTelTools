@@ -92,6 +92,11 @@ def cubic_root(x):
         return np.where(x < 0, np.power(-x, 1/3.), np.power(x, 1/3.))
 
 
+def compute_NIKURADSE(w, h, m):
+    with np.errstate(divide='ignore', invalide='ignore'):
+        return np.sqrt(np.power(m, 2) * KARMAN**2 / np.power(np.log(30 * h / np.exp(1) / w), 2))
+
+
 def compute_ROUSE(ws):
     def _compute_ROUSE(us):
         with np.errstate(divide='ignore'):
@@ -110,7 +115,7 @@ OPERATIONS = {MINUS: lambda a, b: a-b,
               COMPUTE_CHEZY: lambda w, h, m: np.sqrt(np.power(m, 2) * GRAVITY / np.square(w)),
               COMPUTE_STRICKLER: lambda w, h, m: np.sqrt(np.power(m, 2) * GRAVITY / np.square(w) / cubic_root(h)),
               COMPUTE_MANNING: lambda w, h, m: np.sqrt(np.power(m, 2) * GRAVITY * np.power(w, 2) / cubic_root(h)),
-              COMPUTE_NIKURADSE: lambda w, h, m: np.sqrt(np.power(m, 2) * KARMAN**2 / np.power(np.log(30 * h / np.exp(1) / w), 2))}
+              COMPUTE_NIKURADSE: compute_NIKURADSE}
 
 # define basic equations (binary) and special equations (unary and ternary)
 BASIC_EQUATIONS = {'H': Equation((S, B), H, MINUS), 'S': Equation((H, B), S, MINUS),
