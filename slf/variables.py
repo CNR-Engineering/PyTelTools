@@ -246,12 +246,12 @@ def get_necessary_equations(known_var_IDs, needed_var_IDs, us_equation):
         if 'US' in selected_unknown_var_IDs:
             necessary_equations.append(BASIC_EQUATIONS['M'])
         elif 'US' not in known_var_IDs:
-             if 'TAU' in selected_unknown_var_IDs:
+            if 'TAU' in selected_unknown_var_IDs:
                 necessary_equations.append(BASIC_EQUATIONS['M'])
-             elif 'DMAX' in selected_unknown_var_IDs and 'TAU' not in known_var_IDs:
+            elif 'DMAX' in selected_unknown_var_IDs and 'TAU' not in known_var_IDs:
                 necessary_equations.append(BASIC_EQUATIONS['M'])
-             elif is_rouse:
-                 necessary_equations.append(BASIC_EQUATIONS['M'])
+            elif is_rouse:
+                necessary_equations.append(BASIC_EQUATIONS['M'])
 
     # add I and J
     if 'I' in selected_unknown_var_IDs:

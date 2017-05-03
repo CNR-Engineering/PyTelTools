@@ -159,7 +159,7 @@ class TruncatedTriangularPrisms(Mesh2D):
                 centroid = intersection.centroid
                 height = Interpolator(new_triangle).get_interpolator_at(centroid.x, centroid.y).dot(np.array([z_top, 0, 0]))
                 return intersection.area * height
-        else:  # negative trahedron
+        else:  # negative tetrahedron
             (z_bottom, _, bottom), (z_middle, _, middle), (z_top, _, top) = sorted(zip(values, [1, 2, 3], [p1, p2, p3]))
             bottom_middle_intersect = (z_middle * bottom - z_bottom * middle) / (z_middle - z_bottom)
             bottom_top_intersect = (z_top * bottom - z_bottom * top) / (z_top - z_bottom)
@@ -186,97 +186,103 @@ class TruncatedTriangularPrisms(Mesh2D):
                 return intersected_volume - (volume_negative - volume_tetrahedron_not_in_polygon)
 
 
-def volume_net_strict(var_ID, input_stream, output_stream, polynames, polygons, time_sampling_frequency=1):
-    base = TruncatedTriangularPrisms(input_stream)
-    weights = []
-    for poly in polygons:
-        weights.append(base.polygon_intersection_strict(poly))
+class VolumeCalculator:
+    NET_STRICT, NET, POSITIVE, NEGATIVE = 0, 1, 2, 3
 
-    # write the first line
-    output_stream.write('time')
-    for name in polynames:
-        output_stream.write(';')
-        output_stream.write(name)
-    output_stream.write('\n')
+    def __init__(self, volume_type, var_ID, input_stream, output_stream, polynames, polygons,
+                 time_sampling_frequency=1, second_var_ID=None):
+        self.volume_type = volume_type
+        self.input_stream = input_stream
+        self.output_stream = output_stream
+        self.polynames = polynames
+        self.polygons = polygons
 
-    # write the volumes, one frame per line
-    for i in range(0, len(input_stream.time), time_sampling_frequency):
-        i_time = input_stream.time[i]
-        output_stream.write(str(i_time))
+        self.var_ID = var_ID
+        self.second_var_ID = second_var_ID
 
-        variable = input_stream.read_var_in_frame(i, var_ID)
-        for j in range(len(polygons)):
-            output_stream.write(';')
-            weight = weights[j]
-            output_stream.write(str(weight.dot(variable)))
-        output_stream.write('\n')
+        self.time = input_stream.time[0::time_sampling_frequency]
 
+        self.write_first_line()
 
-def volume_net(var_ID, input_stream, output_stream, polynames, polygons, time_sampling_frequency=1):
-    base_triangles = TruncatedTriangularPrisms(input_stream)
-    weights = []
+        self.base_triangles = TruncatedTriangularPrisms(input_stream)
 
-    for poly in polygons:
-        weight, triangle_polygon_intersection = base_triangles.polygon_intersection(poly)
-        weights.append((weight, triangle_polygon_intersection))
+        self.weights = []
+        self.construct_weights()
+        self.write_volumes()
 
-    # write the first line
-    output_stream.write('time')
-    for name in polynames:
-        output_stream.write(';')
-        output_stream.write(name)
-    output_stream.write('\n')
+    def write_first_line(self):
+        self.output_stream.write('time')
+        for name in self.polynames:
+            self.output_stream.write(';')
+            self.output_stream.write(name)
+        self.output_stream.write('\n')
 
-    # write the volumes, one frame per line
-    for i in range(0, len(input_stream.time), time_sampling_frequency):
-        i_time = input_stream.time[i]
-        output_stream.write(str(i_time))
+    def construct_weights(self):
+        if self.volume_type == VolumeCalculator.NET_STRICT:
+            for poly in self.polygons:
+                self.weights.append(self.base_triangles.polygon_intersection_strict(poly))
+        elif self.volume_type == VolumeCalculator.NET:
+            for poly in self.polygons:
+                weight, triangle_polygon_intersection = self.base_triangles.polygon_intersection(poly)
+                self.weights.append((weight, triangle_polygon_intersection))
+        elif self.volume_type == VolumeCalculator.POSITIVE:
+            for poly in self.polygons:
+                self.weights.append(self.base_triangles.polygon_intersection_all(poly))
+        else:  # negative volume
+            for poly in self.polygons:
+                weight, triangle_polygon_intersection = self.base_triangles.polygon_intersection(poly)
+                triangles = self.base_triangles.polygon_intersection_all(poly)
+                self.weights.append((weight, triangle_polygon_intersection, triangles))
 
-        variable = input_stream.read_var_in_frame(i, var_ID)
-        for j in range(len(polygons)):
-            weight, triangle_polygon_intersection = weights[j]
-            volume_inside = weight.dot(variable)
-            volume_extra = TruncatedTriangularPrisms.extra_volume_in_polygon(triangle_polygon_intersection, variable)
-            output_stream.write(';')
-            output_stream.write(str(volume_inside + volume_extra))
-        output_stream.write('\n')
-
-
-def volume_superior(var_ID, input_stream, output_stream, polynames, polygons, time_sampling_frequency=1):
-    base_triangles = TruncatedTriangularPrisms(input_stream)
-    triangles_in_polygon = []
-
-    for poly in polygons:
-        triangles_in_polygon.append(base_triangles.polygon_intersection_all(poly))
-
-    # write the first line
-    output_stream.write('time')
-    for name in polynames:
-        output_stream.write(';')
-        output_stream.write(name)
-    output_stream.write('\n')
-
-    # write the volumes, one frame per line
-    for i in range(0, len(input_stream.time), time_sampling_frequency):
-        i_time = input_stream.time[i]
-        output_stream.write(str(i_time))
-
-        variable = input_stream.read_var_in_frame(i, var_ID)
-        for j in range(len(polygons)):
-            triangles, extra = triangles_in_polygon[j]
+    def volume_in_frame_in_polygon(self, weight, values, polygon):
+        if self.volume_type == VolumeCalculator.NET_STRICT:
+            return weight.dot(values)
+        elif self.volume_type == VolumeCalculator.NET:
+            strict_weight, triangle_polygon_intersection = weight
+            volume_inside = weight.dot(values)
+            volume_boundary = TruncatedTriangularPrisms.extra_volume_in_polygon(triangle_polygon_intersection, values)
+            return volume_inside + volume_boundary
+        elif self.volume_type == VolumeCalculator.POSITIVE:
+            triangles, extra = weight
             volume_total = 0
             for a, b, c in triangles:
                 t = triangles[a, b, c]
-                volume_total += TruncatedTriangularPrisms.superior_prism_volume(t, variable[[a, b, c]])
+                volume_total += TruncatedTriangularPrisms.superior_prism_volume(t, values[[a, b, c]])
             for a, b, c in extra:
                 triangle, intersection = extra[a, b, c]
-                volume_total += TruncatedTriangularPrisms.superior_prism_volume_in_intersection(triangle, polygons[j],
+                volume_total += TruncatedTriangularPrisms.superior_prism_volume_in_intersection(triangle, polygon,
                                                                                                 intersection,
-                                                                                                variable[[a, b, c]])
-            output_stream.write(';')
-            output_stream.write(str(volume_total))
+                                                                                                values[[a, b, c]])
+            return volume_total
+        else:
+            strict_weight, triangle_polygon_intersection, triangles = weight
+            triangles, extra = triangles
+            volume_inside = weight.dot(values)
+            volume_boundary = TruncatedTriangularPrisms.extra_volume_in_polygon(triangle_polygon_intersection, values)
+            volume_net = volume_inside + volume_boundary
+            volume_positive = 0
+            for a, b, c in triangles:
+                t = triangles[a, b, c]
+                volume_positive += TruncatedTriangularPrisms.superior_prism_volume(t, values[[a, b, c]])
+            for a, b, c in extra:
+                triangle, intersection = extra[a, b, c]
+                volume_positive += TruncatedTriangularPrisms.superior_prism_volume_in_intersection(triangle, polygon,
+                                                                                                   intersection,
+                                                                                                   values[[a, b, c]])
+            return volume_net - volume_positive
 
-        output_stream.write('\n')
+    def write_volumes(self):
+        for i, i_time in enumerate(self.time):
+            self.output_stream.write(str(i_time))
+
+            values = self.input_stream.read_var_in_frame(i, self.var_ID)
+            for j in range(len(self.polygons)):
+                self.output_stream.write(';')
+                weight = self.weights[j]
+                volume = self.volume_in_frame_in_polygon(weight, values, self.polygons[j])
+
+                self.output_stream.write(str(volume))
+            self.output_stream.write('\n')
 
 
 

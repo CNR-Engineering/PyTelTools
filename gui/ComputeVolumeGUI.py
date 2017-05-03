@@ -9,6 +9,24 @@ from slf.volume import *
 from geom import BlueKenue
 
 
+class OutputProgressDialog(QProgressDialog):
+    def __init__(self, parent=None):
+        super().__init__('Output in progress', 'OK', 0, 100, parent)
+
+        self.cancelButton = QPushButton('OK')
+        self.setCancelButton(self.cancelButton)
+        self.cancelButton.setEnabled(False)
+
+        self.setAutoReset(False)
+        self.setAutoClose(False)
+
+        self.setWindowTitle('Writing the output...')
+        self.setWindowFlags(Qt.WindowTitleHint)
+        self.setFixedSize(300, 150)
+
+        self.open()
+
+
 class ComputeVolumeGUI(QWidget):
     def __init__(self, parent=None):
         super().__init__()
@@ -190,17 +208,22 @@ class ComputeVolumeGUI(QWidget):
         if overwrite is None:
             return
 
-        var_ID = self.firstVarBox.currentText()
         self.setEnabled(False)
-        names = [str(i+1) for i in range(len(self.polygons))]
-        with Serafin.Read(self.filename, 'fr') as f:
-            f.header = self.header
-            f.time = self.time
-            with open(filename, 'w') as f2:
-                if self.supVolumeBox.isChecked():
-                    volume_superior(var_ID, f, f2, names, self.polygons)
-                else:
-                    volume_net(var_ID, f, f2, names, self.polygons)
+        progressBar = OutputProgressDialog()
+        progressBar.setValue(0)
+
+        var_ID = self.firstVarBox.currentText()
+        names = ['polygon %d' % (i+1) for i in range(len(self.polygons))]
+
+        # with Serafin.Read(self.filename, 'fr') as f:
+        #     f.header = self.header
+        #     f.time = self.time
+        #     with open(filename, 'w') as f2:
+        #         if self.supVolumeBox.isChecked():
+        #             volume_superior(var_ID, f, f2, names, self.polygons)
+        #         else:
+        #             volume_net(var_ID, f, f2, names, self.polygons)
+
         self.setEnabled(True)
 
 

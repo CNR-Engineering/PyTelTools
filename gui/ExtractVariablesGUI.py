@@ -1009,10 +1009,10 @@ class ExtractVariablesGUI(QWidget):
                                                               self.us_equation)
 
                 for i in output_time_indices:
-                    progressBar.setValue(4 + int(95 * (i+1) / len(output_time_indices)))
                     vals = do_calculations_in_frame(necessary_equations, self.us_equation, resin, i,
                                                     output_header.var_IDs, output_header.np_float_type)
                     resout.write_entire_frame(output_header, self.time[i], vals)
+                    progressBar.setValue(4 + int(95 * (i+1) / len(output_time_indices)))
 
         logging.info('Finished writing the output')
         progressBar.setValue(100)
