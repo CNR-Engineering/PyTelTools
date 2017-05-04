@@ -752,9 +752,9 @@ class ExtractVariablesGUI(QWidget):
         # add new variables to the table
         for i, var in enumerate(self.available_vars):
             self.firstTable.insertRow(self.firstTable.rowCount())
-            id_item = QTableWidgetItem(var.ID().strip())
-            name_item = QTableWidgetItem(var.name(self.language).decode('utf-8').strip())
-            unit_item = QTableWidgetItem(var.unit().decode('utf-8').strip())
+            id_item = QTableWidgetItem(var.ID())
+            name_item = QTableWidgetItem(var.name(self.language))
+            unit_item = QTableWidgetItem(var.unit())
             self.firstTable.setItem(offset+i, 0, QTableWidgetItem(id_item))
             self.firstTable.setItem(offset+i, 1, QTableWidgetItem(name_item))
             self.firstTable.setItem(offset+i, 2, QTableWidgetItem(unit_item))

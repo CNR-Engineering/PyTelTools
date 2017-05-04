@@ -23,12 +23,13 @@ class SerafinVariableNames:
     def __init__(self, is_2d, language):
         self.language = language
         base_folder = os.path.dirname(os.path.realpath(__file__))
+        index_col = {'fr': 1, 'en': 2}[language]
         if is_2d:
             self.var_table = pd.read_csv(os.path.join(base_folder, 'data', 'Serafin_var2D.csv'),
-                                         index_col=0, header=0, sep=',')
+                                         index_col=index_col, header=0, sep=';')
         else:
             self.var_table = pd.read_csv(os.path.join(base_folder, 'data', 'Serafin_var3D.csv'),
-                                         index_col=0, header=0, sep=',')
+                                         index_col=index_col, header=0, sep=';')
 
     def name_to_ID(self, var_name):
         """!
@@ -36,21 +37,12 @@ class SerafinVariableNames:
         @param var_name <bytes>: the name of the new variable
         @return <bytes>: the unit of the new variable
         """
+        # print(var_name, self.var_table.index.tolist())
         try:
-            var_index = self.var_table[self.language].tolist().index(var_name)
+            var_index = self.var_table.index.tolist().index(var_name)
         except ValueError:
             return  # handled in Serafin.Read
-        var_ID = self.var_table.index.values[var_index]
-        return var_ID
-
-    def add_new_var(self, var_name, var_unit):
-        """!
-        @brief Add new variable specification in the table
-        @param var_name <bytes>: the name of the new variable
-        @param var_unit <bytes>: the unit of the new variable
-        """
-        self.var_table.append({var_name.decode('utf-8'): [var_name, var_name, var_unit]}, ignore_index=True)
-
+        return self.var_table['varID'][var_index]
 
 
 class SerafinValidationError(Exception):
@@ -198,12 +190,11 @@ class SerafinHeader:
 
         # Deduce variable IDs (if known from specifications) from names
         for var_name, var_unit in zip(self.var_names, self.var_units):
-            name = var_name.decode(encoding='utf-8')
+            name = var_name.decode(encoding='utf-8').strip()
             var_id = self.specifications.name_to_ID(name)
             if var_id is None:
                 module_logger.warn('WARNING: The variable name "%s" is not known. The complete name will be used as ID' % name)
-                self.specifications.add_new_var(var_name, var_unit)
-                var_id = name.strip()
+                var_id = name
             self.var_IDs.append(var_id)
 
         # Build ikle2d

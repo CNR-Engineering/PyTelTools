@@ -46,7 +46,7 @@ class Equation():
         self.operator = operator
 
 
-def build_basic_variables():
+def build_variables():
     """!
     @brief Initialize the BASIC_VARIABLES constant
     """
@@ -58,27 +58,26 @@ B,FOND ,BOTTOM,M
 Q,DEBIT SCALAIRE,SCALAR FLOWRATE,M2/S
 I,DEBIT SUIVANT X,FLOWRATE ALONG X,M2/S
 J,DEBIT SUIVANT Y,FLOWRATE ALONG Y,M2/S
-M,VITESSE SCALAIRE,SCALAR VELOCITY,M/S"""
+M,VITESSE SCALAIRE,SCALAR VELOCITY,M/S
+US,VITESSE DE FROT.,FRICTION VEL.,M/S
+TAU,CONTRAINTE,BED SHEAR STRESS,PASCAL
+DMAX,DIAMETRE,DIAMETER,MM
+W,FROTTEMENT,BOTTOM FRICTION,
+ROUSE,NOMBRE DE ROUSE,ROUSE NUMBER,"""
 
     for i, row in enumerate(spec.split('\n')):
         ID, name_fr, name_en, unit = row.split(',')
-        BASIC_VARIABLES[ID] = Variable(ID, bytes(name_fr, 'utf-8').ljust(16), bytes(name_en, 'utf-8').ljust(16),
-                                       bytes(unit, 'utf-8').ljust(16))
+        VARIABLES[ID] = Variable(ID, name_fr, name_en, unit)
 
 
-# basic variables are stored as constants in a dictionary with ordered keys
-BASIC_VARIABLES = {}
-ordered_IDs = ['H', 'U', 'V', 'M', 'S', 'B', 'I', 'J', 'Q']
+# all variable entities involved in computations are stored as constants in a dictionary with ordered keys
+VARIABLES = {}
+basic_vars_IDs = ['H', 'U', 'V', 'M', 'S', 'B', 'I', 'J', 'Q']
 
+build_variables()
+H, U, V, M, S, B, I, J, Q, US, TAU, DMAX, W, ROUSE = [VARIABLES[var]
+                                                      for var in basic_vars_IDs + ['US', 'TAU', 'DMAX', 'W', 'ROUSE']]
 
-# construct the variable types as constants
-build_basic_variables()
-H, U, V, M, S, B, I, J, Q = [BASIC_VARIABLES[var] for var in ordered_IDs]
-US = Variable('US', bytes('VITESSE DE FROT.', 'utf-8').ljust(16), bytes('FRICTION VEL.', 'utf-8').ljust(16), bytes('M/S', 'utf-8').ljust(16))
-TAU = Variable('TAU', bytes('CONTRAINTE', 'utf-8').ljust(16), bytes('CONSTRAINT', 'utf-8').ljust(16), bytes('PA', 'utf-8').ljust(16))
-DMAX = Variable('DMAX', bytes('DIAMETRE', 'utf-8').ljust(16), bytes('DIAMETER', 'utf-8').ljust(16), bytes('MM', 'utf-8').ljust(16))
-W = Variable('W', bytes('FROTTEMEN', 'utf-8').ljust(16), bytes('BOTTOM FRICTION', 'utf-8').ljust(16), bytes('  ', 'utf-8').ljust(16))
-ROUSE = Variable('ROUSE', bytes('NOMBRE DE ROUSE', 'utf-8').ljust(16), bytes('ROUSE NUMBER', 'utf-8').ljust(16), bytes('  ', 'utf-8').ljust(16))  # just a dummy
 
 # define some special operators
 def compute_DMAX(tau):
@@ -119,6 +118,7 @@ OPERATIONS = {MINUS: lambda a, b: a-b,
 
 # define basic equations (binary) and special equations (unary and ternary)
 BASIC_EQUATIONS = {'H': Equation((S, B), H, MINUS), 'S': Equation((H, B), S, MINUS),
+                   'B': Equation((S, H), B, MINUS),
                    'M': Equation((U, V), M, NORM2), 'I': Equation((H, U), I, TIMES),
                    'J': Equation((H, V), J, TIMES), 'Q': Equation((I, J), Q, NORM2)}
 TAU_EQUATION = Equation((US,), TAU, COMPUTE_TAU)
@@ -139,7 +139,7 @@ def is_basic_variable(var_ID):
     @param var_ID <str>: the ID (short name) of the variable
     @return <bool>: True if the variable is one of the nine basic variables
     """
-    return var_ID in ordered_IDs
+    return var_ID in basic_vars_IDs
 
 
 def do_unary_calculation(equation, input_values):
@@ -182,7 +182,7 @@ def get_available_variables(input_var_IDs):
     @return <[Variable]>: the list of variables computable from the input variables by basic relations
     """
     available_vars = []
-    computables = list(map(BASIC_VARIABLES.get, filter(is_basic_variable, input_var_IDs)))
+    computables = list(map(VARIABLES.get, filter(is_basic_variable, input_var_IDs)))
 
     while True:
         found_new_computable = False
@@ -202,7 +202,7 @@ def get_available_variables(input_var_IDs):
     if 'US' in input_var_IDs:
         if 'TAU' not in input_var_IDs:
             available_vars.append(TAU)
-        if 'DIAMETRE' not in input_var_IDs and 'DIAMETER' not in input_var_IDs:
+        if 'DMAX' not in input_var_IDs:
             available_vars.append(DMAX)
     return available_vars
 
@@ -221,6 +221,10 @@ def get_necessary_equations(known_var_IDs, needed_var_IDs, us_equation):
     # add S
     if 'S' in selected_unknown_var_IDs:
         necessary_equations.append(BASIC_EQUATIONS['S'])
+
+    # add B
+    if 'B' in selected_unknown_var_IDs:
+        necessary_equations.append(BASIC_EQUATIONS['B'])
 
     # add H
     if 'H' in selected_unknown_var_IDs:
