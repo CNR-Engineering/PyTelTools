@@ -162,9 +162,12 @@ class ComputeVolumeGUI(QWidget):
             self.header = copy.deepcopy(resin.header)
             self.time = resin.time[:]
 
-        for var_ID in self.header.var_IDs:
-            self.firstVarBox.addItem(var_ID)
         self.secondVarBox.addItem('0')
+        self.secondVarBox.addItem('Initial values of the first variable')
+
+        for var_ID, var_name in zip(self.header.var_IDs, self.header.var_names):
+            self.firstVarBox.addItem(var_ID + ' (%s)' % var_name.decode('utf-8').strip())
+            self.secondVarBox.addItem(var_ID + ' (%s)' % var_name.decode('utf-8').strip())
 
     def btnOpenPolygonEvent(self):
         options = QFileDialog.Options()
@@ -192,7 +195,6 @@ class ComputeVolumeGUI(QWidget):
         if not self.polygons or self.header is None:
             return
 
-
         options = QFileDialog.Options()
         options |= QFileDialog.DontUseNativeDialog
         options |= QFileDialog.DontConfirmOverwrite
@@ -212,18 +214,27 @@ class ComputeVolumeGUI(QWidget):
         progressBar = OutputProgressDialog()
         progressBar.setValue(0)
 
-        var_ID = self.firstVarBox.currentText()
+        var_ID = self.firstVarBox.currentText().split('(')[0][:-1]
+        second_var_ID = self.secondVarBox.currentText()
+        if second_var_ID == '0':
+            second_var_ID = None
+        elif '(' in second_var_ID:
+            second_var_ID = second_var_ID.split('(')[0][:-1]
+        else:
+            second_var_ID = VolumeCalculator.INIT_VALUE
+
         names = ['polygon %d' % (i+1) for i in range(len(self.polygons))]
 
-        # with Serafin.Read(self.filename, 'fr') as f:
-        #     f.header = self.header
-        #     f.time = self.time
-        #     with open(filename, 'w') as f2:
-        #         if self.supVolumeBox.isChecked():
-        #             volume_superior(var_ID, f, f2, names, self.polygons)
-        #         else:
-        #             volume_net(var_ID, f, f2, names, self.polygons)
+        with Serafin.Read(self.filename, 'fr') as f:
+            f.header = self.header
+            f.time = self.time
+            with open(filename, 'w') as f2:
+                if self.supVolumeBox.isChecked():
+                    calculator = VolumeCalculator(VolumeCalculator.POSITIVE, var_ID, second_var_ID, f, names, self.polygons)
+                else:
+                    calculator = VolumeCalculator(VolumeCalculator.NET, var_ID, second_var_ID, f, names, self.polygons)
 
+                calculator.write_csv(f2)
         self.setEnabled(True)
 
 

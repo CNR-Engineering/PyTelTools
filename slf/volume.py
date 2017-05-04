@@ -70,17 +70,23 @@ class TruncatedTriangularPrisms(Mesh2D):
         @param <geom.Polyline> polygon: A polygon
         @return <dict, dict>: The dictionaries of all triangles contained in polygon, and of tuples (base triangle, intersection) for boundary triangles
         """
+        weight = np.zeros((self.nb_points,), dtype=np.float64)
         triangles = {}
-        extra = {}
+        triangle_polygon_net_intersection = {}
+        triangle_polygon_intersection = {}
         for i, j, k in self.triangles:
             t = self.triangles[i, j, k]
             if polygon.contains(t):
                 triangles[i, j, k] = t
+                weight[[i, j, k]] += t.area
             else:
                 is_intersected, intersection = polygon.polygon_intersection(t)
                 if is_intersected:
-                    extra[i, j, k] = (t, intersection)
-        return triangles, extra
+                    centroid = intersection.centroid
+                    interpolator = Interpolator(t).get_interpolator_at(centroid.x, centroid.y)
+                    triangle_polygon_net_intersection[i, j, k] = (intersection.area, interpolator)
+                    triangle_polygon_intersection[i, j, k] = (t, intersection)
+        return weight / 3.0, triangle_polygon_net_intersection, triangles, triangle_polygon_intersection
 
     @staticmethod
     def extra_volume_in_polygon(triangle_polygon_intersection, variable):
@@ -187,13 +193,14 @@ class TruncatedTriangularPrisms(Mesh2D):
 
 
 class VolumeCalculator:
-    NET_STRICT, NET, POSITIVE, NEGATIVE = 0, 1, 2, 3
+    NET_STRICT, NET, POSITIVE = 0, 1, 2
+    INIT_VALUE = '+'
 
-    def __init__(self, volume_type, var_ID, input_stream, output_stream, polynames, polygons,
-                 time_sampling_frequency=1, second_var_ID=None):
+    def __init__(self, volume_type, var_ID, second_var_ID, input_stream, polynames, polygons,
+                 time_sampling_frequency=1):
         self.volume_type = volume_type
         self.input_stream = input_stream
-        self.output_stream = output_stream
+        # self.output_stream = output_stream
         self.polynames = polynames
         self.polygons = polygons
 
@@ -202,20 +209,9 @@ class VolumeCalculator:
 
         self.time = input_stream.time[0::time_sampling_frequency]
 
-        self.write_first_line()
-
         self.base_triangles = TruncatedTriangularPrisms(input_stream)
 
         self.weights = []
-        self.construct_weights()
-        self.write_volumes()
-
-    def write_first_line(self):
-        self.output_stream.write('time')
-        for name in self.polynames:
-            self.output_stream.write(';')
-            self.output_stream.write(name)
-        self.output_stream.write('\n')
 
     def construct_weights(self):
         if self.volume_type == VolumeCalculator.NET_STRICT:
@@ -228,61 +224,79 @@ class VolumeCalculator:
         elif self.volume_type == VolumeCalculator.POSITIVE:
             for poly in self.polygons:
                 self.weights.append(self.base_triangles.polygon_intersection_all(poly))
-        else:  # negative volume
-            for poly in self.polygons:
-                weight, triangle_polygon_intersection = self.base_triangles.polygon_intersection(poly)
-                triangles = self.base_triangles.polygon_intersection_all(poly)
-                self.weights.append((weight, triangle_polygon_intersection, triangles))
 
     def volume_in_frame_in_polygon(self, weight, values, polygon):
         if self.volume_type == VolumeCalculator.NET_STRICT:
             return weight.dot(values)
         elif self.volume_type == VolumeCalculator.NET:
             strict_weight, triangle_polygon_intersection = weight
-            volume_inside = weight.dot(values)
+            volume_inside = strict_weight.dot(values)
             volume_boundary = TruncatedTriangularPrisms.extra_volume_in_polygon(triangle_polygon_intersection, values)
             return volume_inside + volume_boundary
-        elif self.volume_type == VolumeCalculator.POSITIVE:
-            triangles, extra = weight
-            volume_total = 0
-            for a, b, c in triangles:
-                t = triangles[a, b, c]
-                volume_total += TruncatedTriangularPrisms.superior_prism_volume(t, values[[a, b, c]])
-            for a, b, c in extra:
-                triangle, intersection = extra[a, b, c]
-                volume_total += TruncatedTriangularPrisms.superior_prism_volume_in_intersection(triangle, polygon,
-                                                                                                intersection,
-                                                                                                values[[a, b, c]])
-            return volume_total
         else:
-            strict_weight, triangle_polygon_intersection, triangles = weight
-            triangles, extra = triangles
-            volume_inside = weight.dot(values)
-            volume_boundary = TruncatedTriangularPrisms.extra_volume_in_polygon(triangle_polygon_intersection, values)
-            volume_net = volume_inside + volume_boundary
+            strict_weight, triangle_polygon_intersection_net, triangles, triangle_polygon_intersection = weight
+            volume_net = strict_weight.dot(values)
+            volume_net += TruncatedTriangularPrisms.extra_volume_in_polygon(triangle_polygon_intersection_net, values)
+
             volume_positive = 0
             for a, b, c in triangles:
                 t = triangles[a, b, c]
                 volume_positive += TruncatedTriangularPrisms.superior_prism_volume(t, values[[a, b, c]])
-            for a, b, c in extra:
-                triangle, intersection = extra[a, b, c]
+            for a, b, c in triangle_polygon_intersection:
+                triangle, intersection = triangle_polygon_intersection[a, b, c]
                 volume_positive += TruncatedTriangularPrisms.superior_prism_volume_in_intersection(triangle, polygon,
                                                                                                    intersection,
                                                                                                    values[[a, b, c]])
-            return volume_net - volume_positive
+            return volume_net, volume_positive, volume_net-volume_positive
 
-    def write_volumes(self):
+    def run(self):
+        self.construct_weights()
+        result = []
+
+        init_values = None
+        if self.second_var_ID == VolumeCalculator.INIT_VALUE:
+            init_values = self.input_stream.read_var_in_frame(0, self.var_ID)
+
         for i, i_time in enumerate(self.time):
-            self.output_stream.write(str(i_time))
+            i_result = [str(i_time)]
 
             values = self.input_stream.read_var_in_frame(i, self.var_ID)
+            if self.second_var_ID is not None:
+                if self.second_var_ID == VolumeCalculator.INIT_VALUE:
+                    values -= init_values
+                else:
+                    second_values = self.input_stream.read_var_in_frame(i, self.second_var_ID)
+                    values -= second_values
+
             for j in range(len(self.polygons)):
-                self.output_stream.write(';')
                 weight = self.weights[j]
                 volume = self.volume_in_frame_in_polygon(weight, values, self.polygons[j])
+                if self.volume_type == VolumeCalculator.POSITIVE:
+                    for v in volume:
+                        i_result.append(str(v))
+                else:
+                    i_result.append(str(volume))
+            result.append(i_result)
+        return result
 
-                self.output_stream.write(str(volume))
-            self.output_stream.write('\n')
+    def write_csv(self, output_stream):
+        result = self.run()
+
+        output_stream.write('time')
+        for name in self.polynames:
+            output_stream.write(';')
+            output_stream.write(name)
+            if self.volume_type == VolumeCalculator.POSITIVE:
+                output_stream.write(';')
+                output_stream.write(name + ' POSITIVE')
+                output_stream.write(';')
+                output_stream.write(name + ' NEGATIVE')
+
+        output_stream.write('\n')
+
+        for line in result:
+            output_stream.write(';'.join(line))
+            output_stream.write('\n')
 
 
 
