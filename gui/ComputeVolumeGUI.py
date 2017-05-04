@@ -19,9 +19,15 @@ class VolumeCalculatorGUI(QThread):
         self.calculator = VolumeCalculator(volume_type, var_ID, second_var_ID, input_stream, polynames, polygons,
                                            time_sampling_frequency)
 
-    def run_calculator_GUI(self):
+    def run_calculator(self):
+        self.tick.emit(6)
+        QApplication.processEvents()
+        self.calculator.construct_triangles()
+        self.tick.emit(15)
+        QApplication.processEvents()
         self.calculator.construct_weights()
-        self.tick.emit(5)
+        self.tick.emit(30)
+        QApplication.processEvents()
 
         result = []
         init_values = None
@@ -49,11 +55,11 @@ class VolumeCalculatorGUI(QThread):
                     i_result.append(str(volume))
             result.append(i_result)
 
-            self.tick.emit(4 + int(95 * (i+1) / len(self.calculator.time)))
+            self.tick.emit(30 + int(70 * (i+1) / len(self.calculator.time)))
         return result
 
     def write_csv(self, output_stream):
-        result = self.run_calculator_GUI()
+        result = self.run_calculator()
         self.calculator.write_csv(result, output_stream)
 
 
@@ -72,8 +78,9 @@ class OutputProgressDialog(QProgressDialog):
         self.setWindowFlags(Qt.WindowTitleHint)
         self.setFixedSize(300, 150)
 
-        self.setValue(0)
         self.open()
+        self.setValue(0)
+        QApplication.processEvents()
 
     def connectToCalculator(self, thread):
         thread.tick.connect(self.setValue)
@@ -289,6 +296,9 @@ class ComputeVolumeGUI(QWidget):
                 calculator = VolumeCalculatorGUI(VolumeCalculator.POSITIVE, var_ID, second_var_ID, f, names, self.polygons)
             else:
                 calculator = VolumeCalculatorGUI(VolumeCalculator.NET, var_ID, second_var_ID, f, names, self.polygons)
+
+            progressBar.setValue(5)
+            QApplication.processEvents()
             progressBar.connectToCalculator(calculator)
 
             with open(filename, 'w') as f2:

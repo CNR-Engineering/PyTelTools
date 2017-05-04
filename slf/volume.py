@@ -209,9 +209,11 @@ class VolumeCalculator:
 
         self.time = input_stream.time[0::time_sampling_frequency]
 
-        self.base_triangles = TruncatedTriangularPrisms(input_stream)
-
+        self.base_triangles = {}
         self.weights = []
+
+    def construct_triangles(self):
+        self.base_triangles = TruncatedTriangularPrisms(self.input_stream)
 
     def construct_weights(self):
         if self.volume_type == VolumeCalculator.NET_STRICT:
@@ -250,6 +252,7 @@ class VolumeCalculator:
             return volume_net, volume_positive, volume_net-volume_positive
 
     def run(self):
+        self.construct_triangles()
         self.construct_weights()
         result = []
 

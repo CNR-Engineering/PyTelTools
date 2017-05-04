@@ -506,6 +506,7 @@ class OutputProgressDialog(QProgressDialog):
         self.setCancelButton(self.cancelButton)
         self.cancelButton.setEnabled(False)
 
+
         self.setAutoReset(False)
         self.setAutoClose(False)
 
@@ -514,7 +515,8 @@ class OutputProgressDialog(QProgressDialog):
         self.setFixedSize(300, 150)
 
         self.open()
-
+        self.setValue(0)
+        QApplication.processEvents()
 
 class ExtractVariablesGUI(QWidget):
     """!
@@ -988,7 +990,6 @@ class ExtractVariablesGUI(QWidget):
 
         self.setEnabled(False)
         progressBar = OutputProgressDialog()
-        progressBar.setValue(0)
 
         # do some calculations
         with Serafin.Read(self.filename, self.language) as resin:
@@ -996,6 +997,7 @@ class ExtractVariablesGUI(QWidget):
             resin.header = self.header
             resin.time = self.time
             progressBar.setValue(5)
+            QApplication.processEvents()
 
             with Serafin.Write(filename, self.language, overwrite) as resout:
                 # deduce header from selected variable IDs and write header
@@ -1012,7 +1014,7 @@ class ExtractVariablesGUI(QWidget):
                     vals = do_calculations_in_frame(necessary_equations, self.us_equation, resin, i,
                                                     output_header.var_IDs, output_header.np_float_type)
                     resout.write_entire_frame(output_header, self.time[i], vals)
-                    progressBar.setValue(4 + int(95 * (i+1) / len(output_time_indices)))
+                    progressBar.setValue(5 + int(95 * (i+1) / len(output_time_indices)))
 
         logging.info('Finished writing the output')
         progressBar.setValue(100)
