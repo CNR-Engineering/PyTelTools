@@ -176,7 +176,7 @@ class ComputeVolumeGUI(QWidget):
                                                   'Line sets (*.i2s);;Shapefile (*.shp);;All Files (*)', options=options)
         if not filename:
             return
-        is_i2s = filename[-4:] == '.2s'
+        is_i2s = filename[-4:] == '.i2s'
         is_shp = filename[-4:] == '.shp'
 
         if not is_i2s and not is_shp:
