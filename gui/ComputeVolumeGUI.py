@@ -180,7 +180,7 @@ class ComputeVolumeGUI(QWidget):
         is_shp = filename[-4:] == '.shp'
 
         if not is_i2s and not is_shp:
-            QMessageBox.critical(self, 'Error', 'Only .i2s and .shp file formats is currently supported.',
+            QMessageBox.critical(self, 'Error', 'Only .i2s and .shp file formats are currently supported.',
                                  QMessageBox.Ok)
             return
 
@@ -194,7 +194,7 @@ class ComputeVolumeGUI(QWidget):
                 for poly_name, poly in f:
                     self.polygons.append(poly)
         else:
-            for polygon in Shapefile.read_shp('testdata/mypoly.shp'):
+            for polygon in Shapefile.read_shp(filename):
                 self.polygons.append(polygon)
 
     def btnSubmitEvent(self):
