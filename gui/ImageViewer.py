@@ -5,11 +5,9 @@ from PyQt5.QtGui import *
 from PyQt5.QtPrintSupport import QPrinter, QPrintDialog
 
 
-class ImageViewer(QMainWindow):
-    def __init__(self, parent=None):
+class ImageViewer(QWidget):
+    def __init__(self):
         super().__init__()
-        self.parent = parent
-
         self.scaleFactor = 0.0
 
         self.imageLabel = QLabel()
@@ -18,29 +16,45 @@ class ImageViewer(QMainWindow):
                                       QSizePolicy.Ignored)
         self.imageLabel.setScaledContents(True)
 
+        self.menuBar = QMenuBar()
+        self.toolBar = QToolBar()
+
         self.scrollArea = QScrollArea()
         self.scrollArea.setBackgroundRole(QPalette.Dark)
         self.scrollArea.setWidget(self.imageLabel)
-        self.setCentralWidget(self.scrollArea)
+
+        vlayout = QVBoxLayout()
+        vlayout.addWidget(self.menuBar)
+        vlayout.addWidget(self.toolBar)
+        vlayout.addWidget(self.scrollArea)
+        vlayout.setSpacing(0)
+        vlayout.setContentsMargins(0, 0, 0, 0)
+        self.setLayout(vlayout)
 
         self.createActions()
         self.createMenus()
+        self.createTools()
 
         self.setWindowTitle('Image Viewer')
         self.resize(600, 600)
-        self.show()
 
     def open(self):
-        fileName, _ = QFileDialog.getOpenFileName(self, 'Open File',
+        filename, _ = QFileDialog.getOpenFileName(self, 'Open File',
                                                   QDir.currentPath())
-        if not fileName:
+        if not filename:
             return
-        image = QImage(fileName)
+        image = QImage(filename)
         if image.isNull():
             QMessageBox.information(self, 'Image Viewer',
-                    'Cannot load %s.' % fileName)
+                                    'Cannot load %s.' % filename)
             return
 
+        self.openImage(image)
+
+    def save(self):
+        pass
+
+    def openImage(self, image):
         self.imageLabel.setPixmap(QPixmap.fromImage(image))
         self.scaleFactor = 1.0
 
@@ -50,20 +64,24 @@ class ImageViewer(QMainWindow):
         self.imageLabel.adjustSize()
 
     def createActions(self):
-        self.openAct = QAction("&Open...", self, shortcut="Ctrl+O",
-                triggered=self.open)
+        icons = self.style().standardIcon
 
-        self.exitAct = QAction("E&xit", self,
-                triggered=self.close)
+        self.openAct = QAction('&Open...', self, shortcut='Ctrl+O',
+                               triggered=self.open, icon=icons(QStyle.SP_DialogOpenButton))
+        
+        self.saveAct = QAction('&Save as...', self, shortcut='Ctrl+S',
+                               triggered=self.save, icon=icons(QStyle.SP_DialogSaveButton))
+        
+        self.exitAct = QAction('E&xit', self,
+                               triggered=self.close, icon=icons(QStyle.SP_DialogCloseButton))
 
-        self.zoomInAct = QAction("Zoom &In (25%)", self,
-                shortcut="Ctrl++", enabled=False, triggered=self.zoomIn)
+        self.zoomInAct = QAction('Zoom &In (25%)', self, shortcut='Ctrl++', 
+                                 enabled=False, triggered=self.zoomIn)
 
-        self.zoomOutAct = QAction("Zoom &Out (25%)", self,
-                shortcut="Ctrl+-", enabled=False, triggered=self.zoomOut)
+        self.zoomOutAct = QAction('Zoom &Out (25%)', self, shortcut='Ctrl+-', 
+                                  enabled=False, triggered=self.zoomOut)
 
-        self.normalSizeAct = QAction("&Normal Size", self,
-                enabled=False, triggered=self.normalSize)
+        self.normalSizeAct = QAction('&Normal Size', self, enabled=False, triggered=self.normalSize)
 
     def zoomIn(self):
         self.scaleImage(1.25)
@@ -78,7 +96,7 @@ class ImageViewer(QMainWindow):
     def createMenus(self):
         self.fileMenu = QMenu("&File", self)
         self.fileMenu.addAction(self.openAct)
-        self.fileMenu.addSeparator()
+        self.fileMenu.addAction(self.saveAct)
         self.fileMenu.addSeparator()
         self.fileMenu.addAction(self.exitAct)
 
@@ -87,8 +105,12 @@ class ImageViewer(QMainWindow):
         self.viewMenu.addAction(self.zoomOutAct)
         self.viewMenu.addAction(self.normalSizeAct)
 
-        self.menuBar().addMenu(self.fileMenu)
-        self.menuBar().addMenu(self.viewMenu)
+        self.menuBar.addMenu(self.fileMenu)
+        self.menuBar.addMenu(self.viewMenu)
+
+    def createTools(self):
+        self.toolBar.addAction(self.openAct)
+        self.toolBar.addAction(self.saveAct)
 
     def scaleImage(self, factor):
         self.scaleFactor *= factor
@@ -120,4 +142,5 @@ if __name__ == '__main__':
 
     app = QApplication(sys.argv)
     imageViewer = ImageViewer()
+    imageViewer.show()
     sys.exit(app.exec_())

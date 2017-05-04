@@ -542,6 +542,7 @@ class ExtractVariablesGUI(QWidget):
 
         self.setFixedWidth(800)
         self.setMaximumHeight(750)
+        self.setWindowFlags(self.windowFlags() | Qt.CustomizeWindowHint)
         self.setWindowTitle('Extract variables and frames from Serafin file')
         self._center()
 
@@ -988,7 +989,10 @@ class ExtractVariablesGUI(QWidget):
         if overwrite is None:
             return
 
-        self.setEnabled(False)
+        # disable close button
+        self.setWindowFlags(self.windowFlags() & ~Qt.WindowCloseButtonHint)
+        self.show()
+
         progressBar = OutputProgressDialog()
 
         # do some calculations
@@ -1020,7 +1024,10 @@ class ExtractVariablesGUI(QWidget):
         progressBar.setValue(100)
         progressBar.cancelButton.setEnabled(True)
         progressBar.exec_()
-        self.setEnabled(True)
+
+        # enable close button
+        self.setWindowFlags(self.windowFlags() | Qt.WindowCloseButtonHint)
+        self.show()
 
 
 def exception_hook(exctype, value, traceback):
