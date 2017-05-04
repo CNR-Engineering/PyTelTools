@@ -279,9 +279,7 @@ class VolumeCalculator:
             result.append(i_result)
         return result
 
-    def write_csv(self, output_stream):
-        result = self.run()
-
+    def write_csv(self, result, output_stream):
         output_stream.write('time')
         for name in self.polynames:
             output_stream.write(';')
@@ -297,6 +295,9 @@ class VolumeCalculator:
         for line in result:
             output_stream.write(';'.join(line))
             output_stream.write('\n')
+
+
+
 
 
 

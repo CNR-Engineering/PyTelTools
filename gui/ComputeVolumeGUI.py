@@ -5,8 +5,56 @@ from PyQt5.QtWidgets import *
 from PyQt5.QtGui import *
 from PyQt5.QtCore import *
 from slf import Serafin
-from slf.volume import *
+from slf.volume import VolumeCalculator
 from geom import BlueKenue, Shapefile
+
+
+class VolumeCalculatorGUI(QThread):
+    tick = pyqtSignal(int, name='changed')
+
+    def __init__(self, volume_type, var_ID, second_var_ID, input_stream, polynames, polygons,
+                 time_sampling_frequency=1):
+        super().__init__()
+
+        self.calculator = VolumeCalculator(volume_type, var_ID, second_var_ID, input_stream, polynames, polygons,
+                                           time_sampling_frequency)
+
+    def run_calculator_GUI(self):
+        self.calculator.construct_weights()
+        self.tick.emit(5)
+
+        result = []
+        init_values = None
+        if self.calculator.second_var_ID == VolumeCalculator.INIT_VALUE:
+            init_values = self.calculator.input_stream.read_var_in_frame(0, self.calculator.var_ID)
+
+        for i, i_time in enumerate(self.calculator.time):
+            i_result = [str(i_time)]
+
+            values = self.calculator.input_stream.read_var_in_frame(i, self.calculator.var_ID)
+            if self.calculator.second_var_ID is not None:
+                if self.calculator.second_var_ID == VolumeCalculator.INIT_VALUE:
+                    values -= init_values
+                else:
+                    second_values = self.calculator.input_stream.read_var_in_frame(i, self.calculator.second_var_ID)
+                    values -= second_values
+
+            for j in range(len(self.calculator.polygons)):
+                weight = self.calculator.weights[j]
+                volume = self.calculator.volume_in_frame_in_polygon(weight, values, self.calculator.polygons[j])
+                if self.calculator.volume_type == VolumeCalculator.POSITIVE:
+                    for v in volume:
+                        i_result.append(str(v))
+                else:
+                    i_result.append(str(volume))
+            result.append(i_result)
+
+            self.tick.emit(4 + int(95 * (i+1) / len(self.calculator.time)))
+        return result
+
+    def write_csv(self, output_stream):
+        result = self.run_calculator_GUI()
+        self.calculator.write_csv(result, output_stream)
 
 
 class OutputProgressDialog(QProgressDialog):
@@ -24,7 +72,11 @@ class OutputProgressDialog(QProgressDialog):
         self.setWindowFlags(Qt.WindowTitleHint)
         self.setFixedSize(300, 150)
 
+        self.setValue(0)
         self.open()
+
+    def connectToCalculator(self, thread):
+        thread.tick.connect(self.setValue)
 
 
 class ComputeVolumeGUI(QWidget):
@@ -218,7 +270,6 @@ class ComputeVolumeGUI(QWidget):
 
         self.setEnabled(False)
         progressBar = OutputProgressDialog()
-        progressBar.setValue(0)
 
         var_ID = self.firstVarBox.currentText().split('(')[0][:-1]
         second_var_ID = self.secondVarBox.currentText()
@@ -234,13 +285,18 @@ class ComputeVolumeGUI(QWidget):
         with Serafin.Read(self.filename, 'fr') as f:
             f.header = self.header
             f.time = self.time
-            with open(filename, 'w') as f2:
-                if self.supVolumeBox.isChecked():
-                    calculator = VolumeCalculator(VolumeCalculator.POSITIVE, var_ID, second_var_ID, f, names, self.polygons)
-                else:
-                    calculator = VolumeCalculator(VolumeCalculator.NET, var_ID, second_var_ID, f, names, self.polygons)
+            if self.supVolumeBox.isChecked():
+                calculator = VolumeCalculatorGUI(VolumeCalculator.POSITIVE, var_ID, second_var_ID, f, names, self.polygons)
+            else:
+                calculator = VolumeCalculatorGUI(VolumeCalculator.NET, var_ID, second_var_ID, f, names, self.polygons)
+            progressBar.connectToCalculator(calculator)
 
+            with open(filename, 'w') as f2:
                 calculator.write_csv(f2)
+
+        progressBar.setValue(100)
+        progressBar.cancelButton.setEnabled(True)
+        progressBar.exec_()
         self.setEnabled(True)
 
 
