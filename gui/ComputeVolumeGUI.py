@@ -6,7 +6,7 @@ from PyQt5.QtGui import *
 from PyQt5.QtCore import *
 from slf import Serafin
 from slf.volume import *
-from geom import BlueKenue
+from geom import BlueKenue, Shapefile
 
 
 class OutputProgressDialog(QProgressDialog):
@@ -176,9 +176,11 @@ class ComputeVolumeGUI(QWidget):
                                                   'Line sets (*.i2s);;Shapefile (*.shp);;All Files (*)', options=options)
         if not filename:
             return
+        is_i2s = filename[-4:] == '.2s'
+        is_shp = filename[-4:] == '.shp'
 
-        if filename[-4:] != '.i2s':
-            QMessageBox.critical(self, 'Error', 'Only .i2s file format is currently supported.',
+        if not is_i2s and not is_shp:
+            QMessageBox.critical(self, 'Error', 'Only .i2s and .shp file formats is currently supported.',
                                  QMessageBox.Ok)
             return
 
@@ -186,10 +188,14 @@ class ComputeVolumeGUI(QWidget):
         self.polygonNameBox.setText(filename)
         self.polygons = []
 
-        with BlueKenue.Read(filename) as f:
-            f.read_header()
-            for poly_name, poly in f:
-                self.polygons.append(poly)
+        if is_i2s:
+            with BlueKenue.Read(filename) as f:
+                f.read_header()
+                for poly_name, poly in f:
+                    self.polygons.append(poly)
+        else:
+            for polygon in Shapefile.read_shp('testdata/mypoly.shp'):
+                self.polygons.append(polygon)
 
     def btnSubmitEvent(self):
         if not self.polygons or self.header is None:
