@@ -712,7 +712,6 @@ class ExtractVariablesGUI(QWidget):
         hlayout.addWidget(self.btnSubmit)
         hlayout.addItem(QSpacerItem(30, 1))
         hlayout.addWidget(self.singlePrecisionBox)
-        hlayout.addLayout(vlayout)
 
         hlayout.addItem(QSpacerItem(30, 1))
         hlayout.addWidget(self.timeSelection)
