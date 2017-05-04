@@ -746,7 +746,7 @@ class ExtractVariablesGUI(QWidget):
             self.firstTable.setItem(i, 2, QTableWidgetItem(unit_item))
         offset = self.firstTable.rowCount()
 
-        # find new computable variables (stored as Equation object)
+        # find new computable variables (stored as slf.variables.Variable objects)
         self.available_vars = get_available_variables(self.header.var_IDs)
 
         # add new variables to the table
@@ -856,8 +856,8 @@ class ExtractVariablesGUI(QWidget):
             var = self.available_vars[-3+i]
             self.firstTable.insertRow(self.firstTable.rowCount())
             id_item = QTableWidgetItem(var.ID().strip())
-            name_item = QTableWidgetItem(var.name(self.language).decode('utf-8').strip())
-            unit_item = QTableWidgetItem(var.unit().decode('utf-8').strip())
+            name_item = QTableWidgetItem(var.name(self.language))
+            unit_item = QTableWidgetItem(var.unit())
             self.firstTable.setItem(offset+i, 0, QTableWidgetItem(id_item))
             self.firstTable.setItem(offset+i, 1, QTableWidgetItem(name_item))
             self.firstTable.setItem(offset+i, 2, QTableWidgetItem(unit_item))

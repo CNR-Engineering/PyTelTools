@@ -54,7 +54,9 @@ def build_variables():
 V,VITESSE V,VELOCITY V,M/S
 H,HAUTEUR D'EAU,WATER DEPTH,M
 S,SURFACE LIBRE,FREE SURFACE,M
-B,FOND ,BOTTOM,M
+B,FOND,BOTTOM,M
+C,CELERITE,CELERITY,M/S
+F,FROUDE,FROUDE NUMBER,
 Q,DEBIT SCALAIRE,SCALAR FLOWRATE,M2/S
 I,DEBIT SUIVANT X,FLOWRATE ALONG X,M2/S
 J,DEBIT SUIVANT Y,FLOWRATE ALONG Y,M2/S
@@ -63,7 +65,7 @@ US,VITESSE DE FROT.,FRICTION VEL.,M/S
 TAU,CONTRAINTE,BED SHEAR STRESS,PASCAL
 DMAX,DIAMETRE,DIAMETER,MM
 W,FROTTEMENT,BOTTOM FRICTION,
-ROUSE,NOMBRE DE ROUSE,ROUSE NUMBER,"""
+ROUSE,NOMBRE DE ROUSE,ROUSE NUMBER, """
 
     for i, row in enumerate(spec.split('\n')):
         ID, name_fr, name_en, unit = row.split(',')
@@ -72,11 +74,11 @@ ROUSE,NOMBRE DE ROUSE,ROUSE NUMBER,"""
 
 # all variable entities involved in computations are stored as constants in a dictionary with ordered keys
 VARIABLES = {}
-basic_vars_IDs = ['H', 'U', 'V', 'M', 'S', 'B', 'I', 'J', 'Q']
+basic_vars_IDs = ['H', 'U', 'V', 'M', 'S', 'B', 'I', 'J', 'Q', 'C', 'F']
 
 build_variables()
-H, U, V, M, S, B, I, J, Q, US, TAU, DMAX, W, ROUSE = [VARIABLES[var]
-                                                      for var in basic_vars_IDs + ['US', 'TAU', 'DMAX', 'W', 'ROUSE']]
+H, U, V, M, S, B, I, J, Q, C, F, US, TAU, DMAX, W, ROUSE = [VARIABLES[var] for var in
+                                                            basic_vars_IDs + ['US', 'TAU', 'DMAX', 'W', 'ROUSE']]
 
 
 # define some special operators
@@ -142,29 +144,7 @@ def is_basic_variable(var_ID):
     return var_ID in basic_vars_IDs
 
 
-def do_unary_calculation(equation, input_values):
-    """!
-    @brief Apply explicitly a unary operator on input values
-    @param equation <Equation>: an equation containing a unary operator
-    @param input_values <[numpy 1D-array]>: the values of the input variable
-    @return <numpy 1D-array>: the values of the output variable
-    """
-    operation = OPERATIONS[equation.operator]
-    return operation(input_values)
-
-
-def do_binary_calculation(equation, input_values):
-    """!
-    @brief Apply explicitly a binary operator on input values
-    @param equation <Equation>: an equation containing a binary operator
-    @param input_values <[numpy 1D-array]>: the values of the input variables
-    @return <numpy 1D-array>: the values of the output variable
-    """
-    operation = OPERATIONS[equation.operator]
-    return operation(input_values[0], input_values[1])
-
-
-def do_ternary_calculation(equation, input_values):
+def do_calculation(equation, input_values):
     """!
     @brief Apply explicitly a ternary operator on input values
     @param equation <Equation>: an equation containing a ternary operator
@@ -172,6 +152,11 @@ def do_ternary_calculation(equation, input_values):
     @return <numpy 1D-array>: the values of the output variable
     """
     operation = OPERATIONS[equation.operator]
+    nb_operands = len(input_values)
+    if nb_operands == 1:
+        return operation(input_values[0])
+    elif nb_operands == 2:
+        return operation(input_values[0], input_values[1])
     return operation(input_values[0], input_values[1], input_values[2])
 
 
@@ -348,25 +333,18 @@ def do_calculations_in_frame(equations, us_equation, input_serafin, time_index, 
             if input_var_ID not in computed_values and input_var_ID[:5] != 'ROUSE':
                 computed_values[input_var_ID] = input_serafin.read_var_in_frame(time_index, input_var_ID)
 
-        # handle the special case for TAU, DMAX and US
+        # handle the special case for US (user-specified equation)
         if equation.output.ID() == 'US':
-            computed_values['US'] = do_ternary_calculation(us_equation, [computed_values['W'],
-                                                                         computed_values['H'],
-                                                                         computed_values['M']])
-            continue
-        elif equation.output.ID() == 'TAU':
-            computed_values['TAU'] = do_unary_calculation(TAU_EQUATION, computed_values['US'])
-            continue
-        elif equation.output.ID() == 'DMAX':
-            computed_values['DMAX'] = do_unary_calculation(DMAX_EQUATION, computed_values['TAU'])
-            continue
-        # handle the very special case for ROUSE
+            computed_values['US'] = do_calculation(us_equation, [computed_values['W'],
+                                                                 computed_values['H'],
+                                                                 computed_values['M']])
+        # handle the very special case for ROUSE (equation depending on user-specified value)
         elif equation.output.ID() == 'ROUSE':
             computed_values[equation.input[0].ID()] = equation.operator(computed_values['US'])
             continue
 
-        # handle the normal case (binary operation)
-        output_values = do_binary_calculation(equation, [computed_values[var_ID] for var_ID in input_var_IDs])
+        # handle the normal case
+        output_values = do_calculation(equation, [computed_values[var_ID] for var_ID in input_var_IDs])
         computed_values[equation.output.ID()] = output_values
 
     # reconstruct the output values array in the order of the selected IDs
