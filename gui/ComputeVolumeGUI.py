@@ -185,7 +185,7 @@ class VolumePlotViewer(PlotViewer):
         self.data = pd.read_csv(csv_file, header=0, sep=';')
         # put tmp figure in the same folder as the result file
         result_folder, _ = os.path.split(csv_file)
-        self.figName = result_folder + self.figName
+        self.figName = os.path.join(result_folder, self.figName)
 
         self.var_ID = self.parent.var_ID
         self.second_var_ID = self.parent.second_var_ID
