@@ -11,7 +11,8 @@ import matplotlib.pyplot as plt
 from slf import Serafin
 from slf.volume import VolumeCalculator
 from geom import BlueKenue, Shapefile
-from gui.util import PlotViewer, QPlainTextEditLogger
+from gui.util import PlotViewer, QPlainTextEditLogger, TableWidgetDragRows
+
 
 
 class VolumeCalculatorGUI(QThread):
@@ -98,8 +99,6 @@ class PlotColumnsSelector(QDialog):
 
         self.list = QListWidget()
         for name in columns:
-            if name == 'time':
-                continue
             item = QListWidgetItem(name)
             item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
             if name in current_columns:
@@ -145,16 +144,15 @@ class PlotColumnsSelector(QDialog):
 
 
 class ColumnNameEditor(QDialog):
-    def __init__(self, column_labels):
+    def __init__(self, column_labels, selected_columns):
         super().__init__()
 
         self.table = QTableWidget()
         self.table .setColumnCount(2)
         self.table .setHorizontalHeaderLabels(['Column', 'Label'])
         row = 0
-        for column, label in column_labels.items():
-            if column == 'time':
-                continue
+        for column in selected_columns:
+            label = column_labels[column]
             self.table.insertRow(row)
             c = QTableWidgetItem(column)
             l = QTableWidgetItem(label)
@@ -176,19 +174,112 @@ class ColumnNameEditor(QDialog):
         self.resize(self.sizeHint())
         self.setWindowTitle('Change column labels')
 
-    def getLabels(self):
-        new_labels = {}
+    def getLabels(self, old_labels):
         for row in range(self.table.rowCount()):
             column = self.table.item(row, 0).text()
             label = self.table.item(row, 1).text()
-            new_labels[column] = label
-        return new_labels
+            old_labels[column] = label
+
+
+class ColorTable(QTableWidget):
+    def __init__(self):
+        super().__init__()
+        self.setColumnCount(2)
+        self.setHorizontalHeaderLabels(['Column', 'Color'])
+        self.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.setAcceptDrops(True)
+        self.setDragDropOverwriteMode(False)
+        self.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.setSelectionMode(QAbstractItemView.SingleSelection)
+        self.last_drop_row = None
+
+    def dropMimeData(self, row, col, mimeData, action):
+        self.last_drop_row = row
+        return True
+
+    def dropEvent(self, event):
+        sender = event.source()
+        super().dropEvent(event)
+        dropRow = self.last_drop_row
+        if dropRow > self.rowCount()-1:
+            return
+        color = QTableWidgetItem(self.item(dropRow, 1))
+        selectedRows = sender.getselectedRowsFast()
+        selectedRow = selectedRows[0]
+        item = sender.item(selectedRow, 0)
+        source = QTableWidgetItem(item)
+        self.setItem(dropRow, 1, source)
+        sender.insertRow(sender.rowCount())
+        sender.setItem(sender.rowCount()-1, 0, color)
+        sender.removeRow(selectedRow)
+        event.accept()
+
+class ColumnColorEditor(QDialog):
+    def __init__(self, parent):
+        super().__init__()
+
+        self.table = ColorTable()
+        self.table.setFixedHeight(300)
+        used_colors = []
+        row = 0
+        for column in parent.current_columns:
+            label = parent.column_labels[column]
+            color = parent.colorToName[parent.column_colors[column]]
+            used_colors.append(color)
+            self.table.insertRow(row)
+            lab = QTableWidgetItem(label)
+            col = QTableWidgetItem(color)
+            self.table.setItem(row, 0, lab)
+            self.table.setItem(row, 1, col)
+            row += 1
+        self.available_colors = TableWidgetDragRows()
+        self.available_colors.setSelectionMode(QAbstractItemView.SingleSelection)
+        self.available_colors.setColumnCount(1)
+        self.available_colors.setHorizontalHeaderLabels(['Available colors'])
+        self.available_colors.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.available_colors.setAcceptDrops(False)
+        self.available_colors.setFixedSize(250, 300)
+        row = 0
+        for color in parent.defaultColors:
+            color_name = parent.colorToName[color]
+            if color_name not in used_colors:
+                self.available_colors.insertRow(row)
+                col = QTableWidgetItem(color_name)
+                self.available_colors.setItem(row, 0, col)
+                row += 1
+
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel,
+                                   Qt.Horizontal, self)
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        vlayout = QVBoxLayout()
+        vlayout.addWidget(QLabel('Drag and drop color from left to right'))
+        hlayout = QHBoxLayout()
+        hlayout.addWidget(self.available_colors)
+        hlayout.addWidget(self.table)
+        vlayout.addLayout(hlayout)
+        vlayout.addWidget(buttons)
+        self.setLayout(vlayout)
+
+        self.setFixedSize(500, 400)
+        self.setWindowTitle('Change column color')
+
+    def getColors(self, old_colors, name_to_color):
+        for row in range(self.table.rowCount()):
+            column = self.table.item(row, 0).text()
+            color = self.table.item(row, 1).text()
+            old_colors[column] = name_to_color[color]
 
 
 class VolumePlotViewer(PlotViewer):
     def __init__(self, parent):
         super().__init__()
         self.parent = parent
+        self.defaultColors = ['b', 'r', 'g', 'y', 'k', 'c', '#F28AD6', 'm']
+        name = ['Blue', 'Red', 'Green', 'Yellow', 'Black', 'Cyan', 'Pink', 'Magenta']
+        self.colorToName = {c: n for c, n in zip(self.defaultColors, name)}
+        self.nameToColor = {n: c for c, n in zip(self.defaultColors, name)}
+
         self.setWindowTitle('Visualize the temporal evolution of volumes')
 
         self.data = None
@@ -205,11 +296,14 @@ class VolumePlotViewer(PlotViewer):
         self.current_title = ''
         self.current_size = (8.0, 6.0)
         self.column_labels = {}
+        self.column_colors = {}
 
         self.selectColumnsAct = QAction('Select columns', self, icon=self.style().standardIcon(QStyle.SP_FileDialogDetailedView),
                                         triggered=self.selectColumns)
         self.editColumnNamesAct = QAction('Edit column names', self, icon=self.style().standardIcon(QStyle.SP_FileDialogDetailedView),
                                           triggered=self.editColumns)
+        self.editColumColorAct = QAction('Edit column color', self, icon=self.style().standardIcon(QStyle.SP_FileDialogDetailedView),
+                                          triggered=self.editColor)
 
         self.convertTimeAct = QAction('Show date/time', self, checkable=True,
                                       icon=self.style().standardIcon(QStyle.SP_DialogApplyButton))
@@ -219,6 +313,7 @@ class VolumePlotViewer(PlotViewer):
         self.convertTimeAct.changed.connect(self.convertTime)
         self.toolBar.addAction(self.selectColumnsAct)
         self.toolBar.addAction(self.editColumnNamesAct)
+        self.toolBar.addAction(self.editColumColorAct)
         self.toolBar.addSeparator()
         self.toolBar.addAction(self.convertTimeAct)
         self.toolBar.addAction(self.changeDateAct)
@@ -244,6 +339,7 @@ class VolumePlotViewer(PlotViewer):
         self.current_title = ''
         self.current_size = (8.0, 6.0)
         self.column_labels = {}
+        self.column_colors = {}
 
         # get the new data
         csv_file = self.parent.csvNameBox.text()
@@ -263,10 +359,14 @@ class VolumePlotViewer(PlotViewer):
         self.str_datetime = list(map(lambda x: x.strftime('%Y/%m/%d\n%H:%M'), self.datetime))
         self.current_xlabel = self._defaultXLabel(self.parent.language)
         self.current_ylabel = self._defaultYLabel(self.parent.language)
-        self.column_labels = {x: x for x in list(self.data)}
+        columns = list(self.data)[1:]
+        self.column_labels = {x: x for x in columns}
+        self.column_colors = {x: None for x in columns}
+        for i in range(min(len(columns), len(self.defaultColors))):
+            self.column_colors[columns[i]] = self.defaultColors[i]
 
     def selectColumns(self):
-        msg = PlotColumnsSelector(list(self.data), self.current_columns)
+        msg = PlotColumnsSelector(list(self.data)[1:], self.current_columns)
         value = msg.exec_()
         if value == QDialog.Rejected:
             return
@@ -274,11 +374,19 @@ class VolumePlotViewer(PlotViewer):
         self.updateImage(columns=selection)
 
     def editColumns(self):
-        msg = ColumnNameEditor(self.column_labels)
+        msg = ColumnNameEditor(self.column_labels, self.current_columns)
         value = msg.exec_()
         if value == QDialog.Rejected:
             return
-        self.column_labels = msg.getLabels()
+        msg.getLabels(self.column_labels)
+        self.updateImage()
+
+    def editColor(self):
+        msg = ColumnColorEditor(self)
+        value = msg.exec_()
+        if value == QDialog.Rejected:
+            return
+        msg.getColors(self.column_colors, self.nameToColor)
         self.updateImage()
 
     def changeDate(self):
@@ -356,8 +464,8 @@ class VolumePlotViewer(PlotViewer):
         fig = plt.gcf()
         ax = plt.gca()
         for color, column in zip(self.defaultColors[:len(columns)], columns):
-            plt.plot(self.data['time'], self.data[column], '-', color=color, linewidth=2,
-                     label=self.column_labels[column])
+            plt.plot(self.data['time'], self.data[column], '-', color=self.column_colors[column],
+                     linewidth=2, label=self.column_labels[column])
 
         plt.ylabel(ylabel)
         if show_date:

@@ -87,7 +87,6 @@ class PlotViewer(QWidget):
         super().__init__()
         self.scaleFactor = 0.0
         self.figName = '.tmp_%s.png' % strftime("%Y_%m_%d_%H_%M_%S", gmtime())
-        self.defaultColors = ['b', 'r', 'g', 'y', 'k', 'c', '#7ec6f7', 'm']
 
         self.imageLabel = QLabel()
         self.imageLabel.setBackgroundRole(QPalette.Base)
