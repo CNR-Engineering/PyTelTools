@@ -181,7 +181,12 @@ class VolumePlotViewer(PlotViewer):
         return 'Volume of (%s - %s)' % (self.var_ID, self.second_var_ID)
 
     def getData(self):
-        self.data = pd.read_csv(self.parent.csvNameBox.text(), header=0, sep=';')
+        csv_file = self.parent.csvNameBox.text()
+        self.data = pd.read_csv(csv_file, header=0, sep=';')
+        # put tmp figure in the same folder as the result file
+        result_folder, _ = os.path.split(csv_file)
+        self.figName = result_folder + self.figName
+
         self.var_ID = self.parent.var_ID
         self.second_var_ID = self.parent.second_var_ID
         if self.parent.header.date is not None:
