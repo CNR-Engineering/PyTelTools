@@ -22,5 +22,5 @@ $ source venv/bin/activate
 
 ## Usage
 ```bash
-$ python slf_interface.py
+$ python main_interface.py
 ```
