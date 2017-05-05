@@ -1,7 +1,6 @@
 import sys
 import os
 import copy
-from shutil import copyfile
 import datetime
 from PyQt5.QtWidgets import *
 from PyQt5.QtGui import *
@@ -11,7 +10,8 @@ import matplotlib.pyplot as plt
 from slf import Serafin
 from slf.volume import VolumeCalculator
 from geom import BlueKenue, Shapefile
-from gui.ImageViewer import ImageViewer
+from gui.PlotViewer import PlotViewer
+
 
 class VolumeCalculatorGUI(QThread):
     tick = pyqtSignal(int, name='changed')
@@ -90,39 +90,95 @@ class OutputProgressDialog(QProgressDialog):
         thread.tick.connect(self.setValue)
 
 
-class VolumePlotViewer(ImageViewer):
-    FIG_NAME = '.TMP.png'
+class PlotColumnsSelector(QDialog):
+    def __init__(self, columns, current_columns):
+        super().__init__()
 
+        self.list = QListWidget()
+        for name in columns:
+            if name == 'time':
+                continue
+            item = QListWidgetItem(name)
+            item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
+            if name in current_columns:
+                item.setCheckState(Qt.Checked)
+            else:
+                item.setCheckState(Qt.Unchecked)
+            self.list.addItem(item)
+
+        self.selection = tuple([])
+
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel,
+                                   Qt.Horizontal, self)
+        buttons.accepted.connect(self.checkSelection)
+        buttons.rejected.connect(self.reject)
+        vlayout = QVBoxLayout()
+        vlayout.addWidget(QLabel('  Select up to 5 columns to plot'))
+        vlayout.addWidget(self.list)
+        vlayout.addWidget(buttons)
+        self.setLayout(vlayout)
+
+        self.resize(self.sizeHint())
+        self.setWindowTitle('Select columns to plot')
+
+    def getSelection(self):
+        selection = []
+        for row in range(self.list.count()):
+            item = self.list.item(row)
+            if item.checkState() == Qt.Checked:
+                selection.append(item.text())
+        return tuple(selection)
+
+    def checkSelection(self):
+        self.selection = self.getSelection()
+        if not self.selection:
+            QMessageBox.critical(self, 'Error', 'Select at least one column to plot.',
+                                 QMessageBox.Ok)
+            return
+        if len(self.selection) > 5:
+            QMessageBox.critical(self, 'Error', 'Select up to 5 columns.',
+                                 QMessageBox.Ok)
+            return
+        self.accept()
+
+
+class VolumePlotViewer(PlotViewer):
     def __init__(self, parent):
         super().__init__()
         self.parent = parent
         self.setWindowTitle('Visualize the temporal evolution of volumes')
+
         self.data = None
         self.datetime = []
         self.var_ID = None
         self.second_var_ID = None
 
-        self.openAct.setEnabled(False)
+        # intialize graphical parameters
+        self.show_date = False
+        self.current_columns = ('polygon 1',)
+        self.current_xlabel = 'Time (second)'
+        self.current_ylabel = None  # will be initialized while getting the data
+        self.current_title = ''
 
         icons = self.style().standardIcon
-        self.convertTimeAct = QAction('&Convert seconds to date...', self,
-                                      triggered=self.convertTime, icon=icons(QStyle.SP_DialogApplyButton))
+        self.selectColumnsAct = QAction('Select columns', self, icon=icons(QStyle.SP_FileDialogDetailedView),
+                                        triggered=self.selectColumns)
+
+        self.convertTimeAct = QAction('Show date/time', self, checkable=True,
+                                      icon=icons(QStyle.SP_DialogApplyButton))
+        self.convertTimeAct.changed.connect(self.convertTime)
+
+        self.toolBar.addAction(self.selectColumnsAct)
+        self.toolBar.addSeparator()
         self.toolBar.addAction(self.convertTimeAct)
+        self.toolBar.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
 
-    def save(self):
-        options = QFileDialog.Options()
-        options |= QFileDialog.DontUseNativeDialog
-        filename, _ = QFileDialog.getSaveFileName(self, 'Save image', '',
-                                                  'PNG Files (*.png)', options=options)
-
-        # check the file name consistency
-        if not filename:
-            return
-        if len(filename) < 5 or filename[-4:] != '.png':
-            filename += '.png'
-
-        # simply move the temporary file to the desired location
-        copyfile(self.FIG_NAME, filename)
+    def _defaultYLabel(self):
+        if self.second_var_ID == VolumeCalculator.INIT_VALUE:
+            return 'Volume of (%s - %s$_0$)' % (self.var_ID, self.var_ID)
+        elif self.second_var_ID is None:
+            return 'Volume of %s' % self.var_ID
+        return 'Volume of (%s - %s)' % (self.var_ID, self.second_var_ID)
 
     def getData(self):
         self.data = pd.read_csv(self.parent.csvNameBox.text(), header=0, sep=';')
@@ -133,25 +189,82 @@ class VolumePlotViewer(ImageViewer):
             start_time = datetime.datetime(year, month, day, hour, minute, second)
         else:
             start_time = datetime.datetime(1900, 1, 1, 0, 0, 0)
-
         self.datetime = list(map(lambda x: start_time + datetime.timedelta(seconds=x), self.data['time']))
+        self.current_ylabel = self._defaultYLabel()
 
-    def updateImage(self, date=False, polyname='polygon 1'):
-        plt.plot(self.data['time'], self.data[polyname], 'b-', linewidth=2)
-        plt.ylabel('Volumes of %s' % self.var_ID)
-        if date:
+    def selectColumns(self):
+        msg = PlotColumnsSelector(list(self.data), self.current_columns)
+        value = msg.exec_()
+        if value == QDialog.Rejected:
+            return
+        selection = msg.selection
+        self.updateImage(columns=selection)
+
+    def convertTime(self):
+        self.updateImage(show_date=not self.show_date)
+        if self.show_date:
+            self.xLabelAct.setEnabled(False)
+        else:
+            self.xLabelAct.setEnabled(True)
+
+    def changeTitle(self):
+        value, ok = QInputDialog.getText(self, 'Change title',
+                                         'Enter a new title', text=self.current_title)
+        if not ok:
+            return
+        self.updateImage(title=value)
+
+    def changeXLabel(self):
+        value, ok = QInputDialog.getText(self, 'Change X label',
+                                         'Enter a new X label', text=self.current_xlabel)
+        if not ok:
+            return
+        self.updateImage(xlabel=value)
+
+    def changeYLabel(self):
+        value, ok = QInputDialog.getText(self, 'Change Y label',
+                                         'Enter a new Y label', text=self.current_ylabel)
+        if not ok:
+            return
+        self.updateImage(ylabel=value)
+
+    def updateImage(self, show_date=None, columns=None, xlabel=None, ylabel=None, title=None):
+        if columns is None:
+            columns = self.current_columns
+        if ylabel is None:
+            ylabel = self.current_ylabel
+        if xlabel is None:
+            xlabel = self.current_xlabel
+        if title is None:
+            title = self.current_title
+        if show_date is None:
+            show_date = self.show_date
+
+        fig = plt.gcf()
+
+        for color, column in zip(self.defaultColors[:len(columns)], columns):
+            plt.plot(self.data['time'], self.data[column], '-', color=color, linewidth=2, label=column)
+
+        plt.ylabel(ylabel)
+        if show_date:
             ax = plt.gca()
             datenames = plt.setp(ax, xticklabels=list(map(lambda x: x.strftime('%d/%m/%y\n%H:%M'), self.datetime)))
             plt.setp(datenames, rotation=45, fontsize=8)
         else:
-            plt.xlabel('Time (second)')
-        plt.savefig(self.FIG_NAME)
-        self.openImage(QImage(self.FIG_NAME))
-
-    def convertTime(self):
-        self.updateImage(date=True)
+            plt.xlabel(xlabel)
+        plt.title(title)
+        plt.legend()
+        plt.savefig(self.figName)
+        fig.clear()
+        self.show_date = show_date
+        self.current_columns = columns
+        self.current_xlabel = xlabel
+        self.current_ylabel = ylabel
+        self.current_title = title
+        self.openImage(QImage(self.figName))
 
     def closeEvent(self, event):
+        os.remove(self.figName)
         self.parent.setEnabled(True)
         self.parent.setWindowFlags(self.parent.windowFlags() | Qt.WindowCloseButtonHint)
         self.parent.show()

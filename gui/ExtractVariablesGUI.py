@@ -518,6 +518,7 @@ class OutputProgressDialog(QProgressDialog):
         self.setValue(0)
         QApplication.processEvents()
 
+
 class ExtractVariablesGUI(QWidget):
     """!
     @brief A graphical interface for extracting and computing variables from .slf file
