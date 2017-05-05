@@ -197,7 +197,7 @@ class VolumeCalculator:
     INIT_VALUE = '+'
 
     def __init__(self, volume_type, var_ID, second_var_ID, input_stream, polynames, polygons,
-                 time_sampling_frequency=1):
+                 time_sampling_frequency):
         self.volume_type = volume_type
         self.input_stream = input_stream
         # self.output_stream = output_stream
@@ -207,7 +207,7 @@ class VolumeCalculator:
         self.var_ID = var_ID
         self.second_var_ID = second_var_ID
 
-        self.time = input_stream.time[0::time_sampling_frequency]
+        self.time_indices = range(0, len(input_stream.time), time_sampling_frequency)
 
         self.base_triangles = {}
         self.weights = []
@@ -260,15 +260,15 @@ class VolumeCalculator:
         if self.second_var_ID == VolumeCalculator.INIT_VALUE:
             init_values = self.input_stream.read_var_in_frame(0, self.var_ID)
 
-        for i, i_time in enumerate(self.time):
-            i_result = [str(i_time)]
+        for time_index in self.time_indices:
+            i_result = [str(self.input_stream.time[time_index])]
 
-            values = self.input_stream.read_var_in_frame(i, self.var_ID)
+            values = self.input_stream.read_var_in_frame(time_index, self.var_ID)
             if self.second_var_ID is not None:
                 if self.second_var_ID == VolumeCalculator.INIT_VALUE:
                     values -= init_values
                 else:
-                    second_values = self.input_stream.read_var_in_frame(i, self.second_var_ID)
+                    second_values = self.input_stream.read_var_in_frame(time_index, self.second_var_ID)
                     values -= second_values
 
             for j in range(len(self.polygons)):

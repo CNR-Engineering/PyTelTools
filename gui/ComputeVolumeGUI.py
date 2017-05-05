@@ -18,7 +18,7 @@ class VolumeCalculatorGUI(QThread):
     tick = pyqtSignal(int, name='changed')
 
     def __init__(self, volume_type, var_ID, second_var_ID, input_stream, polynames, polygons,
-                 time_sampling_frequency=1):
+                 time_sampling_frequency):
         super().__init__()
 
         self.calculator = VolumeCalculator(volume_type, var_ID, second_var_ID, input_stream, polynames, polygons,
@@ -40,15 +40,15 @@ class VolumeCalculatorGUI(QThread):
         if self.calculator.second_var_ID == VolumeCalculator.INIT_VALUE:
             init_values = self.calculator.input_stream.read_var_in_frame(0, self.calculator.var_ID)
 
-        for i, i_time in enumerate(self.calculator.time):
-            i_result = [str(i_time)]
+        for i, time_index in enumerate(self.calculator.time_indices):
+            i_result = [str(self.calculator.input_stream.time[time_index])]
 
-            values = self.calculator.input_stream.read_var_in_frame(i, self.calculator.var_ID)
+            values = self.calculator.input_stream.read_var_in_frame(time_index, self.calculator.var_ID)
             if self.calculator.second_var_ID is not None:
                 if self.calculator.second_var_ID == VolumeCalculator.INIT_VALUE:
                     values -= init_values
                 else:
-                    second_values = self.calculator.input_stream.read_var_in_frame(i, self.calculator.second_var_ID)
+                    second_values = self.calculator.input_stream.read_var_in_frame(time_index, self.calculator.second_var_ID)
                     values -= second_values
 
             for j in range(len(self.calculator.polygons)):
@@ -61,7 +61,7 @@ class VolumeCalculatorGUI(QThread):
                     i_result.append(str(volume))
             result.append(i_result)
 
-            self.tick.emit(30 + int(70 * (i+1) / len(self.calculator.time)))
+            self.tick.emit(30 + int(70 * (i+1) / len(self.calculator.time_indices)))
         return result
 
     def write_csv(self, output_stream):
@@ -340,12 +340,12 @@ class ComputeVolumeGUI(QWidget):
         self.frenchButton.setChecked(True)
 
         # create the button open Serafin
-        self.btnOpenSerafin = QPushButton('Load Serafin', self)
+        self.btnOpenSerafin = QPushButton('Load Serafin', self, icon=self.style().standardIcon(QStyle.SP_DialogOpenButton))
         self.btnOpenSerafin.setToolTip('<b>Open</b> a .slf file')
         self.btnOpenSerafin.setFixedSize(105, 50)
 
         # create the button open Polygon
-        self.btnOpenPolygon = QPushButton('Load Polygons', self)
+        self.btnOpenPolygon = QPushButton('Load Polygons', self, icon=self.style().standardIcon(QStyle.SP_DialogOpenButton))
         self.btnOpenPolygon.setToolTip('<b>Open</b> a .i2s or .shp file')
         self.btnOpenPolygon.setFixedSize(105, 50)
 
@@ -369,16 +369,18 @@ class ComputeVolumeGUI(QWidget):
         self.secondVarBox = QComboBox()
         self.secondVarBox.setFixedSize(400, 30)
 
-        # create the check for selecting superior volume
-        self.supVolumeBox = QCheckBox('Compute positive volumes (slow)', self)
+        # create the boxes for volume calculation options
+        self.supVolumeBox = QCheckBox('Compute positive and negative volumes (slow)', self)
+        self.timeSampling = QLineEdit('1')
+        self.timeSampling.setFixedWidth(50)
 
         # create the submit button
-        self.btnSubmit = QPushButton('Submit\n(export to .csv)', self)
+        self.btnSubmit = QPushButton('Submit\n(to .csv)', self, icon=self.style().standardIcon(QStyle.SP_DialogSaveButton))
         self.btnSubmit.setFixedSize(105, 50)
 
         # create the button for opening the image viewer
         self.btnImage = QPushButton('Visualize results', self)
-        self.btnImage.setFixedSize(135, 50)
+        self.btnImage.setFixedSize(135, 60)
         self.btnImage.setEnabled(False)
 
         # create the image viewer
@@ -400,7 +402,6 @@ class ComputeVolumeGUI(QWidget):
         mainLayout = QVBoxLayout()
         hlayout = QHBoxLayout()
         hlayout.setAlignment(Qt.AlignLeft)
-        hlayout.addItem(QSpacerItem(50, 1))
         hlayout.addWidget(self.btnOpenSerafin)
         hlayout.addItem(QSpacerItem(30, 1))
         hlayout.addWidget(self.langBox)
@@ -408,13 +409,12 @@ class ComputeVolumeGUI(QWidget):
         mainLayout.addItem(QSpacerItem(10, 10))
 
         hlayout = QHBoxLayout()
-        hlayout.addWidget(QLabel('Input file'))
+        hlayout.addWidget(QLabel('     Input file'))
         hlayout.addWidget(self.serafinNameBox)
-
         mainLayout.addLayout(hlayout)
 
         hlayout = QHBoxLayout()
-        hlayout.addWidget(QLabel('Summary'))
+        hlayout.addWidget(QLabel('     Summary'))
         hlayout.addWidget(self.summaryTextBox)
         mainLayout.addLayout(hlayout)
         mainLayout.addItem(QSpacerItem(10, 20))
@@ -422,29 +422,36 @@ class ComputeVolumeGUI(QWidget):
         hlayout.addWidget(self.btnOpenPolygon)
         hlayout.addWidget(self.polygonNameBox)
         mainLayout.addLayout(hlayout)
+        mainLayout.addItem(QSpacerItem(10, 10))
+
+        glayout = QGridLayout()
+        glayout.addWidget(QLabel('     Select the principal variable'), 1, 1)
+        glayout.addWidget(self.firstVarBox, 1, 2)
+        glayout.addWidget(QLabel('     Select a variable to subtract (optional)'), 2, 1)
+        glayout.addWidget(self.secondVarBox, 2, 2)
+        glayout.addWidget(QLabel('     More options'), 3, 1)
+        glayout.addWidget(self.supVolumeBox, 3, 2)
         hlayout = QHBoxLayout()
-        lb = QLabel('     Select the principal variable')
-        hlayout.addWidget(lb)
-        hlayout.setAlignment(lb, Qt.AlignHCenter)
-        hlayout.addWidget(self.firstVarBox)
-        hlayout.setAlignment(self.firstVarBox, Qt.AlignLeft)
-        mainLayout.addLayout(hlayout)
-        hlayout = QHBoxLayout()
-        lb = QLabel('     Select a variable to subtract (optional)')
-        hlayout.addWidget(lb)
-        hlayout.setAlignment(lb, Qt.AlignHCenter)
-        hlayout.addWidget(self.secondVarBox)
-        hlayout.setAlignment(self.secondVarBox, Qt.AlignLeft)
-        mainLayout.addLayout(hlayout)
-        mainLayout.addWidget(self.supVolumeBox)
-        mainLayout.setAlignment(self.supVolumeBox, Qt.AlignHCenter)
+        hlayout.addWidget(QLabel('Time sampling frequency'))
+        hlayout.addWidget(self.timeSampling)
+        hlayout.setAlignment(self.timeSampling, Qt.AlignLeft)
+        hlayout.addStretch()
+        glayout.addLayout(hlayout, 4, 2)
+
+        glayout.setAlignment(Qt.AlignLeft)
+        glayout.setSpacing(10)
+        mainLayout.addLayout(glayout)
+        mainLayout.addItem(QSpacerItem(10, 20))
+
         hlayout = QHBoxLayout()
         hlayout.addWidget(self.btnSubmit)
         hlayout.addWidget(self.csvNameBox)
         mainLayout.addLayout(hlayout)
+
+        mainLayout.addItem(QSpacerItem(10, 10))
         mainLayout.addWidget(self.btnImage)
         mainLayout.setAlignment(self.btnImage, Qt.AlignHCenter)
-        mainLayout.addItem(QSpacerItem(10, 10))
+        mainLayout.addItem(QSpacerItem(10, 15))
         mainLayout.addWidget(QLabel('   Message logs'))
         mainLayout.addWidget(self.logTextBox.widget)
         self.setLayout(mainLayout)
@@ -479,6 +486,7 @@ class ComputeVolumeGUI(QWidget):
         self.secondVarBox.clear()
         self.csvNameBox.clear()
         self.btnImage.setEnabled(False)
+        self.timeSampling.setText('1')
 
         if not self.frenchButton.isChecked():
             self.language = 'en'
@@ -556,6 +564,17 @@ class ComputeVolumeGUI(QWidget):
         if not self.polygons or self.header is None:
             return
 
+        try:
+            sampling_frequency = int(self.timeSampling.text())
+        except ValueError:
+            QMessageBox.critical(self, 'Error', 'The sampling frequency must be a number!',
+                                 QMessageBox.Ok)
+            return
+        if sampling_frequency < 1 or sampling_frequency > len(self.time):
+            QMessageBox.critical(self, 'Error', 'The sampling frequency must be in the range [1; nbFrames]!',
+                                 QMessageBox.Ok)
+            return
+
         options = QFileDialog.Options()
         options |= QFileDialog.DontUseNativeDialog
         options |= QFileDialog.DontConfirmOverwrite
@@ -598,10 +617,10 @@ class ComputeVolumeGUI(QWidget):
             resin.time = self.time
             if self.supVolumeBox.isChecked():
                 calculator = VolumeCalculatorGUI(VolumeCalculator.POSITIVE, self.var_ID, self.second_var_ID,
-                                                 resin, names, self.polygons)
+                                                 resin, names, self.polygons, sampling_frequency)
             else:
                 calculator = VolumeCalculatorGUI(VolumeCalculator.NET, self.var_ID, self.second_var_ID,
-                                                 resin, names, self.polygons)
+                                                 resin, names, self.polygons, sampling_frequency)
 
             progressBar.setValue(5)
             QApplication.processEvents()

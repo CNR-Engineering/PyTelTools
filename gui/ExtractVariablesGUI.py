@@ -484,7 +484,7 @@ class ExtractVariablesGUI(QWidget):
         @brief (Used in __init__) Create widgets
         """
         # create the button open
-        self.btnOpen = QPushButton('Open', self)
+        self.btnOpen = QPushButton('Open', self, icon=self.style().standardIcon(QStyle.SP_DialogOpenButton))
         self.btnOpen.setToolTip('<b>Open</b> a .slf file')
         self.btnOpen.setFixedSize(85, 50)
 
@@ -551,7 +551,7 @@ class ExtractVariablesGUI(QWidget):
         self.timeSelection.endIndex.setEnabled(False)
 
         # create the submit button
-        self.btnSubmit = QPushButton('Submit', self)
+        self.btnSubmit = QPushButton('Submit', self, icon=self.style().standardIcon(QStyle.SP_DialogSaveButton))
         self.btnSubmit.setToolTip('<b>Submit</b> to write a .slf output')
         self.btnSubmit.setFixedSize(85, 50)
         self.btnSubmit.setEnabled(False)
