@@ -467,13 +467,11 @@ class VolumePlotViewer(PlotViewer):
         self.datetime = map(lambda x: self.start_time + datetime.timedelta(seconds=x), self.data['time'])
         self.str_datetime = list(map(lambda x: x.strftime('%Y/%m/%d\n%H:%M'), self.datetime))
         self.updateImage()
+        self.xLabelAct.setEnabled(not self.show_date)
 
     def convertTime(self):
         self.updateImage(show_date=not self.show_date)
-        if self.show_date:
-            self.xLabelAct.setEnabled(False)
-        else:
-            self.xLabelAct.setEnabled(True)
+        self.xLabelAct.setEnabled(not self.show_date)
 
     def changeTitle(self):
         value, ok = QInputDialog.getText(self, 'Change title',
