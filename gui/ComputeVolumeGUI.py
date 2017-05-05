@@ -7,6 +7,7 @@ from PyQt5.QtGui import *
 from PyQt5.QtCore import *
 import pandas as pd
 import matplotlib.pyplot as plt
+from matplotlib.ticker import FormatStrFormatter
 from slf import Serafin
 from slf.volume import VolumeCalculator
 from geom import BlueKenue, Shapefile
@@ -246,19 +247,20 @@ class VolumePlotViewer(PlotViewer):
             show_date = self.show_date
 
         fig = plt.gcf()
-
+        ax = plt.gca()
+        ax.yaxis.set_major_formatter(FormatStrFormatter('%.1e'))
         for color, column in zip(self.defaultColors[:len(columns)], columns):
             plt.plot(self.data['time'], self.data[column], '-', color=color, linewidth=2, label=column)
 
         plt.ylabel(ylabel)
         if show_date:
-            ax = plt.gca()
             datenames = plt.setp(ax, xticklabels=list(map(lambda x: x.strftime('%d/%m/%y\n%H:%M'), self.datetime)))
             plt.setp(datenames, rotation=45, fontsize=8)
         else:
             plt.xlabel(xlabel)
         plt.title(title)
         plt.legend()
+        plt.tight_layout()
         plt.savefig(self.figName)
         fig.clear()
         self.show_date = show_date
