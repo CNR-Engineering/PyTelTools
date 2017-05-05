@@ -248,7 +248,6 @@ class VolumePlotViewer(PlotViewer):
 
         fig = plt.gcf()
         ax = plt.gca()
-        ax.yaxis.set_major_formatter(FormatStrFormatter('%.1e'))
         for color, column in zip(self.defaultColors[:len(columns)], columns):
             plt.plot(self.data['time'], self.data[column], '-', color=color, linewidth=2, label=column)
 
