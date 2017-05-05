@@ -115,7 +115,7 @@ class PlotColumnsSelector(QDialog):
         buttons.accepted.connect(self.checkSelection)
         buttons.rejected.connect(self.reject)
         vlayout = QVBoxLayout()
-        vlayout.addWidget(QLabel('  Select up to 5 columns to plot'))
+        vlayout.addWidget(QLabel('  Select up to 8 columns to plot'))
         vlayout.addWidget(self.list)
         vlayout.addWidget(buttons)
         self.setLayout(vlayout)
@@ -137,11 +137,52 @@ class PlotColumnsSelector(QDialog):
             QMessageBox.critical(self, 'Error', 'Select at least one column to plot.',
                                  QMessageBox.Ok)
             return
-        if len(self.selection) > 5:
-            QMessageBox.critical(self, 'Error', 'Select up to 5 columns.',
+        if len(self.selection) > 8:
+            QMessageBox.critical(self, 'Error', 'Select up to 8 columns.',
                                  QMessageBox.Ok)
             return
         self.accept()
+
+
+class ColumnNameEditor(QDialog):
+    def __init__(self, column_labels):
+        super().__init__()
+
+        self.table = QTableWidget()
+        self.table .setColumnCount(2)
+        self.table .setHorizontalHeaderLabels(['Column', 'Label'])
+        row = 0
+        for column, label in column_labels.items():
+            if column == 'time':
+                continue
+            self.table.insertRow(row)
+            c = QTableWidgetItem(column)
+            l = QTableWidgetItem(label)
+            self.table.setItem(row, 0, c)
+            self.table.setItem(row, 1, l)
+            self.table.item(row, 0).setFlags(Qt.ItemIsEditable)
+            row += 1
+
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel,
+                                   Qt.Horizontal, self)
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        vlayout = QVBoxLayout()
+        vlayout.addWidget(QLabel('Click on the name to modify'))
+        vlayout.addWidget(self.table)
+        vlayout.addWidget(buttons)
+        self.setLayout(vlayout)
+
+        self.resize(self.sizeHint())
+        self.setWindowTitle('Change column labels')
+
+    def getLabels(self):
+        new_labels = {}
+        for row in range(self.table.rowCount()):
+            column = self.table.item(row, 0).text()
+            label = self.table.item(row, 1).text()
+            new_labels[column] = label
+        return new_labels
 
 
 class VolumePlotViewer(PlotViewer):
@@ -151,6 +192,7 @@ class VolumePlotViewer(PlotViewer):
         self.setWindowTitle('Visualize the temporal evolution of volumes')
 
         self.data = None
+        self.start_time = None
         self.datetime = []
         self.var_ID = None
         self.second_var_ID = None
@@ -162,18 +204,24 @@ class VolumePlotViewer(PlotViewer):
         self.current_ylabel = None
         self.current_title = ''
         self.current_size = (8.0, 6.0)
+        self.column_labels = {}
 
-        icons = self.style().standardIcon
-        self.selectColumnsAct = QAction('Select columns', self, icon=icons(QStyle.SP_FileDialogDetailedView),
+        self.selectColumnsAct = QAction('Select columns', self, icon=self.style().standardIcon(QStyle.SP_FileDialogDetailedView),
                                         triggered=self.selectColumns)
+        self.editColumnNamesAct = QAction('Edit column names', self, icon=self.style().standardIcon(QStyle.SP_FileDialogDetailedView),
+                                          triggered=self.editColumns)
 
         self.convertTimeAct = QAction('Show date/time', self, checkable=True,
-                                      icon=icons(QStyle.SP_DialogApplyButton))
-        self.convertTimeAct.changed.connect(self.convertTime)
+                                      icon=self.style().standardIcon(QStyle.SP_DialogApplyButton))
+        self.changeDateAct = QAction('Modify start date', self, triggered=self.changeDate,
+                                     icon=self.style().standardIcon(QStyle.SP_DialogApplyButton))
 
+        self.convertTimeAct.changed.connect(self.convertTime)
         self.toolBar.addAction(self.selectColumnsAct)
+        self.toolBar.addAction(self.editColumnNamesAct)
         self.toolBar.addSeparator()
         self.toolBar.addAction(self.convertTimeAct)
+        self.toolBar.addAction(self.changeDateAct)
         self.toolBar.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
 
     def _defaultXLabel(self, language):
@@ -190,6 +238,14 @@ class VolumePlotViewer(PlotViewer):
         return 'Volume %s (%s - %s)' % (word, self.var_ID, self.second_var_ID)
 
     def getData(self):
+        # reinitialize old graphical parameters
+        self.show_date = False
+        self.current_columns = ('Polygon 1',)
+        self.current_title = ''
+        self.current_size = (8.0, 6.0)
+        self.column_labels = {}
+
+        # get the new data
         csv_file = self.parent.csvNameBox.text()
         self.data = pd.read_csv(csv_file, header=0, sep=';')
         # put tmp figure in the same folder as the result file
@@ -200,13 +256,14 @@ class VolumePlotViewer(PlotViewer):
         self.second_var_ID = self.parent.second_var_ID
         if self.parent.header.date is not None:
             year, month, day, hour, minute, second = self.parent.header.date
-            start_time = datetime.datetime(year, month, day, hour, minute, second)
+            self.start_time = datetime.datetime(year, month, day, hour, minute, second)
         else:
-            start_time = datetime.datetime(1900, 1, 1, 0, 0, 0)
-        self.datetime = map(lambda x: start_time + datetime.timedelta(seconds=x), self.data['time'])
-        self.datetime = list(map(lambda x: x.strftime('%Y/%m/%d\n%H:%M'), self.datetime))
+            self.start_time = datetime.datetime(1900, 1, 1, 0, 0, 0)
+        self.datetime = map(lambda x: self.start_time + datetime.timedelta(seconds=x), self.data['time'])
+        self.str_datetime = list(map(lambda x: x.strftime('%Y/%m/%d\n%H:%M'), self.datetime))
         self.current_xlabel = self._defaultXLabel(self.parent.language)
         self.current_ylabel = self._defaultYLabel(self.parent.language)
+        self.column_labels = {x: x for x in list(self.data)}
 
     def selectColumns(self):
         msg = PlotColumnsSelector(list(self.data), self.current_columns)
@@ -215,6 +272,30 @@ class VolumePlotViewer(PlotViewer):
             return
         selection = msg.selection
         self.updateImage(columns=selection)
+
+    def editColumns(self):
+        msg = ColumnNameEditor(self.column_labels)
+        value = msg.exec_()
+        if value == QDialog.Rejected:
+            return
+        self.column_labels = msg.getLabels()
+        self.updateImage()
+
+    def changeDate(self):
+        value, ok = QInputDialog.getText(self, 'Change start date',
+                                         'Enter the start date',
+                                         text=self.start_time.strftime('%Y-%m-%d %X'))
+        if not ok:
+            return
+        try:
+            self.start_time = datetime.datetime.strptime(value, '%Y-%m-%d %X')
+        except ValueError:
+            QMessageBox.critical(self, 'Error', 'Invalid input.',
+                                 QMessageBox.Ok)
+            return
+        self.datetime = map(lambda x: self.start_time + datetime.timedelta(seconds=x), self.data['time'])
+        self.str_datetime = list(map(lambda x: x.strftime('%Y/%m/%d\n%H:%M'), self.datetime))
+        self.updateImage()
 
     def convertTime(self):
         self.updateImage(show_date=not self.show_date)
@@ -275,16 +356,18 @@ class VolumePlotViewer(PlotViewer):
         fig = plt.gcf()
         ax = plt.gca()
         for color, column in zip(self.defaultColors[:len(columns)], columns):
-            plt.plot(self.data['time'], self.data[column], '-', color=color, linewidth=2, label=column)
+            plt.plot(self.data['time'], self.data[column], '-', color=color, linewidth=2,
+                     label=self.column_labels[column])
 
         plt.ylabel(ylabel)
         if show_date:
-            datenames = plt.setp(ax, xticklabels=self.datetime)
+            datenames = plt.setp(ax, xticklabels=self.str_datetime)
             plt.setp(datenames, rotation=45, fontsize=8)
         else:
             plt.xlabel(xlabel)
         plt.title(title)
         plt.legend()
+        plt.grid(True)
         plt.tight_layout()
         fig.set_size_inches(size[0], size[1])
         plt.savefig(self.figName, dpi=100)
