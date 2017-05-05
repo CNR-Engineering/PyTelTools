@@ -424,8 +424,7 @@ class VolumePlotViewer(PlotViewer):
         ax.set_xlim(minx - 0.05 * w, maxx + 0.05 * w)
         ax.set_ylim(miny - 0.05 * h, maxy + 0.05 * h)
         plt.gca().set_aspect('equal', adjustable='box')
-        plt.show()
-        plt.ioff()
+        plt.show(block=False)
         fig.canvas.mpl_connect('close_event', lambda event: self.locatePolygonAct.setEnabled(True))
 
     def selectColumns(self):
@@ -587,7 +586,6 @@ class ComputeVolumeGUI(QWidget):
     def _initWidgets(self):
         # create a checkbox for language selection
         self.langBox = QGroupBox('Input language')
-        self.langBox.setFixedHeight(50)
         hlayout = QHBoxLayout()
         self.frenchButton = QRadioButton('French')
         hlayout.addWidget(self.frenchButton)
@@ -596,12 +594,12 @@ class ComputeVolumeGUI(QWidget):
         self.frenchButton.setChecked(True)
 
         # create the button open Serafin
-        self.btnOpenSerafin = QPushButton('Load Serafin', self, icon=self.style().standardIcon(QStyle.SP_DialogOpenButton))
+        self.btnOpenSerafin = QPushButton('Load\nSerafin', self, icon=self.style().standardIcon(QStyle.SP_DialogOpenButton))
         self.btnOpenSerafin.setToolTip('<b>Open</b> a .slf file')
         self.btnOpenSerafin.setFixedSize(105, 50)
 
         # create the button open Polygon
-        self.btnOpenPolygon = QPushButton('Load Polygons', self, icon=self.style().standardIcon(QStyle.SP_DialogOpenButton))
+        self.btnOpenPolygon = QPushButton('Load\nPolygons', self, icon=self.style().standardIcon(QStyle.SP_DialogOpenButton))
         self.btnOpenPolygon.setToolTip('<b>Open</b> a .i2s or .shp file')
         self.btnOpenPolygon.setFixedSize(105, 50)
 
