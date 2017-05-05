@@ -1,5 +1,6 @@
 import sys
 import os
+import logging
 import copy
 import datetime
 from PyQt5.QtWidgets import *
@@ -7,11 +8,10 @@ from PyQt5.QtGui import *
 from PyQt5.QtCore import *
 import pandas as pd
 import matplotlib.pyplot as plt
-from matplotlib.ticker import FormatStrFormatter
 from slf import Serafin
 from slf.volume import VolumeCalculator
 from geom import BlueKenue, Shapefile
-from gui.PlotViewer import PlotViewer
+from gui.util import PlotViewer, QPlainTextEditLogger
 
 
 class VolumeCalculatorGUI(QThread):
@@ -33,6 +33,7 @@ class VolumeCalculatorGUI(QThread):
         self.calculator.construct_weights()
         self.tick.emit(30)
         QApplication.processEvents()
+        logging.info('Finished processing the mesh')
 
         result = []
         init_values = None
@@ -154,12 +155,13 @@ class VolumePlotViewer(PlotViewer):
         self.var_ID = None
         self.second_var_ID = None
 
-        # intialize graphical parameters
+        # initialize graphical parameters
         self.show_date = False
-        self.current_columns = ('polygon 1',)
-        self.current_xlabel = 'Time (second)'
-        self.current_ylabel = None  # will be initialized while getting the data
+        self.current_columns = ('Polygon 1',)
+        self.current_xlabel = None
+        self.current_ylabel = None
         self.current_title = ''
+        self.current_size = (8.0, 6.0)
 
         icons = self.style().standardIcon
         self.selectColumnsAct = QAction('Select columns', self, icon=icons(QStyle.SP_FileDialogDetailedView),
@@ -174,12 +176,18 @@ class VolumePlotViewer(PlotViewer):
         self.toolBar.addAction(self.convertTimeAct)
         self.toolBar.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
 
-    def _defaultYLabel(self):
+    def _defaultXLabel(self, language):
+        if language == 'fr':
+            return 'Temps (seconde)'
+        return 'Time (second)'
+
+    def _defaultYLabel(self, language):
+        word = {'fr': 'de', 'en': 'of'}[language]
         if self.second_var_ID == VolumeCalculator.INIT_VALUE:
-            return 'Volume of (%s - %s$_0$)' % (self.var_ID, self.var_ID)
+            return 'Volume %s (%s - %s$_0$)' % (word, self.var_ID, self.var_ID)
         elif self.second_var_ID is None:
-            return 'Volume of %s' % self.var_ID
-        return 'Volume of (%s - %s)' % (self.var_ID, self.second_var_ID)
+            return 'Volume %s %s' % (word, self.var_ID)
+        return 'Volume %s (%s - %s)' % (word, self.var_ID, self.second_var_ID)
 
     def getData(self):
         csv_file = self.parent.csvNameBox.text()
@@ -195,8 +203,10 @@ class VolumePlotViewer(PlotViewer):
             start_time = datetime.datetime(year, month, day, hour, minute, second)
         else:
             start_time = datetime.datetime(1900, 1, 1, 0, 0, 0)
-        self.datetime = list(map(lambda x: start_time + datetime.timedelta(seconds=x), self.data['time']))
-        self.current_ylabel = self._defaultYLabel()
+        self.datetime = map(lambda x: start_time + datetime.timedelta(seconds=x), self.data['time'])
+        self.datetime = list(map(lambda x: x.strftime('%Y/%m/%d\n%H:%M'), self.datetime))
+        self.current_xlabel = self._defaultXLabel(self.parent.language)
+        self.current_ylabel = self._defaultYLabel(self.parent.language)
 
     def selectColumns(self):
         msg = PlotColumnsSelector(list(self.data), self.current_columns)
@@ -234,7 +244,21 @@ class VolumePlotViewer(PlotViewer):
             return
         self.updateImage(ylabel=value)
 
-    def updateImage(self, show_date=None, columns=None, xlabel=None, ylabel=None, title=None):
+    def changeSize(self):
+        value, ok = QInputDialog.getText(self, 'Change figure size',
+                                         'Enter a new figure size (separated by comma)',
+                                         text=', '.join(map(str, self.current_size)))
+        if not ok:
+            return
+        try:
+            new_size = tuple(map(float, value.split(',')))
+        except ValueError:
+            QMessageBox.critical(self, 'Error', 'Invalid input.',
+                                 QMessageBox.Ok)
+            return
+        self.updateImage(size=new_size)
+
+    def updateImage(self, show_date=None, columns=None, xlabel=None, ylabel=None, title=None, size=None):
         if columns is None:
             columns = self.current_columns
         if ylabel is None:
@@ -245,6 +269,8 @@ class VolumePlotViewer(PlotViewer):
             title = self.current_title
         if show_date is None:
             show_date = self.show_date
+        if size is None:
+            size = self.current_size
 
         fig = plt.gcf()
         ax = plt.gca()
@@ -253,20 +279,23 @@ class VolumePlotViewer(PlotViewer):
 
         plt.ylabel(ylabel)
         if show_date:
-            datenames = plt.setp(ax, xticklabels=list(map(lambda x: x.strftime('%d/%m/%y\n%H:%M'), self.datetime)))
+            datenames = plt.setp(ax, xticklabels=self.datetime)
             plt.setp(datenames, rotation=45, fontsize=8)
         else:
             plt.xlabel(xlabel)
         plt.title(title)
         plt.legend()
         plt.tight_layout()
-        plt.savefig(self.figName)
+        fig.set_size_inches(size[0], size[1])
+        plt.savefig(self.figName, dpi=100)
         fig.clear()
+
         self.show_date = show_date
         self.current_columns = columns
         self.current_xlabel = xlabel
         self.current_ylabel = ylabel
         self.current_title = title
+        self.current_size = size
         self.openImage(QImage(self.figName))
 
     def closeEvent(self, event):
@@ -284,6 +313,7 @@ class ComputeVolumeGUI(QWidget):
 
         self.filename = None
         self.header = None
+        self.language = 'fr'
         self.time = []
         self.polygons = []
         self.var_ID = None
@@ -293,11 +323,22 @@ class ComputeVolumeGUI(QWidget):
         self._setLayout()
         self._bindEvents()
 
-        self.setFixedSize(600, 450)
+        self.setFixedWidth(750)
+        self.setMaximumHeight(750)
         self.setWindowFlags(self.windowFlags() | Qt.CustomizeWindowHint)
         self.setWindowTitle('Compute and visualize volumes inside polygons')
 
     def _initWidgets(self):
+        # create a checkbox for language selection
+        self.langBox = QGroupBox('Input language')
+        self.langBox.setFixedHeight(50)
+        hlayout = QHBoxLayout()
+        self.frenchButton = QRadioButton('French')
+        hlayout.addWidget(self.frenchButton)
+        hlayout.addWidget(QRadioButton('English'))
+        self.langBox.setLayout(hlayout)
+        self.frenchButton.setChecked(True)
+
         # create the button open Serafin
         self.btnOpenSerafin = QPushButton('Load Serafin', self)
         self.btnOpenSerafin.setToolTip('<b>Open</b> a .slf file')
@@ -311,19 +352,22 @@ class ComputeVolumeGUI(QWidget):
         # create some text fields displaying the IO files info
         self.serafinNameBox = QLineEdit()
         self.serafinNameBox.setReadOnly(True)
-        self.serafinNameBox.setFixedSize(600, 30)
+        self.serafinNameBox.setFixedHeight(30)
+        self.summaryTextBox = QPlainTextEdit()
+        self.summaryTextBox.setFixedHeight(50)
+        self.summaryTextBox.setReadOnly(True)
         self.polygonNameBox = QLineEdit()
         self.polygonNameBox.setReadOnly(True)
-        self.polygonNameBox.setFixedSize(600, 30)
+        self.polygonNameBox.setFixedHeight(30)
         self.csvNameBox = QLineEdit()
         self.csvNameBox.setReadOnly(True)
-        self.csvNameBox.setFixedSize(600, 30)
+        self.csvNameBox.setFixedHeight(30)
 
         # create combo box widgets for choosing variables
         self.firstVarBox = QComboBox()
-        self.firstVarBox.setFixedSize(300, 30)
+        self.firstVarBox.setFixedSize(400, 30)
         self.secondVarBox = QComboBox()
-        self.secondVarBox.setFixedSize(300, 30)
+        self.secondVarBox.setFixedSize(400, 30)
 
         # create the check for selecting superior volume
         self.supVolumeBox = QCheckBox('Compute positive volumes (slow)', self)
@@ -334,11 +378,17 @@ class ComputeVolumeGUI(QWidget):
 
         # create the button for opening the image viewer
         self.btnImage = QPushButton('Visualize results', self)
-        self.btnImage.setFixedSize(105, 50)
+        self.btnImage.setFixedSize(135, 50)
         self.btnImage.setEnabled(False)
 
         # create the image viewer
         self.img = VolumePlotViewer(self)
+
+        # create the widget displaying message logs
+        self.logTextBox = QPlainTextEditLogger(self)
+        self.logTextBox.setFormatter(logging.Formatter('%(asctime)s - [%(levelname)s] - \n%(message)s'))
+        logging.getLogger().addHandler(self.logTextBox)
+        logging.getLogger().setLevel(logging.INFO)
 
     def _bindEvents(self):
         self.btnOpenSerafin.clicked.connect(self.btnOpenSerafinEvent)
@@ -347,38 +397,57 @@ class ComputeVolumeGUI(QWidget):
         self.btnImage.clicked.connect(self.btnImageEvent)
 
     def _setLayout(self):
-        vlayout = QVBoxLayout()
+        mainLayout = QVBoxLayout()
         hlayout = QHBoxLayout()
+        hlayout.setAlignment(Qt.AlignLeft)
+        hlayout.addItem(QSpacerItem(50, 1))
         hlayout.addWidget(self.btnOpenSerafin)
+        hlayout.addItem(QSpacerItem(30, 1))
+        hlayout.addWidget(self.langBox)
+        mainLayout.addLayout(hlayout)
+        mainLayout.addItem(QSpacerItem(10, 10))
+
+        hlayout = QHBoxLayout()
+        hlayout.addWidget(QLabel('Input file'))
         hlayout.addWidget(self.serafinNameBox)
-        vlayout.addLayout(hlayout)
+
+        mainLayout.addLayout(hlayout)
+
+        hlayout = QHBoxLayout()
+        hlayout.addWidget(QLabel('Summary'))
+        hlayout.addWidget(self.summaryTextBox)
+        mainLayout.addLayout(hlayout)
+        mainLayout.addItem(QSpacerItem(10, 20))
         hlayout = QHBoxLayout()
         hlayout.addWidget(self.btnOpenPolygon)
         hlayout.addWidget(self.polygonNameBox)
-        vlayout.addLayout(hlayout)
+        mainLayout.addLayout(hlayout)
         hlayout = QHBoxLayout()
         lb = QLabel('     Select the principal variable')
         hlayout.addWidget(lb)
         hlayout.setAlignment(lb, Qt.AlignHCenter)
         hlayout.addWidget(self.firstVarBox)
         hlayout.setAlignment(self.firstVarBox, Qt.AlignLeft)
-        vlayout.addLayout(hlayout)
+        mainLayout.addLayout(hlayout)
         hlayout = QHBoxLayout()
         lb = QLabel('     Select a variable to subtract (optional)')
         hlayout.addWidget(lb)
         hlayout.setAlignment(lb, Qt.AlignHCenter)
         hlayout.addWidget(self.secondVarBox)
         hlayout.setAlignment(self.secondVarBox, Qt.AlignLeft)
-        vlayout.addLayout(hlayout)
-        vlayout.addWidget(self.supVolumeBox)
-        vlayout.setAlignment(self.supVolumeBox, Qt.AlignHCenter)
+        mainLayout.addLayout(hlayout)
+        mainLayout.addWidget(self.supVolumeBox)
+        mainLayout.setAlignment(self.supVolumeBox, Qt.AlignHCenter)
         hlayout = QHBoxLayout()
         hlayout.addWidget(self.btnSubmit)
         hlayout.addWidget(self.csvNameBox)
-        vlayout.addLayout(hlayout)
-        vlayout.addWidget(self.btnImage)
-        vlayout.setAlignment(self.btnImage, Qt.AlignHCenter)
-        self.setLayout(vlayout)
+        mainLayout.addLayout(hlayout)
+        mainLayout.addWidget(self.btnImage)
+        mainLayout.setAlignment(self.btnImage, Qt.AlignHCenter)
+        mainLayout.addItem(QSpacerItem(10, 10))
+        mainLayout.addWidget(QLabel('   Message logs'))
+        mainLayout.addWidget(self.logTextBox.widget)
+        self.setLayout(mainLayout)
 
     def closeEvent(self, event):
         if self.parent is not None:
@@ -399,15 +468,11 @@ class ComputeVolumeGUI(QWidget):
             return True
         return False
 
-    def btnOpenSerafinEvent(self):
-        options = QFileDialog.Options()
-        options |= QFileDialog.DontUseNativeDialog
-        filename, _ = QFileDialog.getOpenFileName(self, 'Open a .slf file', '',
-                                                  'Serafin Files (*.slf);;All Files (*)', QDir.currentPath(), options=options)
-        if not filename:
-            return
+    def _reinitInput(self, filename):
         self.filename = filename
         self.serafinNameBox.setText(filename)
+        self.summaryTextBox.clear()
+        self.csvNameBox.clear()
         self.header = None
         self.time = []
         self.firstVarBox.clear()
@@ -415,7 +480,22 @@ class ComputeVolumeGUI(QWidget):
         self.csvNameBox.clear()
         self.btnImage.setEnabled(False)
 
-        with Serafin.Read(self.filename, 'fr') as resin:
+        if not self.frenchButton.isChecked():
+            self.language = 'en'
+        else:
+            self.language = 'fr'
+
+    def btnOpenSerafinEvent(self):
+        options = QFileDialog.Options()
+        options |= QFileDialog.DontUseNativeDialog
+        filename, _ = QFileDialog.getOpenFileName(self, 'Open a .slf file', '',
+                                                  'Serafin Files (*.slf);;All Files (*)', QDir.currentPath(), options=options)
+        if not filename:
+            return
+
+        self._reinitInput(filename)
+
+        with Serafin.Read(self.filename, self.language) as resin:
             resin.read_header()
 
             # check if the file is 2D
@@ -425,6 +505,9 @@ class ComputeVolumeGUI(QWidget):
                 return
             # record the time series
             resin.get_time()
+
+            # update the file summary
+            self.summaryTextBox.appendPlainText(resin.get_summary())
 
             # copy to avoid reading the same data in the future
             self.header = copy.deepcopy(resin.header)
@@ -467,6 +550,8 @@ class ComputeVolumeGUI(QWidget):
             for polygon in Shapefile.read_shp(filename):
                 self.polygons.append(polygon)
 
+        logging.info('Finished reading the polygon file %s' % filename)
+
     def btnSubmitEvent(self):
         if not self.polygons or self.header is None:
             return
@@ -487,6 +572,7 @@ class ComputeVolumeGUI(QWidget):
             return
 
         self.csvNameBox.setText(filename)
+        logging.info('Writing the output to %s' % filename)
 
         # disable close button
         self.setWindowFlags(self.windowFlags() & ~Qt.WindowCloseButtonHint)
@@ -505,9 +591,9 @@ class ComputeVolumeGUI(QWidget):
         else:
             self.second_var_ID = VolumeCalculator.INIT_VALUE
 
-        names = ['polygon %d' % (i+1) for i in range(len(self.polygons))]
+        names = ['Polygon %d' % (i+1) for i in range(len(self.polygons))]
 
-        with Serafin.Read(self.filename, 'fr') as resin:
+        with Serafin.Read(self.filename, self.language) as resin:
             resin.header = self.header
             resin.time = self.time
             if self.supVolumeBox.isChecked():
@@ -524,6 +610,7 @@ class ComputeVolumeGUI(QWidget):
             with open(filename, 'w') as f2:
                 calculator.write_csv(f2)
 
+        logging.info('Finished writing the output')
         progressBar.setValue(100)
         progressBar.cancelButton.setEnabled(True)
         progressBar.exec_()
