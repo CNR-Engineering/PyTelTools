@@ -214,6 +214,7 @@ class ColorTable(QTableWidget):
         sender.removeRow(selectedRow)
         event.accept()
 
+
 class ColumnColorEditor(QDialog):
     def __init__(self, parent):
         super().__init__()
@@ -264,11 +265,12 @@ class ColumnColorEditor(QDialog):
         self.setFixedSize(500, 400)
         self.setWindowTitle('Change column color')
 
-    def getColors(self, old_colors, name_to_color):
+    def getColors(self, old_colors, column_labels, name_to_color):
+        label_to_column = {b: a for a, b, in column_labels.items()}
         for row in range(self.table.rowCount()):
-            column = self.table.item(row, 0).text()
+            label = self.table.item(row, 0).text()
             color = self.table.item(row, 1).text()
-            old_colors[column] = name_to_color[color]
+            old_colors[label_to_column[label]] = name_to_color[color]
 
 
 class VolumePlotViewer(PlotViewer):
@@ -386,7 +388,7 @@ class VolumePlotViewer(PlotViewer):
         value = msg.exec_()
         if value == QDialog.Rejected:
             return
-        msg.getColors(self.column_colors, self.nameToColor)
+        msg.getColors(self.column_colors, self.column_labels, self.nameToColor)
         self.updateImage()
 
     def changeDate(self):
