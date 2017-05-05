@@ -8,8 +8,11 @@ from PyQt5.QtGui import *
 from PyQt5.QtCore import *
 import pandas as pd
 import matplotlib.pyplot as plt
+from matplotlib.collections import PatchCollection
+from descartes import PolygonPatch
+
 from slf import Serafin
-from slf.volume import VolumeCalculator
+from slf.volume import TruncatedTriangularPrisms, VolumeCalculator
 from geom import BlueKenue, Shapefile
 from gui.util import PlotViewer, QPlainTextEditLogger, TableWidgetDragRows
 
@@ -19,18 +22,21 @@ class VolumeCalculatorGUI(QThread):
     tick = pyqtSignal(int, name='changed')
 
     def __init__(self, volume_type, var_ID, second_var_ID, input_stream, polynames, polygons,
-                 time_sampling_frequency):
+                 time_sampling_frequency, triangles):
         super().__init__()
 
         self.calculator = VolumeCalculator(volume_type, var_ID, second_var_ID, input_stream, polynames, polygons,
                                            time_sampling_frequency)
+        self.base_triangles = triangles
 
     def run_calculator(self):
         self.tick.emit(6)
         QApplication.processEvents()
-        self.calculator.construct_triangles()
+
+        self.calculator.base_triangles = self.base_triangles
         self.tick.emit(15)
         QApplication.processEvents()
+
         self.calculator.construct_weights()
         self.tick.emit(30)
         QApplication.processEvents()
@@ -188,8 +194,9 @@ class ColorTable(QTableWidget):
         self.setHorizontalHeaderLabels(['Column', 'Color'])
         self.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.setAcceptDrops(True)
+        self.setDragEnabled(True)
         self.setDragDropOverwriteMode(False)
-        self.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.setSelectionBehavior(QAbstractItemView.SelectItems)
         self.setSelectionMode(QAbstractItemView.SingleSelection)
         self.last_drop_row = None
 
@@ -197,21 +204,33 @@ class ColorTable(QTableWidget):
         self.last_drop_row = row
         return True
 
+    def getselectedRow(self):
+        for item in self.selectedItems():
+            return item.row()
+
     def dropEvent(self, event):
         sender = event.source()
         super().dropEvent(event)
         dropRow = self.last_drop_row
         if dropRow > self.rowCount()-1:
             return
-        color = QTableWidgetItem(self.item(dropRow, 1))
-        selectedRows = sender.getselectedRowsFast()
-        selectedRow = selectedRows[0]
-        item = sender.item(selectedRow, 0)
-        source = QTableWidgetItem(item)
-        self.setItem(dropRow, 1, source)
-        sender.insertRow(sender.rowCount())
-        sender.setItem(sender.rowCount()-1, 0, color)
-        sender.removeRow(selectedRow)
+
+        if self != sender:
+            color = QTableWidgetItem(self.item(dropRow, 1))
+            selectedRows = sender.getselectedRowsFast()
+            selectedRow = selectedRows[0]
+
+            item = sender.item(selectedRow, 0)
+            source = QTableWidgetItem(item)
+            self.setItem(dropRow, 1, source)
+            sender.insertRow(sender.rowCount())
+            sender.setItem(sender.rowCount()-1, 0, color)
+            sender.removeRow(selectedRow)
+        else:
+            selectedRow = self.getselectedRow()
+            source = self.item(selectedRow, 1).text()
+            self.item(selectedRow, 1).setText(self.item(dropRow, 1).text())
+            self.item(dropRow, 1).setText(source)
         event.accept()
 
 
@@ -239,7 +258,7 @@ class ColumnColorEditor(QDialog):
         self.available_colors.setHorizontalHeaderLabels(['Available colors'])
         self.available_colors.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.available_colors.setAcceptDrops(False)
-        self.available_colors.setFixedSize(250, 300)
+        self.available_colors.setFixedSize(150, 300)
         row = 0
         for color in parent.defaultColors:
             color_name = parent.colorToName[color]
@@ -254,7 +273,7 @@ class ColumnColorEditor(QDialog):
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
         vlayout = QVBoxLayout()
-        vlayout.addWidget(QLabel('Drag and drop color from left to right'))
+        vlayout.addWidget(QLabel('Drag and drop colors on the polygons'))
         hlayout = QHBoxLayout()
         hlayout.addWidget(self.available_colors)
         hlayout.addWidget(self.table)
@@ -277,6 +296,10 @@ class VolumePlotViewer(PlotViewer):
     def __init__(self, parent):
         super().__init__()
         self.parent = parent
+        self.BLUE = '#6699cc'
+        self.PINK = '#fcabbd'
+        self.BLACK = '#14123a'
+
         self.defaultColors = ['b', 'r', 'g', 'y', 'k', 'c', '#F28AD6', 'm']
         name = ['Blue', 'Red', 'Green', 'Yellow', 'Black', 'Cyan', 'Pink', 'Magenta']
         self.colorToName = {c: n for c, n in zip(self.defaultColors, name)}
@@ -300,6 +323,8 @@ class VolumePlotViewer(PlotViewer):
         self.column_labels = {}
         self.column_colors = {}
 
+        self.locatePolygonAct = QAction('Locate polygons on map', self, icon=self.style().standardIcon(QStyle.SP_DialogHelpButton),
+                                        triggered=self.locate)
         self.selectColumnsAct = QAction('Select columns', self, icon=self.style().standardIcon(QStyle.SP_FileDialogDetailedView),
                                         triggered=self.selectColumns)
         self.editColumnNamesAct = QAction('Edit column names', self, icon=self.style().standardIcon(QStyle.SP_FileDialogDetailedView),
@@ -313,6 +338,9 @@ class VolumePlotViewer(PlotViewer):
                                      icon=self.style().standardIcon(QStyle.SP_DialogApplyButton))
 
         self.convertTimeAct.changed.connect(self.convertTime)
+
+        self.toolBar.addAction(self.locatePolygonAct)
+        self.toolBar.addSeparator()
         self.toolBar.addAction(self.selectColumnsAct)
         self.toolBar.addAction(self.editColumnNamesAct)
         self.toolBar.addAction(self.editColumColorAct)
@@ -366,6 +394,39 @@ class VolumePlotViewer(PlotViewer):
         self.column_colors = {x: None for x in columns}
         for i in range(min(len(columns), len(self.defaultColors))):
             self.column_colors[columns[i]] = self.defaultColors[i]
+        self.triangles = list(self.parent.triangles.triangles.values())
+
+    def locate(self):
+        reply = QMessageBox.question(self, 'Locate polygons on map',
+                                     'This may take up to one minute. Are you sure to proceed?\n'
+                                     '(You can still modify the volume plot with the map open)',
+                                     QMessageBox.Yes | QMessageBox.No)
+        if reply == QMessageBox.No:
+            return
+        self.locatePolygonAct.setEnabled(False)
+
+        fig = plt.figure(1, figsize=(10, 10), dpi=60)
+        ax = fig.add_subplot(111)
+        patches = [PolygonPatch(t.buffer(0), fc=self.BLUE, ec=self.BLUE, alpha=0.5, zorder=1) for t in self.triangles]
+        for p in self.parent.polygons:
+            patches.append(PolygonPatch(p.polyline().buffer(0), fc=self.PINK, ec=self.BLACK, alpha=0.5, zorder=1))
+
+        ax.add_collection(PatchCollection(patches, match_original=True))
+        for p, name in zip(self.parent.polygons,
+                           [self.column_labels[p] for p in ['Polygon %d' % (i+1) for i in range(len(self.parent.polygons))]]):
+            center = p.polyline().centroid
+            cx, cy = center.x, center.y
+            ax.annotate(name, (cx, cy), color='k', weight='bold',
+                        fontsize=8, ha='center', va='center')
+
+        minx, maxx, miny, maxy = self.parent.locations
+        w, h = maxx - minx, maxy - miny
+        ax.set_xlim(minx - 0.05 * w, maxx + 0.05 * w)
+        ax.set_ylim(miny - 0.05 * h, maxy + 0.05 * h)
+        plt.gca().set_aspect('equal', adjustable='box')
+        plt.show()
+        plt.ioff()
+        fig.canvas.mpl_connect('close_event', lambda event: self.locatePolygonAct.setEnabled(True))
 
     def selectColumns(self):
         msg = PlotColumnsSelector(list(self.data)[1:], self.current_columns)
@@ -463,6 +524,7 @@ class VolumePlotViewer(PlotViewer):
         if size is None:
             size = self.current_size
 
+        plt.figure(0)
         fig = plt.gcf()
         ax = plt.gca()
         for color, column in zip(self.defaultColors[:len(columns)], columns):
@@ -482,6 +544,7 @@ class VolumePlotViewer(PlotViewer):
         fig.set_size_inches(size[0], size[1])
         plt.savefig(self.figName, dpi=100)
         fig.clear()
+        plt.close()
 
         self.show_date = show_date
         self.current_columns = columns
@@ -508,6 +571,8 @@ class ComputeVolumeGUI(QWidget):
         self.header = None
         self.language = 'fr'
         self.time = []
+        self.triangles = None
+        self.locations = tuple([])
         self.polygons = []
         self.var_ID = None
         self.second_var_ID = None
@@ -675,6 +740,8 @@ class ComputeVolumeGUI(QWidget):
         self.csvNameBox.clear()
         self.header = None
         self.time = []
+        self.triangles = None
+        self.locations = tuple([])
         self.firstVarBox.clear()
         self.secondVarBox.clear()
         self.csvNameBox.clear()
@@ -709,6 +776,10 @@ class ComputeVolumeGUI(QWidget):
 
             # update the file summary
             self.summaryTextBox.appendPlainText(resin.get_summary())
+
+            # record the triangles for future visualization
+            self.locations = (min(resin.header.x), max(resin.header.x), min(resin.header.y), max(resin.header.y))
+            self.triangles = TruncatedTriangularPrisms(resin)
 
             # copy to avoid reading the same data in the future
             self.header = copy.deepcopy(resin.header)
@@ -810,10 +881,10 @@ class ComputeVolumeGUI(QWidget):
             resin.time = self.time
             if self.supVolumeBox.isChecked():
                 calculator = VolumeCalculatorGUI(VolumeCalculator.POSITIVE, self.var_ID, self.second_var_ID,
-                                                 resin, names, self.polygons, sampling_frequency)
+                                                 resin, names, self.polygons, sampling_frequency, self.triangles)
             else:
                 calculator = VolumeCalculatorGUI(VolumeCalculator.NET, self.var_ID, self.second_var_ID,
-                                                 resin, names, self.polygons, sampling_frequency)
+                                                 resin, names, self.polygons, sampling_frequency, self.triangles)
 
             progressBar.setValue(5)
             QApplication.processEvents()

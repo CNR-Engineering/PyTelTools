@@ -12,7 +12,7 @@ from geom import Polyline
 
 class TruncatedTriangularPrisms(Mesh2D):
     """!
-    @brief The representation of Mesh2D in Serafin file when the calculating the volume over mesh of some variables
+    @brief The representation of Mesh2D in Serafin file when one computes the volume over mesh of some variables
 
     A truncated triangular prism is a triangular prism with non-parallel bases.
     Its geometrical properties are entirely determined by the base triangles.
@@ -209,7 +209,7 @@ class VolumeCalculator:
 
         self.time_indices = range(0, len(input_stream.time), time_sampling_frequency)
 
-        self.base_triangles = {}
+        self.base_triangles = None
         self.weights = []
 
     def construct_triangles(self):
