@@ -8,6 +8,12 @@ from PyQt5.QtGui import *
 from PyQt5.QtCore import *
 import pandas as pd
 import matplotlib.pyplot as plt
+
+import matplotlib
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.figure import Figure
+matplotlib.use('Qt5Agg')
+
 from matplotlib.collections import PatchCollection
 from descartes import PolygonPatch
 
@@ -292,13 +298,59 @@ class ColumnColorEditor(QDialog):
             old_colors[label_to_column[label]] = name_to_color[color]
 
 
-class VolumePlotViewer(PlotViewer):
+class MapCanvas(FigureCanvas):
     def __init__(self, parent):
-        super().__init__()
         self.parent = parent
         self.BLUE = '#6699cc'
         self.PINK = '#fcabbd'
         self.BLACK = '#14123a'
+
+        fig = Figure(figsize=(10, 10), dpi=60)
+        self.axes = fig.add_subplot(111)
+
+        FigureCanvas.__init__(self, fig)
+        self.setParent(None)
+
+        FigureCanvas.setSizePolicy(self,
+                                   QSizePolicy.Expanding,
+                                   QSizePolicy.Expanding)
+        FigureCanvas.updateGeometry(self)
+
+        self.hasFigure = False
+
+    def initFigure(self):
+        patches = [PolygonPatch(t.buffer(0), fc=self.BLUE, ec=self.BLUE, alpha=0.5, zorder=1)
+                   for t in self.parent.triangles]
+        for p in self.parent.parent.polygons:
+            patches.append(PolygonPatch(p.polyline().buffer(0), fc=self.PINK, ec=self.BLACK, alpha=0.5, zorder=1))
+
+        self.axes.add_collection(PatchCollection(patches, match_original=True))
+        for p, name in zip(self.parent.parent.polygons,
+                           [self.parent.column_labels[p] for p in ['Polygon %d' % (i+1)
+                                                         for i in range(len(self.parent.parent.polygons))]]):
+            center = p.polyline().centroid
+            cx, cy = center.x, center.y
+            self.axes.annotate(name, (cx, cy), color='k', weight='bold',
+                               fontsize=8, ha='center', va='center')
+
+        minx, maxx, miny, maxy = self.parent.parent.locations
+        w, h = maxx - minx, maxy - miny
+        self.axes.set_xlim(minx - 0.05 * w, maxx + 0.05 * w)
+        self.axes.set_ylim(miny - 0.05 * h, maxy + 0.05 * h)
+        self.axes.set_aspect('equal', adjustable='box')
+
+        self.hasFigure = True
+
+    def closeEvent(self, event):
+        self.parent.locatePolygonAct.setEnabled(True)
+        self.hide()
+
+
+class VolumePlotViewer(PlotViewer):
+    def __init__(self, parent):
+        super().__init__()
+        self.parent = parent
+        self.map = MapCanvas(self)
 
         self.defaultColors = ['b', 'r', 'g', 'y', 'k', 'c', '#F28AD6', 'm']
         name = ['Blue', 'Red', 'Green', 'Yellow', 'Black', 'Cyan', 'Pink', 'Magenta']
@@ -418,30 +470,12 @@ class VolumePlotViewer(PlotViewer):
                                      QMessageBox.Yes | QMessageBox.No)
         if reply == QMessageBox.No:
             return
+
         self.locatePolygonAct.setEnabled(False)
 
-        fig = plt.figure(1, figsize=(10, 10), dpi=60)
-        fig.canvas.mpl_connect('close_event', lambda event: self.locatePolygonAct.setEnabled(True))
-        ax = fig.add_subplot(111)
-        patches = [PolygonPatch(t.buffer(0), fc=self.BLUE, ec=self.BLUE, alpha=0.5, zorder=1) for t in self.triangles]
-        for p in self.parent.polygons:
-            patches.append(PolygonPatch(p.polyline().buffer(0), fc=self.PINK, ec=self.BLACK, alpha=0.5, zorder=1))
-
-        ax.add_collection(PatchCollection(patches, match_original=True))
-        for p, name in zip(self.parent.polygons,
-                           [self.column_labels[p] for p in ['Polygon %d' % (i+1) for i in range(len(self.parent.polygons))]]):
-            center = p.polyline().centroid
-            cx, cy = center.x, center.y
-            ax.annotate(name, (cx, cy), color='k', weight='bold',
-                        fontsize=8, ha='center', va='center')
-
-        minx, maxx, miny, maxy = self.parent.locations
-        w, h = maxx - minx, maxy - miny
-        ax.set_xlim(minx - 0.05 * w, maxx + 0.05 * w)
-        ax.set_ylim(miny - 0.05 * h, maxy + 0.05 * h)
-        plt.gca().set_aspect('equal', adjustable='box')
-        plt.show()
-        plt.ioff()
+        if not self.map.hasFigure:
+            self.map.initFigure()
+        self.map.show()
 
     def selectColumns(self):
         msg = PlotColumnsSelector(list(self.data)[1:], self.current_columns)
