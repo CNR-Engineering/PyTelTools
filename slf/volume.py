@@ -200,7 +200,6 @@ class VolumeCalculator:
                  time_sampling_frequency):
         self.volume_type = volume_type
         self.input_stream = input_stream
-        # self.output_stream = output_stream
         self.polynames = polynames
         self.polygons = polygons
 

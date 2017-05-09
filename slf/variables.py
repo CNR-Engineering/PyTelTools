@@ -88,6 +88,11 @@ def compute_DMAX(tau):
                                                     0.9055 * np.power(tau, 1.3178)))
 
 
+def square_root(x):
+    with np.errstate(invalid='ignore'):
+        return np.sqrt(x)
+
+
 def cubic_root(x):
     with np.errstate(invalid='ignore'):
         return np.where(x < 0, np.power(-x, 1/3.), np.power(x, 1/3.))
@@ -104,10 +109,12 @@ def compute_ROUSE(ws):
             return np.where(us != 0, ws / us / KARMAN, float('Inf'))
     return _compute_ROUSE
 
+
 # define the operators (relations between variables) as constants
 MINUS, TIMES, NORM2 = 0, 1, 2
 COMPUTE_TAU, COMPUTE_DMAX = 3, 4
 COMPUTE_CHEZY, COMPUTE_STRICKLER, COMPUTE_MANNING, COMPUTE_NIKURADSE = 5, 6, 7, 8
+COMPUTE_C, COMPUTE_F = 9, 10
 OPERATIONS = {MINUS: lambda a, b: a-b,
               TIMES: lambda a, b: a*b,
               NORM2: lambda a, b: np.sqrt(np.square(a) + np.square(b)),
@@ -116,13 +123,18 @@ OPERATIONS = {MINUS: lambda a, b: a-b,
               COMPUTE_CHEZY: lambda w, h, m: np.sqrt(np.power(m, 2) * GRAVITY / np.square(w)),
               COMPUTE_STRICKLER: lambda w, h, m: np.sqrt(np.power(m, 2) * GRAVITY / np.square(w) / cubic_root(h)),
               COMPUTE_MANNING: lambda w, h, m: np.sqrt(np.power(m, 2) * GRAVITY * np.power(w, 2) / cubic_root(h)),
-              COMPUTE_NIKURADSE: compute_NIKURADSE}
+              COMPUTE_NIKURADSE: compute_NIKURADSE,
+              COMPUTE_C: lambda h: square_root(GRAVITY * h),
+              COMPUTE_F: lambda m, c: m / c}
 
-# define basic equations (binary) and special equations (unary and ternary)
+# define basic equations
 BASIC_EQUATIONS = {'H': Equation((S, B), H, MINUS), 'S': Equation((H, B), S, MINUS),
-                   'B': Equation((S, H), B, MINUS),
-                   'M': Equation((U, V), M, NORM2), 'I': Equation((H, U), I, TIMES),
-                   'J': Equation((H, V), J, TIMES), 'Q': Equation((I, J), Q, NORM2)}
+                   'B': Equation((S, H), B, MINUS), 'M': Equation((U, V), M, NORM2),
+                   'I': Equation((H, U), I, TIMES), 'J': Equation((H, V), J, TIMES),
+                   'Q': Equation((I, J), Q, NORM2), 'C': Equation((H,), C, COMPUTE_C),
+                   'F': Equation((M, C), F, COMPUTE_F)}
+
+# define special equations
 TAU_EQUATION = Equation((US,), TAU, COMPUTE_TAU)
 DMAX_EQUATION = Equation((TAU,), DMAX, COMPUTE_DMAX)
 
@@ -216,23 +228,29 @@ def get_necessary_equations(known_var_IDs, needed_var_IDs, us_equation):
         necessary_equations.append(BASIC_EQUATIONS['H'])
     elif 'H' not in known_var_IDs:
         if 'I' in selected_unknown_var_IDs \
-                or 'J' in selected_unknown_var_IDs or 'Q' in selected_unknown_var_IDs:
+                or 'J' in selected_unknown_var_IDs \
+                or 'Q' in selected_unknown_var_IDs \
+                or 'C' in selected_unknown_var_IDs:
+            necessary_equations.append(BASIC_EQUATIONS['H'])
+        elif 'C' not in known_var_IDs and 'F' in selected_unknown_var_IDs:
             necessary_equations.append(BASIC_EQUATIONS['H'])
         elif 'US' in selected_unknown_var_IDs:
             necessary_equations.append(BASIC_EQUATIONS['H'])
         elif 'US' not in known_var_IDs:
-             if 'TAU' in selected_unknown_var_IDs:
+            if 'TAU' in selected_unknown_var_IDs:
                 necessary_equations.append(BASIC_EQUATIONS['H'])
-             elif 'DMAX' in selected_unknown_var_IDs and 'TAU' not in known_var_IDs:
+            elif 'DMAX' in selected_unknown_var_IDs and 'TAU' not in known_var_IDs:
                 necessary_equations.append(BASIC_EQUATIONS['H'])
-             elif is_rouse:
-                 necessary_equations.append(BASIC_EQUATIONS['H'])
+            elif is_rouse:
+                necessary_equations.append(BASIC_EQUATIONS['H'])
 
     # add M
     if 'M' in selected_unknown_var_IDs:
         necessary_equations.append(BASIC_EQUATIONS['M'])
     elif 'M' not in known_var_IDs:
-        if 'US' in selected_unknown_var_IDs:
+        if 'F' in selected_unknown_var_IDs:
+            necessary_equations.append(BASIC_EQUATIONS['M'])
+        elif 'US' in selected_unknown_var_IDs:
             necessary_equations.append(BASIC_EQUATIONS['M'])
         elif 'US' not in known_var_IDs:
             if 'TAU' in selected_unknown_var_IDs:
@@ -241,6 +259,16 @@ def get_necessary_equations(known_var_IDs, needed_var_IDs, us_equation):
                 necessary_equations.append(BASIC_EQUATIONS['M'])
             elif is_rouse:
                 necessary_equations.append(BASIC_EQUATIONS['M'])
+
+    # add C
+    if 'C' in selected_unknown_var_IDs:
+        necessary_equations.append(BASIC_EQUATIONS['C'])
+    elif 'C' not in known_var_IDs and 'F' in selected_unknown_var_IDs:
+        necessary_equations.append(BASIC_EQUATIONS['C'])
+
+    # add F
+    if 'F' in selected_unknown_var_IDs:
+        necessary_equations.append(BASIC_EQUATIONS['F'])
 
     # add I and J
     if 'I' in selected_unknown_var_IDs:

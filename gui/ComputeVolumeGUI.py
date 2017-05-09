@@ -368,10 +368,6 @@ class VolumePlotViewer(PlotViewer):
         # initialize graphical parameters
         self.show_date = False
         self.current_columns = ('Polygon 1',)
-        self.current_xlabel = None
-        self.current_ylabel = None
-        self.current_title = ''
-        self.current_size = (8.0, 6.0)
         self.column_labels = {}
         self.column_colors = {}
 
@@ -415,7 +411,6 @@ class VolumePlotViewer(PlotViewer):
         self.menuBar.addMenu(self.polyMenu)
         self.menuBar.addMenu(self.timeMenu)
 
-
     def _defaultXLabel(self, language):
         if language == 'fr':
             return 'Temps (seconde)'
@@ -429,6 +424,25 @@ class VolumePlotViewer(PlotViewer):
             return 'Volume %s %s' % (word, self.var_ID)
         return 'Volume %s (%s - %s)' % (word, self.var_ID, self.second_var_ID)
 
+    def replot(self):
+        self.canvas.axes.clear()
+        for column in self.current_columns:
+            self.canvas.axes.plot(self.data['time'], self.data[column], '-', color=self.column_colors[column],
+                                  linewidth=2, label=self.column_labels[column])
+        self.canvas.axes.legend()
+        self.canvas.axes.grid()
+        self.canvas.axes.set_ylabel(self.current_ylabel)
+        self.canvas.axes.set_title(self.current_title)
+        if self.show_date:
+            self.canvas.axes.set_xticklabels(self.str_datetime)
+            for label in self.canvas.axes.get_xticklabels():
+                label.set_rotation(45)
+                label.set_fontsize(8)
+        else:
+            self.canvas.axes.set_xlabel(self.current_xlabel)
+
+        self.canvas.draw()
+
     def getData(self):
         # reinitialize old graphical parameters
         self.show_date = False
@@ -441,9 +455,6 @@ class VolumePlotViewer(PlotViewer):
         # get the new data
         csv_file = self.parent.csvNameBox.text()
         self.data = pd.read_csv(csv_file, header=0, sep=';')
-        # put tmp figure in the same folder as the result file
-        result_folder, _ = os.path.split(csv_file)
-        self.figName = os.path.join(result_folder, self.figName)
 
         self.var_ID = self.parent.var_ID
         self.second_var_ID = self.parent.second_var_ID
@@ -454,14 +465,19 @@ class VolumePlotViewer(PlotViewer):
             self.start_time = datetime.datetime(1900, 1, 1, 0, 0, 0)
         self.datetime = map(lambda x: self.start_time + datetime.timedelta(seconds=x), self.data['time'])
         self.str_datetime = list(map(lambda x: x.strftime('%Y/%m/%d\n%H:%M'), self.datetime))
-        self.current_xlabel = self._defaultXLabel(self.parent.language)
-        self.current_ylabel = self._defaultYLabel(self.parent.language)
+
         columns = list(self.data)[1:]
         self.column_labels = {x: x for x in columns}
         self.column_colors = {x: None for x in columns}
         for i in range(min(len(columns), len(self.defaultColors))):
             self.column_colors[columns[i]] = self.defaultColors[i]
         self.triangles = list(self.parent.triangles.triangles.values())
+
+        # initialize the plot
+        self.current_xlabel = self._defaultXLabel(self.parent.language)
+        self.current_ylabel = self._defaultYLabel(self.parent.language)
+        self.current_title = ''
+        self.replot()
 
     def locate(self):
         if not self.map.hasFigure:
@@ -481,8 +497,8 @@ class VolumePlotViewer(PlotViewer):
         value = msg.exec_()
         if value == QDialog.Rejected:
             return
-        selection = msg.selection
-        self.updateImage(columns=selection)
+        self.current_columns = msg.selection
+        self.replot()
 
     def editColumns(self):
         msg = ColumnNameEditor(self.column_labels, self.current_columns)
@@ -490,7 +506,7 @@ class VolumePlotViewer(PlotViewer):
         if value == QDialog.Rejected:
             return
         msg.getLabels(self.column_labels)
-        self.updateImage()
+        self.replot()
 
     def editColor(self):
         msg = ColumnColorEditor(self)
@@ -498,7 +514,7 @@ class VolumePlotViewer(PlotViewer):
         if value == QDialog.Rejected:
             return
         msg.getColors(self.column_colors, self.column_labels, self.nameToColor)
-        self.updateImage()
+        self.replot()
 
     def changeDate(self):
         value, ok = QInputDialog.getText(self, 'Change start date',
@@ -514,95 +530,14 @@ class VolumePlotViewer(PlotViewer):
             return
         self.datetime = map(lambda x: self.start_time + datetime.timedelta(seconds=x), self.data['time'])
         self.str_datetime = list(map(lambda x: x.strftime('%Y/%m/%d\n%H:%M'), self.datetime))
-        self.updateImage()
-        self.xLabelAct.setEnabled(not self.show_date)
+        self.replot()
 
     def convertTime(self):
-        self.updateImage(show_date=not self.show_date)
+        self.show_date = not self.show_date
         self.xLabelAct.setEnabled(not self.show_date)
-
-    def changeTitle(self):
-        value, ok = QInputDialog.getText(self, 'Change title',
-                                         'Enter a new title', text=self.current_title)
-        if not ok:
-            return
-        self.updateImage(title=value)
-
-    def changeXLabel(self):
-        value, ok = QInputDialog.getText(self, 'Change X label',
-                                         'Enter a new X label', text=self.current_xlabel)
-        if not ok:
-            return
-        self.updateImage(xlabel=value)
-
-    def changeYLabel(self):
-        value, ok = QInputDialog.getText(self, 'Change Y label',
-                                         'Enter a new Y label', text=self.current_ylabel)
-        if not ok:
-            return
-        self.updateImage(ylabel=value)
-
-    def changeSize(self):
-        value, ok = QInputDialog.getText(self, 'Change figure size',
-                                         'Enter a new figure size (separated by comma)',
-                                         text=', '.join(map(str, self.current_size)))
-        if not ok:
-            return
-        try:
-            new_size = tuple(map(float, value.split(',')))
-        except ValueError:
-            QMessageBox.critical(self, 'Error', 'Invalid input.',
-                                 QMessageBox.Ok)
-            return
-        self.updateImage(size=new_size)
-
-    def updateImage(self, show_date=None, columns=None, xlabel=None, ylabel=None, title=None, size=None):
-        if columns is None:
-            columns = self.current_columns
-        if ylabel is None:
-            ylabel = self.current_ylabel
-        if xlabel is None:
-            xlabel = self.current_xlabel
-        if title is None:
-            title = self.current_title
-        if show_date is None:
-            show_date = self.show_date
-        if size is None:
-            size = self.current_size
-
-        plt.figure(0)
-        fig = plt.gcf()
-        ax = plt.gca()
-        for color, column in zip(self.defaultColors[:len(columns)], columns):
-            plt.plot(self.data['time'], self.data[column], '-', color=self.column_colors[column],
-                     linewidth=2, label=self.column_labels[column])
-
-        plt.ylabel(ylabel)
-        if show_date:
-            datenames = plt.setp(ax, xticklabels=self.str_datetime)
-            plt.setp(datenames, rotation=45, fontsize=8)
-        else:
-            plt.xlabel(xlabel)
-        plt.title(title)
-        plt.legend()
-        plt.grid(True)
-        plt.tight_layout()
-        fig.set_size_inches(size[0], size[1])
-        plt.savefig(self.figName, dpi=100)
-        fig.clear()
-        plt.clf()
-        plt.close(fig)
-
-        self.show_date = show_date
-        self.current_columns = columns
-        self.current_xlabel = xlabel
-        self.current_ylabel = ylabel
-        self.current_title = title
-        self.current_size = size
-        self.openImage(QImage(self.figName))
+        self.replot()
 
     def closeEvent(self, event):
-        os.remove(self.figName)
         self.parent.setEnabled(True)
         self.parent.setWindowFlags(self.parent.windowFlags() | Qt.WindowCloseButtonHint)
         self.parent.show()
@@ -956,7 +891,6 @@ class ComputeVolumeGUI(QWidget):
         self.setEnabled(False)
         self.setWindowFlags(self.windowFlags() & ~Qt.WindowCloseButtonHint)
         self.show()
-        self.img.updateImage()
         self.img.show()
 
 

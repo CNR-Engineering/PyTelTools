@@ -1,11 +1,16 @@
 import sys
 import os
-from shutil import copyfile
 import logging
-from time import gmtime, strftime
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
+import numpy as np
+import matplotlib
+matplotlib.use('Qt5Agg')
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.figure import Figure
+
+
 
 
 class QPlainTextEditLogger(logging.Handler):
@@ -82,24 +87,41 @@ class TableWidgetDragRows(QTableWidget):
         return selectedRows
 
 
+class PlotCanvas(FigureCanvas):
+    def __init__(self, parent):
+        self.parent = parent
+        self.figure = Figure(figsize=(8, 6), dpi=100)
+        self.axes = self.figure.add_subplot(111)
+        self.initFigure()
+
+        FigureCanvas.__init__(self, self.figure)
+        self.setParent(None)
+
+        FigureCanvas.setSizePolicy(self,
+                                   QSizePolicy.Expanding,
+                                   QSizePolicy.Expanding)
+        FigureCanvas.updateGeometry(self)
+
+    def initFigure(self):
+        x = np.linspace(0, 30, 100)
+        y = np.sin(x)
+        self.axes.plot(x, y)
+
+
 class PlotViewer(QWidget):
     def __init__(self):
         super().__init__()
-        self.scaleFactor = 0.0
-        self.figName = '.tmp_%s.png' % strftime("%Y_%m_%d_%H_%M_%S", gmtime())
-
-        self.imageLabel = QLabel()
-        self.imageLabel.setBackgroundRole(QPalette.Base)
-        self.imageLabel.setSizePolicy(QSizePolicy.Ignored,
-                                      QSizePolicy.Ignored)
-        self.imageLabel.setScaledContents(True)
+        self.canvas = PlotCanvas(self)
+        self.current_xlabel = None
+        self.current_ylabel = None
+        self.current_title = None
 
         self.menuBar = QMenuBar()
         self.toolBar = QToolBar()
 
         self.scrollArea = QScrollArea()
         self.scrollArea.setBackgroundRole(QPalette.Dark)
-        self.scrollArea.setWidget(self.imageLabel)
+        self.scrollArea.setWidget(self.canvas)
 
         vlayout = QVBoxLayout()
         vlayout.addWidget(self.menuBar)
@@ -117,9 +139,6 @@ class PlotViewer(QWidget):
         self.resize(850, 700)
 
     def save(self):
-        if not os.path.exists(self.figName):
-            return
-
         options = QFileDialog.Options()
         options |= QFileDialog.DontUseNativeDialog
         filename, _ = QFileDialog.getSaveFileName(self, 'Save image', '',
@@ -131,21 +150,7 @@ class PlotViewer(QWidget):
         if len(filename) < 5 or filename[-4:] != '.png':
             filename += '.png'
 
-        # simply move the temporary file to the desired location
-        copyfile(self.figName, filename)
-
-    def openImage(self, image):
-        self.imageLabel.setPixmap(QPixmap.fromImage(image))
-
-        self.titleAct.setEnabled(True)
-        self.xLabelAct.setEnabled(True)
-        self.yLabelAct.setEnabled(True)
-        self.sizeAct.setEnabled(True)
-        self.scaleFactor = 1.0
-        self.zoomInAct.setEnabled(True)
-        self.zoomOutAct.setEnabled(True)
-        self.normalSizeAct.setEnabled(True)
-        self.imageLabel.adjustSize()
+        self.canvas.print_png(filename)
 
     def createActions(self):
         icons = self.style().standardIcon
@@ -153,38 +158,37 @@ class PlotViewer(QWidget):
                                triggered=self.save, icon=icons(QStyle.SP_DialogSaveButton))
         self.exitAct = QAction('Exit', self,
                                triggered=self.close, icon=icons(QStyle.SP_DialogCloseButton))
-        self.titleAct = QAction('Modify title', self, enabled=False, triggered=self.changeTitle)
-        self.xLabelAct = QAction('Modify X label', self, enabled=False, triggered=self.changeXLabel)
-        self.yLabelAct = QAction('Modify Y label', self, enabled=False, triggered=self.changeYLabel)
-        self.sizeAct = QAction('Modify figure size', self, enabled=False, triggered=self.changeSize)
+        self.titleAct = QAction('Modify title', self, triggered=self.changeTitle)
+        self.xLabelAct = QAction('Modify X label', self, triggered=self.changeXLabel)
+        self.yLabelAct = QAction('Modify Y label', self, triggered=self.changeYLabel)
 
-        self.zoomInAct = QAction('Zoom In (25%)', self, shortcut='Ctrl++',
-                                 enabled=False, triggered=self.zoomIn)
-        self.zoomOutAct = QAction('Zoom Out (25%)', self, shortcut='Ctrl+-',
-                                  enabled=False, triggered=self.zoomOut)
-        self.normalSizeAct = QAction('Normal Size', self, enabled=False, triggered=self.normalSize)
 
     def changeTitle(self):
-        pass
+        value, ok = QInputDialog.getText(self, 'Change title',
+                                         'Enter a new title', text=self.canvas.axes.get_title())
+        if not ok:
+            return
+        self.canvas.axes.set_title(value)
+        self.canvas.draw()
+        self.current_title = value
 
     def changeXLabel(self):
-        pass
+        value, ok = QInputDialog.getText(self, 'Change X label',
+                                         'Enter a new X label', text=self.canvas.axes.get_xlabel())
+        if not ok:
+            return
+        self.canvas.axes.set_xlabel(value)
+        self.canvas.draw()
+        self.current_xlabel = value
 
     def changeYLabel(self):
-        pass
-
-    def changeSize(self):
-        pass
-
-    def zoomIn(self):
-        self.scaleImage(1.25)
-
-    def zoomOut(self):
-        self.scaleImage(0.8)
-
-    def normalSize(self):
-        self.imageLabel.adjustSize()
-        self.scaleFactor = 1.0
+        value, ok = QInputDialog.getText(self, 'Change X label',
+                                         'Enter a new X label', text=self.canvas.axes.get_ylabel())
+        if not ok:
+            return
+        self.canvas.axes.set_ylabel(value)
+        self.canvas.draw()
+        self.current_ylabel = value
 
     def createMenus(self):
         self.fileMenu = QMenu("&File", self)
@@ -196,35 +200,13 @@ class PlotViewer(QWidget):
         self.editMenu.addAction(self.titleAct)
         self.editMenu.addAction(self.xLabelAct)
         self.editMenu.addAction(self.yLabelAct)
-        self.editMenu.addSeparator()
-        self.editMenu.addAction(self.sizeAct)
-
-        self.viewMenu = QMenu("&View", self)
-        self.viewMenu.addAction(self.zoomInAct)
-        self.viewMenu.addAction(self.zoomOutAct)
-        self.viewMenu.addAction(self.normalSizeAct)
 
         self.menuBar.addMenu(self.fileMenu)
         self.menuBar.addMenu(self.editMenu)
-        self.menuBar.addMenu(self.viewMenu)
 
     def createTools(self):
         self.toolBar.addAction(self.saveAct)
         self.toolBar.addSeparator()
-
-    def scaleImage(self, factor):
-        self.scaleFactor *= factor
-        self.imageLabel.resize(self.scaleFactor * self.imageLabel.pixmap().size())
-
-        self.adjustScrollBar(self.scrollArea.horizontalScrollBar(), factor)
-        self.adjustScrollBar(self.scrollArea.verticalScrollBar(), factor)
-
-        self.zoomInAct.setEnabled(self.scaleFactor < 3.0)
-        self.zoomOutAct.setEnabled(self.scaleFactor > 0.333)
-
-    def adjustScrollBar(self, scrollBar, factor):
-        scrollBar.setValue(int(factor * scrollBar.value()
-                           + ((factor - 1) * scrollBar.pageStep() / 2)))
 
 
 def exception_hook(exctype, value, traceback):
