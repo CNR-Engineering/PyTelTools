@@ -556,6 +556,7 @@ class VolumePlotViewer(PlotViewer):
         fig.set_size_inches(size[0], size[1])
         plt.savefig(self.figName, dpi=100)
         fig.clear()
+        plt.clf()
         plt.close(fig)
 
         self.show_date = show_date
