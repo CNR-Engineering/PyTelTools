@@ -421,6 +421,7 @@ class VolumePlotViewer(PlotViewer):
         self.locatePolygonAct.setEnabled(False)
 
         fig = plt.figure(1, figsize=(10, 10), dpi=60)
+        fig.canvas.mpl_connect('close_event', lambda event: self.locatePolygonAct.setEnabled(True))
         ax = fig.add_subplot(111)
         patches = [PolygonPatch(t.buffer(0), fc=self.BLUE, ec=self.BLUE, alpha=0.5, zorder=1) for t in self.triangles]
         for p in self.parent.polygons:
@@ -441,7 +442,6 @@ class VolumePlotViewer(PlotViewer):
         plt.gca().set_aspect('equal', adjustable='box')
         plt.show()
         plt.ioff()
-        fig.canvas.mpl_connect('close_event', lambda event: self.locatePolygonAct.setEnabled(True))
 
     def selectColumns(self):
         msg = PlotColumnsSelector(list(self.data)[1:], self.current_columns)
