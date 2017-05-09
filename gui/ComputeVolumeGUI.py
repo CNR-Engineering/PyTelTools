@@ -440,6 +440,7 @@ class VolumePlotViewer(PlotViewer):
         ax.set_ylim(miny - 0.05 * h, maxy + 0.05 * h)
         plt.gca().set_aspect('equal', adjustable='box')
         plt.show()
+        plt.ioff()
         fig.canvas.mpl_connect('close_event', lambda event: self.locatePolygonAct.setEnabled(True))
 
     def selectColumns(self):
