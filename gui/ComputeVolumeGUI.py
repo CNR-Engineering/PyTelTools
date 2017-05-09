@@ -7,12 +7,12 @@ from PyQt5.QtWidgets import *
 from PyQt5.QtGui import *
 from PyQt5.QtCore import *
 import pandas as pd
-import matplotlib.pyplot as plt
 
 import matplotlib
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 matplotlib.use('Qt5Agg')
+import matplotlib.pyplot as plt
 
 from matplotlib.collections import PatchCollection
 from descartes import PolygonPatch
@@ -464,17 +464,16 @@ class VolumePlotViewer(PlotViewer):
         self.triangles = list(self.parent.triangles.triangles.values())
 
     def locate(self):
-        reply = QMessageBox.question(self, 'Locate polygons on map',
-                                     'This may take up to one minute. Are you sure to proceed?\n'
-                                     '(You can still modify the volume plot with the map open)',
-                                     QMessageBox.Yes | QMessageBox.No)
-        if reply == QMessageBox.No:
-            return
+        if not self.map.hasFigure:
+            reply = QMessageBox.question(self, 'Locate polygons on map',
+                                         'This may take up to one minute. Are you sure to proceed?\n'
+                                         '(You can still modify the volume plot with the map open)',
+                                         QMessageBox.Yes | QMessageBox.No)
+            if reply == QMessageBox.No:
+                return
+            self.map.initFigure()
 
         self.locatePolygonAct.setEnabled(False)
-
-        if not self.map.hasFigure:
-            self.map.initFigure()
         self.map.show()
 
     def selectColumns(self):
