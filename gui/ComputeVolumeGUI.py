@@ -9,9 +9,9 @@ from PyQt5.QtCore import *
 import pandas as pd
 
 import matplotlib
+matplotlib.use('Qt5Agg')
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
-matplotlib.use('Qt5Agg')
 import matplotlib.pyplot as plt
 
 from matplotlib.collections import PatchCollection
