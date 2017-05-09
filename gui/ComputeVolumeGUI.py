@@ -349,6 +349,21 @@ class VolumePlotViewer(PlotViewer):
         self.toolBar.addAction(self.changeDateAct)
         self.toolBar.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
 
+        self.mapMenu = QMenu('&Map', self)
+        self.mapMenu.addAction(self.locatePolygonAct)
+        self.polyMenu = QMenu('&Polygons', self)
+        self.polyMenu.addAction(self.selectColumnsAct)
+        self.polyMenu.addAction(self.editColumnNamesAct)
+        self.polyMenu.addAction(self.editColumColorAct)
+        self.timeMenu = QMenu('&Date/&Time', self)
+        self.timeMenu.addAction(self.convertTimeAct)
+        self.timeMenu.addAction(self.changeDateAct)
+
+        self.menuBar.addMenu(self.mapMenu)
+        self.menuBar.addMenu(self.polyMenu)
+        self.menuBar.addMenu(self.timeMenu)
+
+
     def _defaultXLabel(self, language):
         if language == 'fr':
             return 'Temps (seconde)'
