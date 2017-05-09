@@ -77,15 +77,19 @@ class TruncatedTriangularPrisms(Mesh2D):
         for i, j, k in self.triangles:
             t = self.triangles[i, j, k]
             if polygon.contains(t):
-                triangles[i, j, k] = t
-                weight[[i, j, k]] += t.area
+                area = t.area
+                vertices = tuple(map(np.array, list(t.exterior.coords)[:-1]))
+                triangles[i, j, k] = (vertices, area)
+                weight[[i, j, k]] += area
             else:
                 is_intersected, intersection = polygon.polygon_intersection(t)
                 if is_intersected:
+                    vertices = tuple(map(np.array, list(t.exterior.coords)[:-1]))
+                    area = t.area
                     centroid = intersection.centroid
                     interpolator = Interpolator(t).get_interpolator_at(centroid.x, centroid.y)
                     triangle_polygon_net_intersection[i, j, k] = (intersection.area, interpolator)
-                    triangle_polygon_intersection[i, j, k] = (t, intersection)
+                    triangle_polygon_intersection[i, j, k] = (vertices, area, intersection)
         return weight / 3.0, triangle_polygon_net_intersection, triangles, triangle_polygon_intersection
 
     @staticmethod
@@ -103,18 +107,18 @@ class TruncatedTriangularPrisms(Mesh2D):
         return volume
 
     @staticmethod
-    def superior_prism_volume(triangle, values):
+    def superior_prism_volume(vertices, area, values):
         """!
         @brief Return the volume in the half-space z > 0 of the prism with the given base triangle and values
         @param <shapely.geometry.Polygon> triangle: A triangle entirely contained in the polygon
         @param <numpy.1D-array> values: The values of the variable on the three nodes of the triangle
         @return <numpy.float>: The volume of the prism in the half-space z > 0
         """
-        p1, p2, p3 = tuple(map(np.array, list(triangle.exterior.coords)[:-1]))
+        p1, p2, p3 = vertices
 
         # eliminate special cases
         if min(values) >= 0:
-            return triangle.area * sum(values) / 3.0
+            return area * sum(values) / 3.0
         elif max(values) <= 0:
             return 0
         # remaining cases: triangle crosses the plane z = 0
@@ -128,12 +132,12 @@ class TruncatedTriangularPrisms(Mesh2D):
             (z_bottom, _, bottom), (z_middle, _, middle), (z_top, _, top) = sorted(zip(values, [1, 2, 3], [p1, p2, p3]))
             bottom_middle_intersect = (z_middle * bottom - z_bottom * middle) / (z_middle - z_bottom)
             bottom_top_intersect = (z_top * bottom - z_bottom * top) / (z_top - z_bottom)
-            volume_total = triangle.area * sum(values) / 3.0
+            volume_total = area * sum(values) / 3.0
             volume_negative = geom.Polygon([bottom, bottom_middle_intersect, bottom_top_intersect]).area * z_bottom / 3.0
             return volume_total - volume_negative
 
     @staticmethod
-    def superior_prism_volume_in_intersection(triangle, polygon, intersection, values):
+    def superior_prism_volume_in_intersection(vertices, polygon, area, intersection, values):
         """!
         @brief Return the volume of the prism in the half-space z > 0 and inside the polygon
         @param <shapely.geometry.Polygon> triangle: The base triangle
@@ -142,11 +146,11 @@ class TruncatedTriangularPrisms(Mesh2D):
         @param <numpy.1D-array> values: The values of the variable on the three nodes of the triangle
         @return <numpy.float>: The volume of the prism in the half-space z > 0 and inside the polygon
         """
-        p1, p2, p3 = tuple(map(np.array, list(triangle.exterior.coords)[:-1]))
+        p1, p2, p3 = vertices
 
         # eliminate special cases
         if min(values) >= 0:
-            return triangle.area * sum(values) / 3.0
+            return area * sum(values) / 3.0
         elif max(values) <= 0:
             return 0
         # remaining cases: triangle crosses the plane z = 0
@@ -241,12 +245,12 @@ class VolumeCalculator:
 
             volume_positive = 0
             for a, b, c in triangles:
-                t = triangles[a, b, c]
-                volume_positive += TruncatedTriangularPrisms.superior_prism_volume(t, values[[a, b, c]])
+                vertices, area = triangles[a, b, c]
+                volume_positive += TruncatedTriangularPrisms.superior_prism_volume(vertices, area, values[[a, b, c]])
             for a, b, c in triangle_polygon_intersection:
-                triangle, intersection = triangle_polygon_intersection[a, b, c]
-                volume_positive += TruncatedTriangularPrisms.superior_prism_volume_in_intersection(triangle, polygon,
-                                                                                                   intersection,
+                vertices, area, intersection = triangle_polygon_intersection[a, b, c]
+                volume_positive += TruncatedTriangularPrisms.superior_prism_volume_in_intersection(vertices, polygon,
+                                                                                                   area, intersection,
                                                                                                    values[[a, b, c]])
             return volume_net, volume_positive, volume_net-volume_positive
 
