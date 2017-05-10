@@ -1,5 +1,6 @@
 numpy
 pandas
 PyQt5
+pyshp
 matplotlib
 descartes
