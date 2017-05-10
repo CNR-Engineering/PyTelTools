@@ -1,3 +1,5 @@
 numpy
 pandas
 PyQt5
+matplotlib
+descartes
