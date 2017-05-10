@@ -1,6 +1,8 @@
+descartes
+matplotlib
 numpy
 pandas
 PyQt5
 pyshp
-matplotlib
-descartes
+pytest
+shapely
