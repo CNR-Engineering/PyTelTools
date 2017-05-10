@@ -1,5 +1,5 @@
 """!
-Interpolation in triangles
+Barycentric interpolation in triangles
 
 """
 
@@ -21,9 +21,8 @@ class Interpolator:
     def get_interpolator_at(self, x, y):
         return (Interpolator.VEC0 * self.norm_z + (x-self.x1) * self.vec_y - (y-self.y1) * self.vec_x) / self.norm_z
 
-
-
-
-
+    def is_in_triangle(self, x, y):
+        coord = (Interpolator.VEC0 * self.norm_z + (x-self.x1) * self.vec_y - (y-self.y1) * self.vec_x) / self.norm_z
+        return np.all(coord >= 0) and np.all(coord <= 1)
 
 
