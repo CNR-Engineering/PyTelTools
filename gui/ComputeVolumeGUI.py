@@ -229,9 +229,9 @@ class ColorTable(QTableWidget):
             item = sender.item(selectedRow, 0)
             source = QTableWidgetItem(item)
             self.setItem(dropRow, 1, source)
-            sender.insertRow(sender.rowCount())
-            sender.setItem(sender.rowCount()-1, 0, color)
-            sender.removeRow(selectedRow)
+            # sender.insertRow(sender.rowCount())
+            # sender.setItem(sender.rowCount()-1, 0, color)
+            # sender.removeRow(selectedRow)
         else:
             selectedRow = self.getselectedRow()
             source = self.item(selectedRow, 1).text()
@@ -268,11 +268,10 @@ class ColumnColorEditor(QDialog):
         row = 0
         for color in parent.defaultColors:
             color_name = parent.colorToName[color]
-            if color_name not in used_colors:
-                self.available_colors.insertRow(row)
-                col = QTableWidgetItem(color_name)
-                self.available_colors.setItem(row, 0, col)
-                row += 1
+            self.available_colors.insertRow(row)
+            col = QTableWidgetItem(color_name)
+            self.available_colors.setItem(row, 0, col)
+            row += 1
 
         buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel,
                                    Qt.Horizontal, self)
