@@ -603,7 +603,7 @@ class ErrorDistributionTab(QWidget):
 
         # create the stats box
         self.resultBox = QPlainTextEdit()
-        self.resultBox.setMaximumSize(300)
+        self.resultBox.setMaximumWidth(300)
         
         # set layout
         mainLayout = QVBoxLayout()
