@@ -12,7 +12,6 @@ from matplotlib.figure import Figure
 
 
 
-
 class QPlainTextEditLogger(logging.Handler):
     """!
     @brief A text edit box displaying the message logs
@@ -92,7 +91,6 @@ class PlotCanvas(FigureCanvas):
         self.parent = parent
         self.figure = Figure(figsize=(8, 6), dpi=100)
         self.axes = self.figure.add_subplot(111)
-        self.initFigure()
 
         FigureCanvas.__init__(self, self.figure)
         self.setParent(None)
@@ -102,22 +100,22 @@ class PlotCanvas(FigureCanvas):
                                    QSizePolicy.Expanding)
         FigureCanvas.updateGeometry(self)
 
-    def initFigure(self):
-        x = np.linspace(0, 30, 100)
-        y = np.sin(x)
-        self.axes.plot(x, y)
-
 
 class PlotViewer(QWidget):
     def __init__(self):
         super().__init__()
         self.canvas = PlotCanvas(self)
-        self.current_xlabel = None
-        self.current_ylabel = None
-        self.current_title = None
+        self.current_xlabel = 'X'
+        self.current_ylabel = 'Y'
+        self.current_title = 'Default plot'
 
+        # add a default plot
+        self.defaultPlot()
+
+        # add the menu bar and the tool bar
         self.menuBar = QMenuBar()
         self.toolBar = QToolBar()
+        self.toolBar.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
 
         self.scrollArea = QScrollArea()
         self.scrollArea.setBackgroundRole(QPalette.Dark)
@@ -161,7 +159,6 @@ class PlotViewer(QWidget):
         self.titleAct = QAction('Modify title', self, triggered=self.changeTitle)
         self.xLabelAct = QAction('Modify X label', self, triggered=self.changeXLabel)
         self.yLabelAct = QAction('Modify Y label', self, triggered=self.changeYLabel)
-
 
     def changeTitle(self):
         value, ok = QInputDialog.getText(self, 'Change title',
@@ -207,6 +204,26 @@ class PlotViewer(QWidget):
     def createTools(self):
         self.toolBar.addAction(self.saveAct)
         self.toolBar.addSeparator()
+
+    def defaultPlot(self):
+        x = np.linspace(0, 30, 100)
+        y = np.sin(x)
+        self.current_xlabel = 'X'
+        self.current_ylabel = 'Y'
+        self.current_title = 'Default plot'
+        self.plot(x, y)
+
+    def plot(self, x, y):
+        """!
+        Default plotting behaviour
+        """
+        self.canvas.axes.clear()
+        self.canvas.axes.plot(x, y, 'b-', linewidth=2)
+        self.canvas.axes.grid()
+        self.canvas.axes.set_xlabel(self.current_xlabel)
+        self.canvas.axes.set_ylabel(self.current_ylabel)
+        self.canvas.axes.set_title(self.current_title)
+        self.canvas.draw()
 
 
 def exception_hook(exctype, value, traceback):

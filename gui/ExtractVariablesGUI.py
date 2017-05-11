@@ -360,8 +360,12 @@ class TimeRangeSlider(QSlider):
             start_index = int(self.info.startIndex.text())
             end_index = int(self.info.endIndex.text())
         except ValueError:
+            self.info.updateText(self._low, self.time_frames[self._low].total_seconds(), self.low(),
+                                 self._high, self.time_frames[self._high].total_seconds(), self.high())
             return
         if start_index <= 0 or end_index > self.nb_frames or start_index > end_index:
+            self.info.updateText(self._low, self.time_frames[self._low].total_seconds(), self.low(),
+                                 self._high, self.time_frames[self._high].total_seconds(), self.high())
             return
         self.setLow(start_index-1)
         self.setHigh(end_index-1)
@@ -450,10 +454,8 @@ class ExtractVariablesGUI(QWidget):
     """!
     @brief A graphical interface for extracting and computing variables from .slf file
     """
-    def __init__(self, parent=None):
+    def __init__(self):
         super().__init__()
-        self.parent = parent
-
         self.filename = None
         self.language = None
 
@@ -469,15 +471,9 @@ class ExtractVariablesGUI(QWidget):
         self._bindEvents()
 
         self.setFixedWidth(800)
-        self.setMaximumHeight(750)
         self.setWindowFlags(self.windowFlags() | Qt.CustomizeWindowHint)
         self.setWindowTitle('Extract variables and frames from Serafin file')
         self._center()
-
-    def closeEvent(self, event):
-        if self.parent is not None:
-            self.parent.closeSerafin()
-        event.accept()
 
     def _initWidgets(self):
         """!
@@ -502,6 +498,7 @@ class ExtractVariablesGUI(QWidget):
         hlayout.addWidget(self.frenchButton)
         hlayout.addWidget(QRadioButton('English'))
         self.langBox.setLayout(hlayout)
+        self.langBox.setMaximumHeight(80)
         self.frenchButton.setChecked(True)
 
         # create two 3-column tables for variables selection
@@ -910,6 +907,12 @@ class ExtractVariablesGUI(QWidget):
             return
         if len(filename) < 5 or filename[-4:] != '.slf':
             filename += '.slf'
+
+        # overwrite to the input file is forbidden
+        if filename == self.filename:
+            QMessageBox.critical(self, 'Error', 'Cannot overwrite to the input file.',
+                                 QMessageBox.Ok)
+            return
 
         # handle overwrite manually
         overwrite = self._handleOverwrite(filename)

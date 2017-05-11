@@ -318,26 +318,27 @@ class MapCanvas(FigureCanvas):
         self.hasFigure = False
 
     def initFigure(self):
+        self.axes.clear()
         patches = [PolygonPatch(t.buffer(0), fc=self.BLUE, ec=self.BLUE, alpha=0.5, zorder=1)
                    for t in self.parent.triangles]
-        for p in self.parent.parent.polygons:
+        for p in self.parent.input.polygons:
             patches.append(PolygonPatch(p.polyline().buffer(0), fc=self.PINK, ec=self.BLACK, alpha=0.5, zorder=1))
 
         self.axes.add_collection(PatchCollection(patches, match_original=True))
-        for p, name in zip(self.parent.parent.polygons,
+        for p, name in zip(self.parent.input.polygons,
                            [self.parent.column_labels[p] for p in ['Polygon %d' % (i+1)
-                                                         for i in range(len(self.parent.parent.polygons))]]):
+                                                         for i in range(len(self.parent.input.polygons))]]):
             center = p.polyline().centroid
             cx, cy = center.x, center.y
             self.axes.annotate(name, (cx, cy), color='k', weight='bold',
                                fontsize=8, ha='center', va='center')
 
-        minx, maxx, miny, maxy = self.parent.parent.locations
+        minx, maxx, miny, maxy = self.parent.input.locations
         w, h = maxx - minx, maxy - miny
         self.axes.set_xlim(minx - 0.05 * w, maxx + 0.05 * w)
         self.axes.set_ylim(miny - 0.05 * h, maxy + 0.05 * h)
         self.axes.set_aspect('equal', adjustable='box')
-
+        self.draw()
         self.hasFigure = True
 
     def closeEvent(self, event):
@@ -346,9 +347,9 @@ class MapCanvas(FigureCanvas):
 
 
 class VolumePlotViewer(PlotViewer):
-    def __init__(self, parent):
+    def __init__(self, inputTab):
         super().__init__()
-        self.parent = parent
+        self.input = inputTab
         self.map = MapCanvas(self)
 
         self.defaultColors = ['b', 'r', 'g', 'y', 'k', 'c', '#F28AD6', 'm']
@@ -363,6 +364,7 @@ class VolumePlotViewer(PlotViewer):
         self.datetime = []
         self.var_ID = None
         self.second_var_ID = None
+        self.triangles = None
 
         # initialize graphical parameters
         self.show_date = False
@@ -394,7 +396,6 @@ class VolumePlotViewer(PlotViewer):
         self.toolBar.addSeparator()
         self.toolBar.addAction(self.convertTimeAct)
         self.toolBar.addAction(self.changeDateAct)
-        self.toolBar.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
 
         self.mapMenu = QMenu('&Map', self)
         self.mapMenu.addAction(self.locatePolygonAct)
@@ -443,22 +444,14 @@ class VolumePlotViewer(PlotViewer):
         self.canvas.draw()
 
     def getData(self):
-        # reinitialize old graphical parameters
-        self.show_date = False
-        self.current_columns = ('Polygon 1',)
-        self.current_title = ''
-        self.current_size = (8.0, 6.0)
-        self.column_labels = {}
-        self.column_colors = {}
-
         # get the new data
-        csv_file = self.parent.csvNameBox.text()
+        csv_file = self.input.csvNameBox.text()
         self.data = pd.read_csv(csv_file, header=0, sep=';')
 
-        self.var_ID = self.parent.var_ID
-        self.second_var_ID = self.parent.second_var_ID
-        if self.parent.header.date is not None:
-            year, month, day, hour, minute, second = self.parent.header.date
+        self.var_ID = self.input.var_ID
+        self.second_var_ID = self.input.second_var_ID
+        if self.input.header.date is not None:
+            year, month, day, hour, minute, second = self.input.header.date
             self.start_time = datetime.datetime(year, month, day, hour, minute, second)
         else:
             self.start_time = datetime.datetime(1900, 1, 1, 0, 0, 0)
@@ -470,11 +463,11 @@ class VolumePlotViewer(PlotViewer):
         self.column_colors = {x: None for x in columns}
         for i in range(min(len(columns), len(self.defaultColors))):
             self.column_colors[columns[i]] = self.defaultColors[i]
-        self.triangles = list(self.parent.triangles.triangles.values())
+        self.triangles = list(self.input.triangles.triangles.values())
 
         # initialize the plot
-        self.current_xlabel = self._defaultXLabel(self.parent.language)
-        self.current_ylabel = self._defaultYLabel(self.parent.language)
+        self.current_xlabel = self._defaultXLabel(self.input.language)
+        self.current_ylabel = self._defaultYLabel(self.input.language)
         self.current_title = ''
         self.replot()
 
@@ -536,18 +529,24 @@ class VolumePlotViewer(PlotViewer):
         self.xLabelAct.setEnabled(not self.show_date)
         self.replot()
 
-    def closeEvent(self, event):
-        self.parent.setEnabled(True)
-        self.parent.setWindowFlags(self.parent.windowFlags() | Qt.WindowCloseButtonHint)
-        self.parent.show()
-        event.accept()
+    def reset(self):
+        self.map.hasFigure = False
+        self.map.close()
+
+        # reinitialize old graphical parameters
+        self.show_date = False
+        self.current_columns = ('Polygon 1',)
+        self.current_title = ''
+        self.column_labels = {}
+        self.column_colors = {}
+        self.triangles = None
 
 
-class ComputeVolumeGUI(QWidget):
-    def __init__(self, parent=None):
+class InputTab(QWidget):
+    def __init__(self, parent):
         super().__init__()
         self.parent = parent
-
+        
         self.filename = None
         self.header = None
         self.language = 'fr'
@@ -562,10 +561,7 @@ class ComputeVolumeGUI(QWidget):
         self._setLayout()
         self._bindEvents()
 
-        self.setFixedWidth(750)
-        self.setMaximumHeight(750)
-        self.setWindowFlags(self.windowFlags() | Qt.CustomizeWindowHint)
-        self.setWindowTitle('Compute and visualize volumes inside polygons')
+        self.setFixedWidth(850)
 
     def _initWidgets(self):
         # create a checkbox for language selection
@@ -575,6 +571,7 @@ class ComputeVolumeGUI(QWidget):
         hlayout.addWidget(self.frenchButton)
         hlayout.addWidget(QRadioButton('English'))
         self.langBox.setLayout(hlayout)
+        self.langBox.setMaximumHeight(80)
         self.frenchButton.setChecked(True)
 
         # create the button open Serafin
@@ -586,6 +583,7 @@ class ComputeVolumeGUI(QWidget):
         self.btnOpenPolygon = QPushButton('Load\nPolygons', self, icon=self.style().standardIcon(QStyle.SP_DialogOpenButton))
         self.btnOpenPolygon.setToolTip('<b>Open</b> a .i2s or .shp file')
         self.btnOpenPolygon.setFixedSize(105, 50)
+        self.btnOpenPolygon.setEnabled(False)
 
         # create some text fields displaying the IO files info
         self.serafinNameBox = QLineEdit()
@@ -615,14 +613,7 @@ class ComputeVolumeGUI(QWidget):
         # create the submit button
         self.btnSubmit = QPushButton('Submit\n(to .csv)', self, icon=self.style().standardIcon(QStyle.SP_DialogSaveButton))
         self.btnSubmit.setFixedSize(105, 50)
-
-        # create the button for opening the image viewer
-        self.btnImage = QPushButton('Visualize results', self)
-        self.btnImage.setFixedSize(135, 60)
-        self.btnImage.setEnabled(False)
-
-        # create the image viewer
-        self.img = VolumePlotViewer(self)
+        self.btnSubmit.setEnabled(False)
 
         # create the widget displaying message logs
         self.logTextBox = QPlainTextEditLogger(self)
@@ -634,7 +625,6 @@ class ComputeVolumeGUI(QWidget):
         self.btnOpenSerafin.clicked.connect(self.btnOpenSerafinEvent)
         self.btnOpenPolygon.clicked.connect(self.btnOpenPolygonEvent)
         self.btnSubmit.clicked.connect(self.btnSubmitEvent)
-        self.btnImage.clicked.connect(self.btnImageEvent)
 
     def _setLayout(self):
         mainLayout = QVBoxLayout()
@@ -686,18 +676,10 @@ class ComputeVolumeGUI(QWidget):
         hlayout.addWidget(self.csvNameBox)
         mainLayout.addLayout(hlayout)
 
-        mainLayout.addItem(QSpacerItem(10, 10))
-        mainLayout.addWidget(self.btnImage)
-        mainLayout.setAlignment(self.btnImage, Qt.AlignHCenter)
         mainLayout.addItem(QSpacerItem(10, 15))
         mainLayout.addWidget(QLabel('   Message logs'))
         mainLayout.addWidget(self.logTextBox.widget)
         self.setLayout(mainLayout)
-
-    def closeEvent(self, event):
-        if self.parent is not None:
-            self.parent.closeVolume()
-        event.accept()
 
     def _handleOverwrite(self, filename):
         """!
@@ -725,7 +707,7 @@ class ComputeVolumeGUI(QWidget):
         self.firstVarBox.clear()
         self.secondVarBox.clear()
         self.csvNameBox.clear()
-        self.btnImage.setEnabled(False)
+        self.btnOpenPolygon.setEnabled(True)
         self.timeSampling.setText('1')
 
         if not self.frenchButton.isChecked():
@@ -741,9 +723,7 @@ class ComputeVolumeGUI(QWidget):
         if not filename:
             return
 
-        self._reinitInput(filename)
-
-        with Serafin.Read(self.filename, self.language) as resin:
+        with Serafin.Read(filename, self.language) as resin:
             resin.read_header()
 
             # check if the file is 2D
@@ -751,6 +731,9 @@ class ComputeVolumeGUI(QWidget):
                 QMessageBox.critical(self, 'Error', 'The file type (TELEMAC 3D) is currently not supported.',
                                      QMessageBox.Ok)
                 return
+
+            self._reinitInput(filename)
+
             # record the time series
             resin.get_time()
 
@@ -759,7 +742,7 @@ class ComputeVolumeGUI(QWidget):
 
             # record the triangles for future visualization
             self.locations = (min(resin.header.x), max(resin.header.x), min(resin.header.y), max(resin.header.y))
-            self.triangles = TruncatedTriangularPrisms(resin)
+            self.triangles = TruncatedTriangularPrisms(resin.header)
 
             # copy to avoid reading the same data in the future
             self.header = copy.deepcopy(resin.header)
@@ -771,6 +754,9 @@ class ComputeVolumeGUI(QWidget):
         for var_ID, var_name in zip(self.header.var_IDs, self.header.var_names):
             self.firstVarBox.addItem(var_ID + ' (%s)' % var_name.decode('utf-8').strip())
             self.secondVarBox.addItem(var_ID + ' (%s)' % var_name.decode('utf-8').strip())
+
+        self.parent.imageTab.reset()
+        self.parent.tab.setTabEnabled(1, False)
 
     def btnOpenPolygonEvent(self):
         options = QFileDialog.Options()
@@ -787,12 +773,7 @@ class ComputeVolumeGUI(QWidget):
                                  QMessageBox.Ok)
             return
 
-        self.polygonNameBox.clear()
-        self.polygonNameBox.setText(filename)
         self.polygons = []
-        self.csvNameBox.clear()
-        self.btnImage.setEnabled(False)
-
         if is_i2s:
             with BlueKenue.Read(filename) as f:
                 f.read_header()
@@ -803,6 +784,13 @@ class ComputeVolumeGUI(QWidget):
                 self.polygons.append(polygon)
 
         logging.info('Finished reading the polygon file %s' % filename)
+
+        self.polygonNameBox.clear()
+        self.polygonNameBox.setText(filename)
+        self.csvNameBox.clear()
+        self.btnSubmit.setEnabled(True)
+        self.parent.imageTab.reset()
+        self.parent.tab.setTabEnabled(1, False)
 
     def btnSubmitEvent(self):
         if not self.polygons or self.header is None:
@@ -878,19 +866,28 @@ class ComputeVolumeGUI(QWidget):
         progressBar.cancelButton.setEnabled(True)
         progressBar.exec_()
 
-        # enable close button
-        self.setWindowFlags(self.windowFlags() | Qt.WindowCloseButtonHint)
-        self.show()
-
         # unlock the image viewer
-        self.btnImage.setEnabled(True)
-        self.img.getData()
+        self.parent.imageTab.getData()
+        self.parent.tab.setTabEnabled(1, True)
 
-    def btnImageEvent(self):
-        self.setEnabled(False)
-        self.setWindowFlags(self.windowFlags() & ~Qt.WindowCloseButtonHint)
-        self.show()
-        self.img.show()
+
+class ComputeVolumeGUI(QWidget):
+    def __init__(self):
+        super().__init__()
+        
+        self.input = InputTab(self)
+        self.imageTab = VolumePlotViewer(self.input)
+
+        self.tab = QTabWidget()
+        self.tab.addTab(self.input, 'Input')
+        self.tab.addTab(self.imageTab, 'Visualize result')
+
+        self.tab.setTabEnabled(1, False)
+        self.tab.setStyleSheet('QTabBar::tab { height: 40px; width: 300px; }')
+
+        mainLayout = QVBoxLayout()
+        mainLayout.addWidget(self.tab)
+        self.setLayout(mainLayout)
 
 
 def exception_hook(exctype, value, traceback):
