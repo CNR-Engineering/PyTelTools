@@ -23,7 +23,6 @@ from geom import BlueKenue, Shapefile
 from gui.util import PlotViewer, QPlainTextEditLogger, TableWidgetDragRows
 
 
-
 class VolumeCalculatorGUI(QThread):
     tick = pyqtSignal(int, name='changed')
 
@@ -131,8 +130,9 @@ class PlotColumnsSelector(QDialog):
         vlayout.addWidget(buttons)
         self.setLayout(vlayout)
 
-        self.resize(self.sizeHint())
         self.setWindowTitle('Select columns to plot')
+        self.resize(self.sizeHint())
+        self.setMinimumWidth(300)
 
     def getSelection(self):
         selection = []
@@ -183,8 +183,9 @@ class ColumnNameEditor(QDialog):
         vlayout.addWidget(buttons)
         self.setLayout(vlayout)
 
-        self.resize(self.sizeHint())
         self.setWindowTitle('Change column labels')
+        self.resize(self.sizeHint())
+        self.setMinimumWidth(300)
 
     def getLabels(self, old_labels):
         for row in range(self.table.rowCount()):
@@ -222,16 +223,12 @@ class ColorTable(QTableWidget):
             return
 
         if self != sender:
-            color = QTableWidgetItem(self.item(dropRow, 1))
             selectedRows = sender.getselectedRowsFast()
             selectedRow = selectedRows[0]
 
             item = sender.item(selectedRow, 0)
             source = QTableWidgetItem(item)
             self.setItem(dropRow, 1, source)
-            # sender.insertRow(sender.rowCount())
-            # sender.setItem(sender.rowCount()-1, 0, color)
-            # sender.removeRow(selectedRow)
         else:
             selectedRow = self.getselectedRow()
             source = self.item(selectedRow, 1).text()
@@ -246,6 +243,8 @@ class ColumnColorEditor(QDialog):
 
         self.table = ColorTable()
         self.table.setFixedHeight(300)
+        self.table.setMaximumWidth(300)
+        self.table.setMaximumWidth(500)
         used_colors = []
         row = 0
         for column in parent.current_columns:
@@ -264,7 +263,10 @@ class ColumnColorEditor(QDialog):
         self.available_colors.setHorizontalHeaderLabels(['Available colors'])
         self.available_colors.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.available_colors.setAcceptDrops(False)
-        self.available_colors.setFixedSize(150, 300)
+        self.available_colors.setFixedHeight(300)
+        self.available_colors.setMinimumWidth(150)
+        self.available_colors.setMaximumWidth(300)
+        self.available_colors.horizontalHeader().setDefaultSectionSize(150)
         row = 0
         for color in parent.defaultColors:
             color_name = parent.colorToName[color]
@@ -360,6 +362,7 @@ class VolumePlotViewer(PlotViewer):
         self.setWindowTitle('Visualize the temporal evolution of volumes')
 
         self.data = None
+        self.time = []
         self.start_time = None
         self.datetime = []
         self.var_ID = None
@@ -367,7 +370,7 @@ class VolumePlotViewer(PlotViewer):
         self.triangles = None
 
         # initialize graphical parameters
-        self.show_date = False
+        self.timeFormat = 0   # 0: second, 1: date, 2: minutes, 3: hours, 4: days
         self.current_columns = ('Polygon 1',)
         self.column_labels = {}
         self.column_colors = {}
@@ -378,15 +381,14 @@ class VolumePlotViewer(PlotViewer):
                                         triggered=self.selectColumns)
         self.editColumnNamesAct = QAction('Edit column names', self, icon=self.style().standardIcon(QStyle.SP_FileDialogDetailedView),
                                           triggered=self.editColumns)
-        self.editColumColorAct = QAction('Edit column color', self, icon=self.style().standardIcon(QStyle.SP_FileDialogDetailedView),
+        self.editColumColorAct = QAction('Edit colors', self, icon=self.style().standardIcon(QStyle.SP_FileDialogDetailedView),
                                           triggered=self.editColor)
 
-        self.convertTimeAct = QAction('Show date/time', self, checkable=True,
+        self.convertTimeAct = QAction('Change date/time format', self, checkable=True,
                                       icon=self.style().standardIcon(QStyle.SP_DialogApplyButton))
         self.changeDateAct = QAction('Modify start date', self, triggered=self.changeDate,
                                      icon=self.style().standardIcon(QStyle.SP_DialogApplyButton))
-
-        self.convertTimeAct.changed.connect(self.convertTime)
+        self.convertTimeAct.toggled.connect(self.convertTime)
 
         self.toolBar.addAction(self.locatePolygonAct)
         self.toolBar.addSeparator()
@@ -413,8 +415,8 @@ class VolumePlotViewer(PlotViewer):
 
     def _defaultXLabel(self, language):
         if language == 'fr':
-            return 'Temps (seconde)'
-        return 'Time (second)'
+            return 'Temps ({})'.format(['seconde', '', 'minute', 'heure', 'jour'][self.timeFormat])
+        return 'Time ({})'.format(['second', '', 'minute', 'hour', 'day'][self.timeFormat])
 
     def _defaultYLabel(self, language):
         word = {'fr': 'de', 'en': 'of'}[language]
@@ -425,22 +427,21 @@ class VolumePlotViewer(PlotViewer):
         return 'Volume %s (%s - %s)' % (word, self.var_ID, self.second_var_ID)
 
     def replot(self):
+        print(self.timeFormat)
         self.canvas.axes.clear()
         for column in self.current_columns:
-            self.canvas.axes.plot(self.data['time'], self.data[column], '-', color=self.column_colors[column],
+            self.canvas.axes.plot(self.time[self.timeFormat], self.data[column], '-', color=self.column_colors[column],
                                   linewidth=2, label=self.column_labels[column])
         self.canvas.axes.legend()
         self.canvas.axes.grid()
+        self.canvas.axes.set_xlabel(self.current_xlabel)
         self.canvas.axes.set_ylabel(self.current_ylabel)
         self.canvas.axes.set_title(self.current_title)
-        if self.show_date:
+        if self.timeFormat == 1:
             self.canvas.axes.set_xticklabels(self.str_datetime)
             for label in self.canvas.axes.get_xticklabels():
                 label.set_rotation(45)
                 label.set_fontsize(8)
-        else:
-            self.canvas.axes.set_xlabel(self.current_xlabel)
-
         self.canvas.draw()
 
     def getData(self):
@@ -456,6 +457,7 @@ class VolumePlotViewer(PlotViewer):
         else:
             self.start_time = datetime.datetime(1900, 1, 1, 0, 0, 0)
         self.datetime = map(lambda x: self.start_time + datetime.timedelta(seconds=x), self.data['time'])
+
         self.str_datetime = list(map(lambda x: x.strftime('%Y/%m/%d\n%H:%M'), self.datetime))
 
         columns = list(self.data)[1:]
@@ -466,6 +468,8 @@ class VolumePlotViewer(PlotViewer):
         self.triangles = list(self.input.triangles.triangles.values())
 
         # initialize the plot
+        self.time = [self.data['time'], self.data['time'], self.data['time'] / 60,
+                     self.data['time'] / 3600, self.data['time'] / 86400]
         self.current_xlabel = self._defaultXLabel(self.input.language)
         self.current_ylabel = self._defaultYLabel(self.input.language)
         self.current_title = ''
@@ -525,8 +529,9 @@ class VolumePlotViewer(PlotViewer):
         self.replot()
 
     def convertTime(self):
-        self.show_date = not self.show_date
-        self.xLabelAct.setEnabled(not self.show_date)
+        self.timeFormat = (1 + self.timeFormat) % 5
+        self.current_xlabel = self._defaultXLabel(self.input.language)
+        self.xLabelAct.setEnabled(self.timeFormat != 1)
         self.replot()
 
     def reset(self):
@@ -534,7 +539,8 @@ class VolumePlotViewer(PlotViewer):
         self.map.close()
 
         # reinitialize old graphical parameters
-        self.show_date = False
+        self.timeFormat = 0
+        self.time = []
         self.current_columns = ('Polygon 1',)
         self.current_title = ''
         self.column_labels = {}
