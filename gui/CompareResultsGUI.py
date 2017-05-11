@@ -222,7 +222,6 @@ class InputTab(QWidget):
         self._initWidgets()
         self._setLayout()
         self._bindEvents()
-        self.setFixedHeight(500)
 
     def _initWidgets(self):
         # create a checkbox for language selection
@@ -433,7 +432,7 @@ class ComputeErrorsTab(QWidget):
         super().__init__()
         self.input = inputTab
         self.timeSelection = DoubleTimeSelection()
-        self.btnCompute = QPushButton('Compute')
+        self.btnCompute = QPushButton('Compute', icon=self.style().standardIcon(QStyle.SP_DialogApplyButton))
         self.btnCompute.setFixedSize(105, 50)
         self.resultTextBox = QPlainTextEdit()
 
@@ -449,7 +448,6 @@ class ComputeErrorsTab(QWidget):
         hlayout.setAlignment(self.btnCompute, Qt.AlignTop)
         hlayout.setAlignment(Qt.AlignHCenter)
         vlayout = QVBoxLayout()
-        vlayout.addWidget(QLabel('Result'))
         vlayout.addWidget(self.resultTextBox)
         hlayout.addItem(QSpacerItem(10, 1))
         hlayout.addLayout(vlayout)
@@ -513,13 +511,13 @@ class ErrorEvolutionTab(QWidget):
         ly = QHBoxLayout()
         ly.addWidget(self.plotViewer)
         gb.setLayout(ly)
-        gb.setStyleSheet('QGroupBox { background-color: rgb(255,255,255); '
-                         'border: 8px solid rgb(108, 122, 137); border-radius: 6px }')
+        gb.setStyleSheet('QGroupBox {border: 8px solid rgb(108, 122, 137); border-radius: 6px }')
         gb.setMaximumWidth(900)
+        gb.setMinimumWidth(600)
 
         # create the reference time selection widget
         self.timeSelection = SimpleTimeSelection()
-        self.btnCompute = QPushButton('Compute')
+        self.btnCompute = QPushButton('Compute', icon=self.style().standardIcon(QStyle.SP_DialogApplyButton))
 
         # create the compute button
         self.btnCompute.setFixedSize(105, 50)
@@ -589,21 +587,21 @@ class ErrorDistributionTab(QWidget):
         ly = QHBoxLayout()
         ly.addWidget(self.plotViewer)
         gb.setLayout(ly)
-        gb.setStyleSheet('QGroupBox { background-color: rgb(255,255,255); '
-                         'border: 8px solid rgb(108, 122, 137); border-radius: 6px }')
-        gb.setMaximumWidth(900)
+        gb.setStyleSheet('QGroupBox {border: 8px solid rgb(108, 122, 137); border-radius: 6px }')
+        gb.setMinimumWidth(800)
 
         # create the reference time selection widget
         self.timeSelection = DoubleTimeSelection()
-        self.btnCompute = QPushButton('Compute')
 
         # create the compute button
+        self.btnCompute = QPushButton('Compute', icon=self.style().standardIcon(QStyle.SP_DialogApplyButton))
         self.btnCompute.setFixedSize(105, 50)
         self.btnCompute.clicked.connect(self.btnComputeEvent)
 
         # create the stats box
         self.resultBox = QPlainTextEdit()
-        self.resultBox.setMaximumWidth(300)
+        self.resultBox.setMinimumWidth(300)
+        self.resultBox.setMaximumWidth(400)
         
         # set layout
         mainLayout = QVBoxLayout()
@@ -612,8 +610,9 @@ class ErrorDistributionTab(QWidget):
         vlayout = QVBoxLayout()
         vlayout.addWidget(self.btnCompute)
         vlayout.addItem(QSpacerItem(10, 10))
-        vlayout.addWidget(QLabel('Result'))
         vlayout.addWidget(self.resultBox)
+        vlayout.setAlignment(self.btnCompute, Qt.AlignRight | Qt.AlignHCenter)
+        vlayout.setAlignment(Qt.AlignHCenter)
         hlayout.addLayout(vlayout)
         hlayout.addWidget(gb)
         hlayout.setSpacing(10)
@@ -691,7 +690,7 @@ class CompareResultsGUI(QWidget):
     def __init__(self):
         super().__init__()
 
-        self.setMinimumWidth(750)
+        self.setMinimumWidth(800)
         self.setWindowFlags(self.windowFlags() | Qt.CustomizeWindowHint)
         self.setWindowTitle('Compare two results on identical meshes')
 

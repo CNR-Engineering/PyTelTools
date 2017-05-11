@@ -561,7 +561,7 @@ class InputTab(QWidget):
         self._setLayout()
         self._bindEvents()
 
-        self.setFixedWidth(850)
+        self.setMinimumWidth(800)
 
     def _initWidgets(self):
         # create a checkbox for language selection
@@ -636,16 +636,16 @@ class InputTab(QWidget):
         mainLayout.addLayout(hlayout)
         mainLayout.addItem(QSpacerItem(10, 10))
 
-        hlayout = QHBoxLayout()
-        hlayout.addWidget(QLabel('     Input file'))
-        hlayout.addWidget(self.serafinNameBox)
-        mainLayout.addLayout(hlayout)
-
-        hlayout = QHBoxLayout()
-        hlayout.addWidget(QLabel('     Summary'))
-        hlayout.addWidget(self.summaryTextBox)
-        mainLayout.addLayout(hlayout)
+        glayout = QGridLayout()
+        glayout.addWidget(QLabel('     Input file'), 1, 1)
+        glayout.addWidget(self.serafinNameBox, 1, 2)
+        glayout.addWidget(QLabel('     Summary'), 2, 1)
+        glayout.addWidget(self.summaryTextBox, 2, 2)
+        glayout.setAlignment(Qt.AlignLeft)
+        glayout.setSpacing(10)
+        mainLayout.addLayout(glayout)
         mainLayout.addItem(QSpacerItem(10, 20))
+
         hlayout = QHBoxLayout()
         hlayout.addWidget(self.btnOpenPolygon)
         hlayout.addWidget(self.polygonNameBox)

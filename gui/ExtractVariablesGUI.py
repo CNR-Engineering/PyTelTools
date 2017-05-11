@@ -165,7 +165,6 @@ class TimeRangeSlider(QSlider):
     def __init__(self):
         super().__init__()
         self.setOrientation(Qt.Horizontal)
-        self.setFixedSize(600, 30)
 
         self.start_time = None
         self.time_frames = None
@@ -389,13 +388,18 @@ class SelectedTimeINFO(QWidget):
         for w in [self.startValue, self.endValue, self.startDate, self.endDate]:
             w.setReadOnly(True)
 
-        self.startIndex.setFixedWidth(30)
-        self.endIndex.setFixedWidth(30)
-        self.startDate.setFixedWidth(110)
-        self.endDate.setFixedWidth(110)
+        self.startIndex.setMinimumWidth(30)
+        self.startIndex.setMaximumWidth(50)
+        self.endIndex.setMinimumWidth(30)
+        self.endIndex.setMaximumWidth(50)
+        self.startValue.setMaximumWidth(100)
+        self.endValue.setMaximumWidth(100)
+        self.startDate.setMinimumWidth(110)
+        self.endDate.setMinimumWidth(110)
 
         self.timeSamplig = QLineEdit('1', self)
-        self.timeSamplig.setFixedWidth(30)
+        self.timeSamplig.setMinimumWidth(30)
+        self.timeSamplig.setMaximumWidth(50)
 
         glayout = QGridLayout()
         glayout.addWidget(QLabel('Sampling frequency'), 1, 1)
@@ -470,7 +474,7 @@ class ExtractVariablesGUI(QWidget):
         self._setLayout()
         self._bindEvents()
 
-        self.setFixedWidth(800)
+        self.setMinimumWidth(800)
         self.setWindowFlags(self.windowFlags() | Qt.CustomizeWindowHint)
         self.setWindowTitle('Extract variables and frames from Serafin file')
         self._center()
@@ -482,7 +486,7 @@ class ExtractVariablesGUI(QWidget):
         # create the button open
         self.btnOpen = QPushButton('Open', self, icon=self.style().standardIcon(QStyle.SP_DialogOpenButton))
         self.btnOpen.setToolTip('<b>Open</b> a .slf file')
-        self.btnOpen.setFixedSize(85, 50)
+        self.btnOpen.setFixedSize(105, 50)
 
         # create some text fields displaying the IO files info
         self.inNameBox = QLineEdit()
@@ -540,6 +544,8 @@ class ExtractVariablesGUI(QWidget):
 
         # create a slider for time selection
         self.timeSlider = TimeRangeSlider()
+        self.timeSlider.setFixedHeight(30)
+        self.timeSlider.setMinimumWidth(600)
         self.timeSlider.setEnabled(False)
 
         # create text boxes for displaying the time selection and sampling
@@ -550,7 +556,7 @@ class ExtractVariablesGUI(QWidget):
         # create the submit button
         self.btnSubmit = QPushButton('Submit', self, icon=self.style().standardIcon(QStyle.SP_DialogSaveButton))
         self.btnSubmit.setToolTip('<b>Submit</b> to write a .slf output')
-        self.btnSubmit.setFixedSize(85, 50)
+        self.btnSubmit.setFixedSize(105, 50)
         self.btnSubmit.setEnabled(False)
 
     def _bindEvents(self):
@@ -578,16 +584,14 @@ class ExtractVariablesGUI(QWidget):
         mainLayout.addLayout(hlayout)
         mainLayout.addItem(QSpacerItem(10, 10))
 
-        hlayout = QHBoxLayout()
-        hlayout.addWidget(QLabel('Input file'))
-        hlayout.addWidget(self.inNameBox)
-
-        mainLayout.addLayout(hlayout)
-
-        hlayout = QHBoxLayout()
-        hlayout.addWidget(QLabel('Summary'))
-        hlayout.addWidget(self.summaryTextBox)
-        mainLayout.addLayout(hlayout)
+        glayout = QGridLayout()
+        glayout.addWidget(QLabel('Input file'), 1, 1)
+        glayout.addWidget(self.inNameBox, 1, 2)
+        glayout.addWidget(QLabel('Summary'), 2, 1)
+        glayout.addWidget(self.summaryTextBox, 2, 2)
+        glayout.setAlignment(Qt.AlignLeft)
+        glayout.setSpacing(10)
+        mainLayout.addLayout(glayout)
 
         mainLayout.addItem(QSpacerItem(1, 10))
         hlayout = QHBoxLayout()

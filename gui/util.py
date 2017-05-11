@@ -206,8 +206,8 @@ class PlotViewer(QWidget):
         self.toolBar.addSeparator()
 
     def defaultPlot(self):
-        x = np.linspace(0, 30, 100)
-        y = np.sin(x)
+        x = [0]
+        y = [0]
         self.current_xlabel = 'X'
         self.current_ylabel = 'Y'
         self.current_title = 'Default plot'

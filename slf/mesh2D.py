@@ -30,7 +30,6 @@ class ReferenceMesh(Mesh2D):
         super().__init__(input_header)
         self.area = {}
         self.point_weight = np.zeros((self.nb_points,), dtype=np.float64)
-        self.point_quadratic_weight = np.zeros((self.nb_points,), dtype=np.float64)
 
         total_area = 0
         for i, j, k in self.triangles:
@@ -38,9 +37,7 @@ class ReferenceMesh(Mesh2D):
             self.area[i, j, k] = area
             total_area += area
             self.point_weight[[i, j, k]] += area
-            self.point_quadratic_weight[[i, j, k]] += area ** 2
         self.point_weight /= 3.0
-        self.point_quadratic_weight /= 3.0
 
         self.inverse_total_area = 1 / total_area
 
@@ -51,7 +48,7 @@ class ReferenceMesh(Mesh2D):
         return self.point_weight.dot(np.abs(values)) * self.inverse_total_area
 
     def root_mean_square_deviation(self, values):
-        return self.point_quadratic_weight.dot(np.square(values)) * self.inverse_total_area
+        return np.sqrt(self.point_weight.dot(np.square(values)) * self.inverse_total_area)
 
 
 
