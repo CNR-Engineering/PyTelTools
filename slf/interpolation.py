@@ -17,12 +17,13 @@ class Interpolator:
         self.vec_x = np.array([x2-x3, x3-self.x1, self.x1-x2])
         self.vec_y = np.array([y2-y3, y3-self.y1, self.y1-y2])
         self.norm_z = (x2-self.x1) * (y3-self.y1) - (y2-self.y1) * (x3-self.x1)
+        self.inv_norm_z = 1 / self.norm_z
 
     def get_interpolator_at(self, x, y):
-        return (Interpolator.VEC0 * self.norm_z + (x-self.x1) * self.vec_y - (y-self.y1) * self.vec_x) / self.norm_z
+        return (Interpolator.VEC0 * self.norm_z + (x-self.x1) * self.vec_y - (y-self.y1) * self.vec_x) * self.inv_norm_z
 
     def is_in_triangle(self, x, y):
-        coord = (Interpolator.VEC0 * self.norm_z + (x-self.x1) * self.vec_y - (y-self.y1) * self.vec_x) / self.norm_z
+        coord = (Interpolator.VEC0 * self.norm_z + (x-self.x1) * self.vec_y - (y-self.y1) * self.vec_x) * self.inv_norm_z
         return np.all(coord >= 0) and np.all(coord <= 1)
 
 

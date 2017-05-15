@@ -110,49 +110,45 @@ class TruncatedTriangularPrisms(Mesh2D):
     def superior_prism_volume(vertices, area, values):
         """!
         @brief Return the volume in the half-space z > 0 of the prism with the given base triangle and values
-        @param <shapely.geometry.Polygon> triangle: A triangle entirely contained in the polygon
+        @param <list> vertices: The coordinates of the three vertices defining the base triangle
+        @param <float> area: The area of the base triangle
         @param <numpy.1D-array> values: The values of the variable on the three nodes of the triangle
-        @return <numpy.float>: The volume of the prism in the half-space z > 0
+        @return <float>: The volume of the prism in the half-space z > 0
         """
-        p1, p2, p3 = vertices
-
         # eliminate special cases
         if min(values) >= 0:
             return area * sum(values) / 3.0
         elif max(values) <= 0:
             return 0
+
+        p1, p2, p3 = vertices
         # remaining cases: triangle crosses the plane z = 0
         nb_points_superior = sum(values > 0)
         if nb_points_superior == 1:  # positive tetrahedron
             (z_bottom, _, bottom), (z_middle, _, middle), (z_top, _, top) = sorted(zip(values, [1, 2, 3], [p1, p2, p3]))
-            top_middle_intersect = (z_top * middle - z_middle * top) / (z_top - z_middle)
-            top_bottom_intersect = (z_top * bottom - z_bottom * top) / (z_top - z_bottom)
-            return geom.Polygon([top, top_middle_intersect, top_bottom_intersect]).area * z_top / 3.0
+            return area * z_top ** 3 / 3 / (z_top - z_middle) / (z_top - z_bottom)
         else:  # negative tetrahedron
             (z_bottom, _, bottom), (z_middle, _, middle), (z_top, _, top) = sorted(zip(values, [1, 2, 3], [p1, p2, p3]))
-            bottom_middle_intersect = (z_middle * bottom - z_bottom * middle) / (z_middle - z_bottom)
-            bottom_top_intersect = (z_top * bottom - z_bottom * top) / (z_top - z_bottom)
             volume_total = area * sum(values) / 3.0
-            volume_negative = geom.Polygon([bottom, bottom_middle_intersect, bottom_top_intersect]).area * z_bottom / 3.0
+            volume_negative = area * z_bottom ** 3 / 3 / (z_top - z_bottom) / (z_middle - z_bottom)
             return volume_total - volume_negative
 
     @staticmethod
-    def superior_prism_volume_in_intersection(vertices, polygon, area, intersection, values):
+    def superior_prism_volume_in_intersection(polygon, vertices, area, intersection, values):
         """!
         @brief Return the volume of the prism in the half-space z > 0 and inside the polygon
-        @param <shapely.geometry.Polygon> triangle: The base triangle
         @param <shapely.geometry.Polygon> polygon: The volume-defining polygon
-        @param <shapely.geometry.Polygon or shapely.geometry.Multipolygon> intersection: The intersection between triangle and polygon
+        @param <list> vertices: The coordinates of the three vertices defining the base triangle
+        @param <float> area: The area of the base triangle
         @param <numpy.1D-array> values: The values of the variable on the three nodes of the triangle
-        @return <numpy.float>: The volume of the prism in the half-space z > 0 and inside the polygon
+        @return <float>: The volume of the prism in the half-space z > 0 and inside the polygon
         """
-        p1, p2, p3 = vertices
-
         # eliminate special cases
         if min(values) >= 0:
             return area * sum(values) / 3.0
         elif max(values) <= 0:
             return 0
+        p1, p2, p3 = vertices
         # remaining cases: triangle crosses the plane z = 0
         nb_points_superior = sum(values > 0)
         if nb_points_superior == 1:  # positive tetrahedron
@@ -239,9 +235,9 @@ class VolumeCalculator:
             volume_boundary = TruncatedTriangularPrisms.extra_volume_in_polygon(triangle_polygon_intersection, values)
             return volume_inside + volume_boundary
         else:
-            strict_weight, triangle_polygon_intersection_net, triangles, triangle_polygon_intersection = weight
+            strict_weight, triangle_polygon_net_intersection, triangles, triangle_polygon_intersection = weight
             volume_net = strict_weight.dot(values)
-            volume_net += TruncatedTriangularPrisms.extra_volume_in_polygon(triangle_polygon_intersection_net, values)
+            volume_net += TruncatedTriangularPrisms.extra_volume_in_polygon(triangle_polygon_net_intersection, values)
 
             volume_positive = 0
             for a, b, c in triangles:
@@ -249,10 +245,10 @@ class VolumeCalculator:
                 volume_positive += TruncatedTriangularPrisms.superior_prism_volume(vertices, area, values[[a, b, c]])
             for a, b, c in triangle_polygon_intersection:
                 vertices, area, intersection = triangle_polygon_intersection[a, b, c]
-                volume_positive += TruncatedTriangularPrisms.superior_prism_volume_in_intersection(vertices, polygon,
+                volume_positive += TruncatedTriangularPrisms.superior_prism_volume_in_intersection(polygon, vertices,
                                                                                                    area, intersection,
                                                                                                    values[[a, b, c]])
-            return volume_net, volume_positive, volume_net-volume_positive
+            return volume_net, volume_positive, volume_net - volume_positive
 
     def run(self):
         self.construct_triangles()

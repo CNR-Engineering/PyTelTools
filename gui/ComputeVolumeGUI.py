@@ -598,9 +598,9 @@ class InputTab(QWidget):
         self.summaryTextBox = QPlainTextEdit()
         self.summaryTextBox.setFixedHeight(50)
         self.summaryTextBox.setReadOnly(True)
-        self.polygonNameBox = QLineEdit()
+        self.polygonNameBox = QPlainTextEdit()
         self.polygonNameBox.setReadOnly(True)
-        self.polygonNameBox.setFixedHeight(30)
+        self.polygonNameBox.setFixedHeight(50)
         self.csvNameBox = QLineEdit()
         self.csvNameBox.setReadOnly(True)
         self.csvNameBox.setFixedHeight(30)
@@ -788,11 +788,15 @@ class InputTab(QWidget):
         else:
             for polygon in Shapefile.read_shp(filename):
                 self.polygons.append(polygon)
+        if not self.polygons:
+            QMessageBox.critical(self, 'Error', 'The file does not contain any polygon.',
+                                 QMessageBox.Ok)
+            return
 
         logging.info('Finished reading the polygon file %s' % filename)
-
         self.polygonNameBox.clear()
-        self.polygonNameBox.setText(filename)
+        self.polygonNameBox.appendPlainText(filename + '\n' + 'The file contains {} polygon{}.'.format(
+                                            len(self.polygons), 's' if len(self.polygons) > 1 else ''))
         self.csvNameBox.clear()
         self.btnSubmit.setEnabled(True)
         self.parent.imageTab.reset()

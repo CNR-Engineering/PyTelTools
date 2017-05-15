@@ -1,6 +1,4 @@
 import sys
-import os
-import logging
 import copy
 from PyQt5.QtWidgets import *
 from PyQt5.QtGui import *
@@ -10,7 +8,7 @@ import numpy as np
 
 from gui.util import PlotViewer
 from slf import Serafin
-from slf.mesh2D import ReferenceMesh
+from slf.comparison import ReferenceMesh
 
 
 class SimpleTimeSelection(QWidget):
