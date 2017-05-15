@@ -278,7 +278,7 @@ class PlotViewer(QWidget):
         """
         self.canvas.axes.clear()
         self.canvas.axes.plot(x, y, 'b-', linewidth=2)
-        self.canvas.axes.grid()
+        self.canvas.axes.grid(linestyle='dotted')
         self.canvas.axes.set_xlabel(self.current_xlabel)
         self.canvas.axes.set_ylabel(self.current_ylabel)
         self.canvas.axes.set_title(self.current_title)

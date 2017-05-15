@@ -845,6 +845,8 @@ class ErrorDistributionTab(QWidget):
         weights = np.ones_like(ewsd) / self.input.ref_mesh.nb_triangles  # make frequency histogram
 
         self.plotViewer.canvas.axes.clear()
+        self.plotViewer.canvas.axes.grid(linestyle='dotted')
+
         self.plotViewer.canvas.axes.hist(ewsd, weights=weights, histtype='bar', color='g',
                                          edgecolor='k', alpha=0.5)
         self.plotViewer.canvas.axes.set_xlabel(self.plotViewer.current_xlabel)

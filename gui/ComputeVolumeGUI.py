@@ -314,18 +314,20 @@ class VolumePlotViewer(PlotViewer):
         self.time = []
         self.start_time = None
         self.datetime = []
+        self.str_datetime = []
+        self.str_datetime_bis = []
         self.var_ID = None
         self.second_var_ID = None
         self.triangles = None
 
         # initialize graphical parameters
-        self.timeFormat = 0   # 0: second, 1: date, 2: minutes, 3: hours, 4: days
+        self.timeFormat = 0   # 0: second, 1: date, 2: date (alternative), 3: minutes, 4: hours, 5: days
         self.current_columns = ('Polygon 1',)
         self.column_labels = {}
         self.column_colors = {}
 
         self.locatePolygons = QAction('Locate polygons\non map', self, icon=self.style().standardIcon(QStyle.SP_DialogHelpButton),
-                                     triggered=self.locatePolygonsEvent)
+                                      triggered=self.locatePolygonsEvent)
         self.selectColumnsAct = QAction('Select\ncolumns', self, icon=self.style().standardIcon(QStyle.SP_FileDialogDetailedView),
                                         triggered=self.selectColumns)
         self.editColumnNamesAct = QAction('Edit column\nnames', self, icon=self.style().standardIcon(QStyle.SP_FileDialogDetailedView),
@@ -364,8 +366,8 @@ class VolumePlotViewer(PlotViewer):
 
     def _defaultXLabel(self, language):
         if language == 'fr':
-            return 'Temps ({})'.format(['seconde', '', 'minute', 'heure', 'jour'][self.timeFormat])
-        return 'Time ({})'.format(['second', '', 'minute', 'hour', 'day'][self.timeFormat])
+            return 'Temps ({})'.format(['seconde', '', '', 'minute', 'heure', 'jour'][self.timeFormat])
+        return 'Time ({})'.format(['second', '', '', 'minute', 'hour', 'day'][self.timeFormat])
 
     def _defaultYLabel(self, language):
         word = {'fr': 'de', 'en': 'of'}[language]
@@ -381,12 +383,12 @@ class VolumePlotViewer(PlotViewer):
             self.canvas.axes.plot(self.time[self.timeFormat], self.data[column], '-', color=self.column_colors[column],
                                   linewidth=2, label=self.column_labels[column])
         self.canvas.axes.legend()
-        self.canvas.axes.grid()
+        self.canvas.axes.grid(linestyle='dotted')
         self.canvas.axes.set_xlabel(self.current_xlabel)
         self.canvas.axes.set_ylabel(self.current_ylabel)
         self.canvas.axes.set_title(self.current_title)
-        if self.timeFormat == 1:
-            self.canvas.axes.set_xticklabels(self.str_datetime)
+        if self.timeFormat in [1, 2]:
+            self.canvas.axes.set_xticklabels(self.str_datetime if self.timeFormat == 1 else self.str_datetime_bis)
             for label in self.canvas.axes.get_xticklabels():
                 label.set_rotation(45)
                 label.set_fontsize(8)
@@ -404,9 +406,10 @@ class VolumePlotViewer(PlotViewer):
             self.start_time = datetime.datetime(year, month, day, hour, minute, second)
         else:
             self.start_time = datetime.datetime(1900, 1, 1, 0, 0, 0)
-        self.datetime = map(lambda x: self.start_time + datetime.timedelta(seconds=x), self.data['time'])
+        self.datetime = list(map(lambda x: self.start_time + datetime.timedelta(seconds=x), self.data['time']))
 
         self.str_datetime = list(map(lambda x: x.strftime('%Y/%m/%d\n%H:%M'), self.datetime))
+        self.str_datetime_bis = list(map(lambda x: x.strftime('%d/%m/%y\n%H:%M'), self.datetime))
 
         columns = list(self.data)[1:]
         self.column_labels = {x: x for x in columns}
@@ -416,8 +419,8 @@ class VolumePlotViewer(PlotViewer):
         self.triangles = list(self.input.triangles.triangles.values())
 
         # initialize the plot
-        self.time = [self.data['time'], self.data['time'], self.data['time'] / 60,
-                     self.data['time'] / 3600, self.data['time'] / 86400]
+        self.time = [self.data['time'], self.data['time'], self.data['time'],
+                     self.data['time'] / 60, self.data['time'] / 3600, self.data['time'] / 86400]
         self.current_xlabel = self._defaultXLabel(self.input.language)
         self.current_ylabel = self._defaultYLabel(self.input.language)
         self.current_title = ''
@@ -475,14 +478,15 @@ class VolumePlotViewer(PlotViewer):
             QMessageBox.critical(self, 'Error', 'Invalid input.',
                                  QMessageBox.Ok)
             return
-        self.datetime = map(lambda x: self.start_time + datetime.timedelta(seconds=x), self.data['time'])
+        self.datetime = list(map(lambda x: self.start_time + datetime.timedelta(seconds=x), self.data['time']))
         self.str_datetime = list(map(lambda x: x.strftime('%Y/%m/%d\n%H:%M'), self.datetime))
+        self.str_datetime_bis = list(map(lambda x: x.strftime('%d/%m/%y\n%H:%M'), self.datetime))
         self.replot()
 
     def convertTime(self):
-        self.timeFormat = (1 + self.timeFormat) % 5
+        self.timeFormat = (1 + self.timeFormat) % 6
         self.current_xlabel = self._defaultXLabel(self.input.language)
-        self.xLabelAct.setEnabled(self.timeFormat != 1)
+        self.xLabelAct.setEnabled(self.timeFormat not in [1, 2])
         self.replot()
 
     def reset(self):
