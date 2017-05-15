@@ -12,15 +12,12 @@ import matplotlib
 matplotlib.use('Qt5Agg')
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
-import matplotlib.pyplot as plt
 
-from matplotlib.collections import PatchCollection
-from descartes import PolygonPatch
 
 from slf import Serafin
 from slf.volume import TruncatedTriangularPrisms, VolumeCalculator
 from geom import BlueKenue, Shapefile
-from gui.util import PlotViewer, QPlainTextEditLogger, TableWidgetDragRows
+from gui.util import PlotViewer, QPlainTextEditLogger, TableWidgetDragRows, PolygonMapCanvas
 
 
 class VolumeCalculatorGUI(QThread):
@@ -299,60 +296,12 @@ class ColumnColorEditor(QDialog):
             old_colors[label_to_column[label]] = name_to_color[color]
 
 
-class MapCanvas(FigureCanvas):
-    def __init__(self, parent):
-        self.parent = parent
-        self.BLUE = '#6699cc'
-        self.PINK = '#fcabbd'
-        self.BLACK = '#14123a'
-
-        fig = Figure(figsize=(10, 10), dpi=60)
-        self.axes = fig.add_subplot(111)
-
-        FigureCanvas.__init__(self, fig)
-        self.setParent(None)
-
-        FigureCanvas.setSizePolicy(self,
-                                   QSizePolicy.Expanding,
-                                   QSizePolicy.Expanding)
-        FigureCanvas.updateGeometry(self)
-
-        self.hasFigure = False
-
-    def initFigure(self):
-        self.axes.clear()
-        patches = [PolygonPatch(t.buffer(0), fc=self.BLUE, ec=self.BLUE, alpha=0.5, zorder=1)
-                   for t in self.parent.triangles]
-        for p in self.parent.input.polygons:
-            patches.append(PolygonPatch(p.polyline().buffer(0), fc=self.PINK, ec=self.BLACK, alpha=0.5, zorder=1))
-
-        self.axes.add_collection(PatchCollection(patches, match_original=True))
-        for p, name in zip(self.parent.input.polygons,
-                           [self.parent.column_labels[p] for p in ['Polygon %d' % (i+1)
-                                                         for i in range(len(self.parent.input.polygons))]]):
-            center = p.polyline().centroid
-            cx, cy = center.x, center.y
-            self.axes.annotate(name, (cx, cy), color='k', weight='bold',
-                               fontsize=8, ha='center', va='center')
-
-        minx, maxx, miny, maxy = self.parent.input.locations
-        w, h = maxx - minx, maxy - miny
-        self.axes.set_xlim(minx - 0.05 * w, maxx + 0.05 * w)
-        self.axes.set_ylim(miny - 0.05 * h, maxy + 0.05 * h)
-        self.axes.set_aspect('equal', adjustable='box')
-        self.draw()
-        self.hasFigure = True
-
-    def closeEvent(self, event):
-        self.parent.locatePolygonAct.setEnabled(True)
-        self.hide()
-
-
 class VolumePlotViewer(PlotViewer):
     def __init__(self, inputTab):
         super().__init__()
         self.input = inputTab
-        self.map = MapCanvas(self)
+        self.map = PolygonMapCanvas(self)
+        self.setMinimumWidth(700)
 
         self.defaultColors = ['b', 'r', 'g', 'y', 'k', 'c', '#F28AD6', 'm']
         name = ['Blue', 'Red', 'Green', 'Yellow', 'Black', 'Cyan', 'Pink', 'Magenta']
@@ -375,22 +324,22 @@ class VolumePlotViewer(PlotViewer):
         self.column_labels = {}
         self.column_colors = {}
 
-        self.locatePolygonAct = QAction('Locate polygons on map', self, icon=self.style().standardIcon(QStyle.SP_DialogHelpButton),
-                                        triggered=self.locate)
-        self.selectColumnsAct = QAction('Select columns', self, icon=self.style().standardIcon(QStyle.SP_FileDialogDetailedView),
+        self.locatePolygons = QAction('Locate polygons\non map', self, icon=self.style().standardIcon(QStyle.SP_DialogHelpButton),
+                                     triggered=self.locatePolygonsEvent)
+        self.selectColumnsAct = QAction('Select\ncolumns', self, icon=self.style().standardIcon(QStyle.SP_FileDialogDetailedView),
                                         triggered=self.selectColumns)
-        self.editColumnNamesAct = QAction('Edit column names', self, icon=self.style().standardIcon(QStyle.SP_FileDialogDetailedView),
+        self.editColumnNamesAct = QAction('Edit column\nnames', self, icon=self.style().standardIcon(QStyle.SP_FileDialogDetailedView),
                                           triggered=self.editColumns)
-        self.editColumColorAct = QAction('Edit colors', self, icon=self.style().standardIcon(QStyle.SP_FileDialogDetailedView),
+        self.editColumColorAct = QAction('Edit column\ncolors', self, icon=self.style().standardIcon(QStyle.SP_FileDialogDetailedView),
                                           triggered=self.editColor)
 
-        self.convertTimeAct = QAction('Change date/time format', self, checkable=True,
+        self.convertTimeAct = QAction('Toggle date/time\nformat', self, checkable=True,
                                       icon=self.style().standardIcon(QStyle.SP_DialogApplyButton))
-        self.changeDateAct = QAction('Modify start date', self, triggered=self.changeDate,
+        self.changeDateAct = QAction('Edit\nstart date', self, triggered=self.changeDate,
                                      icon=self.style().standardIcon(QStyle.SP_DialogApplyButton))
         self.convertTimeAct.toggled.connect(self.convertTime)
 
-        self.toolBar.addAction(self.locatePolygonAct)
+        self.toolBar.addAction(self.locatePolygons)
         self.toolBar.addSeparator()
         self.toolBar.addAction(self.selectColumnsAct)
         self.toolBar.addAction(self.editColumnNamesAct)
@@ -400,7 +349,7 @@ class VolumePlotViewer(PlotViewer):
         self.toolBar.addAction(self.changeDateAct)
 
         self.mapMenu = QMenu('&Map', self)
-        self.mapMenu.addAction(self.locatePolygonAct)
+        self.mapMenu.addAction(self.locatePolygons)
         self.polyMenu = QMenu('&Polygons', self)
         self.polyMenu.addAction(self.selectColumnsAct)
         self.polyMenu.addAction(self.editColumnNamesAct)
@@ -427,7 +376,6 @@ class VolumePlotViewer(PlotViewer):
         return 'Volume %s (%s - %s)' % (word, self.var_ID, self.second_var_ID)
 
     def replot(self):
-        print(self.timeFormat)
         self.canvas.axes.clear()
         for column in self.current_columns:
             self.canvas.axes.plot(self.time[self.timeFormat], self.data[column], '-', color=self.column_colors[column],
@@ -475,17 +423,20 @@ class VolumePlotViewer(PlotViewer):
         self.current_title = ''
         self.replot()
 
-    def locate(self):
-        if not self.map.hasFigure:
+    def locatePolygonsEvent(self):
+        if not self.map.has_figure:
             reply = QMessageBox.question(self, 'Locate polygons on map',
                                          'This may take up to one minute. Are you sure to proceed?\n'
                                          '(You can still modify the volume plot with the map open)',
                                          QMessageBox.Yes | QMessageBox.No)
             if reply == QMessageBox.No:
                 return
-            self.map.initFigure()
 
-        self.locatePolygonAct.setEnabled(False)
+            self.map.reinitFigure(self.triangles, self.input.locations, self.input.polygons,
+                                  map(self.column_labels.get, ['Polygon %d' % (i+1)
+                                                               for i in range(len(self.input.polygons))]))
+
+        self.locatePolygons.setEnabled(False)
         self.map.show()
 
     def selectColumns(self):
@@ -535,7 +486,7 @@ class VolumePlotViewer(PlotViewer):
         self.replot()
 
     def reset(self):
-        self.map.hasFigure = False
+        self.map.has_figure = False
         self.map.close()
 
         # reinitialize old graphical parameters
@@ -890,7 +841,7 @@ class ComputeVolumeGUI(QWidget):
 
         self.tab = QTabWidget()
         self.tab.addTab(self.input, 'Input')
-        self.tab.addTab(self.imageTab, 'Visualize result')
+        self.tab.addTab(self.imageTab, 'Visualize results')
 
         self.tab.setTabEnabled(1, False)
         self.tab.setStyleSheet('QTabBar::tab { height: 40px; width: 300px; }')

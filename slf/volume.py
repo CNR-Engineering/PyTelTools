@@ -93,7 +93,7 @@ class TruncatedTriangularPrisms(Mesh2D):
         return weight / 3.0, triangle_polygon_net_intersection, triangles, triangle_polygon_intersection
 
     @staticmethod
-    def extra_volume_in_polygon(triangle_polygon_intersection, variable):
+    def boundary_volume_in_polygon(triangle_polygon_intersection, variable):
         """!
         @brief Return the total volume in all triangle-polygon intersections
         @param <dict> triangle_polygon_intersection: All triangle-polygon intersections defined by boundary triangles
@@ -232,12 +232,12 @@ class VolumeCalculator:
         elif self.volume_type == VolumeCalculator.NET:
             strict_weight, triangle_polygon_intersection = weight
             volume_inside = strict_weight.dot(values)
-            volume_boundary = TruncatedTriangularPrisms.extra_volume_in_polygon(triangle_polygon_intersection, values)
+            volume_boundary = TruncatedTriangularPrisms.boundary_volume_in_polygon(triangle_polygon_intersection, values)
             return volume_inside + volume_boundary
         else:
             strict_weight, triangle_polygon_net_intersection, triangles, triangle_polygon_intersection = weight
             volume_net = strict_weight.dot(values)
-            volume_net += TruncatedTriangularPrisms.extra_volume_in_polygon(triangle_polygon_net_intersection, values)
+            volume_net += TruncatedTriangularPrisms.boundary_volume_in_polygon(triangle_polygon_net_intersection, values)
 
             volume_positive = 0
             for a, b, c in triangles:

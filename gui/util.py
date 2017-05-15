@@ -9,7 +9,8 @@ import matplotlib
 matplotlib.use('Qt5Agg')
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
-
+from matplotlib.collections import PatchCollection
+from descartes import PolygonPatch
 
 
 class QPlainTextEditLogger(logging.Handler):
@@ -99,6 +100,64 @@ class PlotCanvas(FigureCanvas):
                                    QSizePolicy.Expanding,
                                    QSizePolicy.Expanding)
         FigureCanvas.updateGeometry(self)
+
+
+class MapCanvas(FigureCanvas):
+    def __init__(self):
+        self.BLUE = '#6699cc'
+        self.PINK = '#fcabbd'
+        self.BLACK = '#14123a'
+
+        fig = Figure(figsize=(10, 10), dpi=60)
+        self.axes = fig.add_subplot(111)
+
+        FigureCanvas.__init__(self, fig)
+        self.setParent(None)
+
+        FigureCanvas.setSizePolicy(self,
+                                   QSizePolicy.Expanding,
+                                   QSizePolicy.Expanding)
+        FigureCanvas.updateGeometry(self)
+
+        self.has_figure = False
+
+    def initFigure(self, triangles, locations):
+        self.axes.clear()
+        patches = [PolygonPatch(t.buffer(0), fc=self.BLUE, ec=self.BLUE, alpha=0.5, zorder=1)
+                   for t in triangles]
+        self.axes.add_collection(PatchCollection(patches, match_original=True))
+        minx, maxx, miny, maxy = locations
+        w, h = maxx - minx, maxy - miny
+        self.axes.set_xlim(minx - 0.05 * w, maxx + 0.05 * w)
+        self.axes.set_ylim(miny - 0.05 * h, maxy + 0.05 * h)
+        self.axes.set_aspect('equal', adjustable='box')
+        self.draw()
+        self.has_figure = True
+
+
+class PolygonMapCanvas(MapCanvas):
+    def __init__(self, parent):
+        self.parent = parent
+        super().__init__()
+
+    def reinitFigure(self, triangles, locations, polygons, polynames):
+        self.initFigure(triangles, locations)
+        patches = []
+        for p in polygons:
+            patches.append(PolygonPatch(p.polyline().buffer(0), fc=self.PINK, ec=self.BLACK, alpha=0.5, zorder=1))
+        self.axes.add_collection(PatchCollection(patches, match_original=True))
+
+        for p, name in zip(polygons, polynames):
+            center = p.polyline().centroid
+            cx, cy = center.x, center.y
+            self.axes.annotate(name, (cx, cy), color='k', weight='bold',
+                               fontsize=8, ha='center', va='center')
+
+        self.draw()
+
+    def closeEvent(self, event):
+        self.parent.locatePolygons.setEnabled(True)
+        self.hide()
 
 
 class PlotViewer(QWidget):

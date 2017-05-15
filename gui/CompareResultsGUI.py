@@ -6,9 +6,10 @@ from PyQt5.QtCore import *
 
 import numpy as np
 
-from gui.util import PlotViewer
+from gui.util import PlotViewer, PolygonMapCanvas
 from slf import Serafin
 from slf.comparison import ReferenceMesh
+from geom import BlueKenue, Shapefile
 
 
 class SimpleTimeSelection(QWidget):
@@ -214,8 +215,12 @@ class InputTab(QWidget):
         self.test_header = None
         self.ref_time = []
         self.test_time = []
-
+        self.polygons = []
+        self.map = PolygonMapCanvas(self)
+        self.selected_polygon = None
+        self.locations = None
         self.ref_mesh = None
+        self.polygon_added = False   # is the intersection between the mesh and the selected polygon calculated?
 
         self._initWidgets()
         self._setLayout()
@@ -243,6 +248,18 @@ class InputTab(QWidget):
         self.btnOpenTest.setFixedSize(105, 50)
         self.btnOpenTest.setEnabled(False)
 
+        # create the button open the polygon file
+        self.btnOpenPolygon = QPushButton('Load polygons\n(optional)', self, icon=self.style().standardIcon(QStyle.SP_DialogOpenButton))
+        self.btnOpenPolygon.setToolTip('<b>Open</b> a .i2s or .shp file')
+        self.btnOpenPolygon.setFixedSize(135, 50)
+        self.btnOpenPolygon.setEnabled(False)
+
+        # create the button for locating polygons on map
+        self.locatePolygons = QPushButton('Locate polygons\non map', icon=self.style().standardIcon(QStyle.SP_DialogHelpButton))
+        self.locatePolygons.setToolTip('<b>Open</b> a map with polygons')
+        self.locatePolygons.setFixedSize(135, 50)
+        self.locatePolygons.setEnabled(False)
+
         # create some text fields displaying the IO files info
         self.refNameBox = QLineEdit()
         self.refNameBox.setReadOnly(True)
@@ -262,14 +279,25 @@ class InputTab(QWidget):
         self.testSummaryTextBox.setMinimumHeight(40)
         self.testSummaryTextBox.setMaximumHeight(50)
         self.testSummaryTextBox.setMinimumWidth(600)
+        self.polygonNameBox = QPlainTextEdit()
+        self.polygonNameBox.setReadOnly(True)
+        self.polygonNameBox.setFixedHeight(50)
+        self.polygonNameBox.setMinimumWidth(600)
 
         # create combo box widgets for choosing the variable
         self.varBox = QComboBox()
         self.varBox.setFixedSize(400, 30)
 
+        # create combo box widgets for choosing the polygon
+        self.polygonBox = QComboBox()
+        self.polygonBox.setFixedSize(400, 30)
+
     def _bindEvents(self):
         self.btnOpenRef.clicked.connect(self.btnOpenRefEvent)
         self.btnOpenTest.clicked.connect(self.btnOpenTestEvent)
+        self.btnOpenPolygon.clicked.connect(self.btnOpenPolygonEvent)
+        self.locatePolygons.clicked.connect(self.locatePolygonsEvent)
+        self.polygonBox.currentTextChanged.connect(self.selectPolygonEvent)
 
     def _setLayout(self):
         mainLayout = QVBoxLayout()
@@ -278,8 +306,11 @@ class InputTab(QWidget):
         hlayout.addItem(QSpacerItem(50, 1))
         hlayout.addWidget(self.btnOpenRef)
         hlayout.addWidget(self.btnOpenTest)
+        hlayout.addWidget(self.btnOpenPolygon)
         hlayout.addItem(QSpacerItem(30, 1))
         hlayout.addWidget(self.langBox)
+        hlayout.addItem(QSpacerItem(30, 1))
+        hlayout.addWidget(self.locatePolygons)
         hlayout.setSpacing(10)
         mainLayout.addLayout(hlayout)
         mainLayout.addItem(QSpacerItem(10, 10))
@@ -293,6 +324,8 @@ class InputTab(QWidget):
         glayout.addWidget(self.testNameBox, 3, 2)
         glayout.addWidget(QLabel('     Summary'), 4, 1)
         glayout.addWidget(self.testSummaryTextBox, 4, 2)
+        glayout.addWidget(QLabel('     Polygons'), 5, 1)
+        glayout.addWidget(self.polygonNameBox, 5, 2)
         glayout.setAlignment(Qt.AlignLeft)
         glayout.setVerticalSpacing(10)
 
@@ -302,6 +335,8 @@ class InputTab(QWidget):
         glayout = QGridLayout()
         glayout.addWidget(QLabel('     Select the variable to compare'), 1, 1)
         glayout.addWidget(self.varBox, 1, 2)
+        glayout.addWidget(QLabel('     Select the comparison domain'), 2, 1)
+        glayout.addWidget(self.polygonBox, 2, 2)
         glayout.setAlignment(Qt.AlignLeft)
         glayout.setSpacing(10)
         mainLayout.addLayout(glayout)
@@ -318,13 +353,24 @@ class InputTab(QWidget):
         self.refNameBox.setText(filename)
         self.refSummaryTextBox.clear()
         self.ref_header = None
+        self.locations = None
+        self.polygon_added = False
+        self.selected_polygon = None
+        self.polygons = []
 
         self.test_header = None
         self.test_filename = None
         self.testSummaryTextBox.clear()
         self.testNameBox.clear()
+        self.polygonNameBox.clear()
         self.varBox.clear()
+        self.polygonBox.clear()
         self.btnOpenTest.setEnabled(False)
+        self.btnOpenPolygon.setEnabled(False)
+        self.locatePolygons.setEnabled(False)
+
+        self.map.hide()
+        self.map.has_figure = False
         self.parent.reset()
 
     def _reinitTest(self, filename):
@@ -337,6 +383,30 @@ class InputTab(QWidget):
         self.testNameBox.setText(filename)
         self.testSummaryTextBox.clear()
         self.varBox.clear()
+
+    def locatePolygonsEvent(self):
+        if not self.map.has_figure:
+            reply = QMessageBox.question(self, 'Locate polygons on map',
+                                         'This may take up to one minute. Are you sure to proceed?\n'
+                                         '(You can still modify the volume plot with the map open)',
+                                         QMessageBox.Yes | QMessageBox.No)
+            if reply == QMessageBox.No:
+                return
+            self.map.reinitFigure(list(self.ref_mesh.triangles.values()), self.locations,
+                                  self.polygons, ['Polygon %d' % (i+1) for i in range(len(self.polygons))])
+
+        self.locatePolygons.setEnabled(False)
+        self.map.show()
+
+    def selectPolygonEvent(self, text):
+        if not text:
+            return
+        elif text == 'Entire mesh':
+            self.selected_polygon = None
+        else:
+            polygon_index = int(text.split()[1]) - 1
+            self.selected_polygon = self.polygons[polygon_index]
+        self.polygon_added = False
 
     def btnOpenRefEvent(self):
         options = QFileDialog.Options()
@@ -364,13 +434,19 @@ class InputTab(QWidget):
             # update the file summary
             self.refSummaryTextBox.appendPlainText(resin.get_summary())
 
+            # record the mesh locations for future visualization
+            self.locations = (min(resin.header.x), max(resin.header.x), min(resin.header.y), max(resin.header.y))
+
             # copy to avoid reading the same data in the future
             self.ref_header = copy.deepcopy(resin.header)
             self.ref_time = resin.time[:]
 
         self.ref_mesh = ReferenceMesh(self.ref_header)
         self.parent.add_reference()
+
         self.btnOpenTest.setEnabled(True)
+        self.btnOpenPolygon.setEnabled(True)
+        self.polygonBox.addItem('Entire mesh')
 
     def btnOpenTestEvent(self):
         options = QFileDialog.Options()
@@ -423,6 +499,48 @@ class InputTab(QWidget):
 
         for var_ID, var_name in common_vars:
             self.varBox.addItem(var_ID + ' (%s)' % var_name.decode('utf-8').strip())
+
+    def btnOpenPolygonEvent(self):
+        options = QFileDialog.Options()
+        options |= QFileDialog.DontUseNativeDialog
+        filename, _ = QFileDialog.getOpenFileName(self, 'Open a .i2s or .shp file', '',
+                                                  'Line sets (*.i2s);;Shapefile (*.shp);;All Files (*)', options=options)
+        if not filename:
+            return
+        is_i2s = filename[-4:] == '.i2s'
+        is_shp = filename[-4:] == '.shp'
+
+        if not is_i2s and not is_shp:
+            QMessageBox.critical(self, 'Error', 'Only .i2s and .shp file formats are currently supported.',
+                                 QMessageBox.Ok)
+            return
+
+        self.polygonBox.clear()
+        self.polygonBox.addItem('Entire mesh')
+        self.polygons = []
+        self.polygonNameBox.clear()
+        self.map.close()
+        self.map.has_figure = False
+        self.locatePolygons.setEnabled(False)
+
+        if is_i2s:
+            with BlueKenue.Read(filename) as f:
+                f.read_header()
+                for poly_name, poly in f:
+                    self.polygons.append(poly)
+        else:
+            for polygon in Shapefile.read_shp(filename):
+                self.polygons.append(polygon)
+        if not self.polygons:
+            QMessageBox.critical(self, 'Error', 'The file does not contain any polygon.',
+                                 QMessageBox.Ok)
+            return
+
+        self.polygonNameBox.appendPlainText(filename + '\n' + 'The file contains {} polygon{}.'.format(
+                                            len(self.polygons), 's' if len(self.polygons) > 1 else ''))
+        for i in range(len(self.polygons)):
+            self.polygonBox.addItem('Polygon %d' % (i+1))
+        self.locatePolygons.setEnabled(True)
 
 
 class ComputeErrorsTab(QWidget):
@@ -526,7 +644,7 @@ class ErrorEvolutionTab(QWidget):
         mainLayout.addWidget(self.timeSelection)
         hlayout = QHBoxLayout()
         hlayout.addWidget(self.btnCompute)
-        hlayout.addWidget(gb)
+        hlayout.addWidget(gb, Qt.AlignRight)
         hlayout.setAlignment(self.btnCompute, Qt.AlignTop)
         hlayout.setAlignment(Qt.AlignHCenter)
         hlayout.setSpacing(10)
@@ -570,23 +688,35 @@ class ErrorDistributionTab(QWidget):
     def __init__(self, inputTab):
         super().__init__()
         self.input = inputTab
+        self.ewsd = None
+        self.xlim = None
+        self.ylim = None
 
         # set up a custom plot viewer
         self.plotViewer = PlotViewer()
         self.plotViewer.exitAct.setEnabled(False)
         self.plotViewer.menuBar.setVisible(False)
+        self.XLimitsAct = QAction('Change X limits', self, triggered=self.changeXlimits, enabled=False,
+                                  icon=self.style().standardIcon(QStyle.SP_DialogHelpButton))
+        self.YLimitsAct = QAction('Change Y limits', self, triggered=self.changeYlimits, enabled=False,
+                                  icon=self.style().standardIcon(QStyle.SP_DialogHelpButton))
+
+        self.plotViewer.toolBar.addAction(self.XLimitsAct)
+        self.plotViewer.toolBar.addAction(self.YLimitsAct)
+        self.plotViewer.toolBar.addSeparator()
         self.plotViewer.toolBar.addAction(self.plotViewer.xLabelAct)
         self.plotViewer.toolBar.addSeparator()
         self.plotViewer.toolBar.addAction(self.plotViewer.yLabelAct)
         self.plotViewer.toolBar.addSeparator()
         self.plotViewer.toolBar.addAction(self.plotViewer.titleAct)
+
         # put it in a group box to get a nice border
         gb = QGroupBox()
         ly = QHBoxLayout()
         ly.addWidget(self.plotViewer)
         gb.setLayout(ly)
         gb.setStyleSheet('QGroupBox {border: 8px solid rgb(108, 122, 137); border-radius: 6px }')
-        gb.setMinimumWidth(800)
+        gb.setMinimumWidth(600)
 
         # create the reference time selection widget
         self.timeSelection = DoubleTimeSelection()
@@ -598,9 +728,9 @@ class ErrorDistributionTab(QWidget):
 
         # create the stats box
         self.resultBox = QPlainTextEdit()
-        self.resultBox.setMinimumWidth(300)
-        self.resultBox.setMaximumWidth(400)
-        
+        self.resultBox.setMinimumWidth(400)
+        self.resultBox.setMaximumWidth(600)
+
         # set layout
         mainLayout = QVBoxLayout()
         mainLayout.addWidget(self.timeSelection)
@@ -609,10 +739,10 @@ class ErrorDistributionTab(QWidget):
         vlayout.addWidget(self.btnCompute)
         vlayout.addItem(QSpacerItem(10, 10))
         vlayout.addWidget(self.resultBox)
-        vlayout.setAlignment(self.btnCompute, Qt.AlignRight | Qt.AlignHCenter)
+        vlayout.setAlignment(self.btnCompute, Qt.AlignTop | Qt.AlignRight)
         vlayout.setAlignment(Qt.AlignHCenter)
         hlayout.addLayout(vlayout)
-        hlayout.addWidget(gb)
+        hlayout.addWidget(gb, Qt.AlignHCenter)
         hlayout.setSpacing(10)
         mainLayout.addLayout(hlayout)
         self.setLayout(mainLayout)
@@ -634,12 +764,49 @@ class ErrorDistributionTab(QWidget):
         self.timeSelection.initTest(self.input.test_header.nb_frames)
 
     def reset(self):
+        self.ewsd = None
+        self.xlim = None
+        self.ylim = None
         self.timeSelection.clearText()
         self.resultBox.clear()
         self.plotViewer.defaultPlot()
         self.plotViewer.current_title = 'Distribution of EWSD (element-wise signed deviation)'
         self.plotViewer.current_ylabel = 'Frequency'
         self.plotViewer.current_xlabel = 'EWSD'
+        self.XLimitsAct.setEnabled(False)
+        self.YLimitsAct.setEnabled(False)
+
+    def changeXlimits(self):
+        value, ok = QInputDialog.getText(self, 'Change X limits',
+                                         'Enter the new X limits',
+                                         text=', '.join(map(lambda x: '{:+f}'.format(x),
+                                                            self.plotViewer.canvas.axes.get_xlim())))
+        if not ok:
+            return
+        try:
+            xmin, xmax = map(float, value.split(','))
+        except ValueError:
+            QMessageBox.critical(self, 'Error', 'Invalid input.', QMessageBox.Ok)
+            return
+
+        self.xlim = xmin, xmax
+        self.updateHistogram()
+
+    def changeYlimits(self):
+        value, ok = QInputDialog.getText(self, 'Change Y limits',
+                                         'Enter the new Y limits',
+                                         text=', '.join(map(lambda x: '{:+f}'.format(x),
+                                                            self.plotViewer.canvas.axes.get_ylim())))
+        if not ok:
+            return
+        try:
+            self.ylim = tuple(map(float, value.split(',')))
+        except ValueError:
+            QMessageBox.critical(self, 'Error', 'Invalid input.', QMessageBox.Ok)
+            return
+
+        self.plotViewer.canvas.axes.set_ylim(self.ylim)
+        self.plotViewer.canvas.draw()
 
     def btnComputeEvent(self):
         ref_time = int(self.timeSelection.refIndex.text()) - 1
@@ -657,31 +824,40 @@ class ErrorDistributionTab(QWidget):
             test_values = resin.read_var_in_frame(test_time, selected_variable)
 
         values = test_values - ref_values
-        ewsd = []
-        for i, j, k in self.input.ref_mesh.triangles:
-            ewsd.append(sum(values[[i, j, k]]) * self.input.ref_mesh.area[i, j, k] / 3.0)
-        ewsd = np.array(ewsd)
-        ewsd *= self.input.ref_mesh.nb_triangles * self.input.ref_mesh.inverse_total_area
+        self.ewsd = self.input.ref_mesh.element_wise_signed_deviation(values)
 
-        self.updateStats(ref_time, test_time, ewsd)
-        self.updateHistogram(ewsd)
+        self.updateStats(ref_time, test_time)
+        self.updateHistogram()
 
-    def updateStats(self, ref_time, test_time, ewsd):
-        quantile25, median, quantile75 = np.percentile(ewsd, [25, 50, 75])
+    def updateStats(self, ref_time, test_time):
+        quantile25, median, quantile75 = np.percentile(self.ewsd, [25, 50, 75])
         self.resultBox.appendPlainText(self.template.format(ref_time+1, test_time+1,
-                                                            np.mean(ewsd), np.var(ewsd, ddof=1),
-                                                            np.min(ewsd), quantile25, median,
-                                                            quantile75, np.max(ewsd)))
+                                                            np.mean(self.ewsd), np.var(self.ewsd, ddof=1),
+                                                            np.min(self.ewsd), quantile25, median,
+                                                            quantile75, np.max(self.ewsd)))
 
-    def updateHistogram(self, ewsd):
-        weights = np.ones_like(ewsd) / float(len(ewsd))  # make frequency histogram
+    def updateHistogram(self):
+        if self.xlim is None:
+            ewsd = self.ewsd
+        else:
+            ewsd = list(filter(lambda x: self.xlim[0] <= x <= self.xlim[1], self.ewsd))
+
+        weights = np.ones_like(ewsd) / self.input.ref_mesh.nb_triangles  # make frequency histogram
 
         self.plotViewer.canvas.axes.clear()
-        self.plotViewer.canvas.axes.hist(ewsd, weights=weights)
+        self.plotViewer.canvas.axes.hist(ewsd, weights=weights, histtype='bar', color='g',
+                                         edgecolor='k', alpha=0.5)
         self.plotViewer.canvas.axes.set_xlabel(self.plotViewer.current_xlabel)
         self.plotViewer.canvas.axes.set_ylabel(self.plotViewer.current_ylabel)
         self.plotViewer.canvas.axes.set_title(self.plotViewer.current_title)
+
+        if self.ylim is not None:
+            self.plotViewer.canvas.axes.set_ylim(self.ylim)
+
         self.plotViewer.canvas.draw()
+
+        self.XLimitsAct.setEnabled(True)
+        self.YLimitsAct.setEnabled(True)
 
 
 class CompareResultsGUI(QWidget):
@@ -706,12 +882,21 @@ class CompareResultsGUI(QWidget):
         self.tab.addTab(errorDistributionTab, 'EWSD distribution')
         for i in range(1, 4):
             self.tab.setTabEnabled(i, False)
+        self.tab.currentChanged.connect(self.switch_tab)
 
         self.resultTabs = [errorEvolutionTab, computeErrorTab, errorDistributionTab]
 
         mainLayout = QVBoxLayout()
         mainLayout.addWidget(self.tab)
         self.setLayout(mainLayout)
+
+    def switch_tab(self, index):
+        if index == 0:
+            pass
+        else:
+            if not self.input.polygon_added:
+                self.input.ref_mesh.add_polygon(self.input.selected_polygon)
+                self.input.polygon_added = True
 
     def reset(self):
         for i, tab in enumerate(self.resultTabs):
