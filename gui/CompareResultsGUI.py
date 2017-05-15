@@ -6,7 +6,7 @@ from PyQt5.QtCore import *
 
 import numpy as np
 
-from gui.util import PlotViewer, PolygonMapCanvas
+from gui.util import PlotViewer, MapViewer, PolygonMapCanvas
 from slf import Serafin
 from slf.comparison import ReferenceMesh
 from geom import BlueKenue, Shapefile
@@ -216,11 +216,18 @@ class InputTab(QWidget):
         self.ref_time = []
         self.test_time = []
         self.polygons = []
-        self.map = PolygonMapCanvas(self)
         self.selected_polygon = None
         self.locations = None
         self.ref_mesh = None
         self.polygon_added = False   # is the intersection between the mesh and the selected polygon calculated?
+
+        # initialize the map for locating polygons
+        self.map = MapViewer()
+        self.map.canvas = PolygonMapCanvas()
+        MapViewer.__init__(self.map)
+        self.map.scrollArea.setWidget(self.map.canvas)
+        self.map.resize(800, 700)
+        self.has_map = False
 
         self._initWidgets()
         self._setLayout()
@@ -298,6 +305,7 @@ class InputTab(QWidget):
         self.btnOpenPolygon.clicked.connect(self.btnOpenPolygonEvent)
         self.locatePolygons.clicked.connect(self.locatePolygonsEvent)
         self.polygonBox.currentTextChanged.connect(self.selectPolygonEvent)
+        self.map.closeEvent = lambda event: self.locatePolygons.setEnabled(True)
 
     def _setLayout(self):
         mainLayout = QVBoxLayout()
@@ -370,7 +378,7 @@ class InputTab(QWidget):
         self.locatePolygons.setEnabled(False)
 
         self.map.hide()
-        self.map.has_figure = False
+        self.has_map = False
         self.parent.reset()
 
     def _reinitTest(self, filename):
@@ -385,16 +393,16 @@ class InputTab(QWidget):
         self.varBox.clear()
 
     def locatePolygonsEvent(self):
-        if not self.map.has_figure:
+        if not self.has_map:
             reply = QMessageBox.question(self, 'Locate polygons on map',
                                          'This may take up to one minute. Are you sure to proceed?\n'
                                          '(You can still modify the volume plot with the map open)',
                                          QMessageBox.Yes | QMessageBox.No)
             if reply == QMessageBox.No:
                 return
-            self.map.reinitFigure(list(self.ref_mesh.triangles.values()), self.locations,
-                                  self.polygons, ['Polygon %d' % (i+1) for i in range(len(self.polygons))])
-
+            self.map.canvas.reinitFigure(list(self.ref_mesh.triangles.values()), self.locations,
+                                         self.polygons, ['Polygon %d' % (i+1) for i in range(len(self.polygons))])
+            self.has_map = True
         self.locatePolygons.setEnabled(False)
         self.map.show()
 
@@ -824,7 +832,7 @@ class ErrorDistributionTab(QWidget):
             test_values = resin.read_var_in_frame(test_time, selected_variable)
 
         values = test_values - ref_values
-        self.ewsd = self.input.ref_mesh.element_wise_signed_deviation(values)
+        self.ewsd = list(self.input.ref_mesh.element_wise_signed_deviation(values).values())
 
         self.updateStats(ref_time, test_time)
         self.updateHistogram()

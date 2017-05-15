@@ -4,7 +4,7 @@ import logging
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
-import numpy as np
+
 import matplotlib
 matplotlib.use('Qt5Agg')
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
@@ -119,8 +119,6 @@ class MapCanvas(FigureCanvas):
                                    QSizePolicy.Expanding)
         FigureCanvas.updateGeometry(self)
 
-        self.has_figure = False
-
     def initFigure(self, triangles, locations):
         self.axes.clear()
         patches = [PolygonPatch(t.buffer(0), fc=self.BLUE, ec=self.BLUE, alpha=0.5, zorder=1)
@@ -132,37 +130,81 @@ class MapCanvas(FigureCanvas):
         self.axes.set_ylim(miny - 0.05 * h, maxy + 0.05 * h)
         self.axes.set_aspect('equal', adjustable='box')
         self.draw()
-        self.has_figure = True
 
 
 class PolygonMapCanvas(MapCanvas):
-    def __init__(self, parent):
-        self.parent = parent
+    def __init__(self):
         super().__init__()
 
     def reinitFigure(self, triangles, locations, polygons, polynames):
+        # draw the mesh
         self.initFigure(triangles, locations)
+
+        # add the polygons to the map
         patches = []
         for p in polygons:
             patches.append(PolygonPatch(p.polyline().buffer(0), fc=self.PINK, ec=self.BLACK, alpha=0.5, zorder=1))
         self.axes.add_collection(PatchCollection(patches, match_original=True))
 
+        # add polygon labels
         for p, name in zip(polygons, polynames):
             center = p.polyline().centroid
             cx, cy = center.x, center.y
             self.axes.annotate(name, (cx, cy), color='k', weight='bold',
                                fontsize=8, ha='center', va='center')
-
         self.draw()
 
-    def closeEvent(self, event):
-        self.parent.locatePolygons.setEnabled(True)
-        self.hide()
+
+class MapViewer(QWidget):
+    def __init__(self):
+        super().__init__()
+
+        # add the the tool bar
+        self.toolBar = QToolBar()
+        self.toolBar.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
+
+        self.scrollArea = QScrollArea()
+        self.scrollArea.setBackgroundRole(QPalette.Dark)
+
+        self._setLayout()
+
+        self.saveAct = QAction('Save', self, shortcut='Ctrl+S',
+                                triggered=self.save, icon=self.style().standardIcon(QStyle.SP_DialogSaveButton))
+        self.toolBar.addAction(self.saveAct)
+
+    def _setLayout(self):
+        vlayout = QVBoxLayout()
+        vlayout.addWidget(self.toolBar)
+        vlayout.addWidget(self.scrollArea)
+        vlayout.setSpacing(0)
+        vlayout.setContentsMargins(0, 0, 0, 0)
+        self.setLayout(vlayout)
+
+        self.setWindowTitle('Map Viewer')
+        self.resize(self.sizeHint())
+
+    def save(self):
+        options = QFileDialog.Options()
+        options |= QFileDialog.DontUseNativeDialog
+        filename, _ = QFileDialog.getSaveFileName(self, 'Save image', '',
+                                                  'PNG Files (*.png)', options=options)
+
+        # check the file name consistency
+        if not filename:
+            return
+        if len(filename) < 5 or filename[-4:] != '.png':
+            filename += '.png'
+
+        self.canvas.print_png(filename)
 
 
 class PlotViewer(QWidget):
     def __init__(self):
         super().__init__()
+        self._initWidgets()
+        self._setLayout()
+
+    def _initWidgets(self):
         self.canvas = PlotCanvas(self)
         self.current_xlabel = 'X'
         self.current_ylabel = 'Y'
@@ -180,6 +222,11 @@ class PlotViewer(QWidget):
         self.scrollArea.setBackgroundRole(QPalette.Dark)
         self.scrollArea.setWidget(self.canvas)
 
+        self.createActions()
+        self.createMenus()
+        self.createTools()
+
+    def _setLayout(self):
         vlayout = QVBoxLayout()
         vlayout.addWidget(self.menuBar)
         vlayout.addWidget(self.toolBar)
@@ -188,12 +235,8 @@ class PlotViewer(QWidget):
         vlayout.setContentsMargins(0, 0, 0, 0)
         self.setLayout(vlayout)
 
-        self.createActions()
-        self.createMenus()
-        self.createTools()
-
         self.setWindowTitle('Plot Viewer')
-        self.resize(850, 700)
+        self.resize(self.sizeHint())
 
     def save(self):
         options = QFileDialog.Options()

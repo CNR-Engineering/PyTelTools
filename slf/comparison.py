@@ -87,14 +87,12 @@ class ReferenceMesh(TruncatedTriangularPrisms):
             return np.sqrt((volume_boundary + self.point_weight.dot(squared_values)) * self.inverse_total_area)
 
     def element_wise_signed_deviation(self, values):
-        ewsd = []
+        ewsd = {}
         for i, j, k in self.area:
-            ewsd.append(sum(values[[i, j, k]]) * self.area[i, j, k] / 3.0)
+            ewsd[i, j, k] = sum(values[[i, j, k]]) * self.area[i, j, k] / 3.0 * self.nb_triangles * self.inverse_total_area
         if self.inside_polygon:
             for i, j, k in self.triangle_polygon_intersection:
                 area, interpolator = self.triangle_polygon_intersection[i, j, k]
-                ewsd.append(interpolator.dot(values[[i, j, k]]) * area)
-        ewsd = np.array(ewsd)
-        ewsd *= self.nb_triangles * self.inverse_total_area
+                ewsd[i, j, k] = interpolator.dot(values[[i, j, k]]) * area * self.nb_triangles * self.inverse_total_area
         return ewsd
 

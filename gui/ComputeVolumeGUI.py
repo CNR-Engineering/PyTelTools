@@ -8,16 +8,10 @@ from PyQt5.QtGui import *
 from PyQt5.QtCore import *
 import pandas as pd
 
-import matplotlib
-matplotlib.use('Qt5Agg')
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
-from matplotlib.figure import Figure
-
-
 from slf import Serafin
 from slf.volume import TruncatedTriangularPrisms, VolumeCalculator
 from geom import BlueKenue, Shapefile
-from gui.util import PlotViewer, QPlainTextEditLogger, TableWidgetDragRows, PolygonMapCanvas
+from gui.util import PlotViewer, QPlainTextEditLogger, TableWidgetDragRows, MapViewer, PolygonMapCanvas
 
 
 class VolumeCalculatorGUI(QThread):
@@ -300,8 +294,14 @@ class VolumePlotViewer(PlotViewer):
     def __init__(self, inputTab):
         super().__init__()
         self.input = inputTab
-        self.map = PolygonMapCanvas(self)
-        self.setMinimumWidth(700)
+
+        # initialize the map for locating polygons
+        self.map = MapViewer()
+        self.map.canvas = PolygonMapCanvas()
+        MapViewer.__init__(self.map)
+        self.map.scrollArea.setWidget(self.map.canvas)
+        self.map.resize(800, 700)
+
 
         self.defaultColors = ['b', 'r', 'g', 'y', 'k', 'c', '#F28AD6', 'm']
         name = ['Blue', 'Red', 'Green', 'Yellow', 'Black', 'Cyan', 'Pink', 'Magenta']
@@ -309,6 +309,7 @@ class VolumePlotViewer(PlotViewer):
         self.nameToColor = {n: c for c, n in zip(self.defaultColors, name)}
 
         self.setWindowTitle('Visualize the temporal evolution of volumes')
+        self.setMinimumWidth(700)
 
         self.data = None
         self.time = []
@@ -319,6 +320,7 @@ class VolumePlotViewer(PlotViewer):
         self.var_ID = None
         self.second_var_ID = None
         self.triangles = None
+        self.has_map = False
 
         # initialize graphical parameters
         self.timeFormat = 0   # 0: second, 1: date, 2: date (alternative), 3: minutes, 4: hours, 5: days
@@ -340,6 +342,7 @@ class VolumePlotViewer(PlotViewer):
         self.changeDateAct = QAction('Edit\nstart date', self, triggered=self.changeDate,
                                      icon=self.style().standardIcon(QStyle.SP_DialogApplyButton))
         self.convertTimeAct.toggled.connect(self.convertTime)
+        self.map.closeEvent = lambda event: self.locatePolygons.setEnabled(True)
 
         self.toolBar.addAction(self.locatePolygons)
         self.toolBar.addSeparator()
@@ -427,7 +430,7 @@ class VolumePlotViewer(PlotViewer):
         self.replot()
 
     def locatePolygonsEvent(self):
-        if not self.map.has_figure:
+        if not self.has_map:
             reply = QMessageBox.question(self, 'Locate polygons on map',
                                          'This may take up to one minute. Are you sure to proceed?\n'
                                          '(You can still modify the volume plot with the map open)',
@@ -435,10 +438,10 @@ class VolumePlotViewer(PlotViewer):
             if reply == QMessageBox.No:
                 return
 
-            self.map.reinitFigure(self.triangles, self.input.locations, self.input.polygons,
-                                  map(self.column_labels.get, ['Polygon %d' % (i+1)
-                                                               for i in range(len(self.input.polygons))]))
-
+            self.map.canvas.reinitFigure(self.triangles, self.input.locations, self.input.polygons,
+                                         map(self.column_labels.get, ['Polygon %d' % (i+1)
+                                                                      for i in range(len(self.input.polygons))]))
+            self.has_map = True
         self.locatePolygons.setEnabled(False)
         self.map.show()
 
@@ -490,7 +493,7 @@ class VolumePlotViewer(PlotViewer):
         self.replot()
 
     def reset(self):
-        self.map.has_figure = False
+        self.has_map = False
         self.map.close()
 
         # reinitialize old graphical parameters
