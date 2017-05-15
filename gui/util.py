@@ -5,12 +5,17 @@ from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 
+from shapely.geometry import Polygon
+import numpy as np
 import matplotlib
 matplotlib.use('Qt5Agg')
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 from matplotlib.collections import PatchCollection
 from descartes import PolygonPatch
+from matplotlib import cm, colorbar
+from matplotlib.colors import Normalize, colorConverter
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 
 class QPlainTextEditLogger(logging.Handler):
@@ -103,15 +108,15 @@ class PlotCanvas(FigureCanvas):
 
 
 class MapCanvas(FigureCanvas):
-    def __init__(self):
+    def __init__(self, width=10, height=10, dpi=60):
         self.BLUE = '#6699cc'
         self.PINK = '#fcabbd'
         self.BLACK = '#14123a'
 
-        fig = Figure(figsize=(10, 10), dpi=60)
-        self.axes = fig.add_subplot(111)
+        self.fig = Figure(figsize=(width, height), dpi=dpi)
+        self.axes = self.fig.add_subplot(111)
 
-        FigureCanvas.__init__(self, fig)
+        FigureCanvas.__init__(self, self.fig)
         self.setParent(None)
 
         FigureCanvas.setSizePolicy(self,
@@ -153,6 +158,60 @@ class PolygonMapCanvas(MapCanvas):
             self.axes.annotate(name, (cx, cy), color='k', weight='bold',
                                fontsize=8, ha='center', va='center')
         self.draw()
+
+
+class ColorMapCanvas(MapCanvas):
+    def __init__(self):
+        super().__init__(12, 12, 100)
+        self.TRANSPARENT = colorConverter.to_rgba('black', alpha=0.01)
+
+    def reinitFigure(self, triangles, locations, values, limits=None, polygon=None):
+        self.fig.clear()   # have to remove the color bar
+        self.axes = self.fig.add_subplot(111)
+
+        if limits is None:
+            maxval = max(np.abs(list(values.values())))
+            cmap = cm.ScalarMappable(norm=Normalize(-maxval, maxval), cmap='coolwarm')
+            cmap.set_array(np.linspace(-maxval, maxval, 1000))
+        else:
+            xmin, xmax = limits
+            cmap = cm.ScalarMappable(norm=Normalize(xmin, xmax), cmap='coolwarm')
+            cmap.set_array(np.linspace(xmin, xmax, 1000))
+
+        if polygon is None:
+            minx, maxx, miny, maxy = locations
+            rectangle = None
+        else:
+            coords = list(polygon.coords())[:-1]
+            x, y = list(zip(*coords))
+            minx, maxx, miny, maxy = min(x), max(x), min(y), max(y)
+            rectangle = Polygon([(minx, miny), (maxx, miny), (maxx, miny), (maxx, maxy)])
+        w, h = maxx - minx, maxy - miny
+
+        patches = []
+        for i, j, k in values:
+            t = triangles[i, j, k]
+            if rectangle is not None:
+                if not rectangle.contains(t):
+                    continue
+            color = cmap.to_rgba(values[i, j, k])
+            patches.append(PolygonPatch(t.buffer(0), fc=color, ec=self.TRANSPARENT, linestyle='dotted', zorder=1))
+
+        if polygon is not None:
+            patches.append(PolygonPatch(polygon.polyline().buffer(0), fc=self.TRANSPARENT, ec='black', zorder=1))
+
+        self.axes.add_collection(PatchCollection(patches, match_original=True))
+
+        self.axes.set_xlim(minx - 0.05 * w, maxx + 0.05 * w)
+        self.axes.set_ylim(miny - 0.05 * h, maxy + 0.05 * h)
+        self.axes.set_aspect('equal', adjustable='box')
+
+        divider = make_axes_locatable(self.axes)
+        cax = divider.append_axes('right', size='5%', pad=0.2)
+
+        self.fig.colorbar(cmap, cax=cax)
+        self.draw()
+
 
 
 class MapViewer(QWidget):

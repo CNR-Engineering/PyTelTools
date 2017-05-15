@@ -454,12 +454,11 @@ class OutputProgressDialog(QProgressDialog):
         QApplication.processEvents()
 
 
-class ExtractVariablesGUI(QWidget):
-    """!
-    @brief A graphical interface for extracting and computing variables from .slf file
-    """
-    def __init__(self):
+class InputTab(QWidget):
+    def __init__(self, parent):
         super().__init__()
+        self.parent = parent
+
         self.filename = None
         self.language = None
 
@@ -476,8 +475,6 @@ class ExtractVariablesGUI(QWidget):
 
         self.setMinimumWidth(800)
         self.setWindowFlags(self.windowFlags() | Qt.CustomizeWindowHint)
-        self.setWindowTitle('Extract variables and frames from Serafin file')
-        self._center()
 
     def _initWidgets(self):
         """!
@@ -538,37 +535,14 @@ class ExtractVariablesGUI(QWidget):
         logging.getLogger().addHandler(self.logTextBox)
         logging.getLogger().setLevel(logging.INFO)
 
-        # create a check box for output file format (simple or double precision)
-        self.singlePrecisionBox = QCheckBox('Convert to SERAFIN \n(single precision)', self)
-        self.singlePrecisionBox.setEnabled(False)
-
-        # create a slider for time selection
-        self.timeSlider = TimeRangeSlider()
-        self.timeSlider.setFixedHeight(30)
-        self.timeSlider.setMinimumWidth(600)
-        self.timeSlider.setEnabled(False)
-
-        # create text boxes for displaying the time selection and sampling
-        self.timeSelection = SelectedTimeINFO()
-        self.timeSelection.startIndex.setEnabled(False)
-        self.timeSelection.endIndex.setEnabled(False)
-
-        # create the submit button
-        self.btnSubmit = QPushButton('Submit', self, icon=self.style().standardIcon(QStyle.SP_DialogSaveButton))
-        self.btnSubmit.setToolTip('<b>Submit</b> to write a .slf output')
-        self.btnSubmit.setFixedSize(105, 50)
-        self.btnSubmit.setEnabled(False)
 
     def _bindEvents(self):
         """!
         @brief (Used in __init__) Bind events to widgets
         """
         self.btnOpen.clicked.connect(self.btnOpenEvent)
-        self.btnSubmit.clicked.connect(self.btnSubmitEvent)
         self.btnAddUS.clicked.connect(self.btnAddUSEvent)
         self.btnAddWs.clicked.connect(self.btnAddWsEvent)
-        self.timeSelection.startIndex.returnPressed.connect(self.timeSlider.enterIndexEvent)
-        self.timeSelection.endIndex.returnPressed.connect(self.timeSlider.enterIndexEvent)
 
     def _setLayout(self):
         """
@@ -629,37 +603,11 @@ class ExtractVariablesGUI(QWidget):
         hlayout.addItem(QSpacerItem(30, 1))
 
         mainLayout.addLayout(hlayout)
-        hlayout = QHBoxLayout()
-        mainLayout.addItem(QSpacerItem(10, 5))
-        hlayout.addItem(QSpacerItem(30, 1))
-        hlayout.addWidget(self.timeSlider)
-        hlayout.addItem(QSpacerItem(30, 1))
-        mainLayout.addLayout(hlayout)
 
-        hlayout = QHBoxLayout()
-        hlayout.addItem(QSpacerItem(50, 1))
-        hlayout.addWidget(self.btnSubmit)
-        hlayout.addItem(QSpacerItem(30, 1))
-        hlayout.addWidget(self.singlePrecisionBox)
-
-        hlayout.addItem(QSpacerItem(30, 1))
-        hlayout.addWidget(self.timeSelection)
-        hlayout.addItem(QSpacerItem(50, 1))
-        hlayout.setAlignment(Qt.AlignLeft)
-        mainLayout.addLayout(hlayout)
-
-        mainLayout.addItem(QSpacerItem(800, 10))
+        mainLayout.addItem(QSpacerItem(10, 15))
         mainLayout.addWidget(QLabel('   Message logs'))
         mainLayout.addWidget(self.logTextBox.widget)
         self.setLayout(mainLayout)
-
-    def _center(self):
-        """!
-        @brief (Used in __init__) Center the window with respect to the screen
-        """
-        qr = self.frameGeometry()
-        cp = QDesktopWidget().availableGeometry().center()
-        qr.moveCenter(cp)
 
     def _initVarTables(self):
         """!
@@ -705,71 +653,23 @@ class ExtractVariablesGUI(QWidget):
         self.fall_velocities = []
         self.btnAddUS.setEnabled(False)
         self.btnAddWs.setEnabled(False)
-        self.singlePrecisionBox.setChecked(False)
-        self.singlePrecisionBox.setEnabled(False)
         self.firstTable.setRowCount(0)
         self.secondTable.setRowCount(0)
-        self.timeSlider.setEnabled(False)
-        self.timeSelection.clearText()
-        self.timeSelection.startIndex.setEnabled(False)
-        self.timeSelection.endIndex.setEnabled(False)
-        self.timeSelection.timeSamplig.setText('1')
-        self.btnSubmit.setEnabled(False)
 
         if not self.frenchButton.isChecked():
             self.language = 'en'
         else:
             self.language = 'fr'
 
-    def _handleOverwrite(self, filename):
-        """!
-        @brief (Used in btnSubmitEvent) Handle manually the overwrite option when saving output file
-        """
-        if os.path.exists(filename):
-            msg = QMessageBox.warning(self, 'Confirm overwrite',
-                                      'The file already exists. Do you want to replace it ?',
-                                      QMessageBox.Ok | QMessageBox.Cancel,
-                                      QMessageBox.Ok)
-            if msg == QMessageBox.Cancel:
-                logging.info('Output canceled')
-                return None
-            return True
-        return False
+        self.parent.reset()
 
-    def _getOutputTime(self):
-        start_index = int(self.timeSelection.startIndex.text())
-        end_index = int(self.timeSelection.endIndex.text())
-        try:
-            sampling_frequency = int(self.timeSelection.timeSamplig.text())
-        except ValueError:
-            QMessageBox.critical(self, 'Error', 'The sampling frequency must be a number!',
-                                 QMessageBox.Ok)
-            return []
-        if sampling_frequency < 1 or sampling_frequency > end_index:
-            QMessageBox.critical(self, 'Error', 'The sampling frequency must be in the range [1; nbFrames]!',
-                                 QMessageBox.Ok)
-            return []
-        return list(range(start_index-1, end_index, sampling_frequency))
-
-    def _getSelectedVariables(self):
+    def getSelectedVariables(self):
         selected = []
         for i in range(self.secondTable.rowCount()):
             selected.append((self.secondTable.item(i, 0).text(),
                             bytes(self.secondTable.item(i, 1).text(), 'utf-8').ljust(16),
                             bytes(self.secondTable.item(i, 2).text(), 'utf-8').ljust(16)))
         return selected
-
-    def _getOutputHeader(self, selected_vars):
-        output_header = self.header.copy()
-        output_header.nb_var = len(selected_vars)
-        output_header.var_IDs, output_header.var_names, output_header.var_units = [], [], []
-        for var_ID, var_name, var_unit in selected_vars:
-            output_header.var_IDs.append(var_ID)
-            output_header.var_names.append(var_name)
-            output_header.var_units.append(var_unit)
-        if self.singlePrecisionBox.isChecked():
-            output_header.to_single_precision()
-        return output_header
 
     def btnAddUSEvent(self):
         msg = FrictionLawMessage()
@@ -856,10 +756,6 @@ class ExtractVariablesGUI(QWidget):
         # displaying the available variables
         self._initVarTables()
 
-        # unlock convert to single precision
-        if self.header.float_type == 'd':
-            self.singlePrecisionBox.setEnabled(True)
-
         # unlock add US button
         if 'US' not in self.header.var_IDs and 'W' in self.header.var_IDs:
             available_var_IDs = list(map(lambda x: x.ID(), self.available_vars))
@@ -871,29 +767,162 @@ class ExtractVariablesGUI(QWidget):
         if 'US' in self.header.var_IDs:
             self.btnAddWs.setEnabled(True)
 
+        self.parent.getInput()
+
+
+class TimeTab(QWidget):
+    def __init__(self, input):
+        super().__init__()
+        self.input = input
+
+        # create a slider for time selection
+        self.timeSlider = TimeRangeSlider()
+        self.timeSlider.setFixedHeight(30)
+        self.timeSlider.setMinimumWidth(600)
+        self.timeSlider.setEnabled(False)
+
+        # create text boxes for displaying the time selection and sampling
+        self.timeSelection = SelectedTimeINFO()
+        self.timeSelection.startIndex.setEnabled(False)
+        self.timeSelection.endIndex.setEnabled(False)
+
+        # bind events
+        self.timeSelection.startIndex.returnPressed.connect(self.timeSlider.enterIndexEvent)
+        self.timeSelection.endIndex.returnPressed.connect(self.timeSlider.enterIndexEvent)
+
+        # set layout
+        mainLayout = QVBoxLayout()
+        mainLayout.addWidget(self.timeSlider)
+        mainLayout.addItem(QSpacerItem(10, 5))
+        mainLayout.addWidget(self.timeSelection)
+        mainLayout.setAlignment(Qt.AlignTop)
+        self.setLayout(mainLayout)
+
+        self.setMinimumWidth(800)
+
+    def getTime(self):
+        start_index = int(self.timeSelection.startIndex.text())
+        end_index = int(self.timeSelection.endIndex.text())
+        try:
+            sampling_frequency = int(self.timeSelection.timeSamplig.text())
+        except ValueError:
+            QMessageBox.critical(self, 'Error', 'The sampling frequency must be a number!',
+                                 QMessageBox.Ok)
+            return []
+        if sampling_frequency < 1 or sampling_frequency > end_index:
+            QMessageBox.critical(self, 'Error', 'The sampling frequency must be in the range [1; nbFrames]!',
+                                 QMessageBox.Ok)
+            return []
+        return start_index, end_index, sampling_frequency, list(range(start_index-1, end_index, sampling_frequency))
+
+    def reset(self):
+        self.timeSlider.setEnabled(False)
+        self.timeSelection.clearText()
+        self.timeSelection.startIndex.setEnabled(False)
+        self.timeSelection.endIndex.setEnabled(False)
+        self.timeSelection.timeSamplig.setText('1')
+
+    def getInput(self):
         # unlock the time slider
-        if resin.header.date is not None:
-            year, month, day, hour, minute, second = resin.header.date
+        if self.input.header.date is not None:
+            year, month, day, hour, minute, second = self.input.header.date
             start_time = datetime.datetime(year, month, day, hour, minute, second)
         else:
             start_time = datetime.datetime(1900, 1, 1, 0, 0, 0)
 
-        time_frames = list(map(lambda x: datetime.timedelta(seconds=x), resin.time))
+        time_frames = list(map(lambda x: datetime.timedelta(seconds=x), self.input.time))
         self.timeSlider.reinit(start_time, time_frames, self.timeSelection)
-        if self.header.nb_frames > 1:
+        if self.input.header.nb_frames > 1:
             self.timeSlider.setEnabled(True)
             self.timeSelection.startIndex.setEnabled(True)
             self.timeSelection.endIndex.setEnabled(True)
 
-        # finally unlock the submit button
+
+class SubmitTab(QWidget):
+    def __init__(self, input, timeSelection):
+        super().__init__()
+        self.input = input
+        self.timeSelection = timeSelection
+
+        # create the widget displaying message logs
+        self.logTextBox = QPlainTextEditLogger(self)
+        self.logTextBox.setFormatter(logging.Formatter('%(asctime)s - [%(levelname)s] - \n%(message)s'))
+        logging.getLogger().addHandler(self.logTextBox)
+        logging.getLogger().setLevel(logging.INFO)
+
+        # create a check box for output file format (simple or double precision)
+        self.singlePrecisionBox = QCheckBox('Convert to SERAFIN \n(single precision)', self)
+        self.singlePrecisionBox.setEnabled(False)
+
+        # create the submit button
+        self.btnSubmit = QPushButton('Submit', self, icon=self.style().standardIcon(QStyle.SP_DialogSaveButton))
+        self.btnSubmit.setToolTip('<b>Submit</b> to write a .slf output')
+        self.btnSubmit.setFixedSize(105, 50)
+        self.btnSubmit.setEnabled(False)
+
+        # bind events
+        self.btnSubmit.clicked.connect(self.btnSubmitEvent)
+
+        # set layout
+        mainLayout = QVBoxLayout()
+        hlayout = QHBoxLayout()
+        hlayout.addItem(QSpacerItem(50, 10))
+        hlayout.addWidget(self.btnSubmit)
+        hlayout.addItem(QSpacerItem(50, 10))
+        hlayout.addWidget(self.singlePrecisionBox)
+        hlayout.addItem(QSpacerItem(50, 10))
+        mainLayout.addLayout(hlayout)
+        mainLayout.addItem(QSpacerItem(30, 15))
+        mainLayout.addWidget(QLabel('        Message logs'))
+        mainLayout.addWidget(self.logTextBox.widget)
+        self.setLayout(mainLayout)
+
+    def _handleOverwrite(self, filename):
+        """!
+        @brief (Used in btnSubmitEvent) Handle manually the overwrite option when saving output file
+        """
+        if os.path.exists(filename):
+            msg = QMessageBox.warning(self, 'Confirm overwrite',
+                                      'The file already exists. Do you want to replace it ?',
+                                      QMessageBox.Ok | QMessageBox.Cancel,
+                                      QMessageBox.Ok)
+            if msg == QMessageBox.Cancel:
+                logging.info('Output canceled')
+                return None
+            return True
+        return False
+
+    def reset(self):
+        self.btnSubmit.setEnabled(False)
+        self.singlePrecisionBox.setChecked(False)
+        self.singlePrecisionBox.setEnabled(False)
+
+    def getOutputHeader(self, selected_vars):
+        output_header = self.input.header.copy()
+        output_header.nb_var = len(selected_vars)
+        output_header.var_IDs, output_header.var_names, output_header.var_units = [], [], []
+        for var_ID, var_name, var_unit in selected_vars:
+            output_header.var_IDs.append(var_ID)
+            output_header.var_names.append(var_name)
+            output_header.var_units.append(var_unit)
+        if self.singlePrecisionBox.isChecked():
+            output_header.to_single_precision()
+        return output_header
+
+    def getInput(self):
+        # unlock convert to single precision
+        if self.input.header.float_type == 'd':
+            self.singlePrecisionBox.setEnabled(True)
+
+        # unlock the submit button
         self.btnSubmit.setEnabled(True)
 
     def btnSubmitEvent(self):
-        output_time_indices = self._getOutputTime()
+        start_index, end_index, sampling_frequency, output_time_indices = self.timeSelection.getTime()
         if not output_time_indices:
             return
 
-        selected_vars = self._getSelectedVariables()
+        selected_vars = self.input.getSelectedVariables()
         if not selected_vars:
             QMessageBox.critical(self, 'Error', 'Choose at least one output variable before submit!',
                                  QMessageBox.Ok)
@@ -913,7 +942,7 @@ class ExtractVariablesGUI(QWidget):
             filename += '.slf'
 
         # overwrite to the input file is forbidden
-        if filename == self.filename:
+        if filename == self.input.filename:
             QMessageBox.critical(self, 'Error', 'Cannot overwrite to the input file.',
                                  QMessageBox.Ok)
             return
@@ -930,28 +959,29 @@ class ExtractVariablesGUI(QWidget):
         progressBar = OutputProgressDialog()
 
         # do some calculations
-        with Serafin.Read(self.filename, self.language) as resin:
+        with Serafin.Read(self.input.filename, self.input.language) as resin:
             # instead of re-reading the header and the time, just do a copy
-            resin.header = self.header
-            resin.time = self.time
+            resin.header = self.input.header
+            resin.time = self.input.time
             progressBar.setValue(5)
             QApplication.processEvents()
 
-            with Serafin.Write(filename, self.language, overwrite) as resout:
+            with Serafin.Write(filename, self.input.language, overwrite) as resout:
                 # deduce header from selected variable IDs and write header
-                output_header = self._getOutputHeader(selected_vars)
-                logging.info('Writing the output with variables %s' % str(output_header.var_IDs))
+                output_header = self.getOutputHeader(selected_vars)
+                logging.info('Writing the output with variables %s\nbetween frame %d and %d with frequency %d.'
+                             % (str(output_header.var_IDs), start_index, end_index, sampling_frequency))
 
                 resout.write_header(output_header)
 
                 # do some additional computations
-                necessary_equations = get_necessary_equations(self.header.var_IDs, output_header.var_IDs,
-                                                              self.us_equation)
+                necessary_equations = get_necessary_equations(self.input.header.var_IDs, output_header.var_IDs,
+                                                              self.input.us_equation)
 
                 for i in output_time_indices:
-                    vals = do_calculations_in_frame(necessary_equations, self.us_equation, resin, i,
+                    vals = do_calculations_in_frame(necessary_equations, self.input.us_equation, resin, i,
                                                     output_header.var_IDs, output_header.np_float_type)
-                    resout.write_entire_frame(output_header, self.time[i], vals)
+                    resout.write_entire_frame(output_header, self.input.time[i], vals)
                     progressBar.setValue(5 + int(95 * (i+1) / len(output_time_indices)))
 
         logging.info('Finished writing the output')
@@ -962,6 +992,39 @@ class ExtractVariablesGUI(QWidget):
         # enable close button
         self.setWindowFlags(self.windowFlags() | Qt.WindowCloseButtonHint)
         self.show()
+
+
+class ExtractVariablesGUI(QWidget):
+    def __init__(self):
+        super().__init__()
+
+        self.input = InputTab(self)
+        self.timeTab = TimeTab(self.input)
+        self.submitTab = SubmitTab(self.input, self.timeTab)
+
+        self.tab = QTabWidget()
+        self.tab.addTab(self.input, 'Input')
+        self.tab.addTab(self.timeTab, 'Select time frames')
+        self.tab.addTab(self.submitTab, 'Submit')
+
+        self.tab.setTabEnabled(1, False)
+        self.tab.setTabEnabled(2, False)
+
+        self.tab.setStyleSheet('QTabBar::tab { height: 40px; width: 200px; }')
+
+        mainLayout = QVBoxLayout()
+        mainLayout.addWidget(self.tab)
+        self.setLayout(mainLayout)
+
+    def reset(self):
+        for i, tab in enumerate([self.timeTab, self.submitTab]):
+            tab.reset()
+            self.tab.setTabEnabled(i+1, False)
+
+    def getInput(self):
+        for i, tab in enumerate([self.timeTab, self.submitTab]):
+            tab.getInput()
+            self.tab.setTabEnabled(i+1, True)
 
 
 def exception_hook(exctype, value, traceback):

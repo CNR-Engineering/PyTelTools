@@ -18,6 +18,7 @@ class ReferenceMesh(TruncatedTriangularPrisms):
         self.inverse_total_area = None
 
         self.inside_polygon = False
+        self.polygon = None
         self.triangle_polygon_intersection = {}
 
     def add_polygon(self, polygon):
@@ -38,6 +39,7 @@ class ReferenceMesh(TruncatedTriangularPrisms):
             self.inverse_total_area = 1 / total_area
         else:
             self.inside_polygon = True
+            self.polygon = polygon
 
             self.point_weight = np.zeros((self.nb_points,), dtype=np.float64)
             self.triangle_polygon_intersection = {}

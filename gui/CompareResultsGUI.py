@@ -6,7 +6,7 @@ from PyQt5.QtCore import *
 
 import numpy as np
 
-from gui.util import PlotViewer, MapViewer, PolygonMapCanvas
+from gui.util import PlotViewer, MapViewer, PolygonMapCanvas, ColorMapCanvas
 from slf import Serafin
 from slf.comparison import ReferenceMesh
 from geom import BlueKenue, Shapefile
@@ -395,8 +395,7 @@ class InputTab(QWidget):
     def locatePolygonsEvent(self):
         if not self.has_map:
             reply = QMessageBox.question(self, 'Locate polygons on map',
-                                         'This may take up to one minute. Are you sure to proceed?\n'
-                                         '(You can still modify the volume plot with the map open)',
+                                         'This may take up to one minute. Are you sure to proceed?',
                                          QMessageBox.Yes | QMessageBox.No)
             if reply == QMessageBox.No:
                 return
@@ -705,9 +704,9 @@ class ErrorDistributionTab(QWidget):
         self.plotViewer.exitAct.setEnabled(False)
         self.plotViewer.menuBar.setVisible(False)
         self.XLimitsAct = QAction('Change X limits', self, triggered=self.changeXlimits, enabled=False,
-                                  icon=self.style().standardIcon(QStyle.SP_DialogHelpButton))
+                                  icon=self.style().standardIcon(QStyle.SP_DialogNoButton))
         self.YLimitsAct = QAction('Change Y limits', self, triggered=self.changeYlimits, enabled=False,
-                                  icon=self.style().standardIcon(QStyle.SP_DialogHelpButton))
+                                  icon=self.style().standardIcon(QStyle.SP_DialogNoButton))
 
         self.plotViewer.toolBar.addAction(self.XLimitsAct)
         self.plotViewer.toolBar.addAction(self.YLimitsAct)
@@ -734,6 +733,21 @@ class ErrorDistributionTab(QWidget):
         self.btnCompute.setFixedSize(105, 50)
         self.btnCompute.clicked.connect(self.btnComputeEvent)
 
+        # create the color map button
+        self.btnColorMap = QPushButton('2D View', icon=self.style().standardIcon(QStyle.SP_DialogHelpButton))
+        self.btnColorMap.setFixedSize(105, 50)
+        self.btnColorMap.clicked.connect(self.btnColorMapEvent)
+        self.btnColorMap.setEnabled(False)
+
+        # initialize the map for 2D view
+        self.map = MapViewer()
+        self.map.canvas = ColorMapCanvas()
+        MapViewer.__init__(self.map)
+        self.map.scrollArea.setWidget(self.map.canvas)
+        self.map.resize(800, 700)
+        self.has_map = False
+        self.map.closeEvent = lambda event: self.btnColorMap.setEnabled(True)
+
         # create the stats box
         self.resultBox = QPlainTextEdit()
         self.resultBox.setMinimumWidth(400)
@@ -742,13 +756,17 @@ class ErrorDistributionTab(QWidget):
         # set layout
         mainLayout = QVBoxLayout()
         mainLayout.addWidget(self.timeSelection)
-        hlayout = QHBoxLayout()
         vlayout = QVBoxLayout()
-        vlayout.addWidget(self.btnCompute)
+        hlayout = QHBoxLayout()
+        hlayout.addWidget(self.btnColorMap)
+        hlayout.addWidget(self.btnCompute)
+        hlayout.setSpacing(10)
+        vlayout.addLayout(hlayout)
+        vlayout.setAlignment(hlayout, Qt.AlignTop | Qt.AlignRight)
         vlayout.addItem(QSpacerItem(10, 10))
         vlayout.addWidget(self.resultBox)
-        vlayout.setAlignment(self.btnCompute, Qt.AlignTop | Qt.AlignRight)
         vlayout.setAlignment(Qt.AlignHCenter)
+        hlayout = QHBoxLayout()
         hlayout.addLayout(vlayout)
         hlayout.addWidget(gb, Qt.AlignHCenter)
         hlayout.setSpacing(10)
@@ -775,6 +793,7 @@ class ErrorDistributionTab(QWidget):
         self.ewsd = None
         self.xlim = None
         self.ylim = None
+        self.has_map = False
         self.timeSelection.clearText()
         self.resultBox.clear()
         self.plotViewer.defaultPlot()
@@ -783,6 +802,7 @@ class ErrorDistributionTab(QWidget):
         self.plotViewer.current_xlabel = 'EWSD'
         self.XLimitsAct.setEnabled(False)
         self.YLimitsAct.setEnabled(False)
+        self.btnColorMap.setEnabled(False)
 
     def changeXlimits(self):
         value, ok = QInputDialog.getText(self, 'Change X limits',
@@ -816,39 +836,18 @@ class ErrorDistributionTab(QWidget):
         self.plotViewer.canvas.axes.set_ylim(self.ylim)
         self.plotViewer.canvas.draw()
 
-    def btnComputeEvent(self):
-        ref_time = int(self.timeSelection.refIndex.text()) - 1
-        test_time = int(self.timeSelection.testIndex.text()) - 1
-        selected_variable = self.input.varBox.currentText().split('(')[0][:-1]
-
-        with Serafin.Read(self.input.ref_filename, self.input.ref_language) as resin:
-            resin.header = self.input.ref_header
-            resin.time = self.input.ref_time
-            ref_values = resin.read_var_in_frame(ref_time, selected_variable)
-
-        with Serafin.Read(self.input.test_filename, self.input.test_language) as resin:
-            resin.header = self.input.test_header
-            resin.time = self.input.test_time
-            test_values = resin.read_var_in_frame(test_time, selected_variable)
-
-        values = test_values - ref_values
-        self.ewsd = list(self.input.ref_mesh.element_wise_signed_deviation(values).values())
-
-        self.updateStats(ref_time, test_time)
-        self.updateHistogram()
-
     def updateStats(self, ref_time, test_time):
-        quantile25, median, quantile75 = np.percentile(self.ewsd, [25, 50, 75])
+        ewsd = np.array(list(self.ewsd.values()))
+        quantile25, median, quantile75 = np.percentile(ewsd, [25, 50, 75])
         self.resultBox.appendPlainText(self.template.format(ref_time+1, test_time+1,
-                                                            np.mean(self.ewsd), np.var(self.ewsd, ddof=1),
-                                                            np.min(self.ewsd), quantile25, median,
-                                                            quantile75, np.max(self.ewsd)))
+                                                            np.mean(ewsd), np.var(ewsd, ddof=1),
+                                                            np.min(ewsd), quantile25, median,
+                                                            quantile75, np.max(ewsd)))
 
     def updateHistogram(self):
-        if self.xlim is None:
-            ewsd = self.ewsd
-        else:
-            ewsd = list(filter(lambda x: self.xlim[0] <= x <= self.xlim[1], self.ewsd))
+        ewsd = list(self.ewsd.values())
+        if self.xlim is not None:
+            ewsd = list(filter(lambda x: self.xlim[0] <= x <= self.xlim[1], ewsd))
 
         weights = np.ones_like(ewsd) / self.input.ref_mesh.nb_triangles  # make frequency histogram
 
@@ -866,8 +865,48 @@ class ErrorDistributionTab(QWidget):
 
         self.plotViewer.canvas.draw()
 
+        self.btnColorMap.setEnabled(True)
         self.XLimitsAct.setEnabled(True)
         self.YLimitsAct.setEnabled(True)
+
+    def btnComputeEvent(self):
+        self.xlim = None
+        self.ylim = None
+        self.has_map = False
+
+        ref_time = int(self.timeSelection.refIndex.text()) - 1
+        test_time = int(self.timeSelection.testIndex.text()) - 1
+        selected_variable = self.input.varBox.currentText().split('(')[0][:-1]
+
+        with Serafin.Read(self.input.ref_filename, self.input.ref_language) as resin:
+            resin.header = self.input.ref_header
+            resin.time = self.input.ref_time
+            ref_values = resin.read_var_in_frame(ref_time, selected_variable)
+
+        with Serafin.Read(self.input.test_filename, self.input.test_language) as resin:
+            resin.header = self.input.test_header
+            resin.time = self.input.test_time
+            test_values = resin.read_var_in_frame(test_time, selected_variable)
+
+        values = test_values - ref_values
+        self.ewsd = self.input.ref_mesh.element_wise_signed_deviation(values)
+
+        self.updateStats(ref_time, test_time)
+        self.updateHistogram()
+
+    def btnColorMapEvent(self):
+        if not self.has_map:
+            reply = QMessageBox.question(self, 'Show distribution in 2D',
+                                         'This may take up to two minutes. Are you sure to proceed?',
+                                         QMessageBox.Yes | QMessageBox.No)
+            if reply == QMessageBox.No:
+                return
+
+            self.map.canvas.reinitFigure(self.input.ref_mesh.triangles, self.input.locations,
+                                         self.ewsd, self.xlim, self.input.ref_mesh.polygon)
+            self.has_map = True
+        self.btnColorMap.setEnabled(False)
+        self.map.show()
 
 
 class CompareResultsGUI(QWidget):
