@@ -13,13 +13,13 @@ from geom import BlueKenue, Shapefile
 
 
 class SimpleTimeSelection(QWidget):
-    def __init__(self):
+    def __init__(self, label='Reference frame index'):
         super().__init__()
         self.refIndex = QLineEdit('', self)
         self.refIndex.setMaximumWidth(60)
         self.refSlider = TimeSlider(self.refIndex)
         glayout = QGridLayout()
-        glayout.addWidget(QLabel('Reference frame index'), 1, 1)
+        glayout.addWidget(QLabel(label), 1, 1)
         glayout.addWidget(self.refIndex, 1, 2)
         glayout.addWidget(self.refSlider, 1, 3)
         glayout.setSpacing(10)
@@ -562,9 +562,8 @@ class ComputeErrorsTab(QWidget):
         self.btnCompute.clicked.connect(self.btnComputeEvent)
 
         mainLayout = QVBoxLayout()
-        hlayout = QHBoxLayout()
-        hlayout.addWidget(self.timeSelection)
-        mainLayout.addLayout(hlayout)
+        mainLayout.addItem(QSpacerItem(10, 10))
+        mainLayout.addWidget(self.timeSelection)
         mainLayout.addItem(QSpacerItem(10, 10))
         hlayout = QHBoxLayout()
         hlayout.addWidget(self.btnCompute)
@@ -648,6 +647,7 @@ class ErrorEvolutionTab(QWidget):
 
         # set layout
         mainLayout = QVBoxLayout()
+        mainLayout.addItem(QSpacerItem(10, 10))
         mainLayout.addWidget(self.timeSelection)
         hlayout = QHBoxLayout()
         hlayout.addWidget(self.btnCompute)
@@ -755,6 +755,7 @@ class ErrorDistributionTab(QWidget):
 
         # set layout
         mainLayout = QVBoxLayout()
+        mainLayout.addItem(QSpacerItem(10, 10))
         mainLayout.addWidget(self.timeSelection)
         vlayout = QVBoxLayout()
         hlayout = QHBoxLayout()
@@ -909,6 +910,78 @@ class ErrorDistributionTab(QWidget):
         self.map.show()
 
 
+class BSSTab(QWidget):
+    def __init__(self, inputTab):
+        super().__init__()
+        self.input = inputTab
+        self.timeSelection = DoubleTimeSelection()
+        self.initSelection = SimpleTimeSelection('Initial state index')
+
+        self.btnCompute = QPushButton('Compute', icon=self.style().standardIcon(QStyle.SP_DialogApplyButton))
+        self.btnCompute.setFixedSize(105, 50)
+        self.resultTextBox = QPlainTextEdit()
+
+        self.btnCompute.clicked.connect(self.btnComputeEvent)
+
+        mainLayout = QVBoxLayout()
+        mainLayout.addItem(QSpacerItem(10, 10))
+        mainLayout.addWidget(self.timeSelection)
+        mainLayout.addWidget(self.initSelection)
+        mainLayout.addItem(QSpacerItem(10, 10))
+        hlayout = QHBoxLayout()
+        hlayout.addWidget(self.btnCompute)
+        hlayout.setAlignment(self.btnCompute, Qt.AlignTop)
+        hlayout.setAlignment(Qt.AlignHCenter)
+        vlayout = QVBoxLayout()
+        vlayout.addWidget(self.resultTextBox)
+        hlayout.addItem(QSpacerItem(10, 1))
+        hlayout.addLayout(vlayout)
+        mainLayout.addLayout(hlayout)
+        self.setLayout(mainLayout)
+
+        self.template = '===\nComparison between Ref (frame {}) and Test (frame {})\n' \
+                        'with respect to Init (frame {})\n===\n' \
+                        'BSS\t{:<30}\n'
+
+    def add_reference(self):
+        self.timeSelection.initRef(self.input.ref_header.nb_frames)
+
+    def add_test(self):
+        self.timeSelection.initTest(self.input.test_header.nb_frames)
+        self.initSelection.initRef(self.input.test_header.nb_frames)
+
+    def reset(self):
+        self.timeSelection.clearText()
+        self.resultTextBox.clear()
+
+    def btnComputeEvent(self):
+        ref_time = int(self.timeSelection.refIndex.text()) - 1
+        test_time = int(self.timeSelection.testIndex.text()) - 1
+        init_time = int(self.initSelection.refIndex.text()) - 1
+        selected_variable = self.input.varBox.currentText().split('(')[0][:-1]
+
+        with Serafin.Read(self.input.ref_filename, self.input.ref_language) as resin:
+            resin.header = self.input.ref_header
+            resin.time = self.input.ref_time
+            ref_values = resin.read_var_in_frame(ref_time, selected_variable)
+
+        with Serafin.Read(self.input.test_filename, self.input.test_language) as resin:
+            resin.header = self.input.test_header
+            resin.time = self.input.test_time
+            test_values = resin.read_var_in_frame(test_time, selected_variable)
+            init_values = resin.read_var_in_frame(init_time, selected_variable)
+
+        test_volume = self.input.ref_mesh.quadratic_volume(test_values - ref_values)
+        ref_volume = self.input.ref_mesh.quadratic_volume(ref_values - init_values)
+        if test_volume == 0 and ref_volume == 0:
+            bss = 1
+        else:
+            with np.errstate(divide='ignore'):
+                bss = 1 - test_volume / ref_volume
+        self.resultTextBox.appendPlainText(self.template.format(ref_time+1, test_time+1, init_time+1, bss))
+
+
+
 class CompareResultsGUI(QWidget):
     def __init__(self, parent=None):
         super().__init__()
@@ -925,16 +998,19 @@ class CompareResultsGUI(QWidget):
         errorEvolutionTab = ErrorEvolutionTab(self.input)
         computeErrorTab = ComputeErrorsTab(self.input)
         errorDistributionTab = ErrorDistributionTab(self.input)
+        bssTab = BSSTab(self.input)
 
         self.tab.addTab(self.input, 'Input')
         self.tab.addTab(computeErrorTab, 'Compute MSD/MAD/RMSD')
         self.tab.addTab(errorEvolutionTab, 'MAD evolution')
         self.tab.addTab(errorDistributionTab, 'EWSD distribution')
+        self.tab.addTab(bssTab, 'BSS')
+
         for i in range(1, 4):
             self.tab.setTabEnabled(i, False)
         self.tab.currentChanged.connect(self.switch_tab)
 
-        self.resultTabs = [errorEvolutionTab, computeErrorTab, errorDistributionTab]
+        self.resultTabs = [errorEvolutionTab, computeErrorTab, errorDistributionTab, bssTab]
 
         mainLayout = QVBoxLayout()
         mainLayout.addWidget(self.tab)
@@ -961,6 +1037,8 @@ class CompareResultsGUI(QWidget):
         for i, tab in enumerate(self.resultTabs):
             tab.add_test()
             self.tab.setTabEnabled(i+1, True)
+        if self.input.ref_filename == self.input.test_filename:
+            self.tab.setTabEnabled(4, False)
 
 
 def exception_hook(exctype, value, traceback):

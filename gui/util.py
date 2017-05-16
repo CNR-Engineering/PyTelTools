@@ -13,7 +13,7 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 from matplotlib.collections import PatchCollection
 from descartes import PolygonPatch
-from matplotlib import cm, colorbar
+from matplotlib import cm
 from matplotlib.colors import Normalize, colorConverter
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
@@ -166,7 +166,7 @@ class ColorMapCanvas(MapCanvas):
         self.TRANSPARENT = colorConverter.to_rgba('black', alpha=0.01)
 
     def reinitFigure(self, triangles, locations, values, limits=None, polygon=None):
-        self.fig.clear()   # have to remove the color bar
+        self.fig.clear()   # remove the old color bar
         self.axes = self.fig.add_subplot(111)
 
         if limits is None:
@@ -180,24 +180,19 @@ class ColorMapCanvas(MapCanvas):
 
         if polygon is None:
             minx, maxx, miny, maxy = locations
-            rectangle = None
         else:
             coords = list(polygon.coords())[:-1]
             x, y = list(zip(*coords))
             minx, maxx, miny, maxy = min(x), max(x), min(y), max(y)
-            rectangle = Polygon([(minx, miny), (maxx, miny), (maxx, miny), (maxx, maxy)])
         w, h = maxx - minx, maxy - miny
 
         patches = []
-        for i, j, k in values:
+        for i, j, k in values:   # add the triangles for which the distribution is defined
             t = triangles[i, j, k]
-            if rectangle is not None:
-                if not rectangle.contains(t):
-                    continue
             color = cmap.to_rgba(values[i, j, k])
             patches.append(PolygonPatch(t.buffer(0), fc=color, ec=self.TRANSPARENT, linestyle='dotted', zorder=1))
 
-        if polygon is not None:
+        if polygon is not None:   # add the contour of the triangle
             patches.append(PolygonPatch(polygon.polyline().buffer(0), fc=self.TRANSPARENT, ec='black', zorder=1))
 
         self.axes.add_collection(PatchCollection(patches, match_original=True))

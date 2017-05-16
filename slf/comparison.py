@@ -35,8 +35,6 @@ class ReferenceMesh(TruncatedTriangularPrisms):
                 self.area[i, j, k] = area
                 total_area += area
                 self.point_weight[[i, j, k]] += area
-            self.point_weight /= 3.0
-            self.inverse_total_area = 1 / total_area
         else:
             self.inside_polygon = True
             self.polygon = polygon
@@ -59,8 +57,8 @@ class ReferenceMesh(TruncatedTriangularPrisms):
                         centroid = intersection.centroid
                         interpolator = Interpolator(t).get_interpolator_at(centroid.x, centroid.y)
                         self.triangle_polygon_intersection[i, j, k] = (area, interpolator)
-            self.point_weight /= 3.0
-            self.inverse_total_area = 1 / total_area
+        self.point_weight /= 3.0
+        self.inverse_total_area = 1 / total_area
 
     def mean_signed_deviation(self, values):
         if not self.inside_polygon:
@@ -97,4 +95,13 @@ class ReferenceMesh(TruncatedTriangularPrisms):
                 area, interpolator = self.triangle_polygon_intersection[i, j, k]
                 ewsd[i, j, k] = interpolator.dot(values[[i, j, k]]) * area * self.nb_triangles * self.inverse_total_area
         return ewsd
+
+    def quadratic_volume(self, values):
+        if not self.inside_polygon:
+            return self.point_weight.dot(np.square(values))
+        else:
+            squared_values = np.square(values)
+            volume_boundary = TruncatedTriangularPrisms.boundary_volume_in_polygon(self.triangle_polygon_intersection,
+                                                                                   squared_values)
+            return self.point_weight.dot(squared_values) + volume_boundary
 
