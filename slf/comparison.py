@@ -17,6 +17,7 @@ class ReferenceMesh(TruncatedTriangularPrisms):
         self.point_weight = None
         self.inverse_total_area = None
 
+        self.nb_triangles_inside = 0
         self.inside_polygon = False
         self.polygon = None
         self.triangle_polygon_intersection = {}
@@ -28,7 +29,7 @@ class ReferenceMesh(TruncatedTriangularPrisms):
         if polygon is None:  # entire mesh
             self.inside_polygon = False
             self.triangle_polygon_intersection = {}
-
+            self.nb_triangles_inside = self.nb_triangles
             total_area = 0
             for i, j, k in self.triangles:
                 area = self.triangles[i, j, k].area
@@ -38,6 +39,7 @@ class ReferenceMesh(TruncatedTriangularPrisms):
         else:
             self.inside_polygon = True
             self.polygon = polygon
+            self.nb_triangles_inside = 0
 
             self.point_weight = np.zeros((self.nb_points,), dtype=np.float64)
             self.triangle_polygon_intersection = {}
@@ -45,6 +47,7 @@ class ReferenceMesh(TruncatedTriangularPrisms):
             for i, j, k in self.triangles:
                 t = self.triangles[i, j, k]
                 if polygon.contains(t):
+                    self.nb_triangles_inside += 1
                     area = t.area
                     total_area += area
                     self.point_weight[[i, j, k]] += area
@@ -52,6 +55,7 @@ class ReferenceMesh(TruncatedTriangularPrisms):
                 else:
                     is_intersected, intersection = polygon.polygon_intersection(t)
                     if is_intersected:
+                        self.nb_triangles_inside += 1
                         area = intersection.area
                         total_area += area
                         centroid = intersection.centroid
@@ -89,11 +93,13 @@ class ReferenceMesh(TruncatedTriangularPrisms):
     def element_wise_signed_deviation(self, values):
         ewsd = {}
         for i, j, k in self.area:
-            ewsd[i, j, k] = sum(values[[i, j, k]]) * self.area[i, j, k] / 3.0 * self.nb_triangles * self.inverse_total_area
+            ewsd[i, j, k] = sum(values[[i, j, k]]) * self.area[i, j, k] / 3.0 * self.nb_triangles_inside \
+                            * self.inverse_total_area
         if self.inside_polygon:
             for i, j, k in self.triangle_polygon_intersection:
                 area, interpolator = self.triangle_polygon_intersection[i, j, k]
-                ewsd[i, j, k] = interpolator.dot(values[[i, j, k]]) * area * self.nb_triangles * self.inverse_total_area
+                ewsd[i, j, k] = interpolator.dot(values[[i, j, k]]) * area * self.nb_triangles_inside \
+                                * self.inverse_total_area
         return ewsd
 
     def quadratic_volume(self, values):
