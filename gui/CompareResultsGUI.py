@@ -850,7 +850,7 @@ class ErrorDistributionTab(QWidget):
         if self.xlim is not None:
             ewsd = list(filter(lambda x: self.xlim[0] <= x <= self.xlim[1], ewsd))
 
-        weights = np.ones_like(ewsd) / self.input.ref_mesh.nb_triangles  # make frequency histogram
+        weights = np.ones_like(ewsd) / self.input.ref_mesh.nb_triangles_inside  # make frequency histogram
 
         self.plotViewer.canvas.axes.clear()
         self.plotViewer.canvas.axes.grid(linestyle='dotted')
