@@ -28,7 +28,7 @@ class Read(BKi2s):
             if line == ':EndHeader':
                 break
 
-    def __iter__(self):
+    def get_polygons(self):
         while True:
             line = self.file.readline()
             if not line:  # EOF
@@ -51,8 +51,28 @@ class Read(BKi2s):
             # return only closed polyline
             yield line_header, poly
 
+    def get_open_polylines(self):
+        while True:
+            line = self.file.readline()
+            if not line:  # EOF
+                break
+            if line == '\n':  # there could be blank lines between line sets
+                continue
+            line_header = tuple(line.rstrip().split())
+            try:
+                nb_points = int(line_header[0])
+            except ValueError:
+                continue
+            coordinates = []
+            for i in range(nb_points):
+                line = self.file.readline()
+                coordinates.append(tuple(map(float, line.rstrip().split())))
+            poly = Polyline(coordinates)
 
-
+            if poly.is_closed():
+                continue
+            # return only open polyline
+            yield line_header, poly
 
 
 

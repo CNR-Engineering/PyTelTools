@@ -533,10 +533,10 @@ class InputTab(QWidget):
         if is_i2s:
             with BlueKenue.Read(filename) as f:
                 f.read_header()
-                for poly_name, poly in f:
+                for poly_name, poly in f.get_polygons():
                     self.polygons.append(poly)
         else:
-            for polygon in Shapefile.read_shp(filename):
+            for polygon in Shapefile.get_polygons(filename):
                 self.polygons.append(polygon)
         if not self.polygons:
             QMessageBox.critical(self, 'Error', 'The file does not contain any polygon.',
