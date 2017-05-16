@@ -30,6 +30,12 @@ class VariablesTestCase(unittest.TestCase):
         self.assertEqual(equation_name(get_necessary_equations(['Q', 'I', 'H', 'U', 'V', 'B'], ['S', 'U', 'H'], None)), ['S'])
         self.assertEqual(equation_name(get_necessary_equations(['U', 'B', 'J', 'I', 'Q', 'TAU', 'H', 'B'], ['H', 'S'], None)), ['S'])
 
+    def test_B_equation(self):
+        self.assertEqual(equation_name(get_necessary_equations(['HD', 'RB', 'H'], ['B', 'H'], None)), ['B'])
+        self.assertEqual(equation_name(get_necessary_equations(['HD', 'H', 'S', 'TAU'], ['B', 'S'], None)), ['B'])
+        self.assertEqual(equation_name(get_necessary_equations(['S', 'U', 'H', 'V', 'H'], ['S', 'B', 'H'], None)), ['B'])
+        self.assertEqual(equation_name(get_necessary_equations(['DMAX', 'US', 'RB', 'H', 'Q', 'TAU', 'S', 'I'], ['H', 'B'], None)), ['B'])
+
     def test_C_equation(self):
         self.assertEqual(equation_name(get_necessary_equations(['U', 'V', 'H', 'B'], ['U', 'C', 'H'], None)), ['C'])
         self.assertEqual(equation_name(get_necessary_equations(['U', 'S', 'Q', 'B'], ['U', 'C', 'H'], None)), ['H', 'C'])
@@ -74,5 +80,9 @@ class VariablesTestCase(unittest.TestCase):
         self.assertEqual(equation_name(get_necessary_equations(['US', 'I', 'H', 'U', 'V'], ['M', 'DMAX', 'Q'], None)), ['M', 'J', 'Q', 'TAU', 'DMAX'])
         self.assertEqual(equation_name(get_necessary_equations(['US', 'I', 'H', 'U', 'V'], ['M', 'DMAX', 'Q'], None)), ['M', 'J', 'Q', 'TAU', 'DMAX'])
 
-
+    def test_QS_equation(self):
+        self.assertEqual(equation_name(get_necessary_equations(['HD', 'EF', 'B', 'DF'], ['B', 'QS'], None)), ['QS'])
+        self.assertEqual(equation_name(get_necessary_equations(['EF', 'H', 'S', 'DF'], ['QS', 'S'], None)), ['QS'])
+        self.assertEqual(equation_name(get_necessary_equations(['QSX', 'EF', 'H', 'DF', 'QSY', 'B'], ['S', 'QS', 'H'], None)), ['S', 'QS'])
+        self.assertEqual(equation_name(get_necessary_equations(['DMAX', 'US', 'QSX', 'EF', 'Q', 'DF', 'S', 'B'], ['H', 'QS'], None)), ['H', 'QS'])
 

@@ -65,7 +65,20 @@ US,VITESSE DE FROT.,FRICTION VEL.,M/S
 TAU,CONTRAINTE,BED SHEAR STRESS,PASCAL
 DMAX,DIAMETRE,DIAMETER,MM
 W,FROTTEMENT,BOTTOM FRICTION,
-ROUSE,NOMBRE DE ROUSE,ROUSE NUMBER, """
+ROUSE,NOMBRE DE ROUSE,ROUSE NUMBER,
+HD,EPAISSEUR DU LIT,BED THICKNESS,M
+RB,FOND RIGIDE,RIGID BED,M
+QS,DEBIT SOLIDE,SOLID DISCH,M2/S            
+QSX,DEBIT SOLIDE X,SOLID DISCH X,M2/S            
+QSY,DEBIT SOLIDE Y,SOLID DISCH Y,M2/S
+QSBL,QS CHARRIAGE,QS BEDLOAD,M2/S
+QSBLX,QS CHARRIAGE X,QS BEDLOAD X,M2/S
+QSBLY,QS CHARRIAGE Y,QS BEDLOAD Y,M2/S
+QSSUSP,QS SUSPENSION,QS SUSPENSION,M2/S
+QSSUSPX,QS SUSPENSION X,QS SUSPENSION X,M2/S
+QSSUSPY,QS SUSPENSION Y,QS SUSPENSION Y,M2/S
+EF,FLUX D'EROSION,EROSION FLUX,KG/M2/S
+DF,FLUX DE DEPOT,DEPOSITION FLUX,KG/M2/S"""
 
     for i, row in enumerate(spec.split('\n')):
         ID, name_fr, name_en, unit = row.split(',')
@@ -74,11 +87,13 @@ ROUSE,NOMBRE DE ROUSE,ROUSE NUMBER, """
 
 # all variable entities involved in computations are stored as constants in a dictionary with ordered keys
 VARIABLES = {}
-basic_vars_IDs = ['H', 'U', 'V', 'M', 'S', 'B', 'I', 'J', 'Q', 'C', 'F']
+basic_vars_IDs = ['H', 'U', 'V', 'M', 'S', 'B', 'I', 'J', 'Q', 'C', 'F', 'US', 'TAU', 'DMAX', 'HD', 'RB',
+                  'QS', 'QSX', 'QSY', 'QSBL', 'QSBLX', 'QSBLY', 'QSSUSP', 'QSSUSPX', 'QSSUSPY', 'EF', 'DF']
 
 build_variables()
-H, U, V, M, S, B, I, J, Q, C, F, US, TAU, DMAX, W, ROUSE = [VARIABLES[var] for var in
-                                                            basic_vars_IDs + ['US', 'TAU', 'DMAX', 'W', 'ROUSE']]
+H, U, V, M, S, B, I, J, Q, C, F, US, TAU, DMAX, HD, RB, \
+QS, QSX, QSY, QSBL, QSBLX, QSBLY, QSSUSP, QSSUSPX, QSSUSPY, EF, DF, W, ROUSE = [VARIABLES[var] for var in
+                                                                               basic_vars_IDs + ['W', 'ROUSE']]
 
 
 # define some special operators
@@ -111,11 +126,12 @@ def compute_ROUSE(ws):
 
 
 # define the operators (relations between variables) as constants
-MINUS, TIMES, NORM2 = 0, 1, 2
-COMPUTE_TAU, COMPUTE_DMAX = 3, 4
-COMPUTE_CHEZY, COMPUTE_STRICKLER, COMPUTE_MANNING, COMPUTE_NIKURADSE = 5, 6, 7, 8
-COMPUTE_C, COMPUTE_F = 9, 10
-OPERATIONS = {MINUS: lambda a, b: a-b,
+PLUS, MINUS, TIMES, NORM2 = 1, 2, 3, 4
+COMPUTE_TAU, COMPUTE_DMAX = 5, 6
+COMPUTE_CHEZY, COMPUTE_STRICKLER, COMPUTE_MANNING, COMPUTE_NIKURADSE = 7, 8, 9, 10
+COMPUTE_C, COMPUTE_F = 11, 12
+OPERATIONS = {PLUS: lambda a, b: a+b,
+              MINUS: lambda a, b: a-b,
               TIMES: lambda a, b: a*b,
               NORM2: lambda a, b: np.sqrt(np.square(a) + np.square(b)),
               COMPUTE_TAU: lambda x: RHO_EAU * np.square(x),
@@ -128,16 +144,20 @@ OPERATIONS = {MINUS: lambda a, b: a-b,
               COMPUTE_F: lambda m, c: m / c}
 
 # define basic equations
-BASIC_EQUATIONS = {'H': Equation((S, B), H, MINUS), 'S': Equation((H, B), S, MINUS),
+BASIC_EQUATIONS = {'H': Equation((S, B), H, MINUS), 'S': Equation((H, B), S, PLUS),
                    'B': Equation((S, H), B, MINUS), 'M': Equation((U, V), M, NORM2),
                    'I': Equation((H, U), I, TIMES), 'J': Equation((H, V), J, TIMES),
                    'Q': Equation((I, J), Q, NORM2), 'C': Equation((H,), C, COMPUTE_C),
-                   'F': Equation((M, C), F, COMPUTE_F)}
+                   'F': Equation((M, C), F, COMPUTE_F), 'HD': Equation((B, RB), HD, MINUS),
+                   'RB': Equation((B, HD), RB, MINUS), 'Bbis': Equation((HD, RB), B, PLUS),
+                   'QS': Equation((QSX, QSY), QS, NORM2),
+                   'QSbis': Equation((EF, DF), QS, PLUS),
+                   'QSBL': Equation((QSBLX, QSBLY), QSBL, NORM2),
+                   'QSSUSP': Equation((QSSUSP, QSSUSPY), QSSUSP, NORM2),
+                   'TAU': Equation((US,), TAU, COMPUTE_TAU),
+                   'DMAX': Equation((TAU,), DMAX, COMPUTE_DMAX)}
 
 # define special equations
-TAU_EQUATION = Equation((US,), TAU, COMPUTE_TAU)
-DMAX_EQUATION = Equation((TAU,), DMAX, COMPUTE_DMAX)
-
 CHEZY_EQUATION = Equation((W, H, M), US, COMPUTE_CHEZY)
 STRICKLER_EQUATION = Equation((W, H, M), US, COMPUTE_STRICKLER)
 MANNING_EQUATION = Equation((W, H, M), US, COMPUTE_MANNING)
@@ -195,12 +215,6 @@ def get_available_variables(input_var_IDs):
                 available_vars.append(equation.output)
         if not found_new_computable:
             break
-    # handle the special case for TAU and DMAX
-    if 'US' in input_var_IDs:
-        if 'TAU' not in input_var_IDs:
-            available_vars.append(TAU)
-        if 'DMAX' not in input_var_IDs:
-            available_vars.append(DMAX)
     return available_vars
 
 
@@ -221,7 +235,10 @@ def get_necessary_equations(known_var_IDs, needed_var_IDs, us_equation):
 
     # add B
     if 'B' in selected_unknown_var_IDs:
-        necessary_equations.append(BASIC_EQUATIONS['B'])
+        if 'S' in known_var_IDs:
+            necessary_equations.append(BASIC_EQUATIONS['B'])
+        else:
+            necessary_equations.append(BASIC_EQUATIONS['Bbis'])
 
     # add H
     if 'H' in selected_unknown_var_IDs:
@@ -299,19 +316,34 @@ def get_necessary_equations(known_var_IDs, needed_var_IDs, us_equation):
 
     # add TAU
     if 'TAU' in selected_unknown_var_IDs:
-        necessary_equations.append(TAU_EQUATION)
+        necessary_equations.append(BASIC_EQUATIONS['TAU'])
     elif 'DMAX' in selected_unknown_var_IDs and 'TAU' not in known_var_IDs:
-        necessary_equations.append(TAU_EQUATION)
+        necessary_equations.append(BASIC_EQUATIONS['TAU'])
 
     # add DMAX
     if 'DMAX' in selected_unknown_var_IDs:
-        necessary_equations.append(DMAX_EQUATION)
+        necessary_equations.append(BASIC_EQUATIONS['DMAX'])
 
     # add ROUSE
     for var_ID in selected_unknown_var_IDs:
         if var_ID[:5] == 'ROUSE':
             rouse_value = float(var_ID[6:])
             necessary_equations.append(rouse_equation(var_ID, rouse_value))
+
+    # add QS
+    if 'QS' in selected_unknown_var_IDs:
+        if 'QSX' in known_var_IDs:
+            necessary_equations.append(BASIC_EQUATIONS['QS'])
+        else:
+            necessary_equations.append(BASIC_EQUATIONS['QSbis'])
+
+    # add QSBL
+    if 'QSBL' in selected_unknown_var_IDs:
+        necessary_equations.append(BASIC_EQUATIONS['QSBL'])
+
+    # add QSSUSP
+    if 'QSSUSP' in selected_unknown_var_IDs:
+        necessary_equations.append(BASIC_EQUATIONS['QSSUSP'])
 
     return necessary_equations
 
