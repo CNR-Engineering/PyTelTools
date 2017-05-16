@@ -38,6 +38,9 @@ class Polyline:
     def contains(self, item):
         return self._polyline.contains(item)
 
+    def bounds(self):
+        return self._polyline.bounds
+
     def polygon_intersection(self, triangle):
         """!
         @brief (Used in volume calculation) Return the polygon or multipolygon intersection with the triangle

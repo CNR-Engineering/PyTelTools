@@ -41,10 +41,12 @@ class ReferenceMesh(TruncatedTriangularPrisms):
             self.polygon = polygon
             self.nb_triangles_inside = 0
 
+            bounds = polygon.bounds()
+            potential_elements = list(self.index.intersection(bounds, objects='raw'))
             self.point_weight = np.zeros((self.nb_points,), dtype=np.float64)
             self.triangle_polygon_intersection = {}
             total_area = 0
-            for i, j, k in self.triangles:
+            for i, j, k in potential_elements:
                 t = self.triangles[i, j, k]
                 if polygon.contains(t):
                     self.nb_triangles_inside += 1

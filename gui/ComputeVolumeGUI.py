@@ -59,9 +59,9 @@ class VolumeCalculatorGUI(QThread):
                 volume = self.calculator.volume_in_frame_in_polygon(weight, values, self.calculator.polygons[j])
                 if self.calculator.volume_type == VolumeCalculator.POSITIVE:
                     for v in volume:
-                        i_result.append(str(v))
+                        i_result.append('%.6f' % v)
                 else:
-                    i_result.append(str(volume))
+                    i_result.append('%.6f' % volume)
             result.append(i_result)
 
             self.tick.emit(30 + int(70 * (i+1) / len(self.calculator.time_indices)))

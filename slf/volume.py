@@ -37,8 +37,10 @@ class TruncatedTriangularPrisms(Mesh2D):
         @param <geom.Polyline> polygon: A polygon
         @return <numpy.1D-array>: The weight carried by the triangle nodes
         """
+        bounds = polygon.bounds()
+        potential_elements = list(self.index.intersection(bounds, objects='raw'))
         weight = np.zeros((self.nb_points,), dtype=np.float64)
-        for i, j, k in self.triangles:
+        for i, j, k in potential_elements:
             t = self.triangles[i, j, k]
             if polygon.contains(t):
                 weight[[i, j, k]] += t.area
@@ -50,9 +52,11 @@ class TruncatedTriangularPrisms(Mesh2D):
         @param <geom.Polyline> polygon: A polygon
         @return <numpy.1D-array, dict>: The weight carried by the triangle nodes, and the dictionary of tuple (area, centroid value) for boundary triangles
         """
+        bounds = polygon.bounds()
+        potential_elements = list(self.index.intersection(bounds, objects='raw'))
         weight = np.zeros((self.nb_points,), dtype=np.float64)
         triangle_polygon_intersection = {}
-        for i, j, k in self.triangles:
+        for i, j, k in potential_elements:
             t = self.triangles[i, j, k]
             if polygon.contains(t):
                 weight[[i, j, k]] += t.area
@@ -70,11 +74,13 @@ class TruncatedTriangularPrisms(Mesh2D):
         @param <geom.Polyline> polygon: A polygon
         @return <dict, dict>: The dictionaries of all triangles contained in polygon, and of tuples (base triangle, intersection) for boundary triangles
         """
+        bounds = polygon.bounds()
+        potential_elements = list(self.index.intersection(bounds, objects='raw'))
         weight = np.zeros((self.nb_points,), dtype=np.float64)
         triangles = {}
         triangle_polygon_net_intersection = {}
         triangle_polygon_intersection = {}
-        for i, j, k in self.triangles:
+        for i, j, k in potential_elements:
             t = self.triangles[i, j, k]
             if polygon.contains(t):
                 area = t.area
@@ -275,9 +281,9 @@ class VolumeCalculator:
                 volume = self.volume_in_frame_in_polygon(weight, values, self.polygons[j])
                 if self.volume_type == VolumeCalculator.POSITIVE:
                     for v in volume:
-                        i_result.append(str(v))
+                        i_result.append('%.6f' % v)
                 else:
-                    i_result.append(str(volume))
+                    i_result.append('%.6f' % volume)
             result.append(i_result)
         return result
 

@@ -313,10 +313,10 @@ class InputTab(QWidget):
         hlayout.addItem(QSpacerItem(50, 1))
         hlayout.addWidget(self.btnOpenRef)
         hlayout.addWidget(self.btnOpenTest)
-        hlayout.addWidget(self.btnOpenPolygon)
         hlayout.addItem(QSpacerItem(30, 1))
         hlayout.addWidget(self.langBox)
         hlayout.addItem(QSpacerItem(30, 1))
+        hlayout.addWidget(self.btnOpenPolygon)
         hlayout.addWidget(self.locatePolygons)
         hlayout.setSpacing(10)
         mainLayout.addLayout(hlayout)
@@ -810,6 +810,7 @@ class ErrorDistributionTab(QWidget):
 
         self.xlim = xmin, xmax
         self.updateHistogram()
+        self.has_map = False
 
     def changeYlimits(self):
         value, ok = QInputDialog.getText(self, 'Change Y limits',
