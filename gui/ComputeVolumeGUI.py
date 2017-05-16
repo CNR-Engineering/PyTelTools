@@ -651,7 +651,7 @@ class InputTab(QWidget):
         """
         if os.path.exists(filename):
             msg = QMessageBox.warning(self, 'Confirm overwrite',
-                                      'The file already exists. Do you want to replace it ?',
+                                      'The file already exists. Do you want to replace it?',
                                       QMessageBox.Ok | QMessageBox.Cancel,
                                       QMessageBox.Ok)
             if msg == QMessageBox.Cancel:
@@ -793,10 +793,6 @@ class InputTab(QWidget):
         self.csvNameBox.setText(filename)
         logging.info('Writing the output to %s' % filename)
 
-        # disable close button
-        self.setWindowFlags(self.windowFlags() & ~Qt.WindowCloseButtonHint)
-        self.show()
-
         # initialize the progress bar
         progressBar = OutputProgressDialog()
 
@@ -840,8 +836,9 @@ class InputTab(QWidget):
 
 
 class ComputeVolumeGUI(QWidget):
-    def __init__(self):
+    def __init__(self, parent=None):
         super().__init__()
+        self.parent = parent
         
         self.input = InputTab(self)
         self.imageTab = VolumePlotViewer(self.input)

@@ -910,8 +910,9 @@ class ErrorDistributionTab(QWidget):
 
 
 class CompareResultsGUI(QWidget):
-    def __init__(self):
+    def __init__(self, parent=None):
         super().__init__()
+        self.parent = parent
 
         self.setMinimumWidth(800)
         self.setWindowFlags(self.windowFlags() | Qt.CustomizeWindowHint)

@@ -1,6 +1,7 @@
 import sys
 
 from PyQt5.QtWidgets import *
+from PyQt5.QtCore import *
 
 from gui.ExtractVariablesGUI import ExtractVariablesGUI
 from gui.ComputeVolumeGUI import ComputeVolumeGUI
@@ -11,13 +12,13 @@ class MyMainWindow(QWidget):
     def __init__(self):
         super().__init__()
 
-        slf = ExtractVariablesGUI()
-        volume = ComputeVolumeGUI()
-        compare = CompareResultsGUI()
+        extract = ExtractVariablesGUI(self)
+        volume = ComputeVolumeGUI(self)
+        compare = CompareResultsGUI(self)
 
         stackLayout = QStackedLayout()
         stackLayout.addWidget(QLabel('Hello! This is the start page (TODO)'))
-        stackLayout.addWidget(slf)
+        stackLayout.addWidget(extract)
         stackLayout.addWidget(volume)
         stackLayout.addWidget(compare)
 
@@ -41,9 +42,20 @@ class MyMainWindow(QWidget):
         self.setLayout(mainLayout)
         self.setWindowTitle('Main window')
         self.resize(300, 300)
+        self.setWindowFlags(self.windowFlags() | Qt.CustomizeWindowHint)
 
         self.frameGeom = self.frameGeometry()
         self.move(self.frameGeom.center())
+        self.show()
+
+    def inDialog(self):
+        self.setWindowFlags(self.windowFlags() & ~Qt.WindowCloseButtonHint)
+        self.setEnabled(False)
+        self.show()
+
+    def outDialog(self):
+        self.setWindowFlags(self.windowFlags() | Qt.WindowCloseButtonHint)
+        self.setEnabled(True)
         self.show()
 
 

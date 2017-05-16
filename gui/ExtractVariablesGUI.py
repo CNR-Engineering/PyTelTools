@@ -378,6 +378,7 @@ class SelectedTimeINFO(QWidget):
     """
     def __init__(self):
         super().__init__()
+        self.visited = False  # avoid redundant text display at initialization
 
         self.startIndex = QLineEdit('', self)
         self.endIndex = QLineEdit('', self)
@@ -429,8 +430,148 @@ class SelectedTimeINFO(QWidget):
         self.endDate.setText(str(end_date))
 
     def clearText(self):
-        for w in [self.startIndex, self.endIndex, self.startValue, self.endValue, self.startDate, self.endDate]:
+        for w in [self.startIndex, self.endIndex, self.startValue, self.endValue]:
             w.clear()
+        for w in [self.startDate, self.endDate]:
+            self.visited = False
+            w.clear()
+        self.visited = False
+        self.timeSamplig.setText('1')
+
+
+class TimeTable(TableWidgetDragRows):
+    def __init__(self):
+        super().__init__()
+
+    def dropEvent(self, event):
+        super().dropEvent(event)
+        # sort the table
+        self.sortItems(2, Qt.AscendingOrder)
+
+
+class ManualTimeSelection(QWidget):
+    def __init__(self, input, timeSelection):
+        super().__init__()
+        self.input = input
+        self.timeSelection = timeSelection
+
+        self._initWidgets()
+        self._setLayout()
+        self._bindEvents()
+
+        self.time_frames = None
+        self.hasData = False
+
+        self.setMinimumWidth(750)
+        self.setMinimumHeight(600)
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.setWindowFlags(self.windowFlags() | Qt.CustomizeWindowHint |
+                            Qt.WindowMaximizeButtonHint)
+        self.setWindowFlags(self.windowFlags() & ~ Qt.WindowCloseButtonHint)
+        self.setWindowTitle('Select manually the time frames in the output file')
+
+    def _initWidgets(self):
+        # create the default button (regular sampling)
+        self.btnDefault = QPushButton('Default')
+        self.btnDefault.setToolTip('Regular sampling with the chosen frequency')
+        self.btnDefault.setFixedSize(100, 40)
+
+        # create the clear button
+        self.btnClear = QPushButton('Clear')
+        self.btnClear.setToolTip('Clear selection')
+        self.btnClear.setFixedSize(100, 40)
+
+        # create the OK button
+        self.btnOK = QPushButton('OK', icon=self.style().standardIcon(QStyle.SP_DialogApplyButton))
+        self.btnOK.setFixedSize(100, 40)
+
+        # create two 3-column tables for variables selection
+        self.firstTable = TimeTable()
+        self.secondTable = TimeTable()
+        for tw in [self.firstTable, self.secondTable]:
+            tw.setColumnCount(3)
+            tw.setHorizontalHeaderLabels(['Index', 'Value', 'Date'])
+            vh = tw.verticalHeader()
+            vh.setSectionResizeMode(QHeaderView.Fixed)
+            vh.setDefaultSectionSize(20)
+            hh = tw.horizontalHeader()
+            hh.setDefaultSectionSize(110)
+            tw.setEditTriggers(QAbstractItemView.NoEditTriggers)
+            tw.setMaximumHeight(800)
+
+    def _setLayout(self):
+        mainLayout = QVBoxLayout()
+        mainLayout.addItem(QSpacerItem(30, 15))
+
+        hlayout = QHBoxLayout()
+        hlayout.addItem(QSpacerItem(30, 10))
+        hlayout.addWidget(self.btnDefault)
+        hlayout.addWidget(self.btnClear)
+        hlayout.setSpacing(10)
+        hlayout.setAlignment(Qt.AlignLeft)
+        mainLayout.addLayout(hlayout)
+        mainLayout.addItem(QSpacerItem(10, 15))
+
+        glayout = QGridLayout()
+        glayout.addWidget(QLabel('Available frames'), 1, 1, Qt.AlignHCenter)
+        glayout.addWidget(self.firstTable, 2, 1)
+        glayout.addWidget(QLabel('Selected frames'), 1, 2, Qt.AlignHCenter)
+        glayout.addWidget(self.secondTable, 2, 2)
+        glayout.setSpacing(5)
+        mainLayout.addLayout(glayout)
+        mainLayout.addItem(QSpacerItem(10, 15))
+
+        mainLayout.addWidget(self.btnOK)
+        mainLayout.setAlignment(self.btnOK, Qt.AlignRight)
+        mainLayout.addItem(QSpacerItem(10, 15))
+        self.setLayout(mainLayout)
+
+    def _bindEvents(self):
+        self.btnDefault.clicked.connect(self.defaultSelection)
+        self.btnClear.clicked.connect(self._clearTables)
+        self.btnOK.clicked.connect(self.timeSelection.quitManualSelection)
+
+    def _clearTables(self):
+        self.firstTable.setRowCount(0)
+        self.secondTable.setRowCount(0)
+
+        for i, (value, date) in enumerate(zip(self.input.time, self.time_frames)):
+            self.firstTable.insertRow(self.firstTable.rowCount())
+            index_item = QTableWidgetItem(str(i+1))
+            value_item = QTableWidgetItem(str(value))
+            date_item = QTableWidgetItem(str(date))
+            self.firstTable.setItem(i, 0, index_item)
+            self.firstTable.setItem(i, 1, value_item)
+            self.firstTable.setItem(i, 2, date_item)
+
+    def getData(self):
+        if self.time_frames is None:
+            self.time_frames = list(map(lambda x: self.timeSelection.start_time + datetime.timedelta(seconds=x),
+                                        self.input.time))
+        self.defaultSelection()
+        self.hasData = True
+
+    def defaultSelection(self):
+        _, _, _, time_indices = self.timeSelection.getTime()
+        self.firstTable.setRowCount(0)
+        self.secondTable.setRowCount(0)
+
+        for i, (value, date) in enumerate(zip(self.input.time, self.time_frames)):
+            index_item = QTableWidgetItem(str(i+1))
+            value_item = QTableWidgetItem(str(value))
+            date_item = QTableWidgetItem(str(date))
+            if i in time_indices:
+                row = self.secondTable.rowCount()
+                self.secondTable.insertRow(row)
+                self.secondTable.setItem(row, 0, index_item)
+                self.secondTable.setItem(row, 1, value_item)
+                self.secondTable.setItem(row, 2, date_item)
+            else:
+                row = self.firstTable.rowCount()
+                self.firstTable.insertRow(row)
+                self.firstTable.setItem(row, 0, index_item)
+                self.firstTable.setItem(row, 1, value_item)
+                self.firstTable.setItem(row, 2, date_item)
 
 
 class OutputProgressDialog(QProgressDialog):
@@ -514,8 +655,9 @@ class InputTab(QWidget):
             hh = tw.horizontalHeader()
             hh.setDefaultSectionSize(110)
             tw.setEditTriggers(QAbstractItemView.NoEditTriggers)
+            tw.setMaximumHeight(800)
 
-        self.secondTable.setFixedHeight(300)
+        self.secondTable.setMinimumHeight(400)
 
         # create a button for interpreting W from user-defined friction law
         self.btnAddUS = QPushButton('Add US from friction law', self)
@@ -535,7 +677,6 @@ class InputTab(QWidget):
         logging.getLogger().addHandler(self.logTextBox)
         logging.getLogger().setLevel(logging.INFO)
 
-
     def _bindEvents(self):
         """!
         @brief (Used in __init__) Bind events to widgets
@@ -549,6 +690,7 @@ class InputTab(QWidget):
         @brief: (Used in __init__) Set up layout
         """
         mainLayout = QVBoxLayout()
+        mainLayout.addItem(QSpacerItem(50, 20))
         hlayout = QHBoxLayout()
         hlayout.setAlignment(Qt.AlignLeft)
         hlayout.addItem(QSpacerItem(50, 1))
@@ -771,34 +913,63 @@ class InputTab(QWidget):
 
 
 class TimeTab(QWidget):
-    def __init__(self, input):
+    def __init__(self, parent, input):
         super().__init__()
+        self.parent = parent
         self.input = input
+        self.start_time = None
 
         # create a slider for time selection
         self.timeSlider = TimeRangeSlider()
         self.timeSlider.setFixedHeight(30)
         self.timeSlider.setMinimumWidth(600)
         self.timeSlider.setEnabled(False)
+        self.last_sampling_frequency = 1
 
         # create text boxes for displaying the time selection and sampling
         self.timeSelection = SelectedTimeINFO()
         self.timeSelection.startIndex.setEnabled(False)
         self.timeSelection.endIndex.setEnabled(False)
 
+        # create the tables for manual selection
+        self.manualSelection = ManualTimeSelection(self.input, self)
+
+        # create the button for manual selection
+        self.btnManual = QPushButton('Manual selection')
+        self.btnManual.setFixedSize(130, 50)
+        self.btnManual.setEnabled(False)
+
+        # create a text field for selection display
+        self.selectionTextBox = QPlainTextEdit()
+
         # bind events
         self.timeSelection.startIndex.returnPressed.connect(self.timeSlider.enterIndexEvent)
         self.timeSelection.endIndex.returnPressed.connect(self.timeSlider.enterIndexEvent)
 
+        self.btnManual.clicked.connect(self.btnManualEvent)
+        self.timeSelection.startDate.textChanged.connect(self.regularSelectionEvent)
+        self.timeSelection.endDate.textChanged.connect(self.regularSelectionEvent)
+        self.timeSelection.timeSamplig.returnPressed.connect(self.regularSelectionEvent)
+
         # set layout
         mainLayout = QVBoxLayout()
+        mainLayout.addItem(QSpacerItem(50, 20))
         mainLayout.addWidget(self.timeSlider)
         mainLayout.addItem(QSpacerItem(10, 5))
         mainLayout.addWidget(self.timeSelection)
+        mainLayout.addItem(QSpacerItem(50, 20))
+        hlayout = QHBoxLayout()
+        hlayout.addItem(QSpacerItem(20, 20))
+        hlayout.addWidget(self.btnManual)
+        hlayout.addWidget(self.selectionTextBox, Qt.AlignLeft)
+        hlayout.setSpacing(15)
+        hlayout.setAlignment(self.btnManual, Qt.AlignTop)
+        mainLayout.addLayout(hlayout)
         mainLayout.setAlignment(Qt.AlignTop)
         self.setLayout(mainLayout)
 
         self.setMinimumWidth(800)
+        self.setWindowFlags(self.windowFlags() | Qt.CustomizeWindowHint)
 
     def getTime(self):
         start_index = int(self.timeSelection.startIndex.text())
@@ -808,35 +979,97 @@ class TimeTab(QWidget):
         except ValueError:
             QMessageBox.critical(self, 'Error', 'The sampling frequency must be a number!',
                                  QMessageBox.Ok)
+            self.timeSelection.timeSamplig.setText(str(self.last_sampling_frequency))
             return []
         if sampling_frequency < 1 or sampling_frequency > end_index:
             QMessageBox.critical(self, 'Error', 'The sampling frequency must be in the range [1; nbFrames]!',
                                  QMessageBox.Ok)
+            self.timeSelection.timeSamplig.setText(str(self.last_sampling_frequency))
             return []
+        self.last_sampling_frequency = sampling_frequency
         return start_index, end_index, sampling_frequency, list(range(start_index-1, end_index, sampling_frequency))
+
+    def getManualTime(self):
+        selected_indices = []
+        for i in range(self.manualSelection.secondTable.rowCount()):
+            selected_indices.append(int(self.manualSelection.secondTable.item(i, 0).text())-1)
+        return selected_indices
 
     def reset(self):
         self.timeSlider.setEnabled(False)
-        self.timeSelection.clearText()
         self.timeSelection.startIndex.setEnabled(False)
         self.timeSelection.endIndex.setEnabled(False)
-        self.timeSelection.timeSamplig.setText('1')
+        self.btnManual.setEnabled(False)
+        self.manualSelection.hasData = False
+        self.manualSelection.time_frames = None
+        self.timeSelection.visited = False
+        self.selectionTextBox.clear()
+        self.selectionTextBox.appendPlainText('=== Manual selection mode OFF ===')
 
     def getInput(self):
-        # unlock the time slider
         if self.input.header.date is not None:
             year, month, day, hour, minute, second = self.input.header.date
-            start_time = datetime.datetime(year, month, day, hour, minute, second)
+            self.start_time = datetime.datetime(year, month, day, hour, minute, second)
         else:
-            start_time = datetime.datetime(1900, 1, 1, 0, 0, 0)
+            self.start_time = datetime.datetime(1900, 1, 1, 0, 0, 0)
 
         time_frames = list(map(lambda x: datetime.timedelta(seconds=x), self.input.time))
-        self.timeSlider.reinit(start_time, time_frames, self.timeSelection)
+        self.timeSelection.clearText()
+        self.timeSlider.reinit(self.start_time, time_frames, self.timeSelection)
+
         if self.input.header.nb_frames > 1:
             self.timeSlider.setEnabled(True)
             self.timeSelection.startIndex.setEnabled(True)
             self.timeSelection.endIndex.setEnabled(True)
+            self.btnManual.setEnabled(True)
 
+    def regularSelectionEvent(self):
+        if not self.timeSelection.visited:   # avoid redundant text display at initialization
+            self.timeSelection.visited = True
+            return
+        selection = self.getTime()
+        if not selection:
+            return
+        start_index, end_index, sampling_frequency, indices = selection
+        message = 'Current selection: %d frame%s between frame %d and %d with sampling frequency %d.' \
+                  % (len(indices), ['', 's'][len(indices) > 1], start_index, end_index, sampling_frequency)
+
+        if self.manualSelection.hasData:
+            reply = QMessageBox.warning(self, 'Confirm turn off selection',
+                                        'Do you want to turn off the manuel selection mode?\n(Your manual selection will be cleared)',
+                                        QMessageBox.Ok | QMessageBox.Cancel,
+                                        QMessageBox.Ok)
+            if reply == QMessageBox.Cancel:
+                return
+            self.manualSelection.hasData = False
+            self.selectionTextBox.appendPlainText('== Manual selection mode OFF ==')
+        self.selectionTextBox.appendPlainText(message)
+
+    def btnManualEvent(self):
+        if not self.manualSelection.hasData:
+            reply = QMessageBox.warning(self, 'Confirm manuel selection',
+                                        'Do you want to enter the manuel selection mode?',
+                                        QMessageBox.Ok | QMessageBox.Cancel,
+                                        QMessageBox.Ok)
+            if reply == QMessageBox.Cancel:
+                return
+            self.manualSelection.getData()
+            self.selectionTextBox.appendPlainText('=== Manual selection mode ON ===')
+        self.parent.inDialog()
+        self.manualSelection.show()
+
+    def quitManualSelection(self):
+        selected = self.getManualTime()
+        if not selected:
+            _ = QMessageBox.critical(self, 'Error',
+                                     'Please select at least one frame',
+                                     QMessageBox.Ok, QMessageBox.Ok)
+            return
+        self.parent.outDialog()
+        self.manualSelection.hide()
+        self.selectionTextBox.appendPlainText('Current selection: %d frame%s between frame %d and %d.'
+                                              % (len(selected), ['', 's'][len(selected) > 1],
+                                                 selected[0]+1, selected[-1]+1))
 
 class SubmitTab(QWidget):
     def __init__(self, input, timeSelection):
@@ -865,6 +1098,7 @@ class SubmitTab(QWidget):
 
         # set layout
         mainLayout = QVBoxLayout()
+        mainLayout.addItem(QSpacerItem(50, 20))
         hlayout = QHBoxLayout()
         hlayout.addItem(QSpacerItem(50, 10))
         hlayout.addWidget(self.btnSubmit)
@@ -873,7 +1107,7 @@ class SubmitTab(QWidget):
         hlayout.addItem(QSpacerItem(50, 10))
         mainLayout.addLayout(hlayout)
         mainLayout.addItem(QSpacerItem(30, 15))
-        mainLayout.addWidget(QLabel('        Message logs'))
+        mainLayout.addWidget(QLabel('   Message logs'))
         mainLayout.addWidget(self.logTextBox.widget)
         self.setLayout(mainLayout)
 
@@ -883,7 +1117,7 @@ class SubmitTab(QWidget):
         """
         if os.path.exists(filename):
             msg = QMessageBox.warning(self, 'Confirm overwrite',
-                                      'The file already exists. Do you want to replace it ?',
+                                      'The file already exists. Do you want to replace it?',
                                       QMessageBox.Ok | QMessageBox.Cancel,
                                       QMessageBox.Ok)
             if msg == QMessageBox.Cancel:
@@ -918,15 +1152,28 @@ class SubmitTab(QWidget):
         self.btnSubmit.setEnabled(True)
 
     def btnSubmitEvent(self):
-        start_index, end_index, sampling_frequency, output_time_indices = self.timeSelection.getTime()
-        if not output_time_indices:
-            return
-
+        # fetch the list of selected variables
         selected_vars = self.input.getSelectedVariables()
         if not selected_vars:
             QMessageBox.critical(self, 'Error', 'Choose at least one output variable before submit!',
                                  QMessageBox.Ok)
             return
+
+        # deduce header from selected variable IDs and write header
+        output_header = self.getOutputHeader(selected_vars)
+
+        # fetch the list of selected frames
+        if self.timeSelection.manualSelection.hasData:
+            output_time_indices = self.timeSelection.getManualTime()
+            output_message = 'Writing the output with variables %s for %d frame%s between frame %d and %d.' \
+                              % (str(output_header.var_IDs), len(output_time_indices), ['', 's'][len(output_time_indices) > 1],
+                                 output_time_indices[0]+1, output_time_indices[-1]+1)
+        else:
+            start_index, end_index, sampling_frequency, output_time_indices = self.timeSelection.getTime()
+            output_message = 'Writing the output with variables %s between frame %d and %d with sampling frequency %d.' \
+                              % (str(output_header.var_IDs), start_index, end_index, sampling_frequency)
+        assert output_time_indices
+
 
         # create the save file dialog
         options = QFileDialog.Options()
@@ -967,10 +1214,7 @@ class SubmitTab(QWidget):
             QApplication.processEvents()
 
             with Serafin.Write(filename, self.input.language, overwrite) as resout:
-                # deduce header from selected variable IDs and write header
-                output_header = self.getOutputHeader(selected_vars)
-                logging.info('Writing the output with variables %s\nbetween frame %d and %d with frequency %d.'
-                             % (str(output_header.var_IDs), start_index, end_index, sampling_frequency))
+                logging.info(output_message)
 
                 resout.write_header(output_header)
 
@@ -995,11 +1239,12 @@ class SubmitTab(QWidget):
 
 
 class ExtractVariablesGUI(QWidget):
-    def __init__(self):
+    def __init__(self, parent=None):
         super().__init__()
+        self.parent = parent
 
         self.input = InputTab(self)
-        self.timeTab = TimeTab(self.input)
+        self.timeTab = TimeTab(self, self.input)
         self.submitTab = SubmitTab(self.input, self.timeTab)
 
         self.tab = QTabWidget()
@@ -1015,6 +1260,23 @@ class ExtractVariablesGUI(QWidget):
         mainLayout = QVBoxLayout()
         mainLayout.addWidget(self.tab)
         self.setLayout(mainLayout)
+        self.setWindowFlags(self.windowFlags() | Qt.CustomizeWindowHint)
+
+    def inDialog(self):
+        if self.parent is not None:
+            self.parent.inDialog()
+        else:
+            self.setWindowFlags(self.windowFlags() & ~Qt.WindowCloseButtonHint)
+            self.setEnabled(False)
+            self.show()
+
+    def outDialog(self):
+        if self.parent is not None:
+            self.parent.outDialog()
+        else:
+            self.setWindowFlags(self.windowFlags() | Qt.WindowCloseButtonHint)
+            self.setEnabled(True)
+            self.show()
 
     def reset(self):
         for i, tab in enumerate([self.timeTab, self.submitTab]):
