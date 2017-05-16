@@ -981,7 +981,6 @@ class BSSTab(QWidget):
         self.resultTextBox.appendPlainText(self.template.format(ref_time+1, test_time+1, init_time+1, bss))
 
 
-
 class CompareResultsGUI(QWidget):
     def __init__(self, parent=None):
         super().__init__()
@@ -1006,7 +1005,7 @@ class CompareResultsGUI(QWidget):
         self.tab.addTab(errorDistributionTab, 'EWSD distribution')
         self.tab.addTab(bssTab, 'BSS')
 
-        for i in range(1, 4):
+        for i in range(1, 5):
             self.tab.setTabEnabled(i, False)
         self.tab.currentChanged.connect(self.switch_tab)
 

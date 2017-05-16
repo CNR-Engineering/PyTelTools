@@ -28,8 +28,8 @@ class MyMainWindow(QWidget):
             pageList.addItem('\n' + name + '\n')
         pageList.setFlow(QListView.TopToBottom)
         pageList.currentRowChanged.connect(stackLayout.setCurrentIndex)
+        pageList.currentRowChanged.connect(lambda x: self.resize(self.sizeHint()))
         pageList.setCurrentRow(0)
-
 
         vline = QFrame()
         vline.setFrameShape(QFrame.VLine)
@@ -43,7 +43,6 @@ class MyMainWindow(QWidget):
         self.setWindowTitle('Main window')
         self.resize(300, 300)
         self.setWindowFlags(self.windowFlags() | Qt.CustomizeWindowHint)
-
         self.frameGeom = self.frameGeometry()
         self.move(self.frameGeom.center())
         self.show()
