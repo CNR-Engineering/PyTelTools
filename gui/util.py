@@ -14,6 +14,7 @@ from matplotlib.figure import Figure
 from matplotlib.collections import PatchCollection
 from descartes import PolygonPatch
 from matplotlib import cm
+import matplotlib.tri as tri
 from matplotlib.colors import Normalize, colorConverter
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
@@ -108,9 +109,7 @@ class PlotCanvas(FigureCanvas):
 
 
 class MapCanvas(FigureCanvas):
-    def __init__(self, width=10, height=10, dpi=60):
-        self.BLUE = '#6699cc'
-        self.PINK = '#fcabbd'
+    def __init__(self, width=10, height=10, dpi=100):
         self.BLACK = '#14123a'
 
         self.fig = Figure(figsize=(width, height), dpi=dpi)
@@ -124,15 +123,9 @@ class MapCanvas(FigureCanvas):
                                    QSizePolicy.Expanding)
         FigureCanvas.updateGeometry(self)
 
-    def initFigure(self, triangles, locations):
+    def initFigure(self, mesh):
         self.axes.clear()
-        patches = [PolygonPatch(t.buffer(0), fc=self.BLUE, ec=self.BLUE, alpha=0.5, zorder=1)
-                   for t in triangles]
-        self.axes.add_collection(PatchCollection(patches, match_original=True))
-        minx, maxx, miny, maxy = locations
-        w, h = maxx - minx, maxy - miny
-        self.axes.set_xlim(minx - 0.05 * w, maxx + 0.05 * w)
-        self.axes.set_ylim(miny - 0.05 * h, maxy + 0.05 * h)
+        self.axes.triplot(mesh.x, mesh.y, mesh.ikle, '--', color=self.BLACK, lw=0.3)
         self.axes.set_aspect('equal', adjustable='box')
         self.draw()
 
@@ -140,10 +133,11 @@ class MapCanvas(FigureCanvas):
 class PolygonMapCanvas(MapCanvas):
     def __init__(self):
         super().__init__()
+        self.PINK = '#fcabbd'
 
-    def reinitFigure(self, triangles, locations, polygons, polynames):
+    def reinitFigure(self, mesh, polygons, polynames):
         # draw the mesh
-        self.initFigure(triangles, locations)
+        self.initFigure(mesh)
 
         # add the polygons to the map
         patches = []
@@ -162,51 +156,58 @@ class PolygonMapCanvas(MapCanvas):
 
 class ColorMapCanvas(MapCanvas):
     def __init__(self):
-        super().__init__(12, 12, 100)
+        super().__init__(12, 12, 110)
         self.TRANSPARENT = colorConverter.to_rgba('black', alpha=0.01)
 
-    def reinitFigure(self, triangles, locations, values, limits=None, polygon=None):
+    def reinitFigure(self, mesh, values, limits=None, polygon=None):
         self.fig.clear()   # remove the old color bar
         self.axes = self.fig.add_subplot(111)
 
         if limits is None:
             maxval = max(np.abs(list(values.values())))
-            cmap = cm.ScalarMappable(norm=Normalize(-maxval, maxval), cmap='coolwarm')
-            cmap.set_array(np.linspace(-maxval, maxval, 1000))
+            xmin, xmax = -maxval, maxval
         else:
             xmin, xmax = limits
-            cmap = cm.ScalarMappable(norm=Normalize(xmin, xmax), cmap='coolwarm')
-            cmap.set_array(np.linspace(xmin, xmax, 1000))
 
-        if polygon is None:
-            minx, maxx, miny, maxy = locations
-        else:
+        self.axes.set_aspect('equal', adjustable='box')
+        self.axes.triplot(mesh.x, mesh.y, mesh.ikle, '--', color=self.BLACK, lw=0.3)
+
+        if polygon is not None:
+            # show only the zone in the polygon
             coords = list(polygon.coords())[:-1]
             x, y = list(zip(*coords))
             minx, maxx, miny, maxy = min(x), max(x), min(y), max(y)
-        w, h = maxx - minx, maxy - miny
+            w, h = maxx - minx, maxy - miny
+            self.axes.set_xlim(minx - 0.05 * w, maxx + 0.05 * w)
+            self.axes.set_ylim(miny - 0.05 * h, maxy + 0.05 * h)
 
-        patches = []
-        for i, j, k in values:   # add the triangles for which the distribution is defined
-            t = triangles[i, j, k]
-            color = cmap.to_rgba(values[i, j, k])
-            patches.append(PolygonPatch(t.buffer(0), fc=color, ec=self.TRANSPARENT, linestyle='dotted', zorder=1))
+            # the color value for each triangles inside the polygon
+            colors = []
+            for i, j, k in mesh.triangles:
+                if (i, j, k) in values:
+                    colors.append(values[i, j, k])
+                else:
+                    colors.append(0)
+            colors = np.array(colors)
+        else:
+            colors = np.array([values[i, j, k] for i, j, k in mesh.triangles])
 
-        if polygon is not None:   # add the contour of the triangle
-            patches.append(PolygonPatch(polygon.polyline().buffer(0), fc=self.TRANSPARENT, ec='black', zorder=1))
+        self.axes.tripcolor(mesh.x, mesh.y, mesh.ikle, facecolors=colors,
+                            cmap='coolwarm', vmin=xmin, vmax=xmax,
+                            norm=Normalize(xmin, xmax))
 
-        self.axes.add_collection(PatchCollection(patches, match_original=True))
+        if polygon is not None:  # add the contour of the polygon
+            patches = [PolygonPatch(polygon.polyline().buffer(0), fc=self.TRANSPARENT, ec='black', zorder=1)]
+            self.axes.add_collection(PatchCollection(patches, match_original=True))
 
-        self.axes.set_xlim(minx - 0.05 * w, maxx + 0.05 * w)
-        self.axes.set_ylim(miny - 0.05 * h, maxy + 0.05 * h)
-        self.axes.set_aspect('equal', adjustable='box')
-
+        # add colorbar
         divider = make_axes_locatable(self.axes)
         cax = divider.append_axes('right', size='5%', pad=0.2)
-
+        cmap = cm.ScalarMappable(cmap='coolwarm', norm=Normalize(xmin, xmax))
+        cmap.set_array(np.linspace(xmin, xmax, 1000))
         self.fig.colorbar(cmap, cax=cax)
-        self.draw()
 
+        self.draw()
 
 
 class MapViewer(QWidget):

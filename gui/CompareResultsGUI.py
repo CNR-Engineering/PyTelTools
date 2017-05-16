@@ -217,7 +217,6 @@ class InputTab(QWidget):
         self.test_time = []
         self.polygons = []
         self.selected_polygon = None
-        self.locations = None
         self.ref_mesh = None
         self.polygon_added = False   # is the intersection between the mesh and the selected polygon calculated?
 
@@ -361,7 +360,6 @@ class InputTab(QWidget):
         self.refNameBox.setText(filename)
         self.refSummaryTextBox.clear()
         self.ref_header = None
-        self.locations = None
         self.polygon_added = False
         self.selected_polygon = None
         self.polygons = []
@@ -394,13 +392,8 @@ class InputTab(QWidget):
 
     def locatePolygonsEvent(self):
         if not self.has_map:
-            reply = QMessageBox.question(self, 'Locate polygons on map',
-                                         'This may take up to one minute. Are you sure to proceed?',
-                                         QMessageBox.Yes | QMessageBox.No)
-            if reply == QMessageBox.No:
-                return
-            self.map.canvas.reinitFigure(list(self.ref_mesh.triangles.values()), self.locations,
-                                         self.polygons, ['Polygon %d' % (i+1) for i in range(len(self.polygons))])
+            self.map.canvas.reinitFigure(self.ref_mesh, self.polygons,
+                                         ['Polygon %d' % (i+1) for i in range(len(self.polygons))])
             self.has_map = True
         self.locatePolygons.setEnabled(False)
         self.map.show()
@@ -440,9 +433,6 @@ class InputTab(QWidget):
 
             # update the file summary
             self.refSummaryTextBox.appendPlainText(resin.get_summary())
-
-            # record the mesh locations for future visualization
-            self.locations = (min(resin.header.x), max(resin.header.x), min(resin.header.y), max(resin.header.y))
 
             # copy to avoid reading the same data in the future
             self.ref_header = copy.deepcopy(resin.header)
@@ -898,13 +888,13 @@ class ErrorDistributionTab(QWidget):
     def btnColorMapEvent(self):
         if not self.has_map:
             reply = QMessageBox.question(self, 'Show distribution in 2D',
-                                         'This may take up to two minutes. Are you sure to proceed?',
+                                         'This may take up to one minute. Are you sure to proceed?',
                                          QMessageBox.Yes | QMessageBox.No)
             if reply == QMessageBox.No:
                 return
 
-            self.map.canvas.reinitFigure(self.input.ref_mesh.triangles, self.input.locations,
-                                         self.ewsd, self.xlim, self.input.ref_mesh.polygon)
+            self.map.canvas.reinitFigure(self.input.ref_mesh, self.ewsd,
+                                         self.xlim, self.input.ref_mesh.polygon)
             self.has_map = True
         self.btnColorMap.setEnabled(False)
         self.map.show()

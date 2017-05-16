@@ -18,12 +18,12 @@ class VolumeCalculatorGUI(QThread):
     tick = pyqtSignal(int, name='changed')
 
     def __init__(self, volume_type, var_ID, second_var_ID, input_stream, polynames, polygons,
-                 time_sampling_frequency, triangles):
+                 time_sampling_frequency, mesh):
         super().__init__()
 
         self.calculator = VolumeCalculator(volume_type, var_ID, second_var_ID, input_stream, polynames, polygons,
                                            time_sampling_frequency)
-        self.base_triangles = triangles
+        self.base_triangles = mesh
 
     def run_calculator(self):
         self.tick.emit(6)
@@ -302,7 +302,6 @@ class VolumePlotViewer(PlotViewer):
         self.map.scrollArea.setWidget(self.map.canvas)
         self.map.resize(800, 700)
 
-
         self.defaultColors = ['b', 'r', 'g', 'y', 'k', 'c', '#F28AD6', 'm']
         name = ['Blue', 'Red', 'Green', 'Yellow', 'Black', 'Cyan', 'Pink', 'Magenta']
         self.colorToName = {c: n for c, n in zip(self.defaultColors, name)}
@@ -319,7 +318,6 @@ class VolumePlotViewer(PlotViewer):
         self.str_datetime_bis = []
         self.var_ID = None
         self.second_var_ID = None
-        self.triangles = None
         self.has_map = False
 
         # initialize graphical parameters
@@ -419,7 +417,6 @@ class VolumePlotViewer(PlotViewer):
         self.column_colors = {x: None for x in columns}
         for i in range(min(len(columns), len(self.defaultColors))):
             self.column_colors[columns[i]] = self.defaultColors[i]
-        self.triangles = list(self.input.triangles.triangles.values())
 
         # initialize the plot
         self.time = [self.data['time'], self.data['time'], self.data['time'],
@@ -431,14 +428,7 @@ class VolumePlotViewer(PlotViewer):
 
     def locatePolygonsEvent(self):
         if not self.has_map:
-            reply = QMessageBox.question(self, 'Locate polygons on map',
-                                         'This may take up to one minute. Are you sure to proceed?\n'
-                                         '(You can still modify the volume plot with the map open)',
-                                         QMessageBox.Yes | QMessageBox.No)
-            if reply == QMessageBox.No:
-                return
-
-            self.map.canvas.reinitFigure(self.triangles, self.input.locations, self.input.polygons,
+            self.map.canvas.reinitFigure(self.input.mesh, self.input.polygons,
                                          map(self.column_labels.get, ['Polygon %d' % (i+1)
                                                                       for i in range(len(self.input.polygons))]))
             self.has_map = True
@@ -515,7 +505,7 @@ class InputTab(QWidget):
         self.header = None
         self.language = 'fr'
         self.time = []
-        self.triangles = None
+        self.mesh = None
         self.locations = tuple([])
         self.polygons = []
         self.var_ID = None
@@ -666,7 +656,7 @@ class InputTab(QWidget):
         self.csvNameBox.clear()
         self.header = None
         self.time = []
-        self.triangles = None
+        self.mesh = None
         self.locations = tuple([])
         self.firstVarBox.clear()
         self.secondVarBox.clear()
@@ -704,9 +694,8 @@ class InputTab(QWidget):
             # update the file summary
             self.summaryTextBox.appendPlainText(resin.get_summary())
 
-            # record the triangles for future visualization
-            self.locations = (min(resin.header.x), max(resin.header.x), min(resin.header.y), max(resin.header.y))
-            self.triangles = TruncatedTriangularPrisms(resin.header)
+            # record the mesh for future visualization and calculations
+            self.mesh = TruncatedTriangularPrisms(resin.header)
 
             # copy to avoid reading the same data in the future
             self.header = copy.deepcopy(resin.header)
@@ -813,10 +802,10 @@ class InputTab(QWidget):
             resin.time = self.time
             if self.supVolumeBox.isChecked():
                 calculator = VolumeCalculatorGUI(VolumeCalculator.POSITIVE, self.var_ID, self.second_var_ID,
-                                                 resin, names, self.polygons, sampling_frequency, self.triangles)
+                                                 resin, names, self.polygons, sampling_frequency, self.mesh)
             else:
                 calculator = VolumeCalculatorGUI(VolumeCalculator.NET, self.var_ID, self.second_var_ID,
-                                                 resin, names, self.polygons, sampling_frequency, self.triangles)
+                                                 resin, names, self.polygons, sampling_frequency, self.mesh)
 
             progressBar.setValue(5)
             QApplication.processEvents()
