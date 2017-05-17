@@ -15,6 +15,7 @@ from matplotlib.collections import PatchCollection
 from descartes import PolygonPatch
 from matplotlib import cm
 import matplotlib.tri as tri
+import matplotlib.lines as mlines
 from matplotlib.colors import Normalize, colorConverter
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
@@ -93,6 +94,224 @@ class TableWidgetDragRows(QTableWidget):
         return selectedRows
 
 
+class OutputProgressDialog(QProgressDialog):
+    def __init__(self, parent=None):
+        super().__init__('Output in progress', 'OK', 0, 100, parent)
+
+        self.cancelButton = QPushButton('OK')
+        self.setCancelButton(self.cancelButton)
+        self.cancelButton.setEnabled(False)
+
+        self.setAutoReset(False)
+        self.setAutoClose(False)
+
+        self.setWindowTitle('Writing the output...')
+        self.setWindowFlags(Qt.WindowTitleHint)
+        self.setFixedSize(300, 150)
+
+        self.open()
+        self.setValue(0)
+        QApplication.processEvents()
+
+    def connectToCalculator(self, thread):
+        thread.tick.connect(self.setValue)
+
+
+class PlotColumnsSelector(QDialog):
+    def __init__(self, columns, current_columns):
+        super().__init__()
+
+        self.list = QListWidget()
+        for name in columns:
+            item = QListWidgetItem(name)
+            item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
+            if name in current_columns:
+                item.setCheckState(Qt.Checked)
+            else:
+                item.setCheckState(Qt.Unchecked)
+            self.list.addItem(item)
+
+        self.selection = tuple([])
+
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel,
+                                   Qt.Horizontal, self)
+        buttons.accepted.connect(self.checkSelection)
+        buttons.rejected.connect(self.reject)
+        vlayout = QVBoxLayout()
+        vlayout.addWidget(QLabel('  Select up to 8 columns to plot'))
+        vlayout.addWidget(self.list)
+        vlayout.addWidget(buttons)
+        self.setLayout(vlayout)
+
+        self.setWindowTitle('Select columns to plot')
+        self.resize(self.sizeHint())
+        self.setMinimumWidth(300)
+
+    def getSelection(self):
+        selection = []
+        for row in range(self.list.count()):
+            item = self.list.item(row)
+            if item.checkState() == Qt.Checked:
+                selection.append(item.text())
+        return tuple(selection)
+
+    def checkSelection(self):
+        self.selection = self.getSelection()
+        if not self.selection:
+            QMessageBox.critical(self, 'Error', 'Select at least one column to plot.',
+                                 QMessageBox.Ok)
+            return
+        if len(self.selection) > 8:
+            QMessageBox.critical(self, 'Error', 'Select up to 8 columns.',
+                                 QMessageBox.Ok)
+            return
+        self.accept()
+
+
+class ColumnNameEditor(QDialog):
+    def __init__(self, column_labels, selected_columns):
+        super().__init__()
+
+        self.table = QTableWidget()
+        self.table .setColumnCount(2)
+        self.table .setHorizontalHeaderLabels(['Column', 'Label'])
+        row = 0
+        for column in selected_columns:
+            label = column_labels[column]
+            self.table.insertRow(row)
+            c = QTableWidgetItem(column)
+            l = QTableWidgetItem(label)
+            self.table.setItem(row, 0, c)
+            self.table.setItem(row, 1, l)
+            self.table.item(row, 0).setFlags(Qt.ItemIsEditable)
+            row += 1
+
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel,
+                                   Qt.Horizontal, self)
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        vlayout = QVBoxLayout()
+        vlayout.addWidget(QLabel('Click on the name to modify'))
+        vlayout.addWidget(self.table)
+        vlayout.addWidget(buttons)
+        self.setLayout(vlayout)
+
+        self.setWindowTitle('Change column labels')
+        self.resize(self.sizeHint())
+        self.setMinimumWidth(300)
+
+    def getLabels(self, old_labels):
+        for row in range(self.table.rowCount()):
+            column = self.table.item(row, 0).text()
+            label = self.table.item(row, 1).text()
+            old_labels[column] = label
+
+
+class ColorTable(QTableWidget):
+    def __init__(self):
+        super().__init__()
+        self.setColumnCount(2)
+        self.setHorizontalHeaderLabels(['Column', 'Color'])
+        self.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.setAcceptDrops(True)
+        self.setDragEnabled(True)
+        self.setDragDropOverwriteMode(False)
+        self.setSelectionBehavior(QAbstractItemView.SelectItems)
+        self.setSelectionMode(QAbstractItemView.SingleSelection)
+        self.last_drop_row = None
+
+    def dropMimeData(self, row, col, mimeData, action):
+        self.last_drop_row = row
+        return True
+
+    def getselectedRow(self):
+        for item in self.selectedItems():
+            return item.row()
+
+    def dropEvent(self, event):
+        sender = event.source()
+        super().dropEvent(event)
+        dropRow = self.last_drop_row
+        if dropRow > self.rowCount()-1:
+            return
+
+        if self != sender:
+            selectedRows = sender.getselectedRowsFast()
+            selectedRow = selectedRows[0]
+
+            item = sender.item(selectedRow, 0)
+            source = QTableWidgetItem(item)
+            self.setItem(dropRow, 1, source)
+        else:
+            selectedRow = self.getselectedRow()
+            source = self.item(selectedRow, 1).text()
+            self.item(selectedRow, 1).setText(self.item(dropRow, 1).text())
+            self.item(dropRow, 1).setText(source)
+        event.accept()
+
+
+class ColumnColorEditor(QDialog):
+    def __init__(self, parent):
+        super().__init__()
+
+        self.table = ColorTable()
+        self.table.setFixedHeight(300)
+        self.table.setMaximumWidth(300)
+        self.table.setMaximumWidth(500)
+        used_colors = []
+        row = 0
+        for column in parent.current_columns:
+            label = parent.column_labels[column]
+            color = parent.colorToName[parent.column_colors[column]]
+            used_colors.append(color)
+            self.table.insertRow(row)
+            lab = QTableWidgetItem(label)
+            col = QTableWidgetItem(color)
+            self.table.setItem(row, 0, lab)
+            self.table.setItem(row, 1, col)
+            row += 1
+        self.available_colors = TableWidgetDragRows()
+        self.available_colors.setSelectionMode(QAbstractItemView.SingleSelection)
+        self.available_colors.setColumnCount(1)
+        self.available_colors.setHorizontalHeaderLabels(['Available colors'])
+        self.available_colors.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.available_colors.setAcceptDrops(False)
+        self.available_colors.setFixedHeight(300)
+        self.available_colors.setMinimumWidth(150)
+        self.available_colors.setMaximumWidth(300)
+        self.available_colors.horizontalHeader().setDefaultSectionSize(150)
+        row = 0
+        for color in parent.defaultColors:
+            color_name = parent.colorToName[color]
+            self.available_colors.insertRow(row)
+            col = QTableWidgetItem(color_name)
+            self.available_colors.setItem(row, 0, col)
+            row += 1
+
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel,
+                                   Qt.Horizontal, self)
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        vlayout = QVBoxLayout()
+        vlayout.addWidget(QLabel('Drag and drop colors on the polygons'))
+        hlayout = QHBoxLayout()
+        hlayout.addWidget(self.available_colors)
+        hlayout.addWidget(self.table)
+        vlayout.addLayout(hlayout)
+        vlayout.addWidget(buttons)
+        self.setLayout(vlayout)
+
+        self.setFixedSize(500, 400)
+        self.setWindowTitle('Change column color')
+
+    def getColors(self, old_colors, column_labels, name_to_color):
+        label_to_column = {b: a for a, b, in column_labels.items()}
+        for row in range(self.table.rowCount()):
+            label = self.table.item(row, 0).text()
+            color = self.table.item(row, 1).text()
+            old_colors[label_to_column[label]] = name_to_color[color]
+
+
 class PlotCanvas(FigureCanvas):
     def __init__(self, parent):
         self.parent = parent
@@ -152,6 +371,32 @@ class PolygonMapCanvas(MapCanvas):
             self.axes.annotate(name, (cx, cy), color='k', weight='bold',
                                fontsize=8, ha='center', va='center')
         self.draw()
+
+
+class SectionMapCanvas(MapCanvas):
+    def __init__(self):
+        super().__init__()
+        self.PINK = '#fcabbd'
+
+    def reinitFigure(self, mesh, sections, section_names):
+        # draw the mesh
+        self.initFigure(mesh)
+
+        # add the polylines to the map
+        for p in sections:
+            x, y = p.polyline().xy
+            line = mlines.Line2D(x, y, lw=1)
+            self.axes.add_line(line)
+        #self.axes.add_collection(PatchCollection(patches, match_original=True))
+
+        # add polyline labels
+        for p, name in zip(sections, section_names):
+            center = p.polyline().centroid
+            cx, cy = center.x, center.y
+            self.axes.annotate(name, (cx, cy), color='k', weight='bold',
+                               fontsize=8, ha='center', va='center')
+        self.draw()
+
 
 
 class ColorMapCanvas(MapCanvas):

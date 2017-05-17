@@ -60,6 +60,32 @@ class TriangularVectorField(Mesh2D):
         return flux / 2
 
     @staticmethod
+    def line_double_integral(intersections, height_values, scalar_flux_values):
+        """!
+        @brief The line integral of a scalar field across a section (not really a flux)
+        """
+        flux = 0
+        for i, j, k in intersections:
+            h_vals = height_values[[i, j, k]]
+            f_vals = scalar_flux_values[[i, j, k]]
+
+            endpoints = intersections[i, j, k]
+            endpoints_h, endpoints_f = [], []
+
+            for normal, interpolator in endpoints:
+                endpoints_h.append(interpolator.dot(h_vals))
+                endpoints_f.append(interpolator.dot(f_vals))
+
+            for p in range(len(endpoints)-1):  # iterating through intersecting segments inside the triangle
+                first_h, second_h = endpoints_h[p], endpoints_h[p+1]
+                first_f, second_f = endpoints_f[p], endpoints_f[p+1]
+
+                flux += 2 * (first_f * first_h + second_f * second_h) \
+                          + (first_f * second_h + second_f * first_h)
+
+        return flux / 6
+
+    @staticmethod
     def line_flux(intersections, x_vector_values, y_vector_values):
         """!
         @brief The flux of a vector field across a line
@@ -156,7 +182,7 @@ class TriangularVectorField(Mesh2D):
 
 
 class FluxCalculator:
-    LINE_INTEGRAL, LINE_FLUX, AREA_FLUX, MASS_FLUX = 0, 1, 2, 3
+    LINE_INTEGRAL, DOUBLE_LINE_INTEGRAL, LINE_FLUX, AREA_FLUX, MASS_FLUX = 0, 1, 2, 3, 4
 
     def __init__(self, flux_type, var_IDs, input_stream, section_names, sections, time_sampling_frequency):
         self.flux_type = flux_type
@@ -181,6 +207,8 @@ class FluxCalculator:
     def flux_in_frame(self, intersections, values):
         if self.flux_type == FluxCalculator.LINE_INTEGRAL:
             return TriangularVectorField.line_integral(intersections, values[0])
+        elif self.flux_type == FluxCalculator.DOUBLE_LINE_INTEGRAL:
+            return TriangularVectorField.line_double_integral(intersections, values[0], values[1])
         elif self.flux_type == FluxCalculator.LINE_FLUX:
             return TriangularVectorField.line_flux(intersections, values[0], values[1])
         elif self.flux_type == FluxCalculator.AREA_FLUX:

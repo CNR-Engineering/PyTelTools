@@ -6,6 +6,7 @@ from PyQt5.QtCore import *
 from gui.ExtractVariablesGUI import ExtractVariablesGUI
 from gui.ComputeVolumeGUI import ComputeVolumeGUI
 from gui.CompareResultsGUI import CompareResultsGUI
+from gui.ComputeFluxGUI import ComputeFluxGUI
 
 
 class MyMainWindow(QWidget):
@@ -15,16 +16,18 @@ class MyMainWindow(QWidget):
         extract = ExtractVariablesGUI(self)
         volume = ComputeVolumeGUI(self)
         compare = CompareResultsGUI(self)
+        flux = ComputeFluxGUI(self)
 
         stackLayout = QStackedLayout()
         stackLayout.addWidget(QLabel('Hello! This is the start page (TODO)'))
         stackLayout.addWidget(extract)
         stackLayout.addWidget(volume)
+        stackLayout.addWidget(flux)
         stackLayout.addWidget(compare)
 
         pageList = QListWidget()
         pageList.setFixedWidth(200)
-        for name in ['Start', 'Extract variables', 'Compute volumes', 'Compare two results']:
+        for name in ['Start', 'Extract variables', 'Compute volume', 'Compute flux', 'Compare two results']:
             pageList.addItem('\n' + name + '\n')
         pageList.setFlow(QListView.TopToBottom)
         pageList.currentRowChanged.connect(stackLayout.setCurrentIndex)
