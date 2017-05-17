@@ -110,7 +110,7 @@ class PlotCanvas(FigureCanvas):
 
 class MapCanvas(FigureCanvas):
     def __init__(self, width=10, height=10, dpi=100):
-        self.BLACK = '#14123a'
+        self.BLACK = '#a9a9a9'
 
         self.fig = Figure(figsize=(width, height), dpi=dpi)
         self.axes = self.fig.add_subplot(111)
@@ -125,7 +125,7 @@ class MapCanvas(FigureCanvas):
 
     def initFigure(self, mesh):
         self.axes.clear()
-        self.axes.triplot(mesh.x, mesh.y, mesh.ikle, '--', color=self.BLACK, lw=0.3)
+        self.axes.triplot(mesh.x, mesh.y, mesh.ikle, '--', color=self.BLACK, alpha=0.5, lw=0.3)
         self.axes.set_aspect('equal', adjustable='box')
         self.draw()
 
@@ -170,7 +170,7 @@ class ColorMapCanvas(MapCanvas):
             xmin, xmax = limits
 
         self.axes.set_aspect('equal', adjustable='box')
-        self.axes.triplot(mesh.x, mesh.y, mesh.ikle, '--', color=self.BLACK, lw=0.3)
+        self.axes.triplot(mesh.x, mesh.y, mesh.ikle, '--', color=self.BLACK, alpha=0.5, lw=0.3)
 
         if polygon is not None:
             # show only the zone in the polygon
