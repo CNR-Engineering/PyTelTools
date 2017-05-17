@@ -29,6 +29,7 @@ class VolumeCalculatorGUI(QThread):
         self.tick.emit(6)
         QApplication.processEvents()
 
+        logging.info('Starting to process the mesh')
         self.calculator.base_triangles = self.base_triangles
         self.tick.emit(15)
         QApplication.processEvents()

@@ -37,8 +37,7 @@ class TruncatedTriangularPrisms(Mesh2D):
         @param <geom.Polyline> polygon: A polygon
         @return <numpy.1D-array>: The weight carried by the triangle nodes
         """
-        bounds = polygon.bounds()
-        potential_elements = list(self.index.intersection(bounds, objects='raw'))
+        potential_elements = self.get_intersecting_elements(polygon.bounds())
         weight = np.zeros((self.nb_points,), dtype=np.float64)
         for i, j, k in potential_elements:
             t = self.triangles[i, j, k]
@@ -52,8 +51,7 @@ class TruncatedTriangularPrisms(Mesh2D):
         @param <geom.Polyline> polygon: A polygon
         @return <numpy.1D-array, dict>: The weight carried by the triangle nodes, and the dictionary of tuple (area, centroid value) for boundary triangles
         """
-        bounds = polygon.bounds()
-        potential_elements = list(self.index.intersection(bounds, objects='raw'))
+        potential_elements = self.get_intersecting_elements(polygon.bounds())
         weight = np.zeros((self.nb_points,), dtype=np.float64)
         triangle_polygon_intersection = {}
         for i, j, k in potential_elements:
@@ -74,8 +72,7 @@ class TruncatedTriangularPrisms(Mesh2D):
         @param <geom.Polyline> polygon: A polygon
         @return <dict, dict>: The dictionaries of all triangles contained in polygon, and of tuples (base triangle, intersection) for boundary triangles
         """
-        bounds = polygon.bounds()
-        potential_elements = list(self.index.intersection(bounds, objects='raw'))
+        potential_elements = self.get_intersecting_elements(polygon.bounds())
         weight = np.zeros((self.nb_points,), dtype=np.float64)
         triangles = {}
         triangle_polygon_net_intersection = {}

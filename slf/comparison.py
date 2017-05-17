@@ -41,8 +41,7 @@ class ReferenceMesh(TruncatedTriangularPrisms):
             self.polygon = polygon
             self.nb_triangles_inside = 0
 
-            bounds = polygon.bounds()
-            potential_elements = list(self.index.intersection(bounds, objects='raw'))
+            potential_elements = self.get_intersecting_elements(polygon.bounds())
             self.point_weight = np.zeros((self.nb_points,), dtype=np.float64)
             self.triangle_polygon_intersection = {}
             total_area = 0

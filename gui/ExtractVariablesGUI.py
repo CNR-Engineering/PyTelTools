@@ -1071,6 +1071,7 @@ class TimeTab(QWidget):
                                               % (len(selected), ['', 's'][len(selected) > 1],
                                                  selected[0]+1, selected[-1]+1))
 
+
 class SubmitTab(QWidget):
     def __init__(self, input, timeSelection):
         super().__init__()

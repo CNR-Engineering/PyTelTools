@@ -9,7 +9,8 @@ from rtree.index import Index
 
 class Mesh2D:
     """!
-    The general representation of mesh in Serafin 2D. The basis for interpolation, volume calculations etc.
+    The general representation of mesh in Serafin 2D.
+    The basis for interpolation, volume calculations etc.
     """
     def __init__(self, input_header):
         self.x, self.y = input_header.x, input_header.y
@@ -25,7 +26,8 @@ class Mesh2D:
             self.triangles[i, j, k] = t
             self.index.insert(i, t.bounds, obj=(i, j, k))
 
-
+    def get_intersecting_elements(self, bounding_box):
+        return list(self.index.intersection(bounding_box, objects='raw'))
 
 
 
