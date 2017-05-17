@@ -366,6 +366,7 @@ class InputTab(QWidget):
         mainLayout = QVBoxLayout()
         mainLayout.setSpacing(15)
         hlayout = QHBoxLayout()
+        hlayout.addItem(QSpacerItem(30, 1))
         hlayout.setAlignment(Qt.AlignLeft)
         hlayout.addWidget(self.btnOpenSerafin)
         hlayout.addItem(QSpacerItem(30, 1))
@@ -384,6 +385,7 @@ class InputTab(QWidget):
         mainLayout.addItem(QSpacerItem(10, 20))
 
         hlayout = QHBoxLayout()
+        hlayout.addItem(QSpacerItem(30, 1))
         hlayout.addWidget(self.btnOpenPolygon)
         hlayout.addWidget(self.polygonNameBox)
         mainLayout.addLayout(hlayout)
@@ -409,6 +411,7 @@ class InputTab(QWidget):
         mainLayout.addItem(QSpacerItem(10, 20))
 
         hlayout = QHBoxLayout()
+        hlayout.addItem(QSpacerItem(30, 1))
         hlayout.addWidget(self.btnSubmit)
         hlayout.addWidget(self.csvNameBox)
         mainLayout.addLayout(hlayout)
