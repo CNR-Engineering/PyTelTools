@@ -35,7 +35,7 @@ class TriangularVectorField(Mesh2D):
                         prev_x, prev_y = x, y
                         intersections[i, j, k].append(([0, 0], interpolator.get_interpolator_at(x, y)))
                     else:
-                        intersections[i, j, k].append(([y-prev_y, prev_x-x],
+                        intersections[i, j, k].append(([prev_y-y, x-prev_x],
                                                        interpolator.get_interpolator_at(x, y)))
         return intersections
 

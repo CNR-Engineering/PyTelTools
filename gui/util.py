@@ -16,6 +16,7 @@ from descartes import PolygonPatch
 from matplotlib import cm
 import matplotlib.tri as tri
 import matplotlib.lines as mlines
+
 from matplotlib.colors import Normalize, colorConverter
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
@@ -378,25 +379,21 @@ class SectionMapCanvas(MapCanvas):
         super().__init__()
         self.PINK = '#fcabbd'
 
-    def reinitFigure(self, mesh, sections, section_names):
+    def reinitFigure(self, mesh, sections, section_names, section_colors):
         # draw the mesh
         self.initFigure(mesh)
 
-        # add the polylines to the map
-        for p in sections:
-            x, y = p.polyline().xy
-            line = mlines.Line2D(x, y, lw=1)
-            self.axes.add_line(line)
-        #self.axes.add_collection(PatchCollection(patches, match_original=True))
-
         # add polyline labels
-        for p, name in zip(sections, section_names):
+        for p, name, color in zip(sections, section_names, section_colors):
+            x, y = p.polyline().xy
+            line = mlines.Line2D(x, y, color=color, lw=1)
+            self.axes.add_line(line)
+
             center = p.polyline().centroid
             cx, cy = center.x, center.y
-            self.axes.annotate(name, (cx, cy), color='k', weight='bold',
+            self.axes.annotate(name, (cx, cy), color=color, weight='bold',
                                fontsize=8, ha='center', va='center')
         self.draw()
-
 
 
 class ColorMapCanvas(MapCanvas):

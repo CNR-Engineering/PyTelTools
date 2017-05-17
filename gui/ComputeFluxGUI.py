@@ -239,17 +239,22 @@ class InputTab(QWidget):
             self.fluxBox.addItem('Liquid flux (m3/s): (Q)')
 
         if 'QSX' in header.var_IDs and 'QSY' in header.var_IDs:
-            self.fluxBox.addItem('Solid flux (m3/s): (QSX, QSY)')
+            self.fluxBox.addItem('Solid flux TOTAL (m3/s): (QSX, QSY)')
         if 'QS' in header.var_IDs:
             self.fluxBox.addItem('Solid flux (m3/s): (QS)')
         if 'QSBLX' in header.var_IDs and 'QSBLY' in header.var_IDs:
-            self.fluxBox.addItem('Solid flux (m3/s): (QSBLX, QSBLY)')
+            self.fluxBox.addItem('Solid flux BED LOAD (m3/s): (QSBLX, QSBLY)')
         if 'QSBL' in header.var_IDs:
-            self.fluxBox.addItem('Solid flux (m3/s): (QSBL)')
+            self.fluxBox.addItem('Solid flux BED LOAD (m3/s): (QSBL)')
         if 'QSSUSPX' in header.var_IDs and 'QSSUSPY' in header.var_IDs:
-            self.fluxBox.addItem('Solid flux (m3/s): (QSSUSPX, QSSUSPY)')
+            self.fluxBox.addItem('Solid flux SUSPENSION (m3/s): (QSSUSPX, QSSUSPY)')
         if 'QSSUSP' in header.var_IDs:
-            self.fluxBox.addItem('Solid flux (m3/s): (QSSUSP)')
+            self.fluxBox.addItem('Solid flux SUSPENSION (m3/s): (QSSUSP)')
+        for name in header.var_names:
+            str_name = name.decode('utf-8').strip()
+            if 'QS CLASS' in str_name:
+                self.fluxBox.addItem('Solid flux (m3/s): (%s)' % str_name)
+
         return self.fluxBox.count() > 0
 
     def _getFluxSection(self):
@@ -493,7 +498,7 @@ class FluxPlotViewer(PlotViewer):
 
     def _defaultYLabel(self, language):
         word = {'fr': 'de', 'en': 'of'}[language]
-        return 'Flux %s %s' % (word, str(self.var_IDs))
+        return 'Flux %s (%s)' % (word, ','.join(map(str, self.var_IDs)))
 
     def replot(self):
         self.canvas.axes.clear()
@@ -546,6 +551,8 @@ class FluxPlotViewer(PlotViewer):
         if not self.has_map:
             self.map.canvas.reinitFigure(self.input.mesh, self.input.polylines,
                                          map(self.column_labels.get, ['Section %d' % (i+1)
+                                                                      for i in range(len(self.input.polylines))]),
+                                         map(self.column_colors.get, [self.column_labels['Section %d' % (i+1)]
                                                                       for i in range(len(self.input.polylines))]))
 
             self.has_map = True
