@@ -10,6 +10,7 @@ import numpy as np
 import matplotlib
 matplotlib.use('Qt5Agg')
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT
 from matplotlib.figure import Figure
 from matplotlib.collections import PatchCollection
 from descartes import PolygonPatch
@@ -453,21 +454,20 @@ class ColorMapCanvas(MapCanvas):
 
 
 class MapViewer(QWidget):
-    def __init__(self):
+    def __init__(self, canvas):
         super().__init__()
+        self.canvas = canvas
 
         # add the the tool bar
-        self.toolBar = QToolBar()
+        self.toolBar = NavigationToolbar2QT(self.canvas, self)
         self.toolBar.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
 
         self.scrollArea = QScrollArea()
         self.scrollArea.setBackgroundRole(QPalette.Dark)
+        self.scrollArea.setWidget(self.canvas)
 
         self._setLayout()
-
-        self.saveAct = QAction('Save', self, shortcut='Ctrl+S',
-                                triggered=self.save, icon=self.style().standardIcon(QStyle.SP_DialogSaveButton))
-        self.toolBar.addAction(self.saveAct)
+        self.resize(800, 700)
 
     def _setLayout(self):
         vlayout = QVBoxLayout()
@@ -479,20 +479,6 @@ class MapViewer(QWidget):
 
         self.setWindowTitle('Map Viewer')
         self.resize(self.sizeHint())
-
-    def save(self):
-        options = QFileDialog.Options()
-        options |= QFileDialog.DontUseNativeDialog
-        filename, _ = QFileDialog.getSaveFileName(self, 'Save image', '',
-                                                  'PNG Files (*.png)', options=options)
-
-        # check the file name consistency
-        if not filename:
-            return
-        if len(filename) < 5 or filename[-4:] != '.png':
-            filename += '.png'
-
-        self.canvas.print_png(filename)
 
 
 class PlotViewer(QWidget):

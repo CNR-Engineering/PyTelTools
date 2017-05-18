@@ -81,11 +81,8 @@ class VolumePlotViewer(PlotViewer):
         self.canvas.figure.canvas.mpl_connect('motion_notify_event', self.mouseMove)
 
         # initialize the map for locating polygons
-        self.map = MapViewer()
-        self.map.canvas = PolygonMapCanvas()
-        MapViewer.__init__(self.map)
-        self.map.scrollArea.setWidget(self.map.canvas)
-        self.map.resize(800, 700)
+        canvas = PolygonMapCanvas()
+        self.map = MapViewer(canvas)
 
         self.defaultColors = ['b', 'r', 'g', 'y', 'k', 'c', '#F28AD6', 'm']
         name = ['Blue', 'Red', 'Green', 'Yellow', 'Black', 'Cyan', 'Pink', 'Magenta']

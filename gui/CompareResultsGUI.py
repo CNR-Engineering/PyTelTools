@@ -221,11 +221,8 @@ class InputTab(QWidget):
         self.polygon_added = False   # is the intersection between the mesh and the selected polygon calculated?
 
         # initialize the map for locating polygons
-        self.map = MapViewer()
-        self.map.canvas = PolygonMapCanvas()
-        MapViewer.__init__(self.map)
-        self.map.scrollArea.setWidget(self.map.canvas)
-        self.map.resize(800, 700)
+        canvas = PolygonMapCanvas()
+        self.map = MapViewer(canvas)
         self.has_map = False
 
         self._initWidgets()
@@ -730,11 +727,8 @@ class ErrorDistributionTab(QWidget):
         self.btnColorMap.setEnabled(False)
 
         # initialize the map for 2D view
-        self.map = MapViewer()
-        self.map.canvas = ColorMapCanvas()
-        MapViewer.__init__(self.map)
-        self.map.scrollArea.setWidget(self.map.canvas)
-        self.map.resize(800, 700)
+        canvas = ColorMapCanvas()
+        self.map = MapViewer(canvas)
         self.has_map = False
         self.map.closeEvent = lambda event: self.btnColorMap.setEnabled(True)
 
