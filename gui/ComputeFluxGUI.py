@@ -12,8 +12,7 @@ from slf import Serafin
 from slf.flux import TriangularVectorField, FluxCalculator
 from gui.util import QPlainTextEditLogger
 from geom import BlueKenue, Shapefile
-from gui.util import PlotViewer, QPlainTextEditLogger, ColumnColorEditor, ColumnNameEditor, PlotColumnsSelector, \
-                     SectionMapCanvas, MapViewer, OutputProgressDialog
+from gui.util import TemporalPlotViewer, QPlainTextEditLogger, SectionMapCanvas, MapViewer, OutputProgressDialog
 
 
 class FluxCalculatorGUI(QThread):
@@ -420,54 +419,22 @@ class InputTab(QWidget):
         self.parent.tab.setTabEnabled(1, True)
 
 
-class FluxPlotViewer(PlotViewer):
+class FluxPlotViewer(TemporalPlotViewer):
     def __init__(self, inputTab):
         super().__init__()
         self.input = inputTab
-
-        self.canvas.figure.canvas.mpl_connect('motion_notify_event', self.mouseMove)
 
         # initialize the map for locating sections
         canvas = SectionMapCanvas()
         self.map = MapViewer(canvas)
 
-        self.defaultColors = ['b', 'r', 'g', 'y', 'k', 'c', '#F28AD6', 'm']
-        name = ['Blue', 'Red', 'Green', 'Yellow', 'Black', 'Cyan', 'Pink', 'Magenta']
-        self.colorToName = {c: n for c, n in zip(self.defaultColors, name)}
-        self.nameToColor = {n: c for c, n in zip(self.defaultColors, name)}
-
         self.setWindowTitle('Visualize the temporal evolution of volumes')
-        self.setMinimumWidth(700)
 
-        self.data = None
-        self.time = []
-        self.start_time = None
-        self.datetime = []
-        self.str_datetime = []
-        self.str_datetime_bis = []
         self.var_IDs = []
         self.has_map = False
 
-        # initialize graphical parameters
-        self.timeFormat = 0   # 0: second, 1: date, 2: date (alternative), 3: minutes, 4: hours, 5: days
-        self.current_columns = ('Section 1',)
-        self.column_labels = {}
-        self.column_colors = {}
-
         self.locateSections = QAction('Locate sections\non map', self, icon=self.style().standardIcon(QStyle.SP_DialogHelpButton),
                                       triggered=self.locateSectionsEvent)
-        self.selectColumnsAct = QAction('Select\ncolumns', self, icon=self.style().standardIcon(QStyle.SP_FileDialogDetailedView),
-                                        triggered=self.selectColumns)
-        self.editColumnNamesAct = QAction('Edit column\nnames', self, icon=self.style().standardIcon(QStyle.SP_FileDialogDetailedView),
-                                          triggered=self.editColumns)
-        self.editColumColorAct = QAction('Edit column\ncolors', self, icon=self.style().standardIcon(QStyle.SP_FileDialogDetailedView),
-                                          triggered=self.editColor)
-
-        self.convertTimeAct = QAction('Toggle date/time\nformat', self, checkable=True,
-                                      icon=self.style().standardIcon(QStyle.SP_DialogApplyButton))
-        self.changeDateAct = QAction('Edit\nstart date', self, triggered=self.changeDate,
-                                     icon=self.style().standardIcon(QStyle.SP_DialogApplyButton))
-        self.convertTimeAct.toggled.connect(self.convertTime)
         self.map.closeEvent = lambda event: self.locateSections.setEnabled(True)
 
         self.toolBar.addAction(self.locateSections)
@@ -485,13 +452,9 @@ class FluxPlotViewer(PlotViewer):
         self.polyMenu.addAction(self.selectColumnsAct)
         self.polyMenu.addAction(self.editColumnNamesAct)
         self.polyMenu.addAction(self.editColumColorAct)
-        self.timeMenu = QMenu('&Date/&Time', self)
-        self.timeMenu.addAction(self.convertTimeAct)
-        self.timeMenu.addAction(self.changeDateAct)
 
         self.menuBar.addMenu(self.mapMenu)
         self.menuBar.addMenu(self.polyMenu)
-        self.menuBar.addMenu(self.timeMenu)
 
     def _defaultXLabel(self, language):
         if language == 'fr':
@@ -561,85 +524,13 @@ class FluxPlotViewer(PlotViewer):
         self.locateSections.setEnabled(False)
         self.map.show()
 
-    def selectColumns(self):
-        msg = PlotColumnsSelector(list(self.data)[1:], self.current_columns)
-        value = msg.exec_()
-        if value == QDialog.Rejected:
-            return
-        self.current_columns = msg.selection
-        self.replot()
-
-    def editColumns(self):
-        msg = ColumnNameEditor(self.column_labels, self.current_columns)
-        value = msg.exec_()
-        if value == QDialog.Rejected:
-            return
-        msg.getLabels(self.column_labels)
-        self.replot()
-
-    def editColor(self):
-        msg = ColumnColorEditor(self)
-        value = msg.exec_()
-        if value == QDialog.Rejected:
-            return
-        msg.getColors(self.column_colors, self.column_labels, self.nameToColor)
-        self.replot()
-
-    def changeDate(self):
-        value, ok = QInputDialog.getText(self, 'Change start date',
-                                         'Enter the start date',
-                                         text=self.start_time.strftime('%Y-%m-%d %X'))
-        if not ok:
-            return
-        try:
-            self.start_time = datetime.datetime.strptime(value, '%Y-%m-%d %X')
-        except ValueError:
-            QMessageBox.critical(self, 'Error', 'Invalid input.',
-                                 QMessageBox.Ok)
-            return
-        self.datetime = list(map(lambda x: self.start_time + datetime.timedelta(seconds=x), self.data['time']))
-        self.str_datetime = list(map(lambda x: x.strftime('%Y/%m/%d\n%H:%M'), self.datetime))
-        self.str_datetime_bis = list(map(lambda x: x.strftime('%d/%m/%y\n%H:%M'), self.datetime))
-        self.replot()
-
-    def convertTime(self):
-        self.timeFormat = (1 + self.timeFormat) % 6
-        self.current_xlabel = self._defaultXLabel(self.input.language)
-        self.xLabelAct.setEnabled(self.timeFormat not in [1, 2])
-        self.replot()
-
     def reset(self):
         self.has_map = False
         self.map.close()
 
         # reinitialize old graphical parameters
-        self.timeFormat = 0
-        self.time = []
+        super().reset()
         self.current_columns = ('Section 1',)
-        self.current_title = ''
-        self.column_labels = {}
-        self.column_colors = {}
-
-    def mouseMove(self, event):
-        current_time = event.xdata
-        if current_time is None:
-            self.statusbar.clearMessage()
-            return
-        if self.timeFormat == 1:
-            current_time = self.start_time + datetime.timedelta(seconds=current_time)
-            current_time = current_time.strftime('%Y/%m/%d %H:%M')
-        elif self.timeFormat == 2:
-            current_time = self.start_time + datetime.timedelta(seconds=current_time)
-            current_time = current_time.strftime('%d/%m/%y %H:%M')
-        elif self.timeFormat == 3:
-            current_time /= 60
-        elif self.timeFormat == 4:
-            current_time /= 3600
-        elif self.timeFormat == 5:
-            current_time /= 86400
-        current_time = str(current_time)
-        msg = 'Time: %s \t Value: %s' % (current_time, str(event.ydata))
-        self.statusbar.showMessage(msg)
 
 
 class ComputeFluxGUI(QWidget):

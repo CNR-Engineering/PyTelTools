@@ -4,7 +4,7 @@ import logging
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
-
+import datetime
 from shapely.geometry import Polygon
 import numpy as np
 import matplotlib
@@ -613,6 +613,125 @@ class PlotViewer(QWidget):
         self.canvas.axes.set_title(self.current_title)
         self.canvas.draw()
 
+
+class TemporalPlotViewer(PlotViewer):
+    def __init__(self):
+        super().__init__()
+        self.data = None
+        self.setMinimumWidth(700)
+        self.canvas.figure.canvas.mpl_connect('motion_notify_event', self.mouseMove)
+
+        # initialize graphical parameters
+        self.time = []
+        self.current_columns = []
+        self.column_labels = {}
+        self.column_colors = {}
+        self.start_time = None
+        self.datetime = []
+        self.str_datetime = []
+        self.str_datetime_bis = []
+        self.defaultColors = ['b', 'r', 'g', 'y', 'k', 'c', '#F28AD6', 'm']
+        name = ['Blue', 'Red', 'Green', 'Yellow', 'Black', 'Cyan', 'Pink', 'Magenta']
+        self.colorToName = {c: n for c, n in zip(self.defaultColors, name)}
+        self.nameToColor = {n: c for c, n in zip(self.defaultColors, name)}
+        self.timeFormat = 0   # 0: second, 1: date, 2: date (alternative), 3: minutes, 4: hours, 5: days
+
+
+        self.selectColumnsAct = QAction('Select\ncolumns', self, icon=self.style().standardIcon(QStyle.SP_FileDialogDetailedView),
+                                        triggered=self.selectColumns)
+        self.editColumnNamesAct = QAction('Edit column\nnames', self, icon=self.style().standardIcon(QStyle.SP_FileDialogDetailedView),
+                                          triggered=self.editColumns)
+        self.editColumColorAct = QAction('Edit column\ncolors', self, icon=self.style().standardIcon(QStyle.SP_FileDialogDetailedView),
+                                         triggered=self.editColor)
+        self.convertTimeAct = QAction('Toggle date/time\nformat', self, checkable=True,
+                                      icon=self.style().standardIcon(QStyle.SP_DialogApplyButton))
+        self.changeDateAct = QAction('Edit\nstart date', self, triggered=self.changeDate,
+                                     icon=self.style().standardIcon(QStyle.SP_DialogApplyButton))
+        self.convertTimeAct.toggled.connect(self.convertTime)
+
+        self.timeMenu = QMenu('&Date/&Time', self)
+        self.timeMenu.addAction(self.convertTimeAct)
+        self.timeMenu.addAction(self.changeDateAct)
+        self.menuBar.addMenu(self.timeMenu)
+
+    def selectColumns(self):
+        msg = PlotColumnsSelector(list(self.data)[1:], self.current_columns)
+        value = msg.exec_()
+        if value == QDialog.Rejected:
+            return
+        self.current_columns = msg.selection
+        self.replot()
+
+    def editColumns(self):
+        msg = ColumnNameEditor(self.column_labels, self.current_columns)
+        value = msg.exec_()
+        if value == QDialog.Rejected:
+            return
+        msg.getLabels(self.column_labels)
+        self.replot()
+
+    def editColor(self):
+        msg = ColumnColorEditor(self)
+        value = msg.exec_()
+        if value == QDialog.Rejected:
+            return
+        msg.getColors(self.column_colors, self.column_labels, self.nameToColor)
+        self.replot()
+
+    def replot(self):
+        pass
+
+    def reset(self):
+        # reinitialize old graphical parameters and clear data
+        self.time = []
+        self.timeFormat = 0
+        self.current_title = ''
+        self.column_labels = {}
+        self.column_colors = {}
+
+    def mouseMove(self, event):
+        current_time = event.xdata
+        if current_time is None:
+            self.statusbar.clearMessage()
+            return
+        if self.timeFormat == 1:
+            current_time = self.start_time + datetime.timedelta(seconds=current_time)
+            current_time = current_time.strftime('%Y/%m/%d %H:%M')
+        elif self.timeFormat == 2:
+            current_time = self.start_time + datetime.timedelta(seconds=current_time)
+            current_time = current_time.strftime('%d/%m/%y %H:%M')
+        elif self.timeFormat == 3:
+            current_time /= 60
+        elif self.timeFormat == 4:
+            current_time /= 3600
+        elif self.timeFormat == 5:
+            current_time /= 86400
+        current_time = str(current_time)
+        msg = 'Time: %s \t Value: %s' % (current_time, str(event.ydata))
+        self.statusbar.showMessage(msg)
+
+    def changeDate(self):
+        value, ok = QInputDialog.getText(self, 'Change start date',
+                                         'Enter the start date',
+                                         text=self.start_time.strftime('%Y-%m-%d %X'))
+        if not ok:
+            return
+        try:
+            self.start_time = datetime.datetime.strptime(value, '%Y-%m-%d %X')
+        except ValueError:
+            QMessageBox.critical(self, 'Error', 'Invalid input.',
+                                 QMessageBox.Ok)
+            return
+        self.datetime = list(map(lambda x: self.start_time + datetime.timedelta(seconds=x), self.data['time']))
+        self.str_datetime = list(map(lambda x: x.strftime('%Y/%m/%d\n%H:%M'), self.datetime))
+        self.str_datetime_bis = list(map(lambda x: x.strftime('%d/%m/%y\n%H:%M'), self.datetime))
+        self.replot()
+
+    def convertTime(self):
+        self.timeFormat = (1 + self.timeFormat) % 6
+        self.current_xlabel = self._defaultXLabel(self.input.language)
+        self.xLabelAct.setEnabled(self.timeFormat not in [1, 2])
+        self.replot()
 
 def exception_hook(exctype, value, traceback):
     """!
