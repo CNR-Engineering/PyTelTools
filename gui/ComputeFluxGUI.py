@@ -98,7 +98,7 @@ class InputTab(QWidget):
         self.btnOpenSerafin.setFixedSize(105, 50)
 
         # create the button open Polygon
-        self.btnOpenPolyline = QPushButton('Load\nPolylines', self, icon=self.style().standardIcon(QStyle.SP_DialogOpenButton))
+        self.btnOpenPolyline = QPushButton('Load\nSections', self, icon=self.style().standardIcon(QStyle.SP_DialogOpenButton))
         self.btnOpenPolyline.setToolTip('<b>Open</b> a .i2s or .shp file')
         self.btnOpenPolyline.setFixedSize(105, 50)
         self.btnOpenPolyline.setEnabled(False)
@@ -424,9 +424,6 @@ class FluxPlotViewer(PlotViewer):
     def __init__(self, inputTab):
         super().__init__()
         self.input = inputTab
-        self.statusbar = QStatusBar()
-        self.statusbar.showMessage('')
-        self.layout().addWidget(self.statusbar)
 
         self.canvas.figure.canvas.mpl_connect('motion_notify_event', self.mouseMove)
 
@@ -629,6 +626,7 @@ class FluxPlotViewer(PlotViewer):
     def mouseMove(self, event):
         current_time = event.xdata
         if current_time is None:
+            self.statusbar.clearMessage()
             return
         if self.timeFormat == 1:
             current_time = self.start_time + datetime.timedelta(seconds=current_time)

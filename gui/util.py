@@ -510,7 +510,7 @@ class PlotViewer(QWidget):
         # add a default plot
         self.defaultPlot()
 
-        # add the menu bar and the tool bar
+        # add the menu bar, the tool bar and the status bar
         self.menuBar = QMenuBar()
         self.toolBar = QToolBar()
         self.toolBar.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
@@ -518,6 +518,8 @@ class PlotViewer(QWidget):
         self.scrollArea = QScrollArea()
         self.scrollArea.setBackgroundRole(QPalette.Dark)
         self.scrollArea.setWidget(self.canvas)
+
+        self.statusbar = QStatusBar()
 
         self.createActions()
         self.createMenus()
@@ -528,6 +530,7 @@ class PlotViewer(QWidget):
         vlayout.addWidget(self.menuBar)
         vlayout.addWidget(self.toolBar)
         vlayout.addWidget(self.scrollArea)
+        vlayout.addWidget(self.statusbar)
         vlayout.setSpacing(0)
         vlayout.setContentsMargins(0, 0, 0, 0)
         self.setLayout(vlayout)

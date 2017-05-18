@@ -78,10 +78,6 @@ class VolumePlotViewer(PlotViewer):
     def __init__(self, inputTab):
         super().__init__()
         self.input = inputTab
-        self.statusbar = QStatusBar()
-        self.statusbar.showMessage('')
-        self.layout().addWidget(self.statusbar)
-
         self.canvas.figure.canvas.mpl_connect('motion_notify_event', self.mouseMove)
 
         # initialize the map for locating polygons
@@ -286,6 +282,7 @@ class VolumePlotViewer(PlotViewer):
     def mouseMove(self, event):
         current_time = event.xdata
         if current_time is None:
+            self.statusbar.clearMessage()
             return
         if self.timeFormat == 1:
             current_time = self.start_time + datetime.timedelta(seconds=current_time)
