@@ -963,15 +963,15 @@ class TimeTab(QWidget):
         self.selectionTextBox = QPlainTextEdit()
 
         # bind events
-        self.timeSelection.startIndex.returnPressed.connect(self.timeSlider.enterIndexEvent)
-        self.timeSelection.endIndex.returnPressed.connect(self.timeSlider.enterIndexEvent)
-        self.timeSelection.startValue.returnPressed.connect(self.timeSlider.enterValueEvent)
-        self.timeSelection.endValue.returnPressed.connect(self.timeSlider.enterValueEvent)
+        self.timeSelection.startIndex.editingFinished.connect(self.timeSlider.enterIndexEvent)
+        self.timeSelection.endIndex.editingFinished.connect(self.timeSlider.enterIndexEvent)
+        self.timeSelection.startValue.editingFinished.connect(self.timeSlider.enterValueEvent)
+        self.timeSelection.endValue.editingFinished.connect(self.timeSlider.enterValueEvent)
 
         self.btnManual.clicked.connect(self.btnManualEvent)
         self.timeSelection.startDate.textChanged.connect(self.regularSelectionEvent)
         self.timeSelection.endDate.textChanged.connect(self.regularSelectionEvent)
-        self.timeSelection.timeSamplig.textChanged.connect(self.regularSelectionEvent)
+        self.timeSelection.timeSamplig.editingFinished.connect(self.regularSelectionEvent)
 
         # set layout
         mainLayout = QVBoxLayout()
@@ -996,8 +996,6 @@ class TimeTab(QWidget):
     def getTime(self):
         start_index = int(self.timeSelection.startIndex.text())
         end_index = int(self.timeSelection.endIndex.text())
-        if not self.timeSelection.timeSamplig.text():
-            return []
         try:
             sampling_frequency = int(self.timeSelection.timeSamplig.text())
         except ValueError:
