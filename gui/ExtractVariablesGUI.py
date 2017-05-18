@@ -657,7 +657,7 @@ class InputTab(QWidget):
             tw.setEditTriggers(QAbstractItemView.NoEditTriggers)
             tw.setMaximumHeight(800)
 
-        self.secondTable.setMinimumHeight(400)
+        self.secondTable.setMinimumHeight(300)
 
         # create a button for interpreting W from user-defined friction law
         self.btnAddUS = QPushButton('Add US from friction law', self)
