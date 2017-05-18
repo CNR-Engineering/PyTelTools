@@ -7,7 +7,7 @@ import numpy as np
 import shapely.geometry as geom
 from slf.interpolation import Interpolator
 from slf.mesh2D import Mesh2D
-from geom import Polyline
+from geom import Geometry
 
 
 class TruncatedTriangularPrisms(Mesh2D):
@@ -187,7 +187,7 @@ class TruncatedTriangularPrisms(Mesh2D):
             else:
                 # volume sup = (volume net intersected)
                 #              - (volume negative tetrahedron - volume in tetrahedron but not in polygon)
-                is_intersected, new_difference = Polyline.Polyline.triangle_difference(new_triangle, polygon)
+                is_intersected, new_difference = Geometry.Polyline.triangle_difference(new_triangle, polygon)
                 if not is_intersected:
                     return 0
                 centroid = new_difference.centroid

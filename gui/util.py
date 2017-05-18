@@ -733,6 +733,7 @@ class TemporalPlotViewer(PlotViewer):
         self.xLabelAct.setEnabled(self.timeFormat not in [1, 2])
         self.replot()
 
+
 def exception_hook(exctype, value, traceback):
     """!
     @brief Needed for supressing traceback silencing in newer vesion of PyQt5

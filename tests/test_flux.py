@@ -9,7 +9,7 @@ import unittest
 import numpy as np
 
 from slf import Serafin
-from geom.Polyline import Polyline
+from geom.Geometry import Polyline
 from slf.flux import FluxCalculator
 
 

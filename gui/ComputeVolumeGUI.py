@@ -191,7 +191,6 @@ class VolumePlotViewer(TemporalPlotViewer):
         self.current_columns = ('Polygon 1',)
 
 
-
 class InputTab(QWidget):
     def __init__(self, parent):
         super().__init__()
