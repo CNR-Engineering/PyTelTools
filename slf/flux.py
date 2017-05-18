@@ -14,6 +14,7 @@ class TriangularVectorField(Mesh2D):
     """
     def __init__(self, input_header):
         super().__init__(input_header)
+        self._construct_index()
 
     def section_intersection(self, section):
         """!

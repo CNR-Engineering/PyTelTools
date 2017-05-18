@@ -30,6 +30,7 @@ class TruncatedTriangularPrisms(Mesh2D):
     """
     def __init__(self, input_header):
         super().__init__(input_header)
+        self._construct_index()
 
     def polygon_intersection_strict(self, polygon):
         """!

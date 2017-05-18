@@ -371,13 +371,33 @@ class TimeRangeSlider(QSlider):
         self.info.updateText(self._low, self.time_frames[self._low].total_seconds(), self.low(),
                              self._high, self.time_frames[self._high].total_seconds(), self.high())
 
+    def enterValueEvent(self):
+        try:
+            start_value = float(self.info.startValue.text())
+            end_value = float(self.info.endValue.text())
+            start_index = self.info.parent.input.time.index(start_value) + 1
+            end_index = self.info.parent.input.time.index(end_value) + 1
+        except ValueError:
+            self.info.updateText(self._low, self.time_frames[self._low].total_seconds(), self.low(),
+                                 self._high, self.time_frames[self._high].total_seconds(), self.high())
+            return
+        if start_index <= 0 or end_index > self.nb_frames or start_index > end_index:
+            self.info.updateText(self._low, self.time_frames[self._low].total_seconds(), self.low(),
+                                 self._high, self.time_frames[self._high].total_seconds(), self.high())
+            return
+        self.setLow(start_index-1)
+        self.setHigh(end_index-1)
+        self.info.updateText(self._low, self.time_frames[self._low].total_seconds(), self.low(),
+                             self._high, self.time_frames[self._high].total_seconds(), self.high())
+
 
 class SelectedTimeINFO(QWidget):
     """!
     @brief Text fields for time selection display (with slider)
     """
-    def __init__(self):
+    def __init__(self, parent):
         super().__init__()
+        self.parent = parent
         self.visited = False  # avoid redundant text display at initialization
 
         self.startIndex = QLineEdit('', self)
@@ -386,7 +406,7 @@ class SelectedTimeINFO(QWidget):
         self.endValue = QLineEdit('', self)
         self.startDate = QLineEdit('', self)
         self.endDate = QLineEdit('', self)
-        for w in [self.startValue, self.endValue, self.startDate, self.endDate]:
+        for w in [self.startDate, self.endDate]:
             w.setReadOnly(True)
 
         self.startIndex.setMinimumWidth(30)
@@ -927,7 +947,7 @@ class TimeTab(QWidget):
         self.last_sampling_frequency = 1
 
         # create text boxes for displaying the time selection and sampling
-        self.timeSelection = SelectedTimeINFO()
+        self.timeSelection = SelectedTimeINFO(self)
         self.timeSelection.startIndex.setEnabled(False)
         self.timeSelection.endIndex.setEnabled(False)
 
@@ -945,11 +965,13 @@ class TimeTab(QWidget):
         # bind events
         self.timeSelection.startIndex.returnPressed.connect(self.timeSlider.enterIndexEvent)
         self.timeSelection.endIndex.returnPressed.connect(self.timeSlider.enterIndexEvent)
+        self.timeSelection.startValue.returnPressed.connect(self.timeSlider.enterValueEvent)
+        self.timeSelection.endValue.returnPressed.connect(self.timeSlider.enterValueEvent)
 
         self.btnManual.clicked.connect(self.btnManualEvent)
         self.timeSelection.startDate.textChanged.connect(self.regularSelectionEvent)
         self.timeSelection.endDate.textChanged.connect(self.regularSelectionEvent)
-        self.timeSelection.timeSamplig.returnPressed.connect(self.regularSelectionEvent)
+        self.timeSelection.timeSamplig.textChanged.connect(self.regularSelectionEvent)
 
         # set layout
         mainLayout = QVBoxLayout()
@@ -974,6 +996,8 @@ class TimeTab(QWidget):
     def getTime(self):
         start_index = int(self.timeSelection.startIndex.text())
         end_index = int(self.timeSelection.endIndex.text())
+        if not self.timeSelection.timeSamplig.text():
+            return []
         try:
             sampling_frequency = int(self.timeSelection.timeSamplig.text())
         except ValueError:

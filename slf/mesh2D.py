@@ -19,7 +19,9 @@ class Mesh2D:
         self.nb_points = self.x.shape[0]
         self.nb_triangles = self.ikle.shape[0]
         self.points = np.stack([self.x, self.y], axis=1)
+        self.index = None
 
+    def _construct_index(self):
         self.index = Index()
         for i, j, k in self.ikle:
             t = geom.Polygon([self.points[i], self.points[j], self.points[k]])
