@@ -54,6 +54,8 @@ class FluxCalculatorGUI(QThread):
                 i_result.append('%.6f' % flux)
             result.append(i_result)
             self.tick.emit(30 + int(70 * (i+1) / len(self.calculator.time_indices)))
+            QApplication.processEvents()
+
         return result
 
     def write_csv(self, output_stream):
@@ -137,6 +139,7 @@ class InputTab(QWidget):
         self.btnOpenSerafin.clicked.connect(self.btnOpenSerafinEvent)
         self.btnOpenPolyline.clicked.connect(self.btnOpenPolylineEvent)
         self.btnSubmit.clicked.connect(self.btnSubmitEvent)
+        self.timeSampling.editingFinished.connect(self._checkSamplingFrequency)
 
     def _setLayout(self):
         mainLayout = QVBoxLayout()
@@ -259,6 +262,20 @@ class InputTab(QWidget):
 
         return self.fluxBox.count() > 0
 
+    def _checkSamplingFrequency(self):
+        try:
+            sampling_frequency = int(self.timeSampling.text())
+        except ValueError:
+            QMessageBox.critical(self, 'Error', 'The sampling frequency must be a number!',
+                                 QMessageBox.Ok)
+            self.timeSampling.setText('1')
+            return
+        if sampling_frequency < 1 or sampling_frequency > len(self.time):
+            QMessageBox.critical(self, 'Error', 'The sampling frequency must be in the range [1; nbFrames]!',
+                                 QMessageBox.Ok)
+            self.timeSampling.setText('1')
+            return
+
     def _getFluxSection(self):
         selection = self.fluxBox.currentText()
         var_IDs = list(selection.split(':')[1].split('(')[1][:-1].split(', '))
@@ -355,19 +372,7 @@ class InputTab(QWidget):
         self.parent.tab.setTabEnabled(1, False)
 
     def btnSubmitEvent(self):
-        if not self.polylines or self.header is None:
-            return
-
-        try:
-            sampling_frequency = int(self.timeSampling.text())
-        except ValueError:
-            QMessageBox.critical(self, 'Error', 'The sampling frequency must be a number!',
-                                 QMessageBox.Ok)
-            return
-        if sampling_frequency < 1 or sampling_frequency > len(self.time):
-            QMessageBox.critical(self, 'Error', 'The sampling frequency must be in the range [1; nbFrames]!',
-                                 QMessageBox.Ok)
-            return
+        sampling_frequency = int(self.timeSampling.text())
 
         options = QFileDialog.Options()
         options |= QFileDialog.DontUseNativeDialog
@@ -403,7 +408,7 @@ class InputTab(QWidget):
                                            resin, names, self.polylines, sampling_frequency, self.mesh)
             progressBar.setValue(5)
             QApplication.processEvents()
-            progressBar.connectToCalculator(calculator)
+            progressBar.connectToThread(calculator)
 
             with open(filename, 'w') as f2:
                 calculator.write_csv(f2)
@@ -575,7 +580,7 @@ class ComputeFluxGUI(QWidget):
 
 def exception_hook(exctype, value, traceback):
     """!
-    @brief Needed for supressing traceback silencing in newer vesion of PyQt5
+    @brief Needed for suppressing traceback silencing in newer version of PyQt5
     """
     sys._excepthook(exctype, value, traceback)
     sys.exit(1)

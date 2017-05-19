@@ -1027,7 +1027,7 @@ class CompareResultsGUI(QWidget):
 
 def exception_hook(exctype, value, traceback):
     """!
-    @brief Needed for supressing traceback silencing in newer vesion of PyQt5
+    @brief Needed for suppressing traceback silencing in newer version of PyQt5
     """
     sys._excepthook(exctype, value, traceback)
     sys.exit(1)

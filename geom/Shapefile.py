@@ -47,5 +47,5 @@ def get_points(input_filename, indices=None):
                     decoded_attributes.append(str(attribute))
             if indices is not None:
                 decoded_attributes = [decoded_attributes[i] for i in indices]
-            yield record.shape.points[0], decoded_attributes
+            yield tuple(record.shape.points[0]), decoded_attributes
 

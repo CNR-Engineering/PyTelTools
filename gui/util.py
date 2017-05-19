@@ -97,8 +97,8 @@ class TableWidgetDragRows(QTableWidget):
 
 
 class OutputProgressDialog(QProgressDialog):
-    def __init__(self, parent=None):
-        super().__init__('Output in progress', 'OK', 0, 100, parent)
+    def __init__(self, message='Output in progress', title='Writing the output...', parent=None):
+        super().__init__(message, 'OK', 0, 100, parent)
 
         self.cancelButton = QPushButton('OK')
         self.setCancelButton(self.cancelButton)
@@ -107,7 +107,7 @@ class OutputProgressDialog(QProgressDialog):
         self.setAutoReset(False)
         self.setAutoClose(False)
 
-        self.setWindowTitle('Writing the output...')
+        self.setWindowTitle(title)
         self.setWindowFlags(Qt.WindowTitleHint)
         self.setFixedSize(300, 150)
 
@@ -115,7 +115,7 @@ class OutputProgressDialog(QProgressDialog):
         self.setValue(0)
         QApplication.processEvents()
 
-    def connectToCalculator(self, thread):
+    def connectToThread(self, thread):
         thread.tick.connect(self.setValue)
 
 
@@ -736,7 +736,7 @@ class TemporalPlotViewer(PlotViewer):
 
 def exception_hook(exctype, value, traceback):
     """!
-    @brief Needed for supressing traceback silencing in newer vesion of PyQt5
+    @brief Needed for suppressing traceback silencing in newer version of PyQt5
     """
     sys._excepthook(exctype, value, traceback)
     sys.exit(1)

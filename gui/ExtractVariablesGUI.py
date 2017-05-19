@@ -1175,29 +1175,6 @@ class SubmitTab(QWidget):
         self.btnSubmit.setEnabled(True)
 
     def btnSubmitEvent(self):
-        # fetch the list of selected variables
-        selected_vars = self.input.getSelectedVariables()
-        if not selected_vars:
-            QMessageBox.critical(self, 'Error', 'Choose at least one output variable before submit!',
-                                 QMessageBox.Ok)
-            return
-
-        # deduce header from selected variable IDs and write header
-        output_header = self.getOutputHeader(selected_vars)
-
-        # fetch the list of selected frames
-        if self.timeSelection.manualSelection.hasData:
-            output_time_indices = self.timeSelection.getManualTime()
-            output_message = 'Writing the output with variables %s for %d frame%s between frame %d and %d.' \
-                              % (str(output_header.var_IDs), len(output_time_indices), ['', 's'][len(output_time_indices) > 1],
-                                 output_time_indices[0]+1, output_time_indices[-1]+1)
-        else:
-            start_index, end_index, sampling_frequency, output_time_indices = self.timeSelection.getTime()
-            output_message = 'Writing the output with variables %s between frame %d and %d with sampling frequency %d.' \
-                              % (str(output_header.var_IDs), start_index, end_index, sampling_frequency)
-        assert output_time_indices
-
-
         # create the save file dialog
         options = QFileDialog.Options()
         options |= QFileDialog.DontUseNativeDialog
@@ -1221,6 +1198,23 @@ class SubmitTab(QWidget):
         overwrite = self._handleOverwrite(filename)
         if overwrite is None:
             return
+
+        # fetch the list of selected variables
+        selected_vars = self.input.getSelectedVariables()
+
+        # deduce header from selected variable IDs and write header
+        output_header = self.getOutputHeader(selected_vars)
+
+        # fetch the list of selected frames
+        if self.timeSelection.manualSelection.hasData:
+            output_time_indices = self.timeSelection.getManualTime()
+            output_message = 'Writing the output with variables %s for %d frame%s between frame %d and %d.' \
+                              % (str(output_header.var_IDs), len(output_time_indices), ['', 's'][len(output_time_indices) > 1],
+                                 output_time_indices[0]+1, output_time_indices[-1]+1)
+        else:
+            start_index, end_index, sampling_frequency, output_time_indices = self.timeSelection.getTime()
+            output_message = 'Writing the output with variables %s between frame %d and %d with sampling frequency %d.' \
+                              % (str(output_header.var_IDs), start_index, end_index, sampling_frequency)
 
         # disable close button
         self.setWindowFlags(self.windowFlags() & ~Qt.WindowCloseButtonHint)
@@ -1279,6 +1273,7 @@ class ExtractVariablesGUI(QWidget):
         self.tab.setTabEnabled(2, False)
 
         self.tab.setStyleSheet('QTabBar::tab { height: 40px; width: 200px; }')
+        self.tab.currentChanged.connect(self.switch_tab)
 
         mainLayout = QVBoxLayout()
         mainLayout.addWidget(self.tab)
@@ -1301,6 +1296,14 @@ class ExtractVariablesGUI(QWidget):
             self.setEnabled(True)
             self.show()
 
+    def switch_tab(self, index):
+        if index == 2:
+            if self.input.secondTable.rowCount() == 0:
+                QMessageBox.critical(self, 'Error', 'Choose at least one output variable before submit!',
+                                     QMessageBox.Ok)
+                self.tab.setCurrentIndex(0)
+                return
+
     def reset(self):
         for i, tab in enumerate([self.timeTab, self.submitTab]):
             tab.reset()
@@ -1314,7 +1317,7 @@ class ExtractVariablesGUI(QWidget):
 
 def exception_hook(exctype, value, traceback):
     """!
-    @brief Needed for supressing traceback silencing in newer vesion of PyQt5
+    @brief Needed for suppressing traceback silencing in newer version of PyQt5
     """
     sys._excepthook(exctype, value, traceback)
     sys.exit(1)

@@ -31,8 +31,8 @@ class ReferenceMesh(TruncatedTriangularPrisms):
             self.triangle_polygon_intersection = {}
             self.nb_triangles_inside = self.nb_triangles
             total_area = 0
-            for i, j, k in self.triangles:
-                area = self.triangles[i, j, k].area
+            for (i, j, k), t in self.triangles.items():
+                area = t.area
                 self.area[i, j, k] = area
                 total_area += area
                 self.point_weight[[i, j, k]] += area

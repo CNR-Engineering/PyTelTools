@@ -4,9 +4,11 @@ from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 
 from gui.ExtractVariablesGUI import ExtractVariablesGUI
+from gui.PointsGUI import PointsGUI
 from gui.ComputeVolumeGUI import ComputeVolumeGUI
 from gui.CompareResultsGUI import CompareResultsGUI
 from gui.ComputeFluxGUI import ComputeFluxGUI
+
 
 
 class MyMainWindow(QWidget):
@@ -14,6 +16,7 @@ class MyMainWindow(QWidget):
         super().__init__()
 
         extract = ExtractVariablesGUI(self)
+        interpolate = PointsGUI(self)
         volume = ComputeVolumeGUI(self)
         compare = CompareResultsGUI(self)
         flux = ComputeFluxGUI(self)
@@ -21,13 +24,14 @@ class MyMainWindow(QWidget):
         stackLayout = QStackedLayout()
         stackLayout.addWidget(QLabel('Hello! This is the start page (TODO)'))
         stackLayout.addWidget(extract)
+        stackLayout.addWidget(interpolate)
         stackLayout.addWidget(volume)
         stackLayout.addWidget(flux)
         stackLayout.addWidget(compare)
 
         pageList = QListWidget()
         pageList.setFixedWidth(200)
-        for name in ['Start', 'Extract variables', 'Compute volume', 'Compute flux', 'Compare two results']:
+        for name in ['Start', 'Extract variables', 'Interpolate on points', 'Compute volume', 'Compute flux', 'Compare two results']:
             pageList.addItem('\n' + name + '\n')
         pageList.setFlow(QListView.TopToBottom)
         pageList.currentRowChanged.connect(stackLayout.setCurrentIndex)
@@ -63,7 +67,7 @@ class MyMainWindow(QWidget):
 
 def exception_hook(exctype, value, traceback):
     """!
-    @brief Needed for supressing traceback silencing in newer vesion of PyQt5
+    @brief Needed for suppressing traceback silencing in newer version of PyQt5
     """
     sys._excepthook(exctype, value, traceback)
     sys.exit(1)
