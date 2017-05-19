@@ -79,7 +79,7 @@ class VolumeCalculatorGUI(QThread):
 
 class VolumePlotViewer(TemporalPlotViewer):
     def __init__(self, inputTab):
-        super().__init__()
+        super().__init__('polygon')
         self.input = inputTab
 
         # initialize the map for locating polygons
@@ -116,11 +116,6 @@ class VolumePlotViewer(TemporalPlotViewer):
 
         self.menuBar.addMenu(self.mapMenu)
         self.menuBar.addMenu(self.polyMenu)
-
-    def _defaultXLabel(self, language):
-        if language == 'fr':
-            return 'Temps ({})'.format(['seconde', '', '', 'minute', 'heure', 'jour'][self.timeFormat])
-        return 'Time ({})'.format(['second', '', '', 'minute', 'hour', 'day'][self.timeFormat])
 
     def _defaultYLabel(self, language):
         word = {'fr': 'de', 'en': 'of'}[language]
@@ -164,11 +159,11 @@ class VolumePlotViewer(TemporalPlotViewer):
         self.str_datetime = list(map(lambda x: x.strftime('%Y/%m/%d\n%H:%M'), self.datetime))
         self.str_datetime_bis = list(map(lambda x: x.strftime('%d/%m/%y\n%H:%M'), self.datetime))
 
-        columns = list(self.data)[1:]
-        self.column_labels = {x: x for x in columns}
-        self.column_colors = {x: None for x in columns}
-        for i in range(min(len(columns), len(self.defaultColors))):
-            self.column_colors[columns[i]] = self.defaultColors[i]
+        self.columns = list(self.data)[1:]
+        self.column_labels = {x: x for x in self.columns}
+        self.column_colors = {x: None for x in self.columns}
+        for i in range(min(len(self.columns), len(self.defaultColors))):
+            self.column_colors[self.columns[i]] = self.defaultColors[i]
 
         # initialize the plot
         self.time = [self.data['time'], self.data['time'], self.data['time'],

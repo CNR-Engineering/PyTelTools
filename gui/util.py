@@ -181,8 +181,10 @@ class LoadMeshDialog(OutputProgressDialog):
 
 
 class PlotColumnsSelector(QDialog):
-    def __init__(self, columns, current_columns):
+    def __init__(self, columns, current_columns, name):
         super().__init__()
+        self.name = name
+        self.plural = str(''.join([name, 's']))
 
         self.list = QListWidget()
         for name in columns:
@@ -201,12 +203,12 @@ class PlotColumnsSelector(QDialog):
         buttons.accepted.connect(self.checkSelection)
         buttons.rejected.connect(self.reject)
         vlayout = QVBoxLayout()
-        vlayout.addWidget(QLabel('  Select up to 8 columns to plot'))
+        vlayout.addWidget(QLabel('  Select up to 8 %s to plot' % self.plural))
         vlayout.addWidget(self.list)
         vlayout.addWidget(buttons)
         self.setLayout(vlayout)
 
-        self.setWindowTitle('Select columns to plot')
+        self.setWindowTitle('Select %s to plot' % self.plural)
         self.resize(self.sizeHint())
         self.setMinimumWidth(300)
 
@@ -221,23 +223,23 @@ class PlotColumnsSelector(QDialog):
     def checkSelection(self):
         self.selection = self.getSelection()
         if not self.selection:
-            QMessageBox.critical(self, 'Error', 'Select at least one column to plot.',
+            QMessageBox.critical(self, 'Error', 'Select at least one %s to plot.' % self.name,
                                  QMessageBox.Ok)
             return
         if len(self.selection) > 8:
-            QMessageBox.critical(self, 'Error', 'Select up to 8 columns.',
+            QMessageBox.critical(self, 'Error', 'Select up to 8 %s.' % self.plural,
                                  QMessageBox.Ok)
             return
         self.accept()
 
 
-class ColumnNameEditor(QDialog):
-    def __init__(self, column_labels, selected_columns):
+class ColumnLabelEditor(QDialog):
+    def __init__(self, column_labels, selected_columns, name):
         super().__init__()
 
         self.table = QTableWidget()
         self.table .setColumnCount(2)
-        self.table .setHorizontalHeaderLabels(['Column', 'Label'])
+        self.table .setHorizontalHeaderLabels([name, 'Label'])
         row = 0
         for column in selected_columns:
             label = column_labels[column]
@@ -254,12 +256,12 @@ class ColumnNameEditor(QDialog):
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
         vlayout = QVBoxLayout()
-        vlayout.addWidget(QLabel('Click on the name to modify'))
+        vlayout.addWidget(QLabel('Click on the label to modify'))
         vlayout.addWidget(self.table)
         vlayout.addWidget(buttons)
         self.setLayout(vlayout)
 
-        self.setWindowTitle('Change column labels')
+        self.setWindowTitle('Change %s labels' % name)
         self.resize(self.sizeHint())
         self.setMinimumWidth(300)
 
@@ -271,10 +273,10 @@ class ColumnNameEditor(QDialog):
 
 
 class ColorTable(QTableWidget):
-    def __init__(self):
+    def __init__(self, column_name):
         super().__init__()
         self.setColumnCount(2)
-        self.setHorizontalHeaderLabels(['Column', 'Color'])
+        self.setHorizontalHeaderLabels([column_name, 'Color'])
         self.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.setAcceptDrops(True)
         self.setDragEnabled(True)
@@ -317,7 +319,7 @@ class ColumnColorEditor(QDialog):
     def __init__(self, parent):
         super().__init__()
 
-        self.table = ColorTable()
+        self.table = ColorTable(parent.column_name)
         self.table.setFixedHeight(300)
         self.table.setMaximumWidth(300)
         self.table.setMaximumWidth(500)
@@ -356,7 +358,7 @@ class ColumnColorEditor(QDialog):
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
         vlayout = QVBoxLayout()
-        vlayout.addWidget(QLabel('Drag and drop colors on the polygons'))
+        vlayout.addWidget(QLabel('Drag and drop colors on the %ss' % parent.column_name))
         hlayout = QHBoxLayout()
         hlayout.addWidget(self.available_colors)
         hlayout.addWidget(self.table)
@@ -365,7 +367,7 @@ class ColumnColorEditor(QDialog):
         self.setLayout(vlayout)
 
         self.setFixedSize(500, 400)
-        self.setWindowTitle('Change column color')
+        self.setWindowTitle('Change %s color' % parent.column_name)
 
     def getColors(self, old_colors, column_labels, name_to_color):
         label_to_column = {b: a for a, b, in column_labels.items()}
@@ -676,11 +678,13 @@ class PlotViewer(QWidget):
 
 
 class TemporalPlotViewer(PlotViewer):
-    def __init__(self):
+    def __init__(self, column_name='Column'):
         super().__init__()
         self.data = None
+        self.columns = []
         self.setMinimumWidth(700)
         self.canvas.figure.canvas.mpl_connect('motion_notify_event', self.mouseMove)
+        self.column_name = column_name
 
         # initialize graphical parameters
         self.time = []
@@ -698,11 +702,12 @@ class TemporalPlotViewer(PlotViewer):
         self.timeFormat = 0   # 0: second, 1: date, 2: date (alternative), 3: minutes, 4: hours, 5: days
 
 
-        self.selectColumnsAct = QAction('Select\ncolumns', self, icon=self.style().standardIcon(QStyle.SP_FileDialogDetailedView),
+        self.selectColumnsAct = QAction('Select\n%s' % self.column_name,
+                                        self, icon=self.style().standardIcon(QStyle.SP_FileDialogDetailedView),
                                         triggered=self.selectColumns)
-        self.editColumnNamesAct = QAction('Edit column\nnames', self, icon=self.style().standardIcon(QStyle.SP_FileDialogDetailedView),
+        self.editColumnNamesAct = QAction('Edit %s\nlabels' % self.column_name, self, icon=self.style().standardIcon(QStyle.SP_FileDialogDetailedView),
                                           triggered=self.editColumns)
-        self.editColumColorAct = QAction('Edit column\ncolors', self, icon=self.style().standardIcon(QStyle.SP_FileDialogDetailedView),
+        self.editColumColorAct = QAction('Edit %s\ncolors' % self.column_name, self, icon=self.style().standardIcon(QStyle.SP_FileDialogDetailedView),
                                          triggered=self.editColor)
         self.convertTimeAct = QAction('Toggle date/time\nformat', self, checkable=True,
                                       icon=self.style().standardIcon(QStyle.SP_DialogApplyButton))
@@ -715,8 +720,13 @@ class TemporalPlotViewer(PlotViewer):
         self.timeMenu.addAction(self.changeDateAct)
         self.menuBar.addMenu(self.timeMenu)
 
+    def _defaultXLabel(self, language):
+        if language == 'fr':
+            return 'Temps ({})'.format(['seconde', '', '', 'minute', 'heure', 'jour'][self.timeFormat])
+        return 'Time ({})'.format(['second', '', '', 'minute', 'hour', 'day'][self.timeFormat])
+
     def selectColumns(self):
-        msg = PlotColumnsSelector(list(self.data)[1:], self.current_columns)
+        msg = PlotColumnsSelector(self.columns, self.current_columns, self.column_name)
         value = msg.exec_()
         if value == QDialog.Rejected:
             return
@@ -724,7 +734,7 @@ class TemporalPlotViewer(PlotViewer):
         self.replot()
 
     def editColumns(self):
-        msg = ColumnNameEditor(self.column_labels, self.current_columns)
+        msg = ColumnLabelEditor(self.column_labels, self.current_columns, self.column_name)
         value = msg.exec_()
         if value == QDialog.Rejected:
             return
