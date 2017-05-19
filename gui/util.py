@@ -1,11 +1,14 @@
 import sys
 import os
 import logging
+
+
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 import datetime
-from shapely.geometry import Polygon
+import shapely
+
 import numpy as np
 import matplotlib
 matplotlib.use('Qt5Agg')
@@ -20,6 +23,12 @@ import matplotlib.lines as mlines
 
 from matplotlib.colors import Normalize, colorConverter
 from mpl_toolkits.axes_grid1 import make_axes_locatable
+from rtree.index import Index
+
+from slf.volume import TruncatedTriangularPrisms
+from slf.flux import TriangularVectorField
+from slf.comparison import ReferenceMesh
+from slf.interpolation import MeshInterpolator
 
 
 class QPlainTextEditLogger(logging.Handler):
@@ -117,6 +126,58 @@ class OutputProgressDialog(QProgressDialog):
 
     def connectToThread(self, thread):
         thread.tick.connect(self.setValue)
+
+
+class ConstructIndexThread(QThread):
+    tick = pyqtSignal(int, name='changed')
+
+    def __init__(self, mesh_type, input_header):
+        super().__init__()
+        self.input_header = input_header
+
+        if mesh_type == 'volume':
+            self.mesh = TruncatedTriangularPrisms(input_header, False)
+        elif mesh_type == 'flux':
+            self.mesh = TriangularVectorField(input_header, False)
+        elif mesh_type == 'comparison':
+            self.mesh = ReferenceMesh(input_header, False)
+        else:
+            self.mesh = MeshInterpolator(input_header, False)
+
+    def run(self):
+        self.mesh.index = Index()
+
+        # emit a signal for every five percent of triangles processed
+        five_percent = 0.05 * self.mesh.nb_triangles
+        nb_processed = 0
+        current_percent = 0
+
+        for i, j, k in self.mesh.ikle:
+            t = shapely.geometry.Polygon([self.mesh.points[i], self.mesh.points[j], self.mesh.points[k]])
+            self.mesh.triangles[i, j, k] = t
+            self.mesh.index.insert(i, t.bounds, obj=(i, j, k))
+
+            nb_processed += 1
+            if nb_processed > five_percent:
+                nb_processed = 0
+                current_percent += 5
+                self.tick.emit(current_percent)
+                QApplication.processEvents()
+        return self.mesh
+
+
+class LoadMeshDialog(OutputProgressDialog):
+    def __init__(self, mesh_type, input_header):
+        super().__init__('Processing the mesh. Please wait.', 'Processing the mesh...')
+        self.thread = ConstructIndexThread(mesh_type, input_header)
+        self.connectToThread(self.thread)
+
+    def run(self):
+        self.thread.run()
+        self.setValue(100)
+        self.cancelButton.setEnabled(True)
+        self.exec_()
+        return self.thread.mesh
 
 
 class PlotColumnsSelector(QDialog):

@@ -12,48 +12,16 @@ import pandas as pd
 from slf import Serafin
 from slf.interpolation import Interpolator, MeshInterpolator
 from geom import Shapefile
-from gui.util import TemporalPlotViewer, MapViewer, MapCanvas, QPlainTextEditLogger, TableWidgetDragRows, OutputProgressDialog
+from gui.util import TemporalPlotViewer, MapViewer, MapCanvas, QPlainTextEditLogger, \
+    TableWidgetDragRows, OutputProgressDialog, LoadMeshDialog
 
 
-class MeshInterpolatorGUI(QThread):
+class WriteCSVProcess(QThread):
     tick = pyqtSignal(int, name='changed')
 
-    def __init__(self, input_header):
+    def __init__(self, mesh):
         super().__init__()
-        self.mesh = MeshInterpolator(input_header)
-
-    def get_point_interpolators(self, points):
-        nb_points = len(points)
-        is_inside = [False] * nb_points
-        point_interpolators = [None] * nb_points
-        nb_inside = 0
-
-        # updating the progress bar for every 5% of triangles processed
-        nb_processed = 0
-        current_percent = 0
-        five_percent_triangles = self.mesh.nb_triangles * 0.05
-
-        for (i, j, k), t in self.mesh.triangles.items():
-            nb_processed += 1
-            if nb_processed > five_percent_triangles:
-                nb_processed = 0
-                current_percent += 5
-                self.tick.emit(current_percent)
-                # QApplication.processEvents()
-
-            t_interpolator = Interpolator(t)
-            for p_index, (x, y) in enumerate(points):
-                if is_inside[p_index]:
-                    continue
-                p_is_inside, p_interpolator = t_interpolator.is_in_triangle(x, y)
-                if p_is_inside:
-                    is_inside[p_index] = True
-                    nb_inside += 1
-                    point_interpolators[p_index] = ((i, j, k), p_interpolator)
-            if nb_inside == nb_points:
-                break
-
-        return is_inside, point_interpolators
+        self.mesh = mesh
 
     def write_header(self, output_stream, selected_vars, points):
         output_stream.write('time')
@@ -361,9 +329,12 @@ class InputTab(QWidget):
             self.summaryTextBox.appendPlainText(resin.get_summary())
 
             # record the mesh for future visualization and calculations
-            logging.info('Starting to process the mesh')
-            self.mesh = MeshInterpolatorGUI(resin.header)
-            logging.info('Done')
+            logging.info('Processing the mesh')
+            self.parent.inDialog()
+            meshLoader = LoadMeshDialog('interpolation', resin.header)
+            self.mesh = meshLoader.run()
+            self.parent.outDialog()
+            logging.info('Finished processing the mesh')
 
             # copy to avoid reading the same data in the future
             self.header = copy.deepcopy(resin.header)
@@ -400,27 +371,9 @@ class InputTab(QWidget):
             return
         logging.info('Finished reading the points file %s' % filename)
 
-
-        # locate the points in the msh
-        logging.info('Starting to process the points')
-        self.parent.inDialog()
-
-        # initialize the progress bar
-        progressBar = OutputProgressDialog('Processing the points. Please wait.', 'Processing the points...')
-        progressBar.setValue(1)
-        QApplication.processEvents()
-        progressBar.connectToThread(self.mesh)
-
         is_inside, self.point_interpolators = self.mesh.get_point_interpolators(self.points)
 
         self.attribute_table.getData(self.points, is_inside, fields, attributes)
-        logging.info('Done')
-
-        progressBar.setValue(100)
-        progressBar.cancelButton.setEnabled(True)
-        progressBar.exec_()
-        self.parent.outDialog()
-
 
         self.pointsNameBox.clear()
         self.pointsNameBox.appendPlainText(filename + '\n' + 'The file contains {} point{}.'
@@ -439,7 +392,7 @@ class InputTab(QWidget):
 
     def btnMapEvent(self):
         if not self.has_map:
-            self.map.canvas.initFigure(self.mesh.mesh)
+            self.map.canvas.initFigure(self.mesh)
             self.map.canvas.axes.scatter(*zip(*self.points))
             self.map.canvas.draw()
             self.has_map = True
@@ -550,8 +503,9 @@ class WriteCSVTab(QWidget):
         indices_inside = [i for i in range(len(self.input.points)) if self.input.point_interpolators[i] is not None]
 
         # initialize the progress bar
+        process = WriteCSVProcess(self.input.mesh)
         progressBar = OutputProgressDialog()
-        progressBar.connectToThread(self.input.mesh)
+        progressBar.connectToThread(process)
 
         with Serafin.Read(self.input.filename, self.input.language) as resin:
             resin.header = self.input.header
@@ -561,9 +515,9 @@ class WriteCSVTab(QWidget):
             QApplication.processEvents()
 
             with open(filename, 'w') as fout:
-                self.input.mesh.write_csv(resin, selected_time, selected_var_IDs, fout,
-                                          [self.input.points[i] for i in indices_inside],
-                                          [self.input.point_interpolators[i] for i in indices_inside])
+                process.write_csv(resin, selected_time, selected_var_IDs, fout,
+                                  [self.input.points[i] for i in indices_inside],
+                                  [self.input.point_interpolators[i] for i in indices_inside])
 
         logging.info('Finished writing the output')
         progressBar.setValue(100)

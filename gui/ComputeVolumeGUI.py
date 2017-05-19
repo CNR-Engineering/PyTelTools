@@ -11,7 +11,8 @@ import pandas as pd
 from slf import Serafin
 from slf.volume import TruncatedTriangularPrisms, VolumeCalculator
 from geom import BlueKenue, Shapefile
-from gui.util import TemporalPlotViewer, QPlainTextEditLogger, MapViewer, PolygonMapCanvas, OutputProgressDialog
+from gui.util import TemporalPlotViewer, QPlainTextEditLogger, MapViewer, PolygonMapCanvas, \
+    OutputProgressDialog, LoadMeshDialog
 
 
 class VolumeCalculatorGUI(QThread):
@@ -23,14 +24,14 @@ class VolumeCalculatorGUI(QThread):
 
         self.calculator = VolumeCalculator(volume_type, var_ID, second_var_ID, input_stream, polynames, polygons,
                                            time_sampling_frequency)
-        self.base_triangles = mesh
+        self.mesh = mesh
 
     def run_calculator(self):
         self.tick.emit(6)
         QApplication.processEvents()
 
         logging.info('Starting to process the mesh')
-        self.calculator.base_triangles = self.base_triangles
+        self.calculator.mesh = self.mesh
         self.tick.emit(15)
         QApplication.processEvents()
 
@@ -52,7 +53,8 @@ class VolumeCalculatorGUI(QThread):
                 if self.calculator.second_var_ID == VolumeCalculator.INIT_VALUE:
                     values -= init_values
                 else:
-                    second_values = self.calculator.input_stream.read_var_in_frame(time_index, self.calculator.second_var_ID)
+                    second_values = self.calculator.input_stream.read_var_in_frame(time_index,
+                                                                                   self.calculator.second_var_ID)
                     values -= second_values
 
             for j in range(len(self.calculator.polygons)):
@@ -409,7 +411,12 @@ class InputTab(QWidget):
             self.summaryTextBox.appendPlainText(resin.get_summary())
 
             # record the mesh for future visualization and calculations
-            self.mesh = TruncatedTriangularPrisms(resin.header)
+            logging.info('Processing the mesh')
+            self.parent.inDialog()
+            meshLoader = LoadMeshDialog('volume', resin.header)
+            self.mesh = meshLoader.run()
+            self.parent.outDialog()
+            logging.info('Finished processing the mesh')
 
             # copy to avoid reading the same data in the future
             self.header = copy.deepcopy(resin.header)

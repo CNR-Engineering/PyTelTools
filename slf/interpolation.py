@@ -29,27 +29,23 @@ class Interpolator:
 
 
 class MeshInterpolator(Mesh2D):
-    def __init__(self, input_header):
-        super().__init__(input_header)
-        self._construct_triangles()
+    def __init__(self, input_header, construct_index):
+        super().__init__(input_header, construct_index)
 
     def get_point_interpolators(self, points):
         nb_points = len(points)
         is_inside = [False] * nb_points
         point_interpolators = [None] * nb_points
-        nb_inside = 0
-        for (i, j, k), t in self.triangles.items():
-            t_interpolator = Interpolator(t)
-            for p_index, (x, y) in enumerate(points):
-                if is_inside[p_index]:
-                    continue
-                p_is_inside, p_interpolator = t_interpolator.is_in_triangle(x, y)
-                if p_is_inside:
-                    is_inside[p_index] = True
-                    nb_inside += 1
-                    point_interpolators[p_index] = ((i, j, k), p_interpolator)
-            if nb_inside == nb_points:
-                break
+
+        for index, (x, y) in enumerate(points):
+            potential_element = self.get_intersecting_elements((x, y, x, y))
+            if not potential_element:
+                continue
+            is_inside[index] = True
+            i, j, k = potential_element[0]
+            t = self.triangles[i, j, k]
+            point_interpolators[index] = ((i, j, k), Interpolator(t).get_interpolator_at(x, y))
+
         return is_inside, point_interpolators
 
 

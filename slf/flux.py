@@ -12,9 +12,8 @@ class TriangularVectorField(Mesh2D):
     """!
     @brief The representation of Mesh2D in Serafin file when one computes the flux across sections of some vectors
     """
-    def __init__(self, input_header):
-        super().__init__(input_header)
-        self._construct_index()
+    def __init__(self, input_header, construct_index):
+        super().__init__(input_header, construct_index)
 
     def section_intersection(self, section):
         """!
@@ -195,15 +194,15 @@ class FluxCalculator:
 
         self.time_indices = range(0, len(input_stream.time), time_sampling_frequency)
 
-        self.base_triangles = None
+        self.mesh = None
         self.intersections = []
 
     def construct_triangles(self):
-        self.base_triangles = TriangularVectorField(self.input_stream.header)
+        self.mesh = TriangularVectorField(self.input_stream.header, True)
 
     def construct_intersections(self):
         for section in self.sections:
-            self.intersections.append(self.base_triangles.section_intersection(section))
+            self.intersections.append(self.mesh.section_intersection(section))
 
     def flux_in_frame(self, intersections, values):
         if self.flux_type == FluxCalculator.LINE_INTEGRAL:

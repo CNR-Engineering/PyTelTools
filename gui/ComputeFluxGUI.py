@@ -12,7 +12,8 @@ from slf import Serafin
 from slf.flux import TriangularVectorField, FluxCalculator
 from gui.util import QPlainTextEditLogger
 from geom import BlueKenue, Shapefile
-from gui.util import TemporalPlotViewer, QPlainTextEditLogger, SectionMapCanvas, MapViewer, OutputProgressDialog
+from gui.util import TemporalPlotViewer, QPlainTextEditLogger, SectionMapCanvas, MapViewer, \
+    OutputProgressDialog, LoadMeshDialog
 
 
 class FluxCalculatorGUI(QThread):
@@ -24,14 +25,14 @@ class FluxCalculatorGUI(QThread):
 
         self.calculator = FluxCalculator(flux_type, var_IDs, input_stream,
                                          section_names, sections, time_sampling_frequency)
-        self.base_triangles = mesh
+        self.mesh = mesh
 
     def run_calculator(self):
         self.tick.emit(6)
         QApplication.processEvents()
 
         logging.info('Starting to process the mesh')
-        self.calculator.base_triangles = self.base_triangles
+        self.calculator.mesh = self.mesh
         self.tick.emit(15)
         QApplication.processEvents()
 
@@ -321,7 +322,12 @@ class InputTab(QWidget):
             resin.get_time()
 
             # record the mesh for future visualization and calculations
-            self.mesh = TriangularVectorField(resin.header)
+            logging.info('Processing the mesh')
+            self.parent.inDialog()
+            meshLoader = LoadMeshDialog('flux', resin.header)
+            self.mesh = meshLoader.run()
+            self.parent.outDialog()
+            logging.info('Finished processing the mesh')
 
             # update the file summary
             self.summaryTextBox.appendPlainText(resin.get_summary())

@@ -11,8 +11,8 @@ class ReferenceMesh(TruncatedTriangularPrisms):
     """!
     Compute different error measures when comparing a test mesh to a reference mesh
     """
-    def __init__(self, input_header):
-        super().__init__(input_header)
+    def __init__(self, input_header, construct_index):
+        super().__init__(input_header, construct_index)
         self.area = {}
         self.point_weight = None
         self.inverse_total_area = None

@@ -28,9 +28,8 @@ class TruncatedTriangularPrisms(Mesh2D):
     the surface area of the intersection (polygon or multipolygon) times
     the interpolated value of the centroid of the intersection.
     """
-    def __init__(self, input_header):
-        super().__init__(input_header)
-        self._construct_index()
+    def __init__(self, input_header, construct_index):
+        super().__init__(input_header, construct_index)
 
     def polygon_intersection_strict(self, polygon):
         """!
@@ -212,23 +211,23 @@ class VolumeCalculator:
 
         self.time_indices = range(0, len(input_stream.time), time_sampling_frequency)
 
-        self.base_triangles = None
+        self.mesh = None
         self.weights = []
 
     def construct_triangles(self):
-        self.base_triangles = TruncatedTriangularPrisms(self.input_stream.header)
+        self.mesh = TruncatedTriangularPrisms(self.input_stream.header, True)
 
     def construct_weights(self):
         if self.volume_type == VolumeCalculator.NET_STRICT:
             for poly in self.polygons:
-                self.weights.append(self.base_triangles.polygon_intersection_strict(poly))
+                self.weights.append(self.mesh.polygon_intersection_strict(poly))
         elif self.volume_type == VolumeCalculator.NET:
             for poly in self.polygons:
-                weight, triangle_polygon_intersection = self.base_triangles.polygon_intersection(poly)
+                weight, triangle_polygon_intersection = self.mesh.polygon_intersection(poly)
                 self.weights.append((weight, triangle_polygon_intersection))
         elif self.volume_type == VolumeCalculator.POSITIVE:
             for poly in self.polygons:
-                self.weights.append(self.base_triangles.polygon_intersection_all(poly))
+                self.weights.append(self.mesh.polygon_intersection_all(poly))
 
     def volume_in_frame_in_polygon(self, weight, values, polygon):
         if self.volume_type == VolumeCalculator.NET_STRICT:
