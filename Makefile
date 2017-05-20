@@ -1,14 +1,30 @@
 # make clean
-# make doc
-# make test
-# make venv
+#   Remove all potential generated folder/files
 #
-# Required dependencies
+# make doc
+#   Generate doxygen documentation in doc
+# make update_doc
+#   Update generated documentation (path to local git repository is specified in variable `DOC_PATH`)
+#
+# make test
+#   Check test cases
+#
+# make venv
+#   Create python virtual environnement
+#
+# Required dependencies:
 # - doc: doxygen
+# - test: pytest (Python package, listed in requirements.txt)
 # - venv: virtualenv
+#
+DOC_PATH=../CNR-Engineering.github.io/TelTools
 
-doc:
-	doxygen doxygen.config
+doc: doxygen.config
+	doxygen $<
+
+update_doc: doc
+	rm -r ${DOC_PATH} && cp -r doc/html ${DOC_PATH}
+	cd ${DOC_PATH} && git add -A && git commit -m "Update doc" && git push && cd -
 
 venv:
 	virtualenv venv --python=python3
@@ -21,4 +37,4 @@ test:
 clean:
 	rm -rf doc venv .cache
 
-.PHONY: doc test venv
+.PHONY: clean test update_doc venv
