@@ -69,11 +69,13 @@ class Polyline:
         """!
         @brief (Used in flux calculation) Return the linearString intersection with the triangle
         @param <shapely.geometry.Polygon> triangle: A triangle
-        @return <bool, shapely.geometry.LinearString>: The intersection with the triangle
+        @return <bool, [shapely.geometry.LinearString]>: The intersection with the triangle
         """
         inter = triangle.intersection(self._polyline)
         if inter.geom_type == 'LineString':
-            return True, inter
+            return True, [inter]
+        elif inter.geom_type == 'MultiLineString':
+            return True, list(inter.geoms)
         return False, None
 
 
