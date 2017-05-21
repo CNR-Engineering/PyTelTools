@@ -2,7 +2,7 @@
 Geometrical objects
 """
 
-from shapely.geometry import LineString as OpenPolyline, Polygon as ClosedPolyline
+from shapely.geometry import LineString as OpenPolyline, Polygon as ClosedPolyline, MultiPolygon
 
 
 class Polyline:
@@ -50,6 +50,11 @@ class Polyline:
         inter = self._polyline.intersection(triangle)
         if inter.geom_type == 'Polygon' or inter.geom_type == 'MultiPolygon':
             return True, inter
+        elif inter.geom_type == 'GeometryCollection':
+            poly = list(filter(lambda x: x.geom_type == 'Polygon', inter.geoms))
+            if not poly:
+                return False, None
+            return True, MultiPolygon(poly)
         return False, None
 
     @staticmethod
@@ -63,6 +68,11 @@ class Polyline:
         diff = triangle.difference(polygon.polyline())
         if diff.geom_type == 'Polygon' or diff.geom_type == 'MultiPolygon':
             return True, diff
+        elif diff.geom_type == 'GeometryCollection':
+            poly = list(filter(lambda x: x.geom_type == 'Polygon', diff.geoms))
+            if not poly:
+                return False, None
+            return True, MultiPolygon(poly)
         return False, None
 
     def linestring_intersection(self, triangle):
@@ -76,6 +86,8 @@ class Polyline:
             return True, [inter]
         elif inter.geom_type == 'MultiLineString':
             return True, list(inter.geoms)
+        elif inter.geom_type == 'GeometryCollection':
+            return True, list(filter(lambda x: x.geom_type == 'LineString', inter.geoms))
         return False, None
 
 
