@@ -1,4 +1,4 @@
-from .Polyline import Polyline
+from .Geometry import Polyline
 
 
 class BKi2s:

@@ -7,7 +7,7 @@ import numpy as np
 import shapely.geometry as geom
 from slf.interpolation import Interpolator
 from slf.mesh2D import Mesh2D
-from geom import Polyline
+from geom import Geometry
 
 
 class TruncatedTriangularPrisms(Mesh2D):
@@ -28,8 +28,8 @@ class TruncatedTriangularPrisms(Mesh2D):
     the surface area of the intersection (polygon or multipolygon) times
     the interpolated value of the centroid of the intersection.
     """
-    def __init__(self, input_header):
-        super().__init__(input_header)
+    def __init__(self, input_header, construct_index):
+        super().__init__(input_header, construct_index)
 
     def polygon_intersection_strict(self, polygon):
         """!
@@ -37,8 +37,7 @@ class TruncatedTriangularPrisms(Mesh2D):
         @param <geom.Polyline> polygon: A polygon
         @return <numpy.1D-array>: The weight carried by the triangle nodes
         """
-        bounds = polygon.bounds()
-        potential_elements = list(self.index.intersection(bounds, objects='raw'))
+        potential_elements = self.get_intersecting_elements(polygon.bounds())
         weight = np.zeros((self.nb_points,), dtype=np.float64)
         for i, j, k in potential_elements:
             t = self.triangles[i, j, k]
@@ -52,8 +51,7 @@ class TruncatedTriangularPrisms(Mesh2D):
         @param <geom.Polyline> polygon: A polygon
         @return <numpy.1D-array, dict>: The weight carried by the triangle nodes, and the dictionary of tuple (area, centroid value) for boundary triangles
         """
-        bounds = polygon.bounds()
-        potential_elements = list(self.index.intersection(bounds, objects='raw'))
+        potential_elements = self.get_intersecting_elements(polygon.bounds())
         weight = np.zeros((self.nb_points,), dtype=np.float64)
         triangle_polygon_intersection = {}
         for i, j, k in potential_elements:
@@ -74,8 +72,7 @@ class TruncatedTriangularPrisms(Mesh2D):
         @param <geom.Polyline> polygon: A polygon
         @return <dict, dict>: The dictionaries of all triangles contained in polygon, and of tuples (base triangle, intersection) for boundary triangles
         """
-        bounds = polygon.bounds()
-        potential_elements = list(self.index.intersection(bounds, objects='raw'))
+        potential_elements = self.get_intersecting_elements(polygon.bounds())
         weight = np.zeros((self.nb_points,), dtype=np.float64)
         triangles = {}
         triangle_polygon_net_intersection = {}
@@ -189,7 +186,7 @@ class TruncatedTriangularPrisms(Mesh2D):
             else:
                 # volume sup = (volume net intersected)
                 #              - (volume negative tetrahedron - volume in tetrahedron but not in polygon)
-                is_intersected, new_difference = Polyline.Polyline.triangle_difference(new_triangle, polygon)
+                is_intersected, new_difference = Geometry.Polyline.triangle_difference(new_triangle, polygon)
                 if not is_intersected:
                     return 0
                 centroid = new_difference.centroid
@@ -214,23 +211,23 @@ class VolumeCalculator:
 
         self.time_indices = range(0, len(input_stream.time), time_sampling_frequency)
 
-        self.base_triangles = None
+        self.mesh = None
         self.weights = []
 
     def construct_triangles(self):
-        self.base_triangles = TruncatedTriangularPrisms(self.input_stream.header)
+        self.mesh = TruncatedTriangularPrisms(self.input_stream.header, True)
 
     def construct_weights(self):
         if self.volume_type == VolumeCalculator.NET_STRICT:
             for poly in self.polygons:
-                self.weights.append(self.base_triangles.polygon_intersection_strict(poly))
+                self.weights.append(self.mesh.polygon_intersection_strict(poly))
         elif self.volume_type == VolumeCalculator.NET:
             for poly in self.polygons:
-                weight, triangle_polygon_intersection = self.base_triangles.polygon_intersection(poly)
+                weight, triangle_polygon_intersection = self.mesh.polygon_intersection(poly)
                 self.weights.append((weight, triangle_polygon_intersection))
         elif self.volume_type == VolumeCalculator.POSITIVE:
             for poly in self.polygons:
-                self.weights.append(self.base_triangles.polygon_intersection_all(poly))
+                self.weights.append(self.mesh.polygon_intersection_all(poly))
 
     def volume_in_frame_in_polygon(self, weight, values, polygon):
         if self.volume_type == VolumeCalculator.NET_STRICT:

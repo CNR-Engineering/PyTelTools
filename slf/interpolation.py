@@ -4,6 +4,7 @@ Barycentric interpolation in triangles
 """
 
 import numpy as np
+from slf.mesh2D import Mesh2D
 
 
 class Interpolator:
@@ -24,6 +25,27 @@ class Interpolator:
 
     def is_in_triangle(self, x, y):
         coord = (Interpolator.VEC0 * self.norm_z + (x-self.x1) * self.vec_y - (y-self.y1) * self.vec_x) * self.inv_norm_z
-        return np.all(coord >= 0) and np.all(coord <= 1)
+        return np.all(coord >= 0) and np.all(coord <= 1), coord
+
+
+class MeshInterpolator(Mesh2D):
+    def __init__(self, input_header, construct_index):
+        super().__init__(input_header, construct_index)
+
+    def get_point_interpolators(self, points):
+        nb_points = len(points)
+        is_inside = [False] * nb_points
+        point_interpolators = [None] * nb_points
+
+        for index, (x, y) in enumerate(points):
+            potential_element = self.get_intersecting_elements((x, y, x, y))
+            if not potential_element:
+                continue
+            is_inside[index] = True
+            i, j, k = potential_element[0]
+            t = self.triangles[i, j, k]
+            point_interpolators[index] = ((i, j, k), Interpolator(t).get_interpolator_at(x, y))
+
+        return is_inside, point_interpolators
 
 

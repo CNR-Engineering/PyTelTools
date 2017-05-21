@@ -37,7 +37,6 @@ class SerafinVariableNames:
         @param var_name <bytes>: the name of the new variable
         @return <bytes>: the unit of the new variable
         """
-        # print(var_name, self.var_table.index.tolist())
         try:
             var_index = self.var_table.index.tolist().index(var_name)
         except ValueError:

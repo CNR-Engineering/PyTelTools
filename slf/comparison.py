@@ -11,8 +11,8 @@ class ReferenceMesh(TruncatedTriangularPrisms):
     """!
     Compute different error measures when comparing a test mesh to a reference mesh
     """
-    def __init__(self, input_header):
-        super().__init__(input_header)
+    def __init__(self, input_header, construct_index):
+        super().__init__(input_header, construct_index)
         self.area = {}
         self.point_weight = None
         self.inverse_total_area = None
@@ -31,8 +31,8 @@ class ReferenceMesh(TruncatedTriangularPrisms):
             self.triangle_polygon_intersection = {}
             self.nb_triangles_inside = self.nb_triangles
             total_area = 0
-            for i, j, k in self.triangles:
-                area = self.triangles[i, j, k].area
+            for (i, j, k), t in self.triangles.items():
+                area = t.area
                 self.area[i, j, k] = area
                 total_area += area
                 self.point_weight[[i, j, k]] += area
@@ -41,8 +41,7 @@ class ReferenceMesh(TruncatedTriangularPrisms):
             self.polygon = polygon
             self.nb_triangles_inside = 0
 
-            bounds = polygon.bounds()
-            potential_elements = list(self.index.intersection(bounds, objects='raw'))
+            potential_elements = self.get_intersecting_elements(polygon.bounds())
             self.point_weight = np.zeros((self.nb_points,), dtype=np.float64)
             self.triangle_polygon_intersection = {}
             total_area = 0

@@ -11,7 +11,8 @@ import pandas as pd
 from slf import Serafin
 from slf.volume import TruncatedTriangularPrisms, VolumeCalculator
 from geom import BlueKenue, Shapefile
-from gui.util import PlotViewer, QPlainTextEditLogger, TableWidgetDragRows, MapViewer, PolygonMapCanvas
+from gui.util import TemporalPlotViewer, QPlainTextEditLogger, MapViewer, PolygonMapCanvas, \
+    OutputProgressDialog, LoadMeshDialog
 
 
 class VolumeCalculatorGUI(QThread):
@@ -23,13 +24,14 @@ class VolumeCalculatorGUI(QThread):
 
         self.calculator = VolumeCalculator(volume_type, var_ID, second_var_ID, input_stream, polynames, polygons,
                                            time_sampling_frequency)
-        self.base_triangles = mesh
+        self.mesh = mesh
 
     def run_calculator(self):
         self.tick.emit(6)
         QApplication.processEvents()
 
-        self.calculator.base_triangles = self.base_triangles
+        logging.info('Starting to process the mesh')
+        self.calculator.mesh = self.mesh
         self.tick.emit(15)
         QApplication.processEvents()
 
@@ -51,7 +53,8 @@ class VolumeCalculatorGUI(QThread):
                 if self.calculator.second_var_ID == VolumeCalculator.INIT_VALUE:
                     values -= init_values
                 else:
-                    second_values = self.calculator.input_stream.read_var_in_frame(time_index, self.calculator.second_var_ID)
+                    second_values = self.calculator.input_stream.read_var_in_frame(time_index,
+                                                                                   self.calculator.second_var_ID)
                     values -= second_values
 
             for j in range(len(self.calculator.polygons)):
@@ -65,6 +68,8 @@ class VolumeCalculatorGUI(QThread):
             result.append(i_result)
 
             self.tick.emit(30 + int(70 * (i+1) / len(self.calculator.time_indices)))
+            QApplication.processEvents()
+
         return result
 
     def write_csv(self, output_stream):
@@ -72,274 +77,25 @@ class VolumeCalculatorGUI(QThread):
         self.calculator.write_csv(result, output_stream)
 
 
-class OutputProgressDialog(QProgressDialog):
-    def __init__(self, parent=None):
-        super().__init__('Output in progress', 'OK', 0, 100, parent)
-
-        self.cancelButton = QPushButton('OK')
-        self.setCancelButton(self.cancelButton)
-        self.cancelButton.setEnabled(False)
-
-        self.setAutoReset(False)
-        self.setAutoClose(False)
-
-        self.setWindowTitle('Writing the output...')
-        self.setWindowFlags(Qt.WindowTitleHint)
-        self.setFixedSize(300, 150)
-
-        self.open()
-        self.setValue(0)
-        QApplication.processEvents()
-
-    def connectToCalculator(self, thread):
-        thread.tick.connect(self.setValue)
-
-
-class PlotColumnsSelector(QDialog):
-    def __init__(self, columns, current_columns):
-        super().__init__()
-
-        self.list = QListWidget()
-        for name in columns:
-            item = QListWidgetItem(name)
-            item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
-            if name in current_columns:
-                item.setCheckState(Qt.Checked)
-            else:
-                item.setCheckState(Qt.Unchecked)
-            self.list.addItem(item)
-
-        self.selection = tuple([])
-
-        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel,
-                                   Qt.Horizontal, self)
-        buttons.accepted.connect(self.checkSelection)
-        buttons.rejected.connect(self.reject)
-        vlayout = QVBoxLayout()
-        vlayout.addWidget(QLabel('  Select up to 8 columns to plot'))
-        vlayout.addWidget(self.list)
-        vlayout.addWidget(buttons)
-        self.setLayout(vlayout)
-
-        self.setWindowTitle('Select columns to plot')
-        self.resize(self.sizeHint())
-        self.setMinimumWidth(300)
-
-    def getSelection(self):
-        selection = []
-        for row in range(self.list.count()):
-            item = self.list.item(row)
-            if item.checkState() == Qt.Checked:
-                selection.append(item.text())
-        return tuple(selection)
-
-    def checkSelection(self):
-        self.selection = self.getSelection()
-        if not self.selection:
-            QMessageBox.critical(self, 'Error', 'Select at least one column to plot.',
-                                 QMessageBox.Ok)
-            return
-        if len(self.selection) > 8:
-            QMessageBox.critical(self, 'Error', 'Select up to 8 columns.',
-                                 QMessageBox.Ok)
-            return
-        self.accept()
-
-
-class ColumnNameEditor(QDialog):
-    def __init__(self, column_labels, selected_columns):
-        super().__init__()
-
-        self.table = QTableWidget()
-        self.table .setColumnCount(2)
-        self.table .setHorizontalHeaderLabels(['Column', 'Label'])
-        row = 0
-        for column in selected_columns:
-            label = column_labels[column]
-            self.table.insertRow(row)
-            c = QTableWidgetItem(column)
-            l = QTableWidgetItem(label)
-            self.table.setItem(row, 0, c)
-            self.table.setItem(row, 1, l)
-            self.table.item(row, 0).setFlags(Qt.ItemIsEditable)
-            row += 1
-
-        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel,
-                                   Qt.Horizontal, self)
-        buttons.accepted.connect(self.accept)
-        buttons.rejected.connect(self.reject)
-        vlayout = QVBoxLayout()
-        vlayout.addWidget(QLabel('Click on the name to modify'))
-        vlayout.addWidget(self.table)
-        vlayout.addWidget(buttons)
-        self.setLayout(vlayout)
-
-        self.setWindowTitle('Change column labels')
-        self.resize(self.sizeHint())
-        self.setMinimumWidth(300)
-
-    def getLabels(self, old_labels):
-        for row in range(self.table.rowCount()):
-            column = self.table.item(row, 0).text()
-            label = self.table.item(row, 1).text()
-            old_labels[column] = label
-
-
-class ColorTable(QTableWidget):
-    def __init__(self):
-        super().__init__()
-        self.setColumnCount(2)
-        self.setHorizontalHeaderLabels(['Column', 'Color'])
-        self.setEditTriggers(QAbstractItemView.NoEditTriggers)
-        self.setAcceptDrops(True)
-        self.setDragEnabled(True)
-        self.setDragDropOverwriteMode(False)
-        self.setSelectionBehavior(QAbstractItemView.SelectItems)
-        self.setSelectionMode(QAbstractItemView.SingleSelection)
-        self.last_drop_row = None
-
-    def dropMimeData(self, row, col, mimeData, action):
-        self.last_drop_row = row
-        return True
-
-    def getselectedRow(self):
-        for item in self.selectedItems():
-            return item.row()
-
-    def dropEvent(self, event):
-        sender = event.source()
-        super().dropEvent(event)
-        dropRow = self.last_drop_row
-        if dropRow > self.rowCount()-1:
-            return
-
-        if self != sender:
-            selectedRows = sender.getselectedRowsFast()
-            selectedRow = selectedRows[0]
-
-            item = sender.item(selectedRow, 0)
-            source = QTableWidgetItem(item)
-            self.setItem(dropRow, 1, source)
-        else:
-            selectedRow = self.getselectedRow()
-            source = self.item(selectedRow, 1).text()
-            self.item(selectedRow, 1).setText(self.item(dropRow, 1).text())
-            self.item(dropRow, 1).setText(source)
-        event.accept()
-
-
-class ColumnColorEditor(QDialog):
-    def __init__(self, parent):
-        super().__init__()
-
-        self.table = ColorTable()
-        self.table.setFixedHeight(300)
-        self.table.setMaximumWidth(300)
-        self.table.setMaximumWidth(500)
-        used_colors = []
-        row = 0
-        for column in parent.current_columns:
-            label = parent.column_labels[column]
-            color = parent.colorToName[parent.column_colors[column]]
-            used_colors.append(color)
-            self.table.insertRow(row)
-            lab = QTableWidgetItem(label)
-            col = QTableWidgetItem(color)
-            self.table.setItem(row, 0, lab)
-            self.table.setItem(row, 1, col)
-            row += 1
-        self.available_colors = TableWidgetDragRows()
-        self.available_colors.setSelectionMode(QAbstractItemView.SingleSelection)
-        self.available_colors.setColumnCount(1)
-        self.available_colors.setHorizontalHeaderLabels(['Available colors'])
-        self.available_colors.setEditTriggers(QAbstractItemView.NoEditTriggers)
-        self.available_colors.setAcceptDrops(False)
-        self.available_colors.setFixedHeight(300)
-        self.available_colors.setMinimumWidth(150)
-        self.available_colors.setMaximumWidth(300)
-        self.available_colors.horizontalHeader().setDefaultSectionSize(150)
-        row = 0
-        for color in parent.defaultColors:
-            color_name = parent.colorToName[color]
-            self.available_colors.insertRow(row)
-            col = QTableWidgetItem(color_name)
-            self.available_colors.setItem(row, 0, col)
-            row += 1
-
-        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel,
-                                   Qt.Horizontal, self)
-        buttons.accepted.connect(self.accept)
-        buttons.rejected.connect(self.reject)
-        vlayout = QVBoxLayout()
-        vlayout.addWidget(QLabel('Drag and drop colors on the polygons'))
-        hlayout = QHBoxLayout()
-        hlayout.addWidget(self.available_colors)
-        hlayout.addWidget(self.table)
-        vlayout.addLayout(hlayout)
-        vlayout.addWidget(buttons)
-        self.setLayout(vlayout)
-
-        self.setFixedSize(500, 400)
-        self.setWindowTitle('Change column color')
-
-    def getColors(self, old_colors, column_labels, name_to_color):
-        label_to_column = {b: a for a, b, in column_labels.items()}
-        for row in range(self.table.rowCount()):
-            label = self.table.item(row, 0).text()
-            color = self.table.item(row, 1).text()
-            old_colors[label_to_column[label]] = name_to_color[color]
-
-
-class VolumePlotViewer(PlotViewer):
+class VolumePlotViewer(TemporalPlotViewer):
     def __init__(self, inputTab):
-        super().__init__()
+        super().__init__('polygon')
         self.input = inputTab
 
         # initialize the map for locating polygons
-        self.map = MapViewer()
-        self.map.canvas = PolygonMapCanvas()
-        MapViewer.__init__(self.map)
-        self.map.scrollArea.setWidget(self.map.canvas)
-        self.map.resize(800, 700)
-
-        self.defaultColors = ['b', 'r', 'g', 'y', 'k', 'c', '#F28AD6', 'm']
-        name = ['Blue', 'Red', 'Green', 'Yellow', 'Black', 'Cyan', 'Pink', 'Magenta']
-        self.colorToName = {c: n for c, n in zip(self.defaultColors, name)}
-        self.nameToColor = {n: c for c, n in zip(self.defaultColors, name)}
+        canvas = PolygonMapCanvas()
+        self.map = MapViewer(canvas)
 
         self.setWindowTitle('Visualize the temporal evolution of volumes')
-        self.setMinimumWidth(700)
 
-        self.data = None
-        self.time = []
-        self.start_time = None
-        self.datetime = []
-        self.str_datetime = []
-        self.str_datetime_bis = []
         self.var_ID = None
         self.second_var_ID = None
         self.has_map = False
 
-        # initialize graphical parameters
-        self.timeFormat = 0   # 0: second, 1: date, 2: date (alternative), 3: minutes, 4: hours, 5: days
         self.current_columns = ('Polygon 1',)
-        self.column_labels = {}
-        self.column_colors = {}
 
         self.locatePolygons = QAction('Locate polygons\non map', self, icon=self.style().standardIcon(QStyle.SP_DialogHelpButton),
                                       triggered=self.locatePolygonsEvent)
-        self.selectColumnsAct = QAction('Select\ncolumns', self, icon=self.style().standardIcon(QStyle.SP_FileDialogDetailedView),
-                                        triggered=self.selectColumns)
-        self.editColumnNamesAct = QAction('Edit column\nnames', self, icon=self.style().standardIcon(QStyle.SP_FileDialogDetailedView),
-                                          triggered=self.editColumns)
-        self.editColumColorAct = QAction('Edit column\ncolors', self, icon=self.style().standardIcon(QStyle.SP_FileDialogDetailedView),
-                                          triggered=self.editColor)
-
-        self.convertTimeAct = QAction('Toggle date/time\nformat', self, checkable=True,
-                                      icon=self.style().standardIcon(QStyle.SP_DialogApplyButton))
-        self.changeDateAct = QAction('Edit\nstart date', self, triggered=self.changeDate,
-                                     icon=self.style().standardIcon(QStyle.SP_DialogApplyButton))
-        self.convertTimeAct.toggled.connect(self.convertTime)
         self.map.closeEvent = lambda event: self.locatePolygons.setEnabled(True)
 
         self.toolBar.addAction(self.locatePolygons)
@@ -357,18 +113,9 @@ class VolumePlotViewer(PlotViewer):
         self.polyMenu.addAction(self.selectColumnsAct)
         self.polyMenu.addAction(self.editColumnNamesAct)
         self.polyMenu.addAction(self.editColumColorAct)
-        self.timeMenu = QMenu('&Date/&Time', self)
-        self.timeMenu.addAction(self.convertTimeAct)
-        self.timeMenu.addAction(self.changeDateAct)
 
         self.menuBar.addMenu(self.mapMenu)
         self.menuBar.addMenu(self.polyMenu)
-        self.menuBar.addMenu(self.timeMenu)
-
-    def _defaultXLabel(self, language):
-        if language == 'fr':
-            return 'Temps ({})'.format(['seconde', '', '', 'minute', 'heure', 'jour'][self.timeFormat])
-        return 'Time ({})'.format(['second', '', '', 'minute', 'hour', 'day'][self.timeFormat])
 
     def _defaultYLabel(self, language):
         word = {'fr': 'de', 'en': 'of'}[language]
@@ -412,11 +159,11 @@ class VolumePlotViewer(PlotViewer):
         self.str_datetime = list(map(lambda x: x.strftime('%Y/%m/%d\n%H:%M'), self.datetime))
         self.str_datetime_bis = list(map(lambda x: x.strftime('%d/%m/%y\n%H:%M'), self.datetime))
 
-        columns = list(self.data)[1:]
-        self.column_labels = {x: x for x in columns}
-        self.column_colors = {x: None for x in columns}
-        for i in range(min(len(columns), len(self.defaultColors))):
-            self.column_colors[columns[i]] = self.defaultColors[i]
+        self.columns = list(self.data)[1:]
+        self.column_labels = {x: x for x in self.columns}
+        self.column_colors = {x: None for x in self.columns}
+        for i in range(min(len(self.columns), len(self.defaultColors))):
+            self.column_colors[self.columns[i]] = self.defaultColors[i]
 
         # initialize the plot
         self.time = [self.data['time'], self.data['time'], self.data['time'],
@@ -435,65 +182,12 @@ class VolumePlotViewer(PlotViewer):
         self.locatePolygons.setEnabled(False)
         self.map.show()
 
-    def selectColumns(self):
-        msg = PlotColumnsSelector(list(self.data)[1:], self.current_columns)
-        value = msg.exec_()
-        if value == QDialog.Rejected:
-            return
-        self.current_columns = msg.selection
-        self.replot()
-
-    def editColumns(self):
-        msg = ColumnNameEditor(self.column_labels, self.current_columns)
-        value = msg.exec_()
-        if value == QDialog.Rejected:
-            return
-        msg.getLabels(self.column_labels)
-        self.replot()
-
-    def editColor(self):
-        msg = ColumnColorEditor(self)
-        value = msg.exec_()
-        if value == QDialog.Rejected:
-            return
-        msg.getColors(self.column_colors, self.column_labels, self.nameToColor)
-        self.replot()
-
-    def changeDate(self):
-        value, ok = QInputDialog.getText(self, 'Change start date',
-                                         'Enter the start date',
-                                         text=self.start_time.strftime('%Y-%m-%d %X'))
-        if not ok:
-            return
-        try:
-            self.start_time = datetime.datetime.strptime(value, '%Y-%m-%d %X')
-        except ValueError:
-            QMessageBox.critical(self, 'Error', 'Invalid input.',
-                                 QMessageBox.Ok)
-            return
-        self.datetime = list(map(lambda x: self.start_time + datetime.timedelta(seconds=x), self.data['time']))
-        self.str_datetime = list(map(lambda x: x.strftime('%Y/%m/%d\n%H:%M'), self.datetime))
-        self.str_datetime_bis = list(map(lambda x: x.strftime('%d/%m/%y\n%H:%M'), self.datetime))
-        self.replot()
-
-    def convertTime(self):
-        self.timeFormat = (1 + self.timeFormat) % 6
-        self.current_xlabel = self._defaultXLabel(self.input.language)
-        self.xLabelAct.setEnabled(self.timeFormat not in [1, 2])
-        self.replot()
-
     def reset(self):
         self.has_map = False
         self.map.close()
 
-        # reinitialize old graphical parameters
-        self.timeFormat = 0
-        self.time = []
+        super().reset()
         self.current_columns = ('Polygon 1',)
-        self.current_title = ''
-        self.column_labels = {}
-        self.column_colors = {}
-        self.triangles = None
 
 
 class InputTab(QWidget):
@@ -506,7 +200,6 @@ class InputTab(QWidget):
         self.language = 'fr'
         self.time = []
         self.mesh = None
-        self.locations = tuple([])
         self.polygons = []
         self.var_ID = None
         self.second_var_ID = None
@@ -579,10 +272,13 @@ class InputTab(QWidget):
         self.btnOpenSerafin.clicked.connect(self.btnOpenSerafinEvent)
         self.btnOpenPolygon.clicked.connect(self.btnOpenPolygonEvent)
         self.btnSubmit.clicked.connect(self.btnSubmitEvent)
+        self.timeSampling.editingFinished.connect(self._checkSamplingFrequency)
 
     def _setLayout(self):
         mainLayout = QVBoxLayout()
+        mainLayout.setSpacing(15)
         hlayout = QHBoxLayout()
+        hlayout.addItem(QSpacerItem(30, 1))
         hlayout.setAlignment(Qt.AlignLeft)
         hlayout.addWidget(self.btnOpenSerafin)
         hlayout.addItem(QSpacerItem(30, 1))
@@ -601,6 +297,7 @@ class InputTab(QWidget):
         mainLayout.addItem(QSpacerItem(10, 20))
 
         hlayout = QHBoxLayout()
+        hlayout.addItem(QSpacerItem(30, 1))
         hlayout.addWidget(self.btnOpenPolygon)
         hlayout.addWidget(self.polygonNameBox)
         mainLayout.addLayout(hlayout)
@@ -626,6 +323,7 @@ class InputTab(QWidget):
         mainLayout.addItem(QSpacerItem(10, 20))
 
         hlayout = QHBoxLayout()
+        hlayout.addItem(QSpacerItem(30, 1))
         hlayout.addWidget(self.btnSubmit)
         hlayout.addWidget(self.csvNameBox)
         mainLayout.addLayout(hlayout)
@@ -649,6 +347,20 @@ class InputTab(QWidget):
             return True
         return False
 
+    def _checkSamplingFrequency(self):
+        try:
+            sampling_frequency = int(self.timeSampling.text())
+        except ValueError:
+            QMessageBox.critical(self, 'Error', 'The sampling frequency must be a number!',
+                                 QMessageBox.Ok)
+            self.timeSampling.setText('1')
+            return
+        if sampling_frequency < 1 or sampling_frequency > len(self.time):
+            QMessageBox.critical(self, 'Error', 'The sampling frequency must be in the range [1; nbFrames]!',
+                                 QMessageBox.Ok)
+            self.timeSampling.setText('1')
+            return
+
     def _reinitInput(self, filename):
         self.filename = filename
         self.serafinNameBox.setText(filename)
@@ -657,7 +369,6 @@ class InputTab(QWidget):
         self.header = None
         self.time = []
         self.mesh = None
-        self.locations = tuple([])
         self.firstVarBox.clear()
         self.secondVarBox.clear()
         self.csvNameBox.clear()
@@ -695,7 +406,12 @@ class InputTab(QWidget):
             self.summaryTextBox.appendPlainText(resin.get_summary())
 
             # record the mesh for future visualization and calculations
-            self.mesh = TruncatedTriangularPrisms(resin.header)
+            logging.info('Processing the mesh')
+            self.parent.inDialog()
+            meshLoader = LoadMeshDialog('volume', resin.header)
+            self.mesh = meshLoader.run()
+            self.parent.outDialog()
+            logging.info('Finished processing the mesh')
 
             # copy to avoid reading the same data in the future
             self.header = copy.deepcopy(resin.header)
@@ -750,19 +466,7 @@ class InputTab(QWidget):
         self.parent.tab.setTabEnabled(1, False)
 
     def btnSubmitEvent(self):
-        if not self.polygons or self.header is None:
-            return
-
-        try:
-            sampling_frequency = int(self.timeSampling.text())
-        except ValueError:
-            QMessageBox.critical(self, 'Error', 'The sampling frequency must be a number!',
-                                 QMessageBox.Ok)
-            return
-        if sampling_frequency < 1 or sampling_frequency > len(self.time):
-            QMessageBox.critical(self, 'Error', 'The sampling frequency must be in the range [1; nbFrames]!',
-                                 QMessageBox.Ok)
-            return
+        sampling_frequency = int(self.timeSampling.text())
 
         options = QFileDialog.Options()
         options |= QFileDialog.DontUseNativeDialog
@@ -781,6 +485,7 @@ class InputTab(QWidget):
 
         self.csvNameBox.setText(filename)
         logging.info('Writing the output to %s' % filename)
+        self.parent.inDialog()
 
         # initialize the progress bar
         progressBar = OutputProgressDialog()
@@ -809,7 +514,7 @@ class InputTab(QWidget):
 
             progressBar.setValue(5)
             QApplication.processEvents()
-            progressBar.connectToCalculator(calculator)
+            progressBar.connectToThread(calculator)
 
             with open(filename, 'w') as f2:
                 calculator.write_csv(f2)
@@ -818,6 +523,7 @@ class InputTab(QWidget):
         progressBar.setValue(100)
         progressBar.cancelButton.setEnabled(True)
         progressBar.exec_()
+        self.parent.outDialog()
 
         # unlock the image viewer
         self.parent.imageTab.getData()
@@ -831,6 +537,7 @@ class ComputeVolumeGUI(QWidget):
         
         self.input = InputTab(self)
         self.imageTab = VolumePlotViewer(self.input)
+        self.setWindowTitle('Compute the volume of a variable inside polygons')
 
         self.tab = QTabWidget()
         self.tab.addTab(self.input, 'Input')
@@ -842,11 +549,28 @@ class ComputeVolumeGUI(QWidget):
         mainLayout = QVBoxLayout()
         mainLayout.addWidget(self.tab)
         self.setLayout(mainLayout)
+        self.setWindowFlags(self.windowFlags() | Qt.CustomizeWindowHint)
+
+    def inDialog(self):
+        if self.parent is not None:
+            self.parent.inDialog()
+        else:
+            self.setWindowFlags(self.windowFlags() & ~Qt.WindowCloseButtonHint)
+            self.setEnabled(False)
+            self.show()
+
+    def outDialog(self):
+        if self.parent is not None:
+            self.parent.outDialog()
+        else:
+            self.setWindowFlags(self.windowFlags() | Qt.WindowCloseButtonHint)
+            self.setEnabled(True)
+            self.show()
 
 
 def exception_hook(exctype, value, traceback):
     """!
-    @brief Needed for supressing traceback silencing in newer vesion of PyQt5
+    @brief Needed for suppressing traceback silencing in newer version of PyQt5
     """
     sys._excepthook(exctype, value, traceback)
     sys.exit(1)

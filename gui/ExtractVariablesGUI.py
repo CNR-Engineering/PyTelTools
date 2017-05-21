@@ -371,13 +371,33 @@ class TimeRangeSlider(QSlider):
         self.info.updateText(self._low, self.time_frames[self._low].total_seconds(), self.low(),
                              self._high, self.time_frames[self._high].total_seconds(), self.high())
 
+    def enterValueEvent(self):
+        try:
+            start_value = float(self.info.startValue.text())
+            end_value = float(self.info.endValue.text())
+            start_index = self.info.parent.input.time.index(start_value) + 1
+            end_index = self.info.parent.input.time.index(end_value) + 1
+        except ValueError:
+            self.info.updateText(self._low, self.time_frames[self._low].total_seconds(), self.low(),
+                                 self._high, self.time_frames[self._high].total_seconds(), self.high())
+            return
+        if start_index <= 0 or end_index > self.nb_frames or start_index > end_index:
+            self.info.updateText(self._low, self.time_frames[self._low].total_seconds(), self.low(),
+                                 self._high, self.time_frames[self._high].total_seconds(), self.high())
+            return
+        self.setLow(start_index-1)
+        self.setHigh(end_index-1)
+        self.info.updateText(self._low, self.time_frames[self._low].total_seconds(), self.low(),
+                             self._high, self.time_frames[self._high].total_seconds(), self.high())
+
 
 class SelectedTimeINFO(QWidget):
     """!
     @brief Text fields for time selection display (with slider)
     """
-    def __init__(self):
+    def __init__(self, parent):
         super().__init__()
+        self.parent = parent
         self.visited = False  # avoid redundant text display at initialization
 
         self.startIndex = QLineEdit('', self)
@@ -386,7 +406,7 @@ class SelectedTimeINFO(QWidget):
         self.endValue = QLineEdit('', self)
         self.startDate = QLineEdit('', self)
         self.endDate = QLineEdit('', self)
-        for w in [self.startValue, self.endValue, self.startDate, self.endDate]:
+        for w in [self.startDate, self.endDate]:
             w.setReadOnly(True)
 
         self.startIndex.setMinimumWidth(30)
@@ -657,7 +677,7 @@ class InputTab(QWidget):
             tw.setEditTriggers(QAbstractItemView.NoEditTriggers)
             tw.setMaximumHeight(800)
 
-        self.secondTable.setMinimumHeight(400)
+        self.secondTable.setMinimumHeight(300)
 
         # create a button for interpreting W from user-defined friction law
         self.btnAddUS = QPushButton('Add US from friction law', self)
@@ -927,7 +947,7 @@ class TimeTab(QWidget):
         self.last_sampling_frequency = 1
 
         # create text boxes for displaying the time selection and sampling
-        self.timeSelection = SelectedTimeINFO()
+        self.timeSelection = SelectedTimeINFO(self)
         self.timeSelection.startIndex.setEnabled(False)
         self.timeSelection.endIndex.setEnabled(False)
 
@@ -943,13 +963,15 @@ class TimeTab(QWidget):
         self.selectionTextBox = QPlainTextEdit()
 
         # bind events
-        self.timeSelection.startIndex.returnPressed.connect(self.timeSlider.enterIndexEvent)
-        self.timeSelection.endIndex.returnPressed.connect(self.timeSlider.enterIndexEvent)
+        self.timeSelection.startIndex.editingFinished.connect(self.timeSlider.enterIndexEvent)
+        self.timeSelection.endIndex.editingFinished.connect(self.timeSlider.enterIndexEvent)
+        self.timeSelection.startValue.editingFinished.connect(self.timeSlider.enterValueEvent)
+        self.timeSelection.endValue.editingFinished.connect(self.timeSlider.enterValueEvent)
 
         self.btnManual.clicked.connect(self.btnManualEvent)
         self.timeSelection.startDate.textChanged.connect(self.regularSelectionEvent)
         self.timeSelection.endDate.textChanged.connect(self.regularSelectionEvent)
-        self.timeSelection.timeSamplig.returnPressed.connect(self.regularSelectionEvent)
+        self.timeSelection.timeSamplig.editingFinished.connect(self.regularSelectionEvent)
 
         # set layout
         mainLayout = QVBoxLayout()
@@ -1071,6 +1093,7 @@ class TimeTab(QWidget):
                                               % (len(selected), ['', 's'][len(selected) > 1],
                                                  selected[0]+1, selected[-1]+1))
 
+
 class SubmitTab(QWidget):
     def __init__(self, input, timeSelection):
         super().__init__()
@@ -1152,29 +1175,6 @@ class SubmitTab(QWidget):
         self.btnSubmit.setEnabled(True)
 
     def btnSubmitEvent(self):
-        # fetch the list of selected variables
-        selected_vars = self.input.getSelectedVariables()
-        if not selected_vars:
-            QMessageBox.critical(self, 'Error', 'Choose at least one output variable before submit!',
-                                 QMessageBox.Ok)
-            return
-
-        # deduce header from selected variable IDs and write header
-        output_header = self.getOutputHeader(selected_vars)
-
-        # fetch the list of selected frames
-        if self.timeSelection.manualSelection.hasData:
-            output_time_indices = self.timeSelection.getManualTime()
-            output_message = 'Writing the output with variables %s for %d frame%s between frame %d and %d.' \
-                              % (str(output_header.var_IDs), len(output_time_indices), ['', 's'][len(output_time_indices) > 1],
-                                 output_time_indices[0]+1, output_time_indices[-1]+1)
-        else:
-            start_index, end_index, sampling_frequency, output_time_indices = self.timeSelection.getTime()
-            output_message = 'Writing the output with variables %s between frame %d and %d with sampling frequency %d.' \
-                              % (str(output_header.var_IDs), start_index, end_index, sampling_frequency)
-        assert output_time_indices
-
-
         # create the save file dialog
         options = QFileDialog.Options()
         options |= QFileDialog.DontUseNativeDialog
@@ -1198,6 +1198,23 @@ class SubmitTab(QWidget):
         overwrite = self._handleOverwrite(filename)
         if overwrite is None:
             return
+
+        # fetch the list of selected variables
+        selected_vars = self.input.getSelectedVariables()
+
+        # deduce header from selected variable IDs and write header
+        output_header = self.getOutputHeader(selected_vars)
+
+        # fetch the list of selected frames
+        if self.timeSelection.manualSelection.hasData:
+            output_time_indices = self.timeSelection.getManualTime()
+            output_message = 'Writing the output with variables %s for %d frame%s between frame %d and %d.' \
+                              % (str(output_header.var_IDs), len(output_time_indices), ['', 's'][len(output_time_indices) > 1],
+                                 output_time_indices[0]+1, output_time_indices[-1]+1)
+        else:
+            start_index, end_index, sampling_frequency, output_time_indices = self.timeSelection.getTime()
+            output_message = 'Writing the output with variables %s between frame %d and %d with sampling frequency %d.' \
+                              % (str(output_header.var_IDs), start_index, end_index, sampling_frequency)
 
         # disable close button
         self.setWindowFlags(self.windowFlags() & ~Qt.WindowCloseButtonHint)
@@ -1256,6 +1273,7 @@ class ExtractVariablesGUI(QWidget):
         self.tab.setTabEnabled(2, False)
 
         self.tab.setStyleSheet('QTabBar::tab { height: 40px; width: 200px; }')
+        self.tab.currentChanged.connect(self.switch_tab)
 
         mainLayout = QVBoxLayout()
         mainLayout.addWidget(self.tab)
@@ -1278,6 +1296,14 @@ class ExtractVariablesGUI(QWidget):
             self.setEnabled(True)
             self.show()
 
+    def switch_tab(self, index):
+        if index == 2:
+            if self.input.secondTable.rowCount() == 0:
+                QMessageBox.critical(self, 'Error', 'Choose at least one output variable before submit!',
+                                     QMessageBox.Ok)
+                self.tab.setCurrentIndex(0)
+                return
+
     def reset(self):
         for i, tab in enumerate([self.timeTab, self.submitTab]):
             tab.reset()
@@ -1291,7 +1317,7 @@ class ExtractVariablesGUI(QWidget):
 
 def exception_hook(exctype, value, traceback):
     """!
-    @brief Needed for supressing traceback silencing in newer vesion of PyQt5
+    @brief Needed for suppressing traceback silencing in newer version of PyQt5
     """
     sys._excepthook(exctype, value, traceback)
     sys.exit(1)

@@ -6,7 +6,7 @@ from PyQt5.QtCore import *
 
 import numpy as np
 
-from gui.util import PlotViewer, MapViewer, PolygonMapCanvas, ColorMapCanvas
+from gui.util import PlotViewer, MapViewer, PolygonMapCanvas, ColorMapCanvas, LoadMeshDialog
 from slf import Serafin
 from slf.comparison import ReferenceMesh
 from geom import BlueKenue, Shapefile
@@ -221,11 +221,8 @@ class InputTab(QWidget):
         self.polygon_added = False   # is the intersection between the mesh and the selected polygon calculated?
 
         # initialize the map for locating polygons
-        self.map = MapViewer()
-        self.map.canvas = PolygonMapCanvas()
-        MapViewer.__init__(self.map)
-        self.map.scrollArea.setWidget(self.map.canvas)
-        self.map.resize(800, 700)
+        canvas = PolygonMapCanvas()
+        self.map = MapViewer(canvas)
         self.has_map = False
 
         self._initWidgets()
@@ -431,6 +428,12 @@ class InputTab(QWidget):
             # record the time series
             resin.get_time()
 
+            # record the mesh
+            self.parent.inDialog()
+            meshLoader = LoadMeshDialog('comparison', resin.header)
+            self.ref_mesh = meshLoader.run()
+            self.parent.outDialog()
+
             # update the file summary
             self.refSummaryTextBox.appendPlainText(resin.get_summary())
 
@@ -438,7 +441,6 @@ class InputTab(QWidget):
             self.ref_header = copy.deepcopy(resin.header)
             self.ref_time = resin.time[:]
 
-        self.ref_mesh = ReferenceMesh(self.ref_header)
         self.parent.add_reference()
 
         self.btnOpenTest.setEnabled(True)
@@ -730,11 +732,8 @@ class ErrorDistributionTab(QWidget):
         self.btnColorMap.setEnabled(False)
 
         # initialize the map for 2D view
-        self.map = MapViewer()
-        self.map.canvas = ColorMapCanvas()
-        MapViewer.__init__(self.map)
-        self.map.scrollArea.setWidget(self.map.canvas)
-        self.map.resize(800, 700)
+        canvas = ColorMapCanvas()
+        self.map = MapViewer(canvas)
         self.has_map = False
         self.map.closeEvent = lambda event: self.btnColorMap.setEnabled(True)
 
@@ -1030,10 +1029,26 @@ class CompareResultsGUI(QWidget):
         if self.input.ref_filename == self.input.test_filename:
             self.tab.setTabEnabled(4, False)
 
+    def inDialog(self):
+        if self.parent is not None:
+            self.parent.inDialog()
+        else:
+            self.setWindowFlags(self.windowFlags() & ~Qt.WindowCloseButtonHint)
+            self.setEnabled(False)
+            self.show()
+
+    def outDialog(self):
+        if self.parent is not None:
+            self.parent.outDialog()
+        else:
+            self.setWindowFlags(self.windowFlags() | Qt.WindowCloseButtonHint)
+            self.setEnabled(True)
+            self.show()
+
 
 def exception_hook(exctype, value, traceback):
     """!
-    @brief Needed for supressing traceback silencing in newer vesion of PyQt5
+    @brief Needed for suppressing traceback silencing in newer version of PyQt5
     """
     sys._excepthook(exctype, value, traceback)
     sys.exit(1)
