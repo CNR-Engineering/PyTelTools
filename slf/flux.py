@@ -25,18 +25,21 @@ class TriangularVectorField(Mesh2D):
         potential_elements = self.get_intersecting_elements(section.bounds())
         for i, j, k in potential_elements:
             t = self.triangles[i, j, k]
-            is_intersected, intersection = section.linestring_intersection(t)
+            is_intersected, t_intersections = section.linestring_intersection(t)
             if is_intersected:
                 interpolator = Interpolator(t)
                 intersections[i, j, k] = []
-                prev_x, prev_y = None, None
-                for x, y in intersection.coords:
-                    if prev_x is None:  # the first point doesn't have a normal vector
-                        prev_x, prev_y = x, y
-                        intersections[i, j, k].append(([0, 0], interpolator.get_interpolator_at(x, y)))
-                    else:
-                        intersections[i, j, k].append(([prev_y-y, x-prev_x],
-                                                       interpolator.get_interpolator_at(x, y)))
+                for intersection in t_intersections:
+                    line = []
+                    prev_x, prev_y = None, None
+                    for x, y in intersection.coords:
+                        if prev_x is None:  # the first point doesn't have a normal vector
+                            prev_x, prev_y = x, y
+                            line.append(([0, 0], interpolator.get_interpolator_at(x, y)))
+                        else:
+                            line.append(([prev_y-y, x-prev_x],
+                                        interpolator.get_interpolator_at(x, y)))
+                    intersections[i, j, k].append(line)
         return intersections
 
     @staticmethod
@@ -48,15 +51,14 @@ class TriangularVectorField(Mesh2D):
         for i, j, k in intersections:
             f_vals = scalar_flux_values[[i, j, k]]
 
-            endpoints = intersections[i, j, k]
-            endpoints_f = []
+            for endpoints in intersections[i, j, k]:
+                endpoints_f = []
 
-            for normal, interpolator in endpoints:
-                endpoints_f.append(interpolator.dot(f_vals))
+                for normal, interpolator in endpoints:
+                    endpoints_f.append(interpolator.dot(f_vals))
 
-            for p in range(len(endpoints)-1):  # iterating through intersecting segments inside the triangle
-                flux += (endpoints_f[p] + endpoints_f[p+1]) * np.linalg.norm(endpoints[p+1][0])
-
+                for p in range(len(endpoints)-1):
+                    flux += (endpoints_f[p] + endpoints_f[p+1]) * np.linalg.norm(endpoints[p+1][0])
         return flux / 2
 
     @staticmethod
@@ -69,19 +71,19 @@ class TriangularVectorField(Mesh2D):
             h_vals = height_values[[i, j, k]]
             f_vals = scalar_flux_values[[i, j, k]]
 
-            endpoints = intersections[i, j, k]
-            endpoints_h, endpoints_f = [], []
+            for endpoints in intersections[i, j, k]:
+                endpoints_h, endpoints_f = [], []
 
-            for normal, interpolator in endpoints:
-                endpoints_h.append(interpolator.dot(h_vals))
-                endpoints_f.append(interpolator.dot(f_vals))
+                for normal, interpolator in endpoints:
+                    endpoints_h.append(interpolator.dot(h_vals))
+                    endpoints_f.append(interpolator.dot(f_vals))
 
-            for p in range(len(endpoints)-1):  # iterating through intersecting segments inside the triangle
-                first_h, second_h = endpoints_h[p], endpoints_h[p+1]
-                first_f, second_f = endpoints_f[p], endpoints_f[p+1]
+                for p in range(len(endpoints)-1):  # iterating through intersecting segments inside the triangle
+                    first_h, second_h = endpoints_h[p], endpoints_h[p+1]
+                    first_f, second_f = endpoints_f[p], endpoints_f[p+1]
 
-                flux += (2 * (first_f * first_h + second_f * second_h)
-                           + (first_f * second_h + second_f * first_h)) * np.linalg.norm(endpoints[p+1][0])
+                    flux += (2 * (first_f * first_h + second_f * second_h)
+                               + (first_f * second_h + second_f * first_h)) * np.linalg.norm(endpoints[p+1][0])
 
         return flux / 6
 
@@ -95,20 +97,20 @@ class TriangularVectorField(Mesh2D):
             x_vals = x_vector_values[[i, j, k]]
             y_vals = y_vector_values[[i, j, k]]
 
-            endpoints = intersections[i, j, k]
-            endpoints_x, endpoints_y = [], []
+            for endpoints in intersections[i, j, k]:
+                endpoints_x, endpoints_y = [], []
 
-            for normal, interpolator in endpoints:
-                endpoints_x.append(interpolator.dot(x_vals))
-                endpoints_y.append(interpolator.dot(y_vals))
+                for normal, interpolator in endpoints:
+                    endpoints_x.append(interpolator.dot(x_vals))
+                    endpoints_y.append(interpolator.dot(y_vals))
 
-            for p in range(len(endpoints)-1):  # iterating through intersecting segments inside the triangle
-                normal = endpoints[p+1][0]
+                for p in range(len(endpoints)-1):  # iterating through intersecting segments inside the triangle
+                    normal = endpoints[p+1][0]
 
-                first_normal = np.dot([endpoints_x[p], endpoints_y[p]], normal)
-                second_normal = np.dot([endpoints_x[p+1], endpoints_y[p+1]], normal)
+                    first_normal = np.dot([endpoints_x[p], endpoints_y[p]], normal)
+                    second_normal = np.dot([endpoints_x[p+1], endpoints_y[p+1]], normal)
 
-                flux += first_normal + second_normal
+                    flux += first_normal + second_normal
 
         return flux / 2
 
@@ -123,24 +125,24 @@ class TriangularVectorField(Mesh2D):
             y_vals = y_vector_values[[i, j, k]]
             h_vals = height_values[[i, j, k]]
 
-            endpoints = intersections[i, j, k]
-            endpoints_x, endpoints_y, endpoints_h = [], [], []
+            for endpoints in intersections[i, j, k]:
+                endpoints_x, endpoints_y, endpoints_h = [], [], []
 
-            for normal, interpolator in endpoints:
-                endpoints_x.append(interpolator.dot(x_vals))
-                endpoints_y.append(interpolator.dot(y_vals))
-                endpoints_h.append(interpolator.dot(h_vals))
+                for normal, interpolator in endpoints:
+                    endpoints_x.append(interpolator.dot(x_vals))
+                    endpoints_y.append(interpolator.dot(y_vals))
+                    endpoints_h.append(interpolator.dot(h_vals))
 
-            for p in range(len(endpoints)-1):  # iterating through intersecting segments inside the triangle
-                normal = endpoints[p+1][0]
+                for p in range(len(endpoints)-1):  # iterating through intersecting segments inside the triangle
+                    normal = endpoints[p+1][0]
 
-                first_normal = np.dot([endpoints_x[p], endpoints_y[p]], normal)
-                second_normal = np.dot([endpoints_x[p+1], endpoints_y[p+1]], normal)
+                    first_normal = np.dot([endpoints_x[p], endpoints_y[p]], normal)
+                    second_normal = np.dot([endpoints_x[p+1], endpoints_y[p+1]], normal)
 
-                first_h, second_h = endpoints_h[p], endpoints_h[p+1]
+                    first_h, second_h = endpoints_h[p], endpoints_h[p+1]
 
-                flux += 2 * (first_normal * first_h + second_normal * second_h) \
-                          + (first_normal * second_h + second_normal * first_h)
+                    flux += 2 * (first_normal * first_h + second_normal * second_h) \
+                              + (first_normal * second_h + second_normal * first_h)
 
         return flux / 6
 
@@ -156,27 +158,27 @@ class TriangularVectorField(Mesh2D):
             h_vals = height_values[[i, j, k]]
             d_vals = density_values[[i, j, k]]
 
-            endpoints = intersections[i, j, k]
-            endpoints_x, endpoints_y, endpoints_h, endpoints_d = [], [], [], []
+            for endpoints in intersections[i, j, k]:
+                endpoints_x, endpoints_y, endpoints_h, endpoints_d = [], [], [], []
 
-            for normal, interpolator in endpoints:
-                endpoints_x.append(interpolator.dot(x_vals))
-                endpoints_y.append(interpolator.dot(y_vals))
-                endpoints_h.append(interpolator.dot(h_vals))
-                endpoints_d.append(interpolator.dot(d_vals))
+                for normal, interpolator in endpoints:
+                    endpoints_x.append(interpolator.dot(x_vals))
+                    endpoints_y.append(interpolator.dot(y_vals))
+                    endpoints_h.append(interpolator.dot(h_vals))
+                    endpoints_d.append(interpolator.dot(d_vals))
 
-            for p in range(len(endpoints)-1):  # iterating through intersecting segments inside the triangle
-                normal = endpoints[p+1][0]
+                for p in range(len(endpoints)-1):  # iterating through intersecting segments inside the triangle
+                    normal = endpoints[p+1][0]
 
-                first_normal = np.dot([endpoints_x[p], endpoints_y[p]], normal)
-                second_normal = np.dot([endpoints_x[p+1], endpoints_y[p+1]], normal)
+                    first_normal = np.dot([endpoints_x[p], endpoints_y[p]], normal)
+                    second_normal = np.dot([endpoints_x[p+1], endpoints_y[p+1]], normal)
 
-                first_h, second_h = endpoints_h[p], endpoints_h[p+1]
-                first_d, second_d = endpoints_d[p], endpoints_d[p+1]
+                    first_h, second_h = endpoints_h[p], endpoints_h[p+1]
+                    first_d, second_d = endpoints_d[p], endpoints_d[p+1]
 
-                flux += 9 * (first_normal * first_h * first_d + second_normal * second_h * second_d) + \
-                        (2*first_normal+second_normal) * (2*first_h+second_h) * (2*first_d+second_d) + \
-                        (first_normal+2*second_normal) * (first_h+2*second_h) * (first_d+2*second_d)
+                    flux += 9 * (first_normal * first_h * first_d + second_normal * second_h * second_d) + \
+                            (2*first_normal+second_normal) * (2*first_h+second_h) * (2*first_d+second_d) + \
+                            (first_normal+2*second_normal) * (first_h+2*second_h) * (first_d+2*second_d)
 
         return flux / 72
 
