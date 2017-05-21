@@ -13,7 +13,7 @@ $ pip install -r requirements.txt
 ```
 
 ### Virtualenv
-The use of isolated Python environments are possible through virtualenv:
+The use of isolated Python environments is possible through virtualenv:
 ```bash
 $ virtualenv venv --python=python3
 $ source venv/bin/activate
