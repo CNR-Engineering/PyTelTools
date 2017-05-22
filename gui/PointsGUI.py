@@ -716,6 +716,7 @@ class ImageTab(TemporalPlotViewer):
         # get the new data
         csv_file = self.input.csvNameBox.text()
         self.data = pd.read_csv(csv_file, header=0, sep=';')
+        self.data.sort_values('time', inplace=True)
 
         if self.input.header.date is not None:
             year, month, day, hour, minute, second = self.input.header.date

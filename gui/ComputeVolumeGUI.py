@@ -15,7 +15,7 @@ from gui.util import TemporalPlotViewer, QPlainTextEditLogger, MapViewer, Polygo
     OutputProgressDialog, LoadMeshDialog, handleOverwrite
 
 
-class VolumeCalculatorGUI(QThread):
+class VolumeCalculatorThread(QThread):
     tick = pyqtSignal(int, name='changed')
 
     def __init__(self, volume_type, var_ID, second_var_ID, input_stream, polynames, polygons,
@@ -146,6 +146,7 @@ class VolumePlotViewer(TemporalPlotViewer):
         # get the new data
         csv_file = self.input.csvNameBox.text()
         self.data = pd.read_csv(csv_file, header=0, sep=';')
+        self.data.sort_values('time', inplace=True)
 
         self.var_ID = self.input.var_ID
         self.second_var_ID = self.input.second_var_ID
@@ -506,11 +507,11 @@ class InputTab(QWidget):
             resin.header = self.header
             resin.time = self.time
             if self.supVolumeBox.isChecked():
-                calculator = VolumeCalculatorGUI(VolumeCalculator.POSITIVE, self.var_ID, self.second_var_ID,
-                                                 resin, names, self.polygons, sampling_frequency, self.mesh)
+                calculator = VolumeCalculatorThread(VolumeCalculator.POSITIVE, self.var_ID, self.second_var_ID,
+                                                    resin, names, self.polygons, sampling_frequency, self.mesh)
             else:
-                calculator = VolumeCalculatorGUI(VolumeCalculator.NET, self.var_ID, self.second_var_ID,
-                                                 resin, names, self.polygons, sampling_frequency, self.mesh)
+                calculator = VolumeCalculatorThread(VolumeCalculator.NET, self.var_ID, self.second_var_ID,
+                                                    resin, names, self.polygons, sampling_frequency, self.mesh)
 
             progressBar.setValue(5)
             QApplication.processEvents()

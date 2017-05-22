@@ -32,6 +32,15 @@ class Polyline:
     def polyline(self):
         return self._polyline
 
+    def segments(self):
+        prev_x, prev_y = None, None
+        for x, y in self.coords():
+            if prev_x is None:
+                prev_x, prev_y = x, y
+            else:
+                yield x > prev_x, y > prev_y, Polyline([(prev_x, prev_y), (x, y)])
+                prev_x, prev_y = x, y
+
     def __str__(self):
         return ['Open', 'Closed'][self.is_closed()] + ' polyline with coordinates %s' % str(list(self.coords()))
 

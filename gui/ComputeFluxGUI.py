@@ -16,7 +16,7 @@ from gui.util import TemporalPlotViewer, QPlainTextEditLogger, SectionMapCanvas,
     OutputProgressDialog, LoadMeshDialog, handleOverwrite
 
 
-class FluxCalculatorGUI(QThread):
+class FluxCalculatorThread(QThread):
     tick = pyqtSignal(int, name='changed')
 
     def __init__(self, flux_type, var_IDs, input_stream, section_names, sections,
@@ -397,8 +397,8 @@ class InputTab(QWidget):
         with Serafin.Read(self.filename, self.language) as resin:
             resin.header = self.header
             resin.time = self.time
-            calculator = FluxCalculatorGUI(flux_type, self.var_IDs,
-                                           resin, names, self.polylines, sampling_frequency, self.mesh)
+            calculator = FluxCalculatorThread(flux_type, self.var_IDs,
+                                              resin, names, self.polylines, sampling_frequency, self.mesh)
             progressBar.setValue(5)
             QApplication.processEvents()
             progressBar.connectToThread(calculator)
@@ -475,6 +475,7 @@ class FluxPlotViewer(TemporalPlotViewer):
         # get the new data
         csv_file = self.input.csvNameBox.text()
         self.data = pd.read_csv(csv_file, header=0, sep=';')
+        self.data.sort_values('time', inplace=True)
 
         self.var_IDs = self.input.var_IDs
         if self.input.header.date is not None:
