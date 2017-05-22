@@ -708,7 +708,8 @@ class InputTab(QWidget):
         @brief: (Used in __init__) Set up layout
         """
         mainLayout = QVBoxLayout()
-        mainLayout.addItem(QSpacerItem(50, 20))
+        mainLayout.addItem(QSpacerItem(10, 10))
+        mainLayout.setSpacing(15)
         hlayout = QHBoxLayout()
         hlayout.setAlignment(Qt.AlignLeft)
         hlayout.addItem(QSpacerItem(50, 1))

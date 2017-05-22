@@ -222,6 +222,7 @@ class InputTab(QWidget):
 
     def _setLayout(self):
         mainLayout = QVBoxLayout()
+        mainLayout.addItem(QSpacerItem(10, 10))
         mainLayout.setSpacing(15)
         hlayout = QHBoxLayout()
         hlayout.addItem(QSpacerItem(30, 1))

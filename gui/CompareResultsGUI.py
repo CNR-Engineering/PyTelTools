@@ -304,6 +304,9 @@ class InputTab(QWidget):
 
     def _setLayout(self):
         mainLayout = QVBoxLayout()
+        mainLayout.addItem(QSpacerItem(10, 20))
+        mainLayout.setSpacing(15)
+
         hlayout = QHBoxLayout()
         hlayout.setAlignment(Qt.AlignLeft)
         hlayout.addItem(QSpacerItem(50, 1))
@@ -340,10 +343,10 @@ class InputTab(QWidget):
         glayout.addWidget(self.varBox, 1, 2)
         glayout.addWidget(QLabel('     Select the comparison domain'), 2, 1)
         glayout.addWidget(self.polygonBox, 2, 2)
-        glayout.setAlignment(Qt.AlignLeft)
         glayout.setSpacing(10)
         mainLayout.addLayout(glayout)
         mainLayout.addItem(QSpacerItem(10, 15))
+        mainLayout.setAlignment(glayout, Qt.AlignTop | Qt.AlignLeft)
         self.setLayout(mainLayout)
 
     def _reinitRef(self, filename):
