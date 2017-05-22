@@ -13,7 +13,7 @@ from slf import Serafin
 from slf.interpolation import Interpolator, MeshInterpolator
 from geom import Shapefile
 from gui.util import TemporalPlotViewer, MapViewer, MapCanvas, QPlainTextEditLogger, \
-    TableWidgetDragRows, OutputProgressDialog, LoadMeshDialog
+    TableWidgetDragRows, OutputProgressDialog, LoadMeshDialog, handleOverwrite
 
 
 class WriteCSVProcess(QThread):
@@ -525,7 +525,7 @@ class InputTab(QWidget):
         is_inside, self.point_interpolators = self.mesh.get_point_interpolators(self.points)
         nb_inside = sum(map(int, is_inside))
         if nb_inside == 0:
-            QMessageBox.critical(self, 'Error', 'No point is inside the mesh.',
+            QMessageBox.critical(self, 'Error', 'No point inside the mesh.',
                                  QMessageBox.Ok)
             return
 
@@ -583,7 +583,7 @@ class InputTab(QWidget):
             return
         if len(filename) < 5 or filename[-4:] != '.csv':
             filename += '.csv'
-        overwrite = self._handleOverwrite(filename)
+        overwrite = handleOverwrite(filename)
         if overwrite is None:
             return
 

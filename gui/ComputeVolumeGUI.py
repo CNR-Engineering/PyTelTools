@@ -12,7 +12,7 @@ from slf import Serafin
 from slf.volume import TruncatedTriangularPrisms, VolumeCalculator
 from geom import BlueKenue, Shapefile
 from gui.util import TemporalPlotViewer, QPlainTextEditLogger, MapViewer, PolygonMapCanvas, \
-    OutputProgressDialog, LoadMeshDialog
+    OutputProgressDialog, LoadMeshDialog, handleOverwrite
 
 
 class VolumeCalculatorGUI(QThread):
@@ -479,7 +479,7 @@ class InputTab(QWidget):
             return
         if len(filename) < 5 or filename[-4:] != '.csv':
             filename += '.csv'
-        overwrite = self._handleOverwrite(filename)
+        overwrite = handleOverwrite(filename)
         if overwrite is None:
             return
 

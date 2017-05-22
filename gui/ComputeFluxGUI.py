@@ -13,7 +13,7 @@ from slf.flux import TriangularVectorField, FluxCalculator
 from gui.util import QPlainTextEditLogger
 from geom import BlueKenue, Shapefile
 from gui.util import TemporalPlotViewer, QPlainTextEditLogger, SectionMapCanvas, MapViewer, \
-    OutputProgressDialog, LoadMeshDialog
+    OutputProgressDialog, LoadMeshDialog, handleOverwrite
 
 
 class FluxCalculatorGUI(QThread):
@@ -215,19 +215,6 @@ class InputTab(QWidget):
         else:
             self.language = 'fr'
 
-    def _handleOverwrite(self, filename):
-        """!
-        @brief (Used in btnSubmitEvent) Handle manually the overwrite option when saving output file
-        """
-        if os.path.exists(filename):
-            msg = QMessageBox.warning(self, 'Confirm overwrite',
-                                      'The file already exists. Do you want to replace it?',
-                                      QMessageBox.Ok | QMessageBox.Cancel,
-                                      QMessageBox.Ok)
-            if msg == QMessageBox.Cancel:
-                return None
-            return True
-        return False
 
     def _addFluxOptions(self, header):
         if 'U' in header.var_IDs and 'V' in header.var_IDs:
@@ -292,7 +279,7 @@ class InputTab(QWidget):
             flux_type = FluxCalculator.AREA_FLUX
         else:
             flux_type = FluxCalculator.MASS_FLUX
-        return flux_type, var_IDs
+        return flux_type, var_IDs, selection
 
     def btnOpenSerafinEvent(self):
         options = QFileDialog.Options()
@@ -391,11 +378,11 @@ class InputTab(QWidget):
             return
         if len(filename) < 5 or filename[-4:] != '.csv':
             filename += '.csv'
-        overwrite = self._handleOverwrite(filename)
+        overwrite = handleOverwrite(filename)
         if overwrite is None:
             return
 
-        flux_type, self.var_IDs = self._getFluxSection()
+        flux_type, self.var_IDs, flux_title = self._getFluxSection()
 
         self.csvNameBox.setText(filename)
         logging.info('Writing the output to %s' % filename)
@@ -426,7 +413,7 @@ class InputTab(QWidget):
         self.parent.outDialog()
 
         # unlock the image viewer
-        self.parent.imageTab.getData()
+        self.parent.imageTab.getData(flux_title)
         self.parent.tab.setTabEnabled(1, True)
 
 
@@ -467,10 +454,6 @@ class FluxPlotViewer(TemporalPlotViewer):
         self.menuBar.addMenu(self.mapMenu)
         self.menuBar.addMenu(self.polyMenu)
 
-    def _defaultYLabel(self, language):
-        word = {'fr': 'de', 'en': 'of'}[language]
-        return 'Flux %s (%s)' % (word, ','.join(map(str, self.var_IDs)))
-
     def replot(self):
         self.canvas.axes.clear()
         for column in self.current_columns:
@@ -488,7 +471,7 @@ class FluxPlotViewer(TemporalPlotViewer):
                 label.set_fontsize(8)
         self.canvas.draw()
 
-    def getData(self):
+    def getData(self, flux_title):
         # get the new data
         csv_file = self.input.csvNameBox.text()
         self.data = pd.read_csv(csv_file, header=0, sep=';')
@@ -514,7 +497,7 @@ class FluxPlotViewer(TemporalPlotViewer):
         self.time = [self.data['time'], self.data['time'], self.data['time'],
                      self.data['time'] / 60, self.data['time'] / 3600, self.data['time'] / 86400]
         self.current_xlabel = self._defaultXLabel(self.input.language)
-        self.current_ylabel = self._defaultYLabel(self.input.language)
+        self.current_ylabel = flux_title
         self.current_title = ''
         self.replot()
 

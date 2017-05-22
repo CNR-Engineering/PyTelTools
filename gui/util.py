@@ -805,6 +805,29 @@ class TemporalPlotViewer(PlotViewer):
         self.replot()
 
 
+def handleOverwrite(filename):
+    """!
+    @brief Handle manually the overwrite option when saving output file
+    """
+    if os.path.exists(filename):
+        msg = QMessageBox.warning(None, 'Confirm overwrite',
+                                  'The file already exists. Do you want to replace it?',
+                                  QMessageBox.Ok | QMessageBox.Cancel,
+                                  QMessageBox.Ok)
+        if msg == QMessageBox.Cancel:
+            return None
+        try:
+            with open(filename, 'w') as f:
+                pass
+        except PermissionError:
+            QMessageBox.critical(None, 'Permission denied',
+                                 'Permission denied. (Is the file opened by another application?).',
+                                 QMessageBox.Ok, QMessageBox.Ok)
+            return None
+        return True
+    return False
+
+
 def exception_hook(exctype, value, traceback):
     """!
     @brief Needed for suppressing traceback silencing in newer version of PyQt5

@@ -14,7 +14,7 @@ import copy
 from slf import Serafin
 from slf.variables import get_available_variables, \
     do_calculations_in_frame, get_necessary_equations, get_US_equation, add_US
-from gui.util import TableWidgetDragRows, QPlainTextEditLogger
+from gui.util import TableWidgetDragRows, QPlainTextEditLogger, handleOverwrite
 
 _YELLOW = QColor(245, 255, 207)
 _GREEN = QColor(200, 255, 180)
@@ -1134,21 +1134,6 @@ class SubmitTab(QWidget):
         mainLayout.addWidget(self.logTextBox.widget)
         self.setLayout(mainLayout)
 
-    def _handleOverwrite(self, filename):
-        """!
-        @brief (Used in btnSubmitEvent) Handle manually the overwrite option when saving output file
-        """
-        if os.path.exists(filename):
-            msg = QMessageBox.warning(self, 'Confirm overwrite',
-                                      'The file already exists. Do you want to replace it?',
-                                      QMessageBox.Ok | QMessageBox.Cancel,
-                                      QMessageBox.Ok)
-            if msg == QMessageBox.Cancel:
-                logging.info('Output canceled')
-                return None
-            return True
-        return False
-
     def reset(self):
         self.btnSubmit.setEnabled(False)
         self.singlePrecisionBox.setChecked(False)
@@ -1195,7 +1180,7 @@ class SubmitTab(QWidget):
             return
 
         # handle overwrite manually
-        overwrite = self._handleOverwrite(filename)
+        overwrite = handleOverwrite(filename)
         if overwrite is None:
             return
 
