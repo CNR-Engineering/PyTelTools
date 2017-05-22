@@ -10,7 +10,6 @@ from PyQt5.QtCore import *
 import pandas as pd
 
 from slf import Serafin
-from slf.interpolation import Interpolator, MeshInterpolator
 from geom import Shapefile
 from gui.util import TemporalPlotViewer, MapViewer, MapCanvas, QPlainTextEditLogger, \
     TableWidgetDragRows, OutputProgressDialog, LoadMeshDialog, handleOverwrite
@@ -434,20 +433,6 @@ class InputTab(QWidget):
             self.timeSampling.setText('1')
             return
 
-    def _handleOverwrite(self, filename):
-        """!
-        @brief (Used in btnSubmitEvent) Handle manually the overwrite option when saving output file
-        """
-        if os.path.exists(filename):
-            msg = QMessageBox.warning(self, 'Confirm overwrite',
-                                      'The file already exists. Do you want to replace it?',
-                                      QMessageBox.Ok | QMessageBox.Cancel,
-                                      QMessageBox.Ok)
-            if msg == QMessageBox.Cancel:
-                return None
-            return True
-        return False
-
     def getSelectedVariables(self):
         selected = []
         for i in range(self.secondTable.rowCount()):
@@ -504,7 +489,7 @@ class InputTab(QWidget):
         is_shp = filename[-4:] == '.shp'
 
         if not is_shp:
-            QMessageBox.critical(self, 'Error', 'Only .shp file formats are currently supported.',
+            QMessageBox.critical(self, 'Error', 'Only .shp file format is currently supported.',
                                  QMessageBox.Ok)
             return
 
@@ -687,7 +672,7 @@ class ImageTab(TemporalPlotViewer):
 
     def _defaultYLabel(self, language):
         word = {'fr': 'de', 'en': 'of'}[language]
-        return 'Evolution %s %s' % (word, self.current_var)
+        return 'Values %s %s' % (word, self.current_var)
 
     def selectVariableEvent(self):
         msg = QDialog()

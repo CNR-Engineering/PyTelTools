@@ -9,7 +9,7 @@ from PyQt5.QtCore import *
 import pandas as pd
 
 from slf import Serafin
-from slf.volume import TruncatedTriangularPrisms, VolumeCalculator
+from slf.volume import VolumeCalculator
 from geom import BlueKenue, Shapefile
 from gui.util import TemporalPlotViewer, QPlainTextEditLogger, MapViewer, PolygonMapCanvas, \
     OutputProgressDialog, LoadMeshDialog, handleOverwrite
@@ -333,20 +333,6 @@ class InputTab(QWidget):
         mainLayout.addWidget(QLabel('   Message logs'))
         mainLayout.addWidget(self.logTextBox.widget)
         self.setLayout(mainLayout)
-
-    def _handleOverwrite(self, filename):
-        """!
-        @brief (Used in btnSubmitEvent) Handle manually the overwrite option when saving output file
-        """
-        if os.path.exists(filename):
-            msg = QMessageBox.warning(self, 'Confirm overwrite',
-                                      'The file already exists. Do you want to replace it?',
-                                      QMessageBox.Ok | QMessageBox.Cancel,
-                                      QMessageBox.Ok)
-            if msg == QMessageBox.Cancel:
-                return None
-            return True
-        return False
 
     def _checkSamplingFrequency(self):
         try:

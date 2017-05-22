@@ -48,4 +48,49 @@ class MeshInterpolator(Mesh2D):
 
         return is_inside, point_interpolators
 
+    def get_line_interpolators(self, line):
+        intersections = []
+        for right, up, segment in line.segments():  # for every segment, sort intersection points
+            segment_intersections = []
+            potential_elements = self.get_intersecting_elements(segment.bounds())
+            for i, j, k in potential_elements:
+                t = self.triangles[i, j, k]
+                is_intersected, t_intersections = segment.linestring_intersection(t)
+                if is_intersected:
+                    interpolator = Interpolator(t)
+                    for intersection in t_intersections:
+                        for x, y in intersection.coords:
+                            segment_intersections.append((x, y, (i, j, k), interpolator.get_interpolator_at(x, y)))
+
+            # first sort by y, then sort by x
+            if up:
+                segment_intersections.sort(key=lambda x: x[1])
+            else:
+                segment_intersections.sort(key=lambda x: x[1], reverse=True)
+            if right:
+                segment_intersections.sort()
+            else:
+                segment_intersections.sort(reverse=True)
+
+            intersections.extend(segment_intersections)
+
+        # if the intersection is continuous, every internal point or turning point has at least two duplicates
+        prev_x, prev_y = None, None
+        duplicates = 0
+        to_remove = [False] * len(intersections)
+        for i, (x, y, _, __) in enumerate(intersections):
+            if i == 0:  # the start and end point are not duplicated
+                continue
+            if prev_x is None:
+                prev_x, prev_y = x, y
+                continue
+            if x == prev_x and y == prev_y:
+                to_remove[i] = True
+                duplicates += 1
+            else:
+                if duplicates == 0:  # no duplicate found, the intersection is discontinuous
+                    return []
+                duplicates = 0
+                prev_x, prev_y = x, y
+        return [intersections[i] for i in range(len(intersections)) if not to_remove[i]]
 

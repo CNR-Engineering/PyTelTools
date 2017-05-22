@@ -9,10 +9,9 @@ from PyQt5.QtCore import *
 import pandas as pd
 
 from slf import Serafin
-from slf.flux import TriangularVectorField, FluxCalculator
-from gui.util import QPlainTextEditLogger
+from slf.flux import FluxCalculator
 from geom import BlueKenue, Shapefile
-from gui.util import TemporalPlotViewer, QPlainTextEditLogger, SectionMapCanvas, MapViewer, \
+from gui.util import TemporalPlotViewer, QPlainTextEditLogger, LineMapCanvas, MapViewer, \
     OutputProgressDialog, LoadMeshDialog, handleOverwrite
 
 
@@ -215,7 +214,6 @@ class InputTab(QWidget):
         else:
             self.language = 'fr'
 
-
     def _addFluxOptions(self, header):
         if 'U' in header.var_IDs and 'V' in header.var_IDs:
             if 'H' in header.var_IDs:
@@ -348,8 +346,8 @@ class InputTab(QWidget):
                 for poly_name, poly in f.get_open_polylines():
                     self.polylines.append(poly)
         else:
-            for polygon in Shapefile.get_open_polylines(filename):
-                self.polylines.append(polygon)
+            for poly in Shapefile.get_open_polylines(filename):
+                self.polylines.append(poly)
         if not self.polylines:
             QMessageBox.critical(self, 'Error', 'The file does not contain any open polyline.',
                                  QMessageBox.Ok)
@@ -423,7 +421,7 @@ class FluxPlotViewer(TemporalPlotViewer):
         self.input = inputTab
 
         # initialize the map for locating sections
-        canvas = SectionMapCanvas()
+        canvas = LineMapCanvas()
         self.map = MapViewer(canvas)
 
         self.setWindowTitle('Visualize the temporal evolution of volumes')

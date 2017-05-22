@@ -8,7 +8,6 @@ import numpy as np
 
 from gui.util import PlotViewer, MapViewer, PolygonMapCanvas, ColorMapCanvas, LoadMeshDialog
 from slf import Serafin
-from slf.comparison import ReferenceMesh
 from geom import BlueKenue, Shapefile
 
 

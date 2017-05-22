@@ -2,7 +2,6 @@ import sys
 import os
 import logging
 
-
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
@@ -438,17 +437,16 @@ class PolygonMapCanvas(MapCanvas):
         self.draw()
 
 
-class SectionMapCanvas(MapCanvas):
+class LineMapCanvas(MapCanvas):
     def __init__(self):
         super().__init__()
-        self.PINK = '#fcabbd'
 
-    def reinitFigure(self, mesh, sections, section_names, section_colors):
+    def reinitFigure(self, mesh, lines, line_names, line_colors):
         # draw the mesh
         self.initFigure(mesh)
 
         # add polyline labels
-        for p, name, color in zip(sections, section_names, section_colors):
+        for p, name, color in zip(lines, line_names, line_colors):
             x, y = p.polyline().xy
             line = mlines.Line2D(x, y, color=color, lw=1)
             self.axes.add_line(line)
