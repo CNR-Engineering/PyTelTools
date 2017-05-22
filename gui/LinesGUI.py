@@ -37,7 +37,7 @@ class WriteCSVProcess(QThread):
         nb_lines = len(indices_nonemtpy)
 
         for u, id_line in enumerate(indices_nonemtpy):
-            line_interpolator = line_interpolators[id_line]
+            line_interpolator, distances = line_interpolators[id_line]
 
             for index, time in enumerate(input_stream.time):
 
@@ -45,7 +45,7 @@ class WriteCSVProcess(QThread):
                 for var in selected_vars:
                     var_values.append(input_stream.read_var_in_frame(index, var))
 
-                for (x, y, (i, j, k), interpolator), distance in line_interpolator:
+                for (x, y, (i, j, k), interpolator), distance in zip(line_interpolator, distances):
 
                     output_stream.write(str(id_line+1))
                     output_stream.write(';')
@@ -123,43 +123,11 @@ class InputTab(QWidget):
         self.linesNameBox = QPlainTextEdit()
         self.linesNameBox.setReadOnly(True)
         self.linesNameBox.setFixedHeight(50)
-        self.csvNameBox = QLineEdit()
-        self.csvNameBox.setReadOnly(True)
-        self.csvNameBox.setFixedHeight(30)
-
-        # create two 3-column tables for variables selection
-        self.firstTable = TableWidgetDragRows()
-        self.secondTable = TableWidgetDragRows()
-        for tw in [self.firstTable, self.secondTable]:
-            tw.setColumnCount(3)
-            tw.setHorizontalHeaderLabels(['ID', 'Name', 'Unit'])
-            vh = tw.verticalHeader()
-            vh.setSectionResizeMode(QHeaderView.Fixed)
-            vh.setDefaultSectionSize(20)
-            hh = tw.horizontalHeader()
-            hh.setDefaultSectionSize(110)
-            tw.setEditTriggers(QAbstractItemView.NoEditTriggers)
-            tw.setMaximumHeight(800)
-            tw.setMinimumHeight(250)
-
-        # create the options
-        self.intersect = QCheckBox()
 
         # create the map button
         self.btnMap = QPushButton('Locate lines\non map', self, icon=self.style().standardIcon(QStyle.SP_DialogHelpButton))
         self.btnMap.setFixedSize(135, 50)
         self.btnMap.setEnabled(False)
-
-        # create the submit button
-        self.btnSubmit = QPushButton('Submit\nto .csv', self, icon=self.style().standardIcon(QStyle.SP_DialogSaveButton))
-        self.btnSubmit.setToolTip('<b>Write</b> output to .csv')
-        self.btnSubmit.setFixedSize(105, 50)
-        self.btnSubmit.setEnabled(False)
-
-        # create the output file name box
-        self.csvNameBox = QLineEdit()
-        self.csvNameBox.setReadOnly(True)
-        self.csvNameBox.setFixedHeight(30)
 
         # create the widget displaying message logs
         self.logTextBox = QPlainTextEditLogger(self)
@@ -171,7 +139,6 @@ class InputTab(QWidget):
         self.btnOpenSerafin.clicked.connect(self.btnOpenSerafinEvent)
         self.btnOpenLines.clicked.connect(self.btnOpenLinesEvent)
         self.btnMap.clicked.connect(self.btnMapEvent)
-        self.btnSubmit.clicked.connect(self.btnSubmitEvent)
 
     def _setLayout(self):
         mainLayout = QVBoxLayout()
@@ -201,46 +168,6 @@ class InputTab(QWidget):
         mainLayout.addLayout(glayout)
         mainLayout.addItem(QSpacerItem(10, 10))
 
-        glayout = QGridLayout()
-        hlayout = QHBoxLayout()
-        hlayout.addItem(QSpacerItem(30, 1))
-        vlayout = QVBoxLayout()
-        lb = QLabel('Available variables')
-        vlayout.addWidget(lb)
-        vlayout.setAlignment(lb, Qt.AlignHCenter)
-        vlayout.addWidget(self.firstTable)
-        hlayout2 = QHBoxLayout()
-        hlayout2.addItem(QSpacerItem(30, 1))
-        hlayout2.addWidget(self.intersect)
-        hlayout2.addWidget(QLabel('Add intersection points'))
-        hlayout2.setAlignment(self.intersect, Qt.AlignLeft)
-        hlayout2.setAlignment(self.intersect, Qt.AlignLeft)
-        hlayout2.addStretch()
-        vlayout.addLayout(hlayout2)
-        hlayout.addLayout(vlayout)
-        hlayout.addItem(QSpacerItem(15, 1))
-
-        vlayout = QVBoxLayout()
-        lb = QLabel('Output variables')
-        vlayout.addWidget(lb)
-        vlayout.setAlignment(lb, Qt.AlignHCenter)
-        vlayout.addWidget(self.secondTable)
-        hlayout.addLayout(vlayout)
-        hlayout.addLayout(vlayout)
-        hlayout.addItem(QSpacerItem(30, 1))
-        glayout.addLayout(hlayout, 1, 1)
-        glayout.setAlignment(Qt.AlignLeft)
-        glayout.setSpacing(10)
-        mainLayout.addLayout(glayout)
-        mainLayout.addItem(QSpacerItem(30, 10))
-
-        hlayout = QHBoxLayout()
-        hlayout.addItem(QSpacerItem(30, 1))
-        hlayout.addWidget(self.btnSubmit)
-        hlayout.addWidget(self.csvNameBox)
-        mainLayout.addLayout(hlayout)
-        mainLayout.addItem(QSpacerItem(30, 15))
-
         mainLayout.addWidget(QLabel('   Message logs'))
         mainLayout.addWidget(self.logTextBox.widget)
         self.setLayout(mainLayout)
@@ -255,37 +182,17 @@ class InputTab(QWidget):
         self.lines = []
         self.line_interpolators = []
         self.line_interpolators_internal = []
-        self.firstTable.setRowCount(0)
-        self.secondTable.setRowCount(0)
+
         self.btnMap.setEnabled(False)
         self.mesh = None
         self.linesNameBox.clear()
         self.btnOpenLines.setEnabled(True)
-        self.intersect.setChecked(False)
-        self.btnSubmit.setEnabled(False)
-        self.csvNameBox.clear()
-        # self.parent.imageTab.reset()
+        self.parent.reset()
 
         if not self.frenchButton.isChecked():
             self.language = 'en'
         else:
             self.language = 'fr'
-
-    def _initVarTables(self):
-        for i, (id, name, unit) in enumerate(zip(self.header.var_IDs, self.header.var_names, self.header.var_units)):
-            self.firstTable.insertRow(self.firstTable.rowCount())
-            id_item = QTableWidgetItem(id.strip())
-            name_item = QTableWidgetItem(name.decode('utf-8').strip())
-            unit_item = QTableWidgetItem(unit.decode('utf-8').strip())
-            self.firstTable.setItem(i, 0, id_item)
-            self.firstTable.setItem(i, 1, name_item)
-            self.firstTable.setItem(i, 2, unit_item)
-
-    def getSelectedVariables(self):
-        selected = []
-        for i in range(self.secondTable.rowCount()):
-            selected.append(self.secondTable.item(i, 0).text())
-        return selected
 
     def btnOpenSerafinEvent(self):
         options = QFileDialog.Options()
@@ -323,9 +230,6 @@ class InputTab(QWidget):
             # copy to avoid reading the same data in the future
             self.header = copy.deepcopy(resin.header)
             self.time = resin.time[:]
-
-        # displaying the available variables
-        self._initVarTables()
 
     def btnOpenLinesEvent(self):
         options = QFileDialog.Options()
@@ -389,9 +293,7 @@ class InputTab(QWidget):
 
         self.has_map = False
         self.btnMap.setEnabled(True)
-        self.btnSubmit.setEnabled(True)
-        self.csvNameBox.clear()
-        # self.parent.imageTab.reset()
+        self.parent.getInput()
 
     def btnMapEvent(self):
         if not self.has_map:
@@ -405,6 +307,130 @@ class InputTab(QWidget):
             self.map.canvas.draw()
             self.has_map = True
         self.map.show()
+
+
+class CSVTab(QWidget):
+    def __init__(self, input, parent):
+        super().__init__()
+        self.input = input
+        self.parent = parent
+
+        self._initWidget()
+        self._setLayout()
+        self.btnSubmit.clicked.connect(self.btnSubmitEvent)
+
+    def _initWidget(self):
+        # create two 3-column tables for variables selection
+        self.firstTable = TableWidgetDragRows()
+        self.secondTable = TableWidgetDragRows()
+        for tw in [self.firstTable, self.secondTable]:
+            tw.setColumnCount(3)
+            tw.setHorizontalHeaderLabels(['ID', 'Name', 'Unit'])
+            vh = tw.verticalHeader()
+            vh.setSectionResizeMode(QHeaderView.Fixed)
+            vh.setDefaultSectionSize(20)
+            hh = tw.horizontalHeader()
+            hh.setDefaultSectionSize(110)
+            tw.setEditTriggers(QAbstractItemView.NoEditTriggers)
+            tw.setMaximumHeight(800)
+            tw.setMinimumHeight(250)
+
+        # create the options
+        self.intersect = QCheckBox()
+
+        # create the submit button
+        self.btnSubmit = QPushButton('Submit\nto .csv', self, icon=self.style().standardIcon(QStyle.SP_DialogSaveButton))
+        self.btnSubmit.setToolTip('<b>Write</b> output to .csv')
+        self.btnSubmit.setFixedSize(105, 50)
+        self.btnSubmit.setEnabled(False)
+
+        # create the output file name box
+        self.csvNameBox = QLineEdit()
+        self.csvNameBox.setReadOnly(True)
+        self.csvNameBox.setFixedHeight(30)
+
+        # create the widget displaying message logs
+        self.logTextBox = QPlainTextEditLogger(self)
+        self.logTextBox.setFormatter(logging.Formatter('%(asctime)s - [%(levelname)s] - \n%(message)s'))
+        logging.getLogger().addHandler(self.logTextBox)
+        logging.getLogger().setLevel(logging.INFO)
+
+    def _setLayout(self):
+        mainLayout = QVBoxLayout()
+        mainLayout.addItem(QSpacerItem(10, 10))
+        mainLayout.setSpacing(15)
+        glayout = QGridLayout()
+        hlayout = QHBoxLayout()
+        hlayout.addItem(QSpacerItem(30, 1))
+        vlayout = QVBoxLayout()
+        lb = QLabel('Available variables')
+        vlayout.addWidget(lb)
+        vlayout.setAlignment(lb, Qt.AlignHCenter)
+        vlayout.addWidget(self.firstTable)
+        hlayout2 = QHBoxLayout()
+        hlayout2.addItem(QSpacerItem(30, 1))
+        hlayout2.addWidget(self.intersect)
+        hlayout2.addWidget(QLabel('Add intersection points'))
+        hlayout2.setAlignment(self.intersect, Qt.AlignLeft)
+        hlayout2.setAlignment(self.intersect, Qt.AlignLeft)
+        hlayout2.addStretch()
+        vlayout.addLayout(hlayout2)
+        hlayout.addLayout(vlayout)
+        hlayout.addItem(QSpacerItem(15, 1))
+
+        vlayout = QVBoxLayout()
+        lb = QLabel('Output variables')
+        vlayout.addWidget(lb)
+        vlayout.setAlignment(lb, Qt.AlignHCenter)
+        vlayout.addWidget(self.secondTable)
+        hlayout.addLayout(vlayout)
+        hlayout.addLayout(vlayout)
+        hlayout.addItem(QSpacerItem(30, 1))
+        glayout.addLayout(hlayout, 1, 1)
+        glayout.setAlignment(Qt.AlignLeft)
+        glayout.setSpacing(10)
+        mainLayout.addLayout(glayout)
+        mainLayout.addItem(QSpacerItem(30, 10))
+
+        hlayout = QHBoxLayout()
+        hlayout.addItem(QSpacerItem(30, 1))
+        hlayout.addWidget(self.btnSubmit)
+        hlayout.addWidget(self.csvNameBox)
+        mainLayout.addLayout(hlayout)
+        mainLayout.addItem(QSpacerItem(30, 15))
+
+        mainLayout.addWidget(QLabel('   Message logs'))
+        mainLayout.addWidget(self.logTextBox.widget)
+        self.setLayout(mainLayout)
+
+    def getSelectedVariables(self):
+        selected = []
+        for i in range(self.secondTable.rowCount()):
+            selected.append(self.secondTable.item(i, 0).text())
+        return selected
+
+    def _initVarTables(self):
+        for i, (id, name, unit) in enumerate(zip(self.input.header.var_IDs,
+                                                 self.input.header.var_names, self.input.header.var_units)):
+            self.firstTable.insertRow(self.firstTable.rowCount())
+            id_item = QTableWidgetItem(id.strip())
+            name_item = QTableWidgetItem(name.decode('utf-8').strip())
+            unit_item = QTableWidgetItem(unit.decode('utf-8').strip())
+            self.firstTable.setItem(i, 0, id_item)
+            self.firstTable.setItem(i, 1, name_item)
+            self.firstTable.setItem(i, 2, unit_item)
+
+    def getInput(self):
+        self._initVarTables()
+        self.btnSubmit.setEnabled(True)
+        self.csvNameBox.clear()
+
+    def reset(self):
+        self.firstTable.setRowCount(0)
+        self.secondTable.setRowCount(0)
+        self.intersect.setChecked(False)
+        self.btnSubmit.setEnabled(False)
+        self.csvNameBox.clear()
 
     def btnSubmitEvent(self):
         selected_var_IDs = self.getSelectedVariables()
@@ -433,16 +459,16 @@ class InputTab(QWidget):
         logging.info('Writing the output to %s' % filename)
         self.parent.inDialog()
 
-        indices_nonempty = [i for i in range(len(self.lines)) if self.line_interpolators[i][0]]
+        indices_nonempty = [i for i in range(len(self.input.lines)) if self.input.line_interpolators[i][0]]
 
         # initialize the progress bar
-        process = WriteCSVProcess(self.mesh)
+        process = WriteCSVProcess(self.input.mesh)
         progressBar = OutputProgressDialog()
         progressBar.connectToThread(process)
 
-        with Serafin.Read(self.filename, self.language) as resin:
-            resin.header = self.header
-            resin.time = self.time
+        with Serafin.Read(self.input.filename, self.input.language) as resin:
+            resin.header = self.input.header
+            resin.time = self.input.time
 
             progressBar.setValue(1)
             QApplication.processEvents()
@@ -451,18 +477,16 @@ class InputTab(QWidget):
 
                 if self.intersect.isChecked():
                     process.write_csv(resin, selected_var_IDs, fout,
-                                      self.line_interpolators, indices_nonempty)
+                                      self.input.line_interpolators, indices_nonempty)
                 else:
                     process.write_csv(resin, selected_var_IDs, fout,
-                                      self.line_interpolators_internal, indices_nonempty)
+                                      self.input.line_interpolators_internal, indices_nonempty)
 
         logging.info('Finished writing the output')
         progressBar.setValue(100)
         progressBar.cancelButton.setEnabled(True)
         progressBar.exec_()
         self.parent.outDialog()
-        # self.parent.imageTab.getData(selected_var_IDs, indices_inside)
-        # self.parent.tab.setTabEnabled(1, True)
 
 
 class LinesGUI(QWidget):
@@ -471,12 +495,12 @@ class LinesGUI(QWidget):
         self.parent = parent
 
         self.input = InputTab(self)
-        # self.imageTab = ImageTab(self.input)
+        self.csvTab = CSVTab(self.input, self)
         self.setWindowTitle('Interpolate values of variables along lines')
 
         self.tab = QTabWidget()
         self.tab.addTab(self.input, 'Input')
-        # self.tab.addTab(self.imageTab, 'Visualize results')
+        self.tab.addTab(self.csvTab, 'Output to CSV')
 
         self.tab.setTabEnabled(1, False)
         self.tab.setStyleSheet('QTabBar::tab { height: 40px; width: 300px; }')
@@ -486,6 +510,13 @@ class LinesGUI(QWidget):
         self.setLayout(mainLayout)
         self.setWindowFlags(self.windowFlags() | Qt.CustomizeWindowHint)
         self.setMinimumWidth(600)
+
+    def getInput(self):
+        self.tab.setTabEnabled(1, True)
+        self.csvTab.getInput()
+
+    def reset(self):
+        self.csvTab.reset()
 
     def inDialog(self):
         if self.parent is not None:

@@ -256,9 +256,6 @@ class InputTab(QWidget):
         self.pointsNameBox = QPlainTextEdit()
         self.pointsNameBox.setReadOnly(True)
         self.pointsNameBox.setFixedHeight(50)
-        self.csvNameBox = QLineEdit()
-        self.csvNameBox.setReadOnly(True)
-        self.csvNameBox.setFixedHeight(30)
 
         # create two 3-column tables for variables selection
         self.firstTable = TableWidgetDragRows()
