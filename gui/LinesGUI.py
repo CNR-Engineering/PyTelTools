@@ -13,7 +13,7 @@ from itertools import islice, cycle
 from slf import Serafin
 from geom import Shapefile, BlueKenue
 from gui.util import MapViewer, LineMapCanvas, QPlainTextEditLogger, \
-    TableWidgetDragRows, OutputProgressDialog, LoadMeshDialog, handleOverwrite, PlotViewer
+    TableWidgetDragRows, OutputProgressDialog, LoadMeshDialog, handleOverwrite, PlotViewer, TimeSlider
 
 
 class SelectVariablesDialog(QDialog):
@@ -67,6 +67,57 @@ class SelectVariablesDialog(QDialog):
                                  QMessageBox.Ok)
             return
         self.accept()
+
+
+class SimpleTimeSelection(QWidget):
+    def __init__(self):
+        super().__init__()
+
+        self.frames = []
+        self.dates = []
+
+        self.index = QLineEdit('', self)
+        self.index.setMaximumWidth(60)
+        self.slider = TimeSlider(self.index)
+        self.value = QLineEdit('', self)
+        self.date = QLineEdit('', self)
+
+        self.index.setMinimumWidth(30)
+        self.value.setMaximumWidth(100)
+        self.value.setMaximumWidth(100)
+        self.date.setMinimumWidth(110)
+
+        mainLayout = QVBoxLayout()
+        mainLayout.addWidget(self.slider)
+        glayout = QGridLayout()
+        glayout.addWidget(QLabel('Frame index'), 1, 1)
+        glayout.addWidget(self.index, 1, 2)
+        glayout.addWidget(QLabel('value'), 1, 3)
+        glayout.addWidget(self.value, 1, 4)
+        glayout.addWidget(QLabel('date'), 1, 5)
+        glayout.addWidget(self.date, 1, 6)
+        glayout.setSpacing(10)
+        mainLayout.addLayout(glayout)
+        self.setLayout(mainLayout)
+        self.index.editingFinished.connect(self.slider.enterIndexEvent)
+        self.index.editingFinished.connect(self.updateSelection)
+
+    def updateSelection(self):
+        index = int(self.index.text()) - 1
+        self.value.setText(str(self.frames[index]))
+        self.date.setText(str(self.dates[index]))
+
+    def initTime(self, frames, dates):
+        self.frames = frames
+        self.dates = dates
+        self.slider.reinit(len(frames), 0)
+        self.index.setText(str(1))
+        self.updateSelection()
+
+    def clearText(self):
+        self.index.clear()
+        self.value.clear()
+        self.date.clear()
 
 
 class WriteCSVProcess(QThread):
@@ -546,6 +597,8 @@ class MultiVariablesImageTab(QWidget):
     def __init__(self, inputTab):
         super().__init__()
         self.input = inputTab
+
+        self.timeSelection = SimpleTimeSelection()
         self.var_table = {}
         self.current_vars = []
 
@@ -588,6 +641,8 @@ class MultiVariablesImageTab(QWidget):
         # set layout
         mainLayout = QVBoxLayout()
         mainLayout.addItem(QSpacerItem(10, 10))
+        mainLayout.addWidget(self.timeSelection)
+        mainLayout.addItem(QSpacerItem(10, 10))
         glayout = QGridLayout()
         glayout.addWidget(QLabel('Select a polyline'), 1, 1)
         glayout.addWidget(self.lineBox, 1, 2)
@@ -613,7 +668,7 @@ class MultiVariablesImageTab(QWidget):
         line_interpolator, distances = self.input.line_interpolators[line_id]
         values = []
 
-        time_index = 0
+        time_index = int(self.timeSelection.index.text()) - 1
 
         with Serafin.Read(self.input.filename, self.input.language) as input_stream:
             input_stream.header = self.input.header
@@ -650,12 +705,23 @@ class MultiVariablesImageTab(QWidget):
         self.lineBox.clear()
         self.var_table = {}
         self.current_vars = []
+        self.varBox.clear()
         self.btnCompute.setEnabled(False)
+        self.plotViewer.defaultPlot()
         self.plotViewer.current_title = ''
         self.plotViewer.current_xlabel = 'Cumulative distance'
         self.plotViewer.current_ylabel = ''
+        self.timeSelection.clearText()
 
     def getInput(self):
+        if self.input.header.date is not None:
+            year, month, day, hour, minute, second = self.input.header.date
+            start_time = datetime.datetime(year, month, day, hour, minute, second)
+        else:
+            start_time = datetime.datetime(1900, 1, 1, 0, 0, 0)
+        frames = list(map(lambda x: start_time + datetime.timedelta(seconds=x), self.input.time))
+        self.timeSelection.initTime(self.input.time, frames)
+
         for i in range(len(self.input.lines)):
             id_line = str(i+1)
             if self.input.line_interpolators[i][0]:
@@ -707,6 +773,8 @@ class LinesGUI(QWidget):
         self.multiVarTab.getInput()
 
     def reset(self):
+        self.tab.setTabEnabled(1, False)
+        self.tab.setTabEnabled(2, False)
         self.csvTab.reset()
         self.multiVarTab.reset()
 

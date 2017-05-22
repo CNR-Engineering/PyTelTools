@@ -30,6 +30,138 @@ from slf.comparison import ReferenceMesh
 from slf.interpolation import MeshInterpolator
 
 
+class TimeSlider(QSlider):
+    """!
+    @brief A slider for choosing the time frame.
+    """
+    def __init__(self, display):
+        super().__init__()
+        self.display = display
+
+        self.setOrientation(Qt.Horizontal)
+        self.setMinimumWidth(500)
+
+        self.start_time = None
+        self.time_frames = None
+        self.nb_frames = 1000
+
+        self.setMinimum(0)
+        self.setMaximum(self.nb_frames-1)
+        self._value = 0
+        self.setTickPosition(QSlider.TicksBelow)
+
+        self.pressed_control = QStyle.SC_None
+        self.hover_control = QStyle.SC_None
+        self.click_offset = 0
+
+    def reinit(self, nb_frames, init_value):
+        self.nb_frames = nb_frames
+        self.setMinimum(0)
+        self.setMaximum(self.nb_frames-1)
+        self._value = init_value
+
+    def value(self):
+        return self._value
+
+    def setValue(self, value):
+        self._value = value
+        self.update()
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        style = QApplication.style()
+
+        opt = QStyleOptionSlider()
+        self.initStyleOption(opt)
+        opt.subControls = QStyle.SC_SliderHandle
+
+        if self.tickPosition() != self.NoTicks:
+            opt.subControls |= QStyle.SC_SliderTickmarks
+
+        if self.pressed_control:
+            opt.activeSubControls = self.pressed_control
+            opt.state |= QStyle.State_Sunken
+        else:
+            opt.activeSubControls = self.hover_control
+
+        opt.sliderPosition = self.value()
+        opt.sliderValue = self.value()
+        style.drawComplexControl(QStyle.CC_Slider, opt, painter, self)
+
+    def mousePressEvent(self, event):
+        event.accept()
+        style = QApplication.style()
+        button = event.button()
+        if button:
+            opt = QStyleOptionSlider()
+            self.initStyleOption(opt)
+
+            opt.sliderPosition = self.value()
+            hit = style.hitTestComplexControl(style.CC_Slider, opt, event.pos(), self)
+            if hit == style.SC_SliderHandle:
+                self.pressed_control = hit
+                self.triggerAction(self.SliderMove)
+                self.setRepeatAction(self.SliderNoAction)
+                self.setSliderDown(True)
+        else:
+            event.ignore()
+
+    def mouseMoveEvent(self, event):
+        if self.pressed_control != QStyle.SC_SliderHandle:
+            event.ignore()
+            return
+
+        event.accept()
+        new_pos = self.__pixelPosToRangeValue(self.__pick(event.pos()))
+        opt = QStyleOptionSlider()
+        self.initStyleOption(opt)
+        self._value = new_pos
+        self.click_offset = new_pos
+
+        # update the tip
+        style = QApplication.style()
+        rectHandle = style.subControlRect(style.CC_Slider, opt, style.SC_SliderHandle)
+        pos = rectHandle.topLeft()
+        pos.setX(pos.x())
+        pos = self.mapToGlobal(pos)
+        QToolTip.showText(pos, str(self.value()+1), self)
+
+        self.update()
+
+    def mouseReleaseEvent(self, event):
+        self.display.setText(str(1 + self.value()))
+
+    def __pick(self, pt):
+        return pt.x()
+
+    def __pixelPosToRangeValue(self, pos):
+        opt = QStyleOptionSlider()
+        self.initStyleOption(opt)
+        style = QApplication.style()
+
+        gr = style.subControlRect(style.CC_Slider, opt, style.SC_SliderGroove, self)
+        sr = style.subControlRect(style.CC_Slider, opt, style.SC_SliderHandle, self)
+
+        slider_length = sr.width()
+        slider_min = gr.x()
+        slider_max = gr.right() - slider_length + 1
+
+        return style.sliderValueFromPosition(self.minimum(), self.maximum(),
+                                             pos-slider_min, slider_max-slider_min,
+                                             opt.upsideDown)
+
+    def enterIndexEvent(self):
+        try:
+            value = int(self.display.text())
+        except ValueError:
+            self.display.setText(str(self.value()+1))
+            return
+        if value <= 0 or value > self.nb_frames:
+            self.display.setText(str(self.value()+1))
+            return
+        self.setValue(value-1)
+
+
 class QPlainTextEditLogger(logging.Handler):
     """!
     @brief A text edit box displaying the message logs
