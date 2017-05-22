@@ -19,9 +19,6 @@ from gui.util import MapViewer, LineMapCanvas, QPlainTextEditLogger, \
 class WriteCSVProcess(QThread):
     tick = pyqtSignal(int, name='changed')
 
-    cumdistance = lambda points: [0] + list(np.cumsum([np.linalg.norm([points[i+1][0]-points[i][0],
-                                               points[i+1][1]-points[i][1]]) for i in range(len(points)-1)]))
-
     def __init__(self, mesh):
         super().__init__()
         self.mesh = mesh
@@ -33,59 +30,14 @@ class WriteCSVProcess(QThread):
             output_stream.write(header)
         output_stream.write('\n')
 
-    def write_csv(self, input_stream, selected_vars, output_stream, lines,
-                  indices_nonemtpy):
-        self.write_header(output_stream, selected_vars)
-
-        nb_lines = len(indices_nonemtpy)
-
-        for u, id_line in enumerate(indices_nonemtpy):
-            line = lines[id_line]
-            points = line.coords()
-            is_inside, point_interpolators = self.mesh.get_point_interpolators(points)
-            line_distance = WriteCSVProcess.cumdistance(points)
-
-            for index, time in enumerate(input_stream.time):
-
-                var_values = []
-                for var in selected_vars:
-                    var_values.append(input_stream.read_var_in_frame(index, var))
-
-                for (x, y), distance, item in zip(line.coords(), line_distance, point_interpolators):
-                    if item is None:
-                        continue
-                    (i, j, k), interpolator = item
-
-                    output_stream.write(str(id_line+1))
-                    output_stream.write(';')
-                    output_stream.write(str(time))
-
-                    output_stream.write(';')
-                    output_stream.write('%.6f' % x)
-                    output_stream.write(';')
-                    output_stream.write('%.6f' % y)
-                    output_stream.write(';')
-                    output_stream.write('%.6f' % distance)
-
-                    for i_var, var in enumerate(selected_vars):
-                        values = var_values[i_var]
-                        output_stream.write(';')
-                        output_stream.write('%.6f' % interpolator.dot(values[[i, j, k]]))
-                    output_stream.write('\n')
-
-            self.tick.emit(int(100 * (u+1) / nb_lines))
-            QApplication.processEvents()
-
-    def write_csv_intersect(self, input_stream, selected_vars, output_stream, line_interpolators,
-                            indices_nonemtpy):
+    def write_csv(self, input_stream, selected_vars, output_stream, line_interpolators,
+                        indices_nonemtpy):
         self.write_header(output_stream, selected_vars)
 
         nb_lines = len(indices_nonemtpy)
 
         for u, id_line in enumerate(indices_nonemtpy):
             line_interpolator = line_interpolators[id_line]
-            points = [(x, y) for x, y, _, __ in line_interpolator]
-            distances = WriteCSVProcess.cumdistance(points)
 
             for index, time in enumerate(input_stream.time):
 
@@ -93,7 +45,7 @@ class WriteCSVProcess(QThread):
                 for var in selected_vars:
                     var_values.append(input_stream.read_var_in_frame(index, var))
 
-                for distance, (x, y, (i, j, k), interpolator) in zip(distances, line_interpolator):
+                for (x, y, (i, j, k), interpolator), distance in line_interpolator:
 
                     output_stream.write(str(id_line+1))
                     output_stream.write(';')
@@ -133,6 +85,7 @@ class InputTab(QWidget):
 
         self.lines = []
         self.line_interpolators = []
+        self.line_interpolators_internal = []  # without intersection points
 
         self._initWidgets()  # some instance attributes will be set there
         self._setLayout()
@@ -301,6 +254,7 @@ class InputTab(QWidget):
         self.time = []
         self.lines = []
         self.line_interpolators = []
+        self.line_interpolators_internal = []
         self.firstTable.setRowCount(0)
         self.secondTable.setRowCount(0)
         self.btnMap.setEnabled(False)
@@ -392,22 +346,30 @@ class InputTab(QWidget):
 
         self.lines = []
         self.line_interpolators = []
+        self.line_interpolators_internal = []
+
         nb_nonempty = 0
 
         if is_i2s:
             with BlueKenue.Read(filename) as f:
                 f.read_header()
                 for poly_name, poly in f.get_open_polylines():
-                    self.lines.append(poly)
-                    self.line_interpolators.append(self.mesh.get_line_interpolators(poly))
-                    if self.line_interpolators[-1]:
+                    line_interpolators, distances, \
+                        line_interpolators_internal, distances_internal = self.mesh.get_line_interpolators(poly)
+                    if not line_interpolators:
                         nb_nonempty += 1
+                    self.lines.append(poly)
+                    self.line_interpolators.append((line_interpolators, distances))
+                    self.line_interpolators_internal.append((line_interpolators_internal, distances_internal))
         else:
             for poly in Shapefile.get_open_polylines(filename):
-                self.lines.append(poly)
-                self.line_interpolators.append(self.mesh.get_line_interpolators(poly))
-                if self.line_interpolators[-1]:
-                    nb_nonempty += 1
+                    line_interpolators, distances, \
+                        line_interpolators_internal, distances_internal = self.mesh.get_line_interpolators(poly)
+                    if not line_interpolators:
+                        nb_nonempty += 1
+                    self.lines.append(poly)
+                    self.line_interpolators.append((line_interpolators, distances))
+                    self.line_interpolators_internal.append((line_interpolators_internal, distances_internal))
         if not self.lines:
             QMessageBox.critical(self, 'Error', 'The file does not contain any open polyline.',
                                  QMessageBox.Ok)
@@ -471,7 +433,7 @@ class InputTab(QWidget):
         logging.info('Writing the output to %s' % filename)
         self.parent.inDialog()
 
-        indices_nonempty = [i for i in range(len(self.lines)) if self.line_interpolators[i]]
+        indices_nonempty = [i for i in range(len(self.lines)) if self.line_interpolators[i][0]]
 
         # initialize the progress bar
         process = WriteCSVProcess(self.mesh)
@@ -488,11 +450,11 @@ class InputTab(QWidget):
             with open(filename, 'w') as fout:
 
                 if self.intersect.isChecked():
-                    process.write_csv_intersect(resin, selected_var_IDs, fout,
-                                                self.line_interpolators, indices_nonempty)
+                    process.write_csv(resin, selected_var_IDs, fout,
+                                      self.line_interpolators, indices_nonempty)
                 else:
                     process.write_csv(resin, selected_var_IDs, fout,
-                                      self.lines, indices_nonempty)
+                                      self.line_interpolators_internal, indices_nonempty)
 
         logging.info('Finished writing the output')
         progressBar.setValue(100)

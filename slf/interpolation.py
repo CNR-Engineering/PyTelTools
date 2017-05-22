@@ -50,6 +50,12 @@ class MeshInterpolator(Mesh2D):
 
     def get_line_interpolators(self, line):
         intersections = []
+        internal_points = []  # line interpolators without intersections
+
+        # record the distance offset before the first intersection point
+        offset = 0
+        found_intersection = False
+
         for right, up, segment in line.segments():  # for every segment, sort intersection points
             segment_intersections = []
             potential_elements = self.get_intersecting_elements(segment.bounds())
@@ -74,12 +80,24 @@ class MeshInterpolator(Mesh2D):
 
             intersections.extend(segment_intersections)
 
+            internal_points.append(segment_intersections[0])
+            internal_points.append(segment_intersections[-1])
+
+            if not found_intersection:
+                first_point, second_point = list(segment.coords())
+                if not segment_intersections:
+                    offset += np.linalg.norm(np.array(second_point) - np.array(first_point))
+                else:
+                    found_intersection = True
+                    first_intersection = np.array(segment_intersections[0][:2])
+                    offset += np.linalg.norm(first_intersection - np.array(first_point))
+
         # if the intersection is continuous, every internal point or turning point has at least two duplicates
         prev_x, prev_y = None, None
         duplicates = 0
         to_remove = [False] * len(intersections)
         for i, (x, y, _, __) in enumerate(intersections):
-            if i == 0:  # the start and end point are not duplicated
+            if i == 0:  # the start and end points are not duplicated
                 continue
             if prev_x is None:
                 prev_x, prev_y = x, y
@@ -89,8 +107,28 @@ class MeshInterpolator(Mesh2D):
                 duplicates += 1
             else:
                 if duplicates == 0:  # no duplicate found, the intersection is discontinuous
-                    return []
+                    return [], [], [], []
                 duplicates = 0
                 prev_x, prev_y = x, y
-        return [intersections[i] for i in range(len(intersections)) if not to_remove[i]]
+
+        intersections = [intersections[i] for i in range(len(intersections)) if not to_remove[i]]
+
+        # trim internal points from 2n+2 to n+1
+        internal_points = [internal_points[0]] + internal_points[2:-1:2] + [internal_points[-1]]
+
+        # compute cumulative distance
+        distance = offset
+        distances = [offset]
+        for i in range(len(intersections)-1):
+            first, second = intersections[i+1], intersections[i]
+            distance += np.linalg.norm([second[0] - first[0], second[1] - first[1]])
+            distances.append(distance)
+
+        distances_internal = [offset]
+        for i in range(len(internal_points)-1):
+            first, second = internal_points[i+1], internal_points[i]
+            distance += np.linalg.norm([second[0] - first[0], second[1] - first[1]])
+            distances_internal.append(distance)
+
+        return intersections, distances, internal_points, distances_internal
 
