@@ -621,6 +621,7 @@ class ErrorEvolutionTab(QWidget):
         self.plotViewer.toolBar.addAction(self.plotViewer.yLabelAct)
         self.plotViewer.toolBar.addSeparator()
         self.plotViewer.toolBar.addAction(self.plotViewer.titleAct)
+        self.plotViewer.canvas.figure.canvas.mpl_connect('motion_notify_event', self.mouseMove)
 
         # put it in a group box to get a nice border
         gb = QGroupBox()
@@ -651,6 +652,12 @@ class ErrorEvolutionTab(QWidget):
         hlayout.setSpacing(10)
         mainLayout.addLayout(hlayout)
         self.setLayout(mainLayout)
+
+    def mouseMove(self, event):
+        if event.xdata is None or event.ydata is None:
+            self.plotViewer.statusbar.clearMessage()
+        msg = 'Time: %s \t Value: %s' % (str(event.xdata), str(event.ydata))
+        self.plotViewer.statusbar.showMessage(msg)
 
     def add_reference(self):
         self.timeSelection.initRef(self.input.ref_header.nb_frames)
@@ -909,11 +916,28 @@ class BSSTab(QWidget):
         self.timeSelection = DoubleTimeSelection()
         self.initSelection = SimpleTimeSelection('Initial state index')
 
+        # set up a custom plot viewer
+        self.has_figure = False
+        self.plotViewer = PlotViewer()
+        self.plotViewer.exitAct.setEnabled(False)
+        self.plotViewer.menuBar.setVisible(False)
+        self.plotViewer.toolBar.addAction(self.plotViewer.xLabelAct)
+        self.plotViewer.toolBar.addSeparator()
+        self.plotViewer.toolBar.addAction(self.plotViewer.yLabelAct)
+        self.plotViewer.toolBar.addSeparator()
+        self.plotViewer.toolBar.addAction(self.plotViewer.titleAct)
+        self.plotViewer.canvas.figure.canvas.mpl_connect('motion_notify_event', self.mouseMove)
+        self.initSelection.refIndex.textChanged.connect(lambda _: self.reinitFigure())
+
+        self.btnEvolution = QPushButton('BSS evolution', icon=self.style().standardIcon(QStyle.SP_DialogApplyButton))
+        self.btnEvolution.setFixedSize(105, 50)
+
         self.btnCompute = QPushButton('Compute', icon=self.style().standardIcon(QStyle.SP_DialogApplyButton))
         self.btnCompute.setFixedSize(105, 50)
         self.resultTextBox = QPlainTextEdit()
 
         self.btnCompute.clicked.connect(self.btnComputeEvent)
+        self.btnEvolution.clicked.connect(self.btnEvolutionEvent)
 
         mainLayout = QVBoxLayout()
         mainLayout.addItem(QSpacerItem(10, 10))
@@ -921,7 +945,9 @@ class BSSTab(QWidget):
         mainLayout.addWidget(self.initSelection)
         mainLayout.addItem(QSpacerItem(10, 10))
         hlayout = QHBoxLayout()
+        hlayout.addWidget(self.btnEvolution)
         hlayout.addWidget(self.btnCompute)
+        hlayout.setAlignment(self.btnEvolution, Qt.AlignTop)
         hlayout.setAlignment(self.btnCompute, Qt.AlignTop)
         hlayout.setAlignment(Qt.AlignHCenter)
         vlayout = QVBoxLayout()
@@ -945,6 +971,52 @@ class BSSTab(QWidget):
     def reset(self):
         self.timeSelection.clearText()
         self.resultTextBox.clear()
+        self.has_figure = False
+        self.plotViewer.defaultPlot()
+        self.plotViewer.current_title = 'Evolution of BSS'
+        self.plotViewer.current_ylabel = 'BSS'
+        self.plotViewer.current_xlabel = 'Time (second)'
+
+    def mouseMove(self, event):
+        if event.xdata is None or event.ydata is None:
+            self.plotViewer.statusbar.clearMessage()
+        msg = 'Time: %s \t Value: %s' % (str(event.xdata), str(event.ydata))
+        self.plotViewer.statusbar.showMessage(msg)
+
+    def reinitFigure(self):
+        self.has_figure = False
+
+    def btnEvolutionEvent(self):
+        if not self.has_figure:
+            all_bss = []
+            ref_time = int(self.timeSelection.refIndex.text()) - 1
+
+            init_time = int(self.initSelection.refIndex.text()) - 1
+            selected_variable = self.input.varBox.currentText().split('(')[0][:-1]
+
+            with Serafin.Read(self.input.ref_filename, self.input.ref_language) as resin:
+                resin.header = self.input.ref_header
+                resin.time = self.input.ref_time
+                ref_values = resin.read_var_in_frame(ref_time, selected_variable)
+
+            with Serafin.Read(self.input.test_filename, self.input.test_language) as resin:
+                resin.header = self.input.test_header
+                resin.time = self.input.test_time
+                init_values = resin.read_var_in_frame(init_time, selected_variable)
+                ref_volume = self.input.ref_mesh.quadratic_volume(ref_values - init_values)
+
+                for index in range(len(self.input.test_time)):
+                    test_values = resin.read_var_in_frame(index, selected_variable)
+
+                    test_volume = self.input.ref_mesh.quadratic_volume(test_values - ref_values)
+                    if test_volume == 0 and ref_volume == 0:
+                        bss = 1
+                    else:
+                        with np.errstate(divide='ignore'):
+                            bss = 1 - test_volume / ref_volume
+                    all_bss.append(bss)
+            self.plotViewer.plot(self.input.test_time, all_bss)
+        self.plotViewer.show()
 
     def btnComputeEvent(self):
         ref_time = int(self.timeSelection.refIndex.text()) - 1
