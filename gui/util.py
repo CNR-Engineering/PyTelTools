@@ -680,7 +680,7 @@ class TemporalPlotViewer(PlotViewer):
         super().__init__()
         self.data = None
         self.columns = []
-        self.setMinimumWidth(700)
+        self.setMinimumWidth(600)
         self.canvas.figure.canvas.mpl_connect('motion_notify_event', self.mouseMove)
         self.column_name = column_name
 

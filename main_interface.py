@@ -39,7 +39,6 @@ class MyMainWindow(QWidget):
             pageList.addItem('\n' + name + '\n')
         pageList.setFlow(QListView.TopToBottom)
         pageList.currentRowChanged.connect(stackLayout.setCurrentIndex)
-        pageList.currentRowChanged.connect(lambda x: self.resize(self.sizeHint()))
         pageList.setCurrentRow(0)
 
         vline = QFrame()

@@ -1,4 +1,3 @@
-import os
 import sys
 import logging
 import copy
@@ -526,7 +525,7 @@ class ComputeFluxGUI(QWidget):
         super().__init__()
         self.parent = parent
 
-        self.setMinimumWidth(800)
+        self.setMinimumWidth(600)
         self.setWindowTitle('Compute the flux of a vector field across sections')
 
         self.input = InputTab(self)

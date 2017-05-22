@@ -1,8 +1,8 @@
 import sys
-import os
 import logging
 import copy
 import datetime
+import numpy as np
 
 from PyQt5.QtWidgets import *
 from PyQt5.QtGui import *
@@ -19,38 +19,100 @@ from gui.util import MapViewer, LineMapCanvas, QPlainTextEditLogger, \
 class WriteCSVProcess(QThread):
     tick = pyqtSignal(int, name='changed')
 
+    cumdistance = lambda points: [0] + list(np.cumsum([np.linalg.norm([points[i+1][0]-points[i][0],
+                                               points[i+1][1]-points[i][1]]) for i in range(len(points)-1)]))
+
     def __init__(self, mesh):
         super().__init__()
         self.mesh = mesh
 
-    def write_header(self, output_stream, selected_vars, points):
-        output_stream.write('time')
-        for x, y in points:
-            for var in selected_vars:
-                output_stream.write(';')
-                output_stream.write('%s (%.4f, %.4f)' % (var, x, y))
+    def write_header(self, output_stream, selected_vars):
+        output_stream.write('Line')
+        for header in ['time', 'x', 'y', 'distance'] + selected_vars:
+            output_stream.write(';')
+            output_stream.write(header)
         output_stream.write('\n')
 
-    def write_csv(self, input_stream, output_time, selected_vars, output_stream, points, point_interpolators):
-        self.write_header(output_stream, selected_vars, points)
+    def write_csv(self, input_stream, selected_vars, output_stream, lines,
+                  indices_nonemtpy):
+        self.write_header(output_stream, selected_vars)
 
-        nb_selected_vars = len(selected_vars)
-        nb_frames = len(output_time)
+        nb_lines = len(indices_nonemtpy)
 
-        for index, time in enumerate(output_time):
-            output_stream.write(str(time))
+        for u, id_line in enumerate(indices_nonemtpy):
+            line = lines[id_line]
+            points = line.coords()
+            is_inside, point_interpolators = self.mesh.get_point_interpolators(points)
+            line_distance = WriteCSVProcess.cumdistance(points)
 
-            var_values = []
-            for var in selected_vars:
-                var_values.append(input_stream.read_var_in_frame(index, var))
+            for index, time in enumerate(input_stream.time):
 
-            for (i, j, k), interpolator in point_interpolators:
-                for index_var in range(nb_selected_vars):
+                var_values = []
+                for var in selected_vars:
+                    var_values.append(input_stream.read_var_in_frame(index, var))
+
+                for (x, y), distance, item in zip(line.coords(), line_distance, point_interpolators):
+                    if item is None:
+                        continue
+                    (i, j, k), interpolator = item
+
+                    output_stream.write(str(id_line+1))
                     output_stream.write(';')
-                    output_stream.write('%.6f' % interpolator.dot(var_values[index_var][[i, j, k]]))
+                    output_stream.write(str(time))
 
-            output_stream.write('\n')
-            self.tick.emit(int(100 * (index+1) / nb_frames))
+                    output_stream.write(';')
+                    output_stream.write('%.6f' % x)
+                    output_stream.write(';')
+                    output_stream.write('%.6f' % y)
+                    output_stream.write(';')
+                    output_stream.write('%.6f' % distance)
+
+                    for i_var, var in enumerate(selected_vars):
+                        values = var_values[i_var]
+                        output_stream.write(';')
+                        output_stream.write('%.6f' % interpolator.dot(values[[i, j, k]]))
+                    output_stream.write('\n')
+
+            self.tick.emit(int(100 * (u+1) / nb_lines))
+            QApplication.processEvents()
+
+    def write_csv_intersect(self, input_stream, selected_vars, output_stream, line_interpolators,
+                            indices_nonemtpy):
+        self.write_header(output_stream, selected_vars)
+
+        nb_lines = len(indices_nonemtpy)
+
+        for u, id_line in enumerate(indices_nonemtpy):
+            line_interpolator = line_interpolators[id_line]
+            points = [(x, y) for x, y, _, __ in line_interpolator]
+            distances = WriteCSVProcess.cumdistance(points)
+
+            for index, time in enumerate(input_stream.time):
+
+                var_values = []
+                for var in selected_vars:
+                    var_values.append(input_stream.read_var_in_frame(index, var))
+
+                for distance, (x, y, (i, j, k), interpolator) in zip(distances, line_interpolator):
+
+                    output_stream.write(str(id_line+1))
+                    output_stream.write(';')
+                    output_stream.write(str(time))
+
+                    output_stream.write(';')
+                    output_stream.write('%.6f' % x)
+                    output_stream.write(';')
+                    output_stream.write('%.6f' % y)
+                    output_stream.write(';')
+                    output_stream.write('%.6f' % distance)
+
+                    for i_var, var in enumerate(selected_vars):
+                        values = var_values[i_var]
+                        output_stream.write(';')
+                        output_stream.write('%.6f' % interpolator.dot(values[[i, j, k]]))
+                    output_stream.write('\n')
+
+            self.tick.emit(int(100 * (u+1) / nb_lines))
             QApplication.processEvents()
 
 
@@ -75,8 +137,6 @@ class InputTab(QWidget):
         self._initWidgets()  # some instance attributes will be set there
         self._setLayout()
         self._bindEvents()
-
-        self.setMinimumWidth(800)
 
     def _initWidgets(self):
         # create a checkbox for language selection
@@ -129,8 +189,8 @@ class InputTab(QWidget):
             tw.setMaximumHeight(800)
             tw.setMinimumHeight(250)
 
-        self.timeSampling = QLineEdit('1')
-        self.timeSampling.setFixedWidth(50)
+        # create the options
+        self.intersect = QCheckBox()
 
         # create the map button
         self.btnMap = QPushButton('Locate lines\non map', self, icon=self.style().standardIcon(QStyle.SP_DialogHelpButton))
@@ -159,7 +219,6 @@ class InputTab(QWidget):
         self.btnOpenLines.clicked.connect(self.btnOpenLinesEvent)
         self.btnMap.clicked.connect(self.btnMapEvent)
         self.btnSubmit.clicked.connect(self.btnSubmitEvent)
-        self.timeSampling.editingFinished.connect(self._checkSamplingFrequency)
 
     def _setLayout(self):
         mainLayout = QVBoxLayout()
@@ -196,6 +255,14 @@ class InputTab(QWidget):
         vlayout.addWidget(lb)
         vlayout.setAlignment(lb, Qt.AlignHCenter)
         vlayout.addWidget(self.firstTable)
+        hlayout2 = QHBoxLayout()
+        hlayout2.addItem(QSpacerItem(30, 1))
+        hlayout2.addWidget(self.intersect)
+        hlayout2.addWidget(QLabel('Add intersection points'))
+        hlayout2.setAlignment(self.intersect, Qt.AlignLeft)
+        hlayout2.setAlignment(self.intersect, Qt.AlignLeft)
+        hlayout2.addStretch()
+        vlayout.addLayout(hlayout2)
         hlayout.addLayout(vlayout)
         hlayout.addItem(QSpacerItem(15, 1))
 
@@ -205,17 +272,9 @@ class InputTab(QWidget):
         vlayout.setAlignment(lb, Qt.AlignHCenter)
         vlayout.addWidget(self.secondTable)
         hlayout.addLayout(vlayout)
+        hlayout.addLayout(vlayout)
         hlayout.addItem(QSpacerItem(30, 1))
-
         glayout.addLayout(hlayout, 1, 1)
-        hlayout = QHBoxLayout()
-        hlayout.addItem(QSpacerItem(30, 1))
-        hlayout.addWidget(QLabel('Time sampling frequency'))
-        hlayout.addWidget(self.timeSampling)
-        hlayout.setAlignment(self.timeSampling, Qt.AlignLeft)
-        hlayout.addStretch()
-        glayout.addLayout(hlayout, 2, 1)
-
         glayout.setAlignment(Qt.AlignLeft)
         glayout.setSpacing(10)
         mainLayout.addLayout(glayout)
@@ -247,7 +306,7 @@ class InputTab(QWidget):
         self.mesh = None
         self.linesNameBox.clear()
         self.btnOpenLines.setEnabled(True)
-        self.timeSampling.setText('1')
+        self.intersect.setChecked(False)
         self.btnSubmit.setEnabled(False)
         self.csvNameBox.clear()
         # self.parent.imageTab.reset()
@@ -266,20 +325,6 @@ class InputTab(QWidget):
             self.firstTable.setItem(i, 0, id_item)
             self.firstTable.setItem(i, 1, name_item)
             self.firstTable.setItem(i, 2, unit_item)
-
-    def _checkSamplingFrequency(self):
-        try:
-            sampling_frequency = int(self.timeSampling.text())
-        except ValueError:
-            QMessageBox.critical(self, 'Error', 'The sampling frequency must be a number!',
-                                 QMessageBox.Ok)
-            self.timeSampling.setText('1')
-            return
-        if sampling_frequency < 1 or sampling_frequency > len(self.time):
-            QMessageBox.critical(self, 'Error', 'The sampling frequency must be in the range [1; nbFrames]!',
-                                 QMessageBox.Ok)
-            self.timeSampling.setText('1')
-            return
 
     def getSelectedVariables(self):
         selected = []
@@ -406,8 +451,6 @@ class InputTab(QWidget):
                                  QMessageBox.Ok)
             return
 
-        sampling_frequency = int(self.timeSampling.text())
-
         options = QFileDialog.Options()
         options |= QFileDialog.DontUseNativeDialog
         options |= QFileDialog.DontConfirmOverwrite
@@ -427,25 +470,28 @@ class InputTab(QWidget):
         logging.info('Writing the output to %s' % filename)
         self.parent.inDialog()
 
-        selected_time = self.time[::sampling_frequency]
         indices_nonempty = [i for i in range(len(self.lines)) if self.line_interpolators[i]]
 
         # initialize the progress bar
         process = WriteCSVProcess(self.mesh)
         progressBar = OutputProgressDialog()
         progressBar.connectToThread(process)
-        #
-        # with Serafin.Read(self.filename, self.language) as resin:
-        #     resin.header = self.header
-        #     resin.time = self.time
-        #
-        #     progressBar.setValue(1)
-        #     QApplication.processEvents()
-        #
-        #     with open(filename, 'w') as fout:
-        #         process.write_csv(resin, selected_time, selected_var_IDs, fout,
-        #                           [self.points[i] for i in indices_inside],
-        #                           [self.point_interpolators[i] for i in indices_inside])
+
+        with Serafin.Read(self.filename, self.language) as resin:
+            resin.header = self.header
+            resin.time = self.time
+
+            progressBar.setValue(1)
+            QApplication.processEvents()
+
+            with open(filename, 'w') as fout:
+
+                if self.intersect.isChecked():
+                    process.write_csv_intersect(resin, selected_var_IDs, fout,
+                                                self.line_interpolators, indices_nonempty)
+                else:
+                    process.write_csv(resin, selected_var_IDs, fout,
+                                      self.lines, indices_nonempty)
 
         logging.info('Finished writing the output')
         progressBar.setValue(100)
@@ -476,6 +522,7 @@ class LinesGUI(QWidget):
         mainLayout.addWidget(self.tab)
         self.setLayout(mainLayout)
         self.setWindowFlags(self.windowFlags() | Qt.CustomizeWindowHint)
+        self.setMinimumWidth(600)
 
     def inDialog(self):
         if self.parent is not None:

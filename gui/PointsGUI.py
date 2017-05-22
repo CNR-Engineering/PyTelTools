@@ -1,5 +1,4 @@
 import sys
-import os
 import logging
 import copy
 import datetime
@@ -219,8 +218,6 @@ class InputTab(QWidget):
         self._initWidgets()  # some instance attributes will be set there
         self._setLayout()
         self._bindEvents()
-
-        self.setMinimumWidth(800)
 
     def _initWidgets(self):
         # create a checkbox for language selection
@@ -779,6 +776,7 @@ class PointsGUI(QWidget):
         mainLayout.addWidget(self.tab)
         self.setLayout(mainLayout)
         self.setWindowFlags(self.windowFlags() | Qt.CustomizeWindowHint)
+        self.setMinimumWidth(600)
 
     def inDialog(self):
         if self.parent is not None:

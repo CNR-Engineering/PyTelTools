@@ -2,7 +2,6 @@
 A GUI for extracting variables and time frames from .slf file
 """
 
-import os
 import sys
 import datetime
 from PyQt5.QtWidgets import *
@@ -634,7 +633,6 @@ class InputTab(QWidget):
         self._setLayout()
         self._bindEvents()
 
-        self.setMinimumWidth(800)
         self.setWindowFlags(self.windowFlags() | Qt.CustomizeWindowHint)
 
     def _initWidgets(self):
@@ -1264,6 +1262,7 @@ class ExtractVariablesGUI(QWidget):
         mainLayout.addWidget(self.tab)
         self.setLayout(mainLayout)
         self.setWindowFlags(self.windowFlags() | Qt.CustomizeWindowHint)
+        self.setMinimumWidth(600)
 
     def inDialog(self):
         if self.parent is not None:
