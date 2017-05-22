@@ -13,7 +13,60 @@ from itertools import islice, cycle
 from slf import Serafin
 from geom import Shapefile, BlueKenue
 from gui.util import MapViewer, LineMapCanvas, QPlainTextEditLogger, \
-    TableWidgetDragRows, OutputProgressDialog, LoadMeshDialog, handleOverwrite
+    TableWidgetDragRows, OutputProgressDialog, LoadMeshDialog, handleOverwrite, PlotViewer
+
+
+class SelectVariablesDialog(QDialog):
+    def __init__(self, var_table):
+        super().__init__()
+        self.var_table = var_table
+
+        self.unitBox = QComboBox()
+        self.varList = QListWidget()
+
+        for var_unit in var_table:
+            self.unitBox.addItem('Unit: %s' % var_unit)
+        self.unitBox.currentTextChanged.connect(self.updateList)
+
+        self.updateList(self.unitBox.currentText())
+
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel,
+                                   Qt.Horizontal, self)
+        buttons.accepted.connect(self.checkSelection)
+        buttons.rejected.connect(self.reject)
+        vlayout = QVBoxLayout()
+        vlayout.addWidget(self.unitBox)
+        vlayout.addWidget(self.varList)
+        vlayout.addWidget(buttons)
+        self.setLayout(vlayout)
+        self.setWindowTitle('Select variables to plot')
+        self.resize(550, 500)
+        self.selection = []
+
+    def getSelection(self):
+        selection = []
+        for row in range(self.varList.count()):
+            item = self.varList.item(row)
+            if item.checkState() == Qt.Checked:
+                selection.append(item.text().split(' (')[0])
+        return tuple(selection)
+
+    def updateList(self, text):
+        self.varList.clear()
+        for var_ID in self.var_table[text.split(': ')[1]]:
+            item = QListWidgetItem(var_ID)
+            item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
+
+            item.setCheckState(Qt.Unchecked)
+            self.varList.addItem(item)
+
+    def checkSelection(self):
+        self.selection = self.getSelection(), self.unitBox.currentText().split(': ')[1]
+        if not self.selection:
+            QMessageBox.critical(self, 'Error', 'Select at least one variable to plot.',
+                                 QMessageBox.Ok)
+            return
+        self.accept()
 
 
 class WriteCSVProcess(QThread):
@@ -310,9 +363,9 @@ class InputTab(QWidget):
 
 
 class CSVTab(QWidget):
-    def __init__(self, input, parent):
+    def __init__(self, inputTab, parent):
         super().__init__()
-        self.input = input
+        self.input = inputTab
         self.parent = parent
 
         self._initWidget()
@@ -489,6 +542,136 @@ class CSVTab(QWidget):
         self.parent.outDialog()
 
 
+class MultiVariablesImageTab(QWidget):
+    def __init__(self, inputTab):
+        super().__init__()
+        self.input = inputTab
+        self.var_table = {}
+        self.current_vars = []
+
+        # set up a custom plot viewer
+        self.plotViewer = PlotViewer()
+        self.plotViewer.exitAct.setEnabled(False)
+        self.plotViewer.menuBar.setVisible(False)
+        self.plotViewer.toolBar.addAction(self.plotViewer.xLabelAct)
+        self.plotViewer.toolBar.addSeparator()
+        self.plotViewer.toolBar.addAction(self.plotViewer.yLabelAct)
+        self.plotViewer.toolBar.addSeparator()
+        self.plotViewer.toolBar.addAction(self.plotViewer.titleAct)
+        self.plotViewer.canvas.figure.canvas.mpl_connect('motion_notify_event', self.plotViewer.mouseMove)
+
+        # put it in a group box to get a nice border
+        gb = QGroupBox()
+        ly = QHBoxLayout()
+        ly.addWidget(self.plotViewer)
+        gb.setLayout(ly)
+        gb.setStyleSheet('QGroupBox {border: 8px solid rgb(108, 122, 137); border-radius: 6px }')
+        gb.setMaximumWidth(900)
+        gb.setMinimumWidth(600)
+
+        # create widgets plot options
+        self.lineBox = QComboBox()
+        self.lineBox.setFixedSize(200, 30)
+        self.btnVars = QPushButton('Select variables')
+        self.btnVars.setFixedSize(120, 30)
+        self.varBox = QLineEdit()
+        self.varBox.setFixedHeight(30)
+        self.varBox.setReadOnly(True)
+
+        # create the compute button
+        self.btnCompute = QPushButton('Compute', icon=self.style().standardIcon(QStyle.SP_DialogApplyButton))
+        self.btnCompute.setFixedSize(105, 50)
+        self.btnCompute.setEnabled(False)
+        self.btnCompute.clicked.connect(self.btnComputeEvent)
+        self.btnVars.clicked.connect(self.btnVarsEvent)
+
+        # set layout
+        mainLayout = QVBoxLayout()
+        mainLayout.addItem(QSpacerItem(10, 10))
+        glayout = QGridLayout()
+        glayout.addWidget(QLabel('Select a polyline'), 1, 1)
+        glayout.addWidget(self.lineBox, 1, 2)
+        glayout.addWidget(self.btnVars, 2, 1)
+        glayout.addWidget(self.varBox, 2, 2)
+        glayout.setAlignment(Qt.AlignLeft)
+        glayout.setVerticalSpacing(10)
+
+        mainLayout.addLayout(glayout)
+        mainLayout.addItem(QSpacerItem(10, 15))
+        hlayout = QHBoxLayout()
+        hlayout.addWidget(self.btnCompute)
+        hlayout.addWidget(gb, Qt.AlignRight)
+        hlayout.setAlignment(self.btnCompute, Qt.AlignTop)
+        hlayout.setAlignment(Qt.AlignHCenter)
+        hlayout.setSpacing(10)
+        mainLayout.addLayout(hlayout)
+        self.setLayout(mainLayout)
+
+    def btnComputeEvent(self):
+        self.plotViewer.current_title = 'Values  of variables along line %s' % self.lineBox.currentText().split()[1]
+        line_id = int(self.lineBox.currentText().split()[1]) - 1
+        line_interpolator, distances = self.input.line_interpolators[line_id]
+        values = []
+
+        time_index = 0
+
+        with Serafin.Read(self.input.filename, self.input.language) as input_stream:
+            input_stream.header = self.input.header
+            input_stream.time = self.input.time
+            for var in self.current_vars:
+                line_var_values = []
+                var_values = input_stream.read_var_in_frame(time_index, var)
+
+                for x, y, (i, j, k), interpolator in line_interpolator:
+                    line_var_values.append(interpolator.dot(var_values[[i, j, k]]))
+                values.append(line_var_values)
+
+        self.plotViewer.canvas.axes.clear()
+        for i, var in enumerate(self.current_vars):
+            self.plotViewer.canvas.axes.plot(distances, values[i], '-', linewidth=2, label=var)
+        self.plotViewer.canvas.axes.legend()
+        self.plotViewer.canvas.axes.grid(linestyle='dotted')
+        self.plotViewer.canvas.axes.set_xlabel(self.plotViewer.current_xlabel)
+        self.plotViewer.canvas.axes.set_ylabel(self.plotViewer.current_ylabel)
+        self.plotViewer.canvas.axes.set_title(self.plotViewer.current_title)
+        self.plotViewer.canvas.draw()
+
+    def btnVarsEvent(self):
+        dialog = SelectVariablesDialog(self.var_table)
+        value = dialog.exec_()
+        if value == QDialog.Rejected:
+            return
+        self.current_vars, current_unit = dialog.selection
+        self.plotViewer.current_ylabel = 'Value (%s)' % current_unit
+        self.varBox.setText('Current selection: %s' % ', '.join(self.current_vars))
+        self.btnCompute.setEnabled(True)
+
+    def reset(self):
+        self.lineBox.clear()
+        self.var_table = {}
+        self.current_vars = []
+        self.btnCompute.setEnabled(False)
+        self.plotViewer.current_title = ''
+        self.plotViewer.current_xlabel = 'Cumulative distance'
+        self.plotViewer.current_ylabel = ''
+
+    def getInput(self):
+        for i in range(len(self.input.lines)):
+            id_line = str(i+1)
+            if self.input.line_interpolators[i][0]:
+                self.lineBox.addItem('Line %s' % id_line)
+        for var_ID, var_name, var_unit in zip(self.input.header.var_IDs, self.input.header.var_names,
+                                              self.input.header.var_units):
+            var_unit = var_unit.decode('utf-8').strip()
+            var_name = var_name.decode('utf-8').strip()
+            if not var_unit:
+                continue
+            if var_unit in self.var_table:
+                self.var_table[var_unit].append('%s (%s)' % (var_ID, var_name))
+            else:
+                self.var_table[var_unit] = ['%s (%s)' % (var_ID, var_name)]
+
+
 class LinesGUI(QWidget):
     def __init__(self, parent=None):
         super().__init__()
@@ -496,14 +679,19 @@ class LinesGUI(QWidget):
 
         self.input = InputTab(self)
         self.csvTab = CSVTab(self.input, self)
+        self.multiVarTab = MultiVariablesImageTab(self.input)
+
         self.setWindowTitle('Interpolate values of variables along lines')
 
         self.tab = QTabWidget()
         self.tab.addTab(self.input, 'Input')
         self.tab.addTab(self.csvTab, 'Output to CSV')
+        self.tab.addTab(self.multiVarTab, 'Visualization (MultiVar)')
 
         self.tab.setTabEnabled(1, False)
-        self.tab.setStyleSheet('QTabBar::tab { height: 40px; width: 300px; }')
+        self.tab.setTabEnabled(2, False)
+
+        self.tab.setStyleSheet('QTabBar::tab { height: 40px; width: 150px; }')
 
         mainLayout = QVBoxLayout()
         mainLayout.addWidget(self.tab)
@@ -513,10 +701,14 @@ class LinesGUI(QWidget):
 
     def getInput(self):
         self.tab.setTabEnabled(1, True)
+        self.tab.setTabEnabled(2, True)
+
         self.csvTab.getInput()
+        self.multiVarTab.getInput()
 
     def reset(self):
         self.csvTab.reset()
+        self.multiVarTab.reset()
 
     def inDialog(self):
         if self.parent is not None:

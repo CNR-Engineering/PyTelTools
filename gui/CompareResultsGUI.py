@@ -621,7 +621,7 @@ class ErrorEvolutionTab(QWidget):
         self.plotViewer.toolBar.addAction(self.plotViewer.yLabelAct)
         self.plotViewer.toolBar.addSeparator()
         self.plotViewer.toolBar.addAction(self.plotViewer.titleAct)
-        self.plotViewer.canvas.figure.canvas.mpl_connect('motion_notify_event', self.mouseMove)
+        self.plotViewer.canvas.figure.canvas.mpl_connect('motion_notify_event', self.plotViewer.mouseMove)
 
         # put it in a group box to get a nice border
         gb = QGroupBox()
@@ -652,12 +652,6 @@ class ErrorEvolutionTab(QWidget):
         hlayout.setSpacing(10)
         mainLayout.addLayout(hlayout)
         self.setLayout(mainLayout)
-
-    def mouseMove(self, event):
-        if event.xdata is None or event.ydata is None:
-            self.plotViewer.statusbar.clearMessage()
-        msg = 'Time: %s \t Value: %s' % (str(event.xdata), str(event.ydata))
-        self.plotViewer.statusbar.showMessage(msg)
 
     def add_reference(self):
         self.timeSelection.initRef(self.input.ref_header.nb_frames)
@@ -926,7 +920,7 @@ class BSSTab(QWidget):
         self.plotViewer.toolBar.addAction(self.plotViewer.yLabelAct)
         self.plotViewer.toolBar.addSeparator()
         self.plotViewer.toolBar.addAction(self.plotViewer.titleAct)
-        self.plotViewer.canvas.figure.canvas.mpl_connect('motion_notify_event', self.mouseMove)
+        self.plotViewer.canvas.figure.canvas.mpl_connect('motion_notify_event', self.plotViewer.mouseMove)
         self.initSelection.refIndex.textChanged.connect(lambda _: self.reinitFigure())
 
         self.btnEvolution = QPushButton('BSS evolution', icon=self.style().standardIcon(QStyle.SP_DialogApplyButton))
@@ -976,12 +970,6 @@ class BSSTab(QWidget):
         self.plotViewer.current_title = 'Evolution of BSS'
         self.plotViewer.current_ylabel = 'BSS'
         self.plotViewer.current_xlabel = 'Time (second)'
-
-    def mouseMove(self, event):
-        if event.xdata is None or event.ydata is None:
-            self.plotViewer.statusbar.clearMessage()
-        msg = 'Time: %s \t Value: %s' % (str(event.xdata), str(event.ydata))
-        self.plotViewer.statusbar.showMessage(msg)
 
     def reinitFigure(self):
         self.has_figure = False

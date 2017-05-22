@@ -662,6 +662,12 @@ class PlotViewer(QWidget):
         self.current_title = 'Default plot'
         self.plot(x, y)
 
+    def mouseMove(self, event):
+        if event.xdata is None or event.ydata is None:
+            self.statusbar.clearMessage()
+        msg = 'Time: %s \t Value: %s' % (str(event.xdata), str(event.ydata))
+        self.statusbar.showMessage(msg)
+
     def plot(self, x, y):
         """!
         Default plotting behaviour
