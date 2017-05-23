@@ -630,6 +630,7 @@ class MultiVariablesImageTab(QWidget):
         self.varBox = QLineEdit()
         self.varBox.setFixedHeight(30)
         self.varBox.setReadOnly(True)
+        self.intersection = QCheckBox()
 
         # create the compute button
         self.btnCompute = QPushButton('Compute', icon=self.style().standardIcon(QStyle.SP_DialogApplyButton))
@@ -644,16 +645,30 @@ class MultiVariablesImageTab(QWidget):
         vlayout.addItem(QSpacerItem(10, 10))
         vlayout.addWidget(self.timeSelection)
         vlayout.addItem(QSpacerItem(10, 10))
-        glayout = QGridLayout()
-        glayout.addWidget(QLabel('Select a polyline'), 1, 1)
-        glayout.addWidget(self.lineBox, 1, 2)
-        glayout.addWidget(self.btnVars, 2, 1)
-        glayout.addWidget(self.varBox, 2, 2)
-        glayout.setAlignment(Qt.AlignLeft)
-        glayout.setVerticalSpacing(10)
-        glayout.setHorizontalSpacing(10)
+        hlayout = QHBoxLayout()
+        hlayout.addWidget(QLabel('   Select a polyline'))
+        hlayout.addWidget(self.lineBox)
+        hlayout.setAlignment(self.lineBox, Qt.AlignLeft)
+        hlayout.addStretch()
+        vlayout.addLayout(hlayout)
+        vlayout.addItem(QSpacerItem(10, 10))
 
-        vlayout.addLayout(glayout)
+        hlayout = QHBoxLayout()
+        hlayout.addWidget(self.btnVars)
+        hlayout.addWidget(self.varBox)
+        vlayout.addLayout(hlayout)
+
+        vlayout.addItem(QSpacerItem(10, 10))
+        hlayout = QHBoxLayout()
+        hlayout.addItem(QSpacerItem(10, 10))
+        hlayout.addWidget(self.intersection)
+        lb = QLabel('Add intersection points')
+        hlayout.addWidget(lb)
+        hlayout.setAlignment(lb, Qt.AlignLeft)
+        hlayout.addStretch()
+        vlayout.addLayout(hlayout)
+        vlayout.addItem(QSpacerItem(10, 10))
+
         vlayout.addItem(QSpacerItem(10, 15))
         vlayout.addWidget(self.btnCompute)
         vlayout.setAlignment(self.btnCompute, Qt.AlignRight)
@@ -667,7 +682,10 @@ class MultiVariablesImageTab(QWidget):
     def btnComputeEvent(self):
         self.plotViewer.current_title = 'Values  of variables along line %s' % self.lineBox.currentText().split()[1]
         line_id = int(self.lineBox.currentText().split()[1]) - 1
-        line_interpolator, distances = self.input.line_interpolators[line_id]
+        if self.intersection.isChecked():
+            line_interpolator, distances = self.input.line_interpolators[line_id]
+        else:
+            line_interpolator, distances = self.input.line_interpolators_internal[line_id]
         values = []
 
         time_index = int(self.timeSelection.index.text()) - 1
