@@ -670,7 +670,7 @@ class MultiVariableImageTab(QWidget):
             line_interpolator, distances = self.input.line_interpolators_internal[line_id]
         values = []
 
-        time_index = int(self.timeSelection.index.text()) - 1
+        time_index = int(self.control.timeSelection.index.text()) - 1
 
         with Serafin.Read(self.input.filename, self.input.language) as input_stream:
             input_stream.header = self.input.header
@@ -837,8 +837,8 @@ class MultiFrameImageTab(QWidget):
         current_var = self.control.varBox.currentText().split(' (')[0]
         self.plotViewer.current_title = 'Values of %s along line %s' % (current_var,
                                                                         self.control.lineBox.currentText().split()[1])
-        line_id = int(self.lineBox.currentText().split()[1]) - 1
-        if self.intersection.isChecked():
+        line_id = int(self.control.lineBox.currentText().split()[1]) - 1
+        if self.control.intersection.isChecked():
             line_interpolator, distances = self.input.line_interpolators[line_id]
         else:
             line_interpolator, distances = self.input.line_interpolators_internal[line_id]
