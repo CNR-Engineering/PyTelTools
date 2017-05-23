@@ -364,20 +364,20 @@ class InputTab(QWidget):
                 for poly_name, poly in f.get_open_polylines():
                     line_interpolators, distances, \
                         line_interpolators_internal, distances_internal = self.mesh.get_line_interpolators(poly)
-                    if not line_interpolators:
+                    if line_interpolators:
                         nb_nonempty += 1
                     self.lines.append(poly)
                     self.line_interpolators.append((line_interpolators, distances))
                     self.line_interpolators_internal.append((line_interpolators_internal, distances_internal))
         else:
             for poly in Shapefile.get_open_polylines(filename):
-                    line_interpolators, distances, \
-                        line_interpolators_internal, distances_internal = self.mesh.get_line_interpolators(poly)
-                    if not line_interpolators:
-                        nb_nonempty += 1
-                    self.lines.append(poly)
-                    self.line_interpolators.append((line_interpolators, distances))
-                    self.line_interpolators_internal.append((line_interpolators_internal, distances_internal))
+                line_interpolators, distances, \
+                    line_interpolators_internal, distances_internal = self.mesh.get_line_interpolators(poly)
+                if line_interpolators:
+                    nb_nonempty += 1
+                self.lines.append(poly)
+                self.line_interpolators.append((line_interpolators, distances))
+                self.line_interpolators_internal.append((line_interpolators_internal, distances_internal))
         if not self.lines:
             QMessageBox.critical(self, 'Error', 'The file does not contain any open polyline.',
                                  QMessageBox.Ok)
@@ -639,10 +639,11 @@ class MultiVariablesImageTab(QWidget):
         self.btnVars.clicked.connect(self.btnVarsEvent)
 
         # set layout
-        mainLayout = QVBoxLayout()
-        mainLayout.addItem(QSpacerItem(10, 10))
-        mainLayout.addWidget(self.timeSelection)
-        mainLayout.addItem(QSpacerItem(10, 10))
+        mainLayout = QHBoxLayout()
+        vlayout = QVBoxLayout()
+        vlayout.addItem(QSpacerItem(10, 10))
+        vlayout.addWidget(self.timeSelection)
+        vlayout.addItem(QSpacerItem(10, 10))
         glayout = QGridLayout()
         glayout.addWidget(QLabel('Select a polyline'), 1, 1)
         glayout.addWidget(self.lineBox, 1, 2)
@@ -650,16 +651,17 @@ class MultiVariablesImageTab(QWidget):
         glayout.addWidget(self.varBox, 2, 2)
         glayout.setAlignment(Qt.AlignLeft)
         glayout.setVerticalSpacing(10)
+        glayout.setHorizontalSpacing(10)
 
-        mainLayout.addLayout(glayout)
-        mainLayout.addItem(QSpacerItem(10, 15))
-        hlayout = QHBoxLayout()
-        hlayout.addWidget(self.btnCompute)
-        hlayout.addWidget(gb, Qt.AlignRight)
-        hlayout.setAlignment(self.btnCompute, Qt.AlignTop)
-        hlayout.setAlignment(Qt.AlignHCenter)
-        hlayout.setSpacing(10)
-        mainLayout.addLayout(hlayout)
+        vlayout.addLayout(glayout)
+        vlayout.addItem(QSpacerItem(10, 15))
+        vlayout.addWidget(self.btnCompute)
+        vlayout.setAlignment(self.btnCompute, Qt.AlignRight)
+        mainLayout.addLayout(vlayout)
+        mainLayout.addWidget(gb)
+        mainLayout.setAlignment(vlayout, Qt.AlignTop)
+        mainLayout.setAlignment(Qt.AlignHCenter)
+        mainLayout.setSpacing(10)
         self.setLayout(mainLayout)
 
     def btnComputeEvent(self):

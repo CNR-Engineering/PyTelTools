@@ -789,7 +789,8 @@ class BSSTab(QWidget):
         self.plotViewer.toolBar.addSeparator()
         self.plotViewer.toolBar.addAction(self.plotViewer.titleAct)
         self.plotViewer.canvas.figure.canvas.mpl_connect('motion_notify_event', self.plotViewer.mouseMove)
-        self.initSelection.refIndex.textChanged.connect(lambda _: self.reinitFigure())
+        self.initSelection.refIndex.textChanged.connect(self.reinitFigure)
+        self.timeSelection.refIndex.textChanged.connect(self.reinitFigure)
 
         self.btnEvolution = QPushButton('BSS evolution', icon=self.style().standardIcon(QStyle.SP_DialogApplyButton))
         self.btnEvolution.setFixedSize(105, 50)
