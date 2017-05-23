@@ -21,22 +21,24 @@ class MainPanel(QWidget):
         compare = CompareResultsGUI(parent)
         flux = ComputeFluxGUI(parent)
 
-        stackLayout = QStackedLayout()
-        stackLayout.addWidget(QLabel('Hello! This is the start page (TODO)'))
-        stackLayout.addWidget(extract)
-        stackLayout.addWidget(points)
-        stackLayout.addWidget(lines)
-        stackLayout.addWidget(volume)
-        stackLayout.addWidget(flux)
-        stackLayout.addWidget(compare)
-        self.setLayout(stackLayout)
+        self.stackLayout = QStackedLayout()
+        self.stackLayout.addWidget(QLabel('Hello! This is the start page (TODO)'))
+        self.stackLayout.addWidget(extract)
+        self.stackLayout.addWidget(points)
+        self.stackLayout.addWidget(lines)
+        self.stackLayout.addWidget(volume)
+        self.stackLayout.addWidget(flux)
+        self.stackLayout.addWidget(compare)
+        self.setLayout(self.stackLayout)
+
+        self.stackLayout.currentChanged.connect(parent.autoResize)
 
 
 class MyMainWindow(QWidget):
     def __init__(self):
         super().__init__()
 
-        panel = MainPanel(self)
+        self.panel = MainPanel(self)
 
         pageList = QListWidget()
         pageList.setMaximumWidth(200)
@@ -44,7 +46,8 @@ class MyMainWindow(QWidget):
                      'Interpolate along lines', 'Compute volume', 'Compute flux', 'Compare two results']:
             pageList.addItem('\n' + name + '\n')
         pageList.setFlow(QListView.TopToBottom)
-        pageList.currentRowChanged.connect(panel.layout().setCurrentIndex)
+        pageList.currentRowChanged.connect(self.panel.layout().setCurrentIndex)
+
         pageList.setCurrentRow(0)
 
         vline = QFrame()
@@ -52,7 +55,7 @@ class MyMainWindow(QWidget):
 
         splitter = QSplitter()
         splitter.addWidget(pageList)
-        splitter.addWidget(panel)
+        splitter.addWidget(self.panel)
         splitter.setHandleWidth(10)
         splitter.setCollapsible(0, False)
 
@@ -66,6 +69,10 @@ class MyMainWindow(QWidget):
         self.frameGeom = self.frameGeometry()
         self.move(self.frameGeom.center())
         self.show()
+
+    def autoResize(self, index):
+        if not self.isMaximized():
+            self.resize(self.panel.stackLayout.widget(index).sizeHint())
 
     def inDialog(self):
         self.setWindowFlags(self.windowFlags() & ~Qt.WindowCloseButtonHint)

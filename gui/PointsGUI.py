@@ -270,7 +270,7 @@ class InputTab(QWidget):
             hh.setDefaultSectionSize(110)
             tw.setEditTriggers(QAbstractItemView.NoEditTriggers)
             tw.setMaximumHeight(800)
-            tw.setMinimumHeight(250)
+            tw.setMinimumHeight(150)
 
         self.timeSampling = QLineEdit('1')
         self.timeSampling.setFixedWidth(50)

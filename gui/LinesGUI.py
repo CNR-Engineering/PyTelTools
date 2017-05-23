@@ -827,6 +827,7 @@ class MultiFrameImageTab(QWidget):
 
         self.splitter.addWidget(self.control)
         self.splitter.addWidget(self.gb)
+
         mainLayout = QHBoxLayout()
 
         mainLayout.addWidget(self.splitter)
