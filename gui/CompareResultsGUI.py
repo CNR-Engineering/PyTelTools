@@ -930,7 +930,7 @@ class CompareResultsGUI(QWidget):
         self.setWindowTitle('Compare two results on identical meshes')
 
         self.tab = QTabWidget()
-        self.tab.setStyleSheet('QTabBar::tab { height: 40px; width: 180px; }')
+        self.tab.setStyleSheet('QTabBar::tab { height: 40px; width: 160px; }')
 
         self.input = InputTab(self)
         errorEvolutionTab = ErrorEvolutionTab(self.input)
@@ -939,7 +939,7 @@ class CompareResultsGUI(QWidget):
         bssTab = BSSTab(self.input)
 
         self.tab.addTab(self.input, 'Input')
-        self.tab.addTab(computeErrorTab, 'Compute MSD/MAD/RMSD')
+        self.tab.addTab(computeErrorTab, 'MSD/MAD/RMSD')
         self.tab.addTab(errorEvolutionTab, 'MAD evolution')
         self.tab.addTab(errorDistributionTab, 'EWSD distribution')
         self.tab.addTab(bssTab, 'BSS')

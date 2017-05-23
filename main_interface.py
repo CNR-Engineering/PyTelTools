@@ -64,7 +64,7 @@ class MyMainWindow(QWidget):
         self.setLayout(mainLayout)
 
         self.setWindowTitle('Main window')
-        self.resize(300, 300)
+        self.resize(800, 600)
         self.setWindowFlags(self.windowFlags() | Qt.CustomizeWindowHint)
         self.frameGeom = self.frameGeometry()
         self.move(self.frameGeom.center())

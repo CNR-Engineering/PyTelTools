@@ -28,8 +28,8 @@ class SimpleTimeSelection(QWidget):
         self.value = QLineEdit('', self)
         self.date = QLineEdit('', self)
 
-        self.value.setMaximumWidth(60)
-        self.value.setMaximumWidth(80)
+        self.index.setMaximumWidth(30)
+        self.value.setMaximumWidth(50)
         self.date.setMaximumWidth(120)
 
         mainLayout = QVBoxLayout()
@@ -639,7 +639,9 @@ class MultiVariableImageTab(QWidget):
 
     def _updateList(self, text):
         self.control.varList.clear()
-        for var_ID in self.var_table[text.split(': ')[1]]:
+        unit = text.split(': ')[1]
+        unit = '' if unit == 'None' else unit
+        for var_ID in self.var_table[unit]:
             item = QListWidgetItem(var_ID)
             item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
 
@@ -721,15 +723,16 @@ class MultiVariableImageTab(QWidget):
                                               self.input.header.var_units):
             var_unit = var_unit.decode('utf-8').strip()
             var_name = var_name.decode('utf-8').strip()
-            if not var_unit:
-                continue
             if var_unit in self.var_table:
                 self.var_table[var_unit].append('%s (%s)' % (var_ID, var_name))
             else:
                 self.var_table[var_unit] = ['%s (%s)' % (var_ID, var_name)]
 
         for var_unit in self.var_table:
-            self.control.unitBox.addItem('Unit: %s' % var_unit)
+            if not var_unit:
+                self.control.unitBox.addItem('Unit: None')
+            else:
+                self.control.unitBox.addItem('Unit: %s' % var_unit)
         self._updateList(self.control.unitBox.currentText())
 
 
