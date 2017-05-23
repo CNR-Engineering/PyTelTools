@@ -32,6 +32,9 @@ class Polyline:
     def polyline(self):
         return self._polyline
 
+    def project(self, point):
+        return self._polyline.project(point)
+
     def segments(self):
         prev_x, prev_y = None, None
         for x, y in self.coords():
@@ -49,6 +52,9 @@ class Polyline:
 
     def bounds(self):
         return self._polyline.bounds
+
+    def length(self):
+        return self._polyline.length
 
     def polygon_intersection(self, triangle):
         """!

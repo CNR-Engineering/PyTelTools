@@ -162,6 +162,57 @@ class TimeSlider(QSlider):
         self.setValue(value-1)
 
 
+class SimpleTimeDateSelection(QWidget):
+    def __init__(self):
+        super().__init__()
+
+        self.frames = []
+        self.dates = []
+
+        self.index = QLineEdit('', self)
+        self.slider = TimeSlider(self.index)
+        self.value = QLineEdit('', self)
+        self.date = QLineEdit('', self)
+
+        self.index.setMaximumWidth(30)
+        self.value.setMaximumWidth(50)
+        self.date.setMaximumWidth(120)
+
+        mainLayout = QVBoxLayout()
+        mainLayout.addWidget(self.slider)
+        hlayout = QHBoxLayout()
+        hlayout.addWidget(QLabel('Frame index'))
+        hlayout.addWidget(self.index)
+        hlayout.addWidget(QLabel('value'))
+        hlayout.addWidget(self.value)
+        hlayout.addWidget(QLabel('date'))
+        hlayout.addWidget(self.date)
+        hlayout.addStretch()
+        hlayout.setAlignment(Qt.AlignLeft)
+        hlayout.setSpacing(10)
+        mainLayout.addLayout(hlayout)
+        self.setLayout(mainLayout)
+        self.index.editingFinished.connect(self.slider.enterIndexEvent)
+        self.index.editingFinished.connect(self.updateSelection)
+
+    def updateSelection(self):
+        index = int(self.index.text()) - 1
+        self.value.setText(str(self.frames[index]))
+        self.date.setText(str(self.dates[index]))
+
+    def initTime(self, frames, dates):
+        self.frames = frames
+        self.dates = dates
+        self.slider.reinit(len(frames), 0)
+        self.index.setText(str(1))
+        self.updateSelection()
+
+    def clearText(self):
+        self.index.clear()
+        self.value.clear()
+        self.date.clear()
+
+
 class QPlainTextEditLogger(logging.Handler):
     """!
     @brief A text edit box displaying the message logs

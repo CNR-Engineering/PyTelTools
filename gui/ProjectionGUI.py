@@ -3,7 +3,7 @@ import logging
 import copy
 import datetime
 import numpy as np
-
+from shapely.geometry import Point
 from PyQt5.QtWidgets import *
 from PyQt5.QtGui import *
 from PyQt5.QtCore import *
@@ -25,44 +25,40 @@ class WriteCSVProcess(QThread):
 
     def write_header(self, output_stream, selected_vars):
         output_stream.write('Line')
-        for header in ['time', 'x', 'y', 'distance'] + selected_vars:
+        for header in ['X projected'] + selected_vars:
             output_stream.write(';')
             output_stream.write(header)
         output_stream.write('\n')
 
     def write_csv(self, input_stream, selected_vars, output_stream, line_interpolators,
-                        indices_nonemtpy):
+                        indices_nonemtpy, reference, time_index):
         self.write_header(output_stream, selected_vars)
 
         nb_lines = len(indices_nonemtpy)
+        max_distance = reference.length()
+
+        var_values = []
+        for var in selected_vars:
+            var_values.append(input_stream.read_var_in_frame(time_index, var))
 
         for u, id_line in enumerate(indices_nonemtpy):
-            line_interpolator, distances = line_interpolators[id_line]
+            line_interpolator, _ = line_interpolators[id_line]
+            distances = []
+            for x, y, _, __ in line_interpolator:
+                distances.append(reference.project(Point(x, y)))
 
-            for index, time in enumerate(input_stream.time):
+            for (x, y, (i, j, k), interpolator), distance in zip(line_interpolator, distances):
+                if distance <= 0 or distance >= max_distance:
+                    continue
+                output_stream.write(str(id_line+1))
+                output_stream.write(';')
+                output_stream.write('%.6f' % distance)
 
-                var_values = []
-                for var in selected_vars:
-                    var_values.append(input_stream.read_var_in_frame(index, var))
-
-                for (x, y, (i, j, k), interpolator), distance in zip(line_interpolator, distances):
-
-                    output_stream.write(str(id_line+1))
+                for i_var, var in enumerate(selected_vars):
+                    values = var_values[i_var]
                     output_stream.write(';')
-                    output_stream.write(str(time))
-
-                    output_stream.write(';')
-                    output_stream.write('%.6f' % x)
-                    output_stream.write(';')
-                    output_stream.write('%.6f' % y)
-                    output_stream.write(';')
-                    output_stream.write('%.6f' % distance)
-
-                    for i_var, var in enumerate(selected_vars):
-                        values = var_values[i_var]
-                        output_stream.write(';')
-                        output_stream.write('%.6f' % interpolator.dot(values[[i, j, k]]))
-                    output_stream.write('\n')
+                    output_stream.write('%.6f' % interpolator.dot(values[[i, j, k]]))
+                output_stream.write('\n')
 
             self.tick.emit(int(100 * (u+1) / nb_lines))
             QApplication.processEvents()
@@ -247,7 +243,6 @@ class InputTab(QWidget):
                                  QMessageBox.Ok)
             return
 
-
         self.lines = []
         self.line_interpolators = []
         self.line_interpolators_internal = []
@@ -337,6 +332,8 @@ class CSVTab(QWidget):
 
         # create the options
         self.intersect = QCheckBox()
+        self.timeSelection = SimpleTimeDateSelection()
+        self.referenceLine = QComboBox()
 
         # create the submit button
         self.btnSubmit = QPushButton('Submit\nto .csv', self, icon=self.style().standardIcon(QStyle.SP_DialogSaveButton))
@@ -357,8 +354,17 @@ class CSVTab(QWidget):
 
     def _setLayout(self):
         mainLayout = QVBoxLayout()
-        mainLayout.addItem(QSpacerItem(10, 10))
         mainLayout.setSpacing(15)
+        mainLayout.addItem(QSpacerItem(10, 10))
+        mainLayout.addWidget(self.timeSelection)
+        hlayout = QHBoxLayout()
+        hlayout.addWidget(QLabel('   Reference line'))
+        hlayout.addWidget(self.referenceLine)
+        hlayout.setAlignment(self.referenceLine, Qt.AlignLeft)
+        hlayout.addStretch()
+        mainLayout.addLayout(hlayout)
+        mainLayout.addItem(QSpacerItem(10, 10))
+
         glayout = QGridLayout()
         hlayout = QHBoxLayout()
         hlayout.addItem(QSpacerItem(30, 1))
@@ -423,13 +429,26 @@ class CSVTab(QWidget):
         self._initVarTables()
         self.btnSubmit.setEnabled(True)
         self.csvNameBox.clear()
+        if self.input.header.date is not None:
+            year, month, day, hour, minute, second = self.input.header.date
+            start_time = datetime.datetime(year, month, day, hour, minute, second)
+        else:
+            start_time = datetime.datetime(1900, 1, 1, 0, 0, 0)
+        frames = list(map(lambda x: start_time + datetime.timedelta(seconds=x), self.input.time))
+        self.timeSelection.initTime(self.input.time, frames)
+        for i in range(len(self.input.lines)):
+            id_line = str(i+1)
+            if self.input.line_interpolators[i][0]:
+                self.referenceLine.addItem('Line %s' % id_line)
 
     def reset(self):
         self.firstTable.setRowCount(0)
         self.secondTable.setRowCount(0)
         self.intersect.setChecked(False)
         self.btnSubmit.setEnabled(False)
+        self.timeSelection.clearText()
         self.csvNameBox.clear()
+        self.referenceLine.clear()
 
     def btnSubmitEvent(self):
         selected_var_IDs = self.getSelectedVariables()
@@ -459,6 +478,8 @@ class CSVTab(QWidget):
         self.parent.inDialog()
 
         indices_nonempty = [i for i in range(len(self.input.lines)) if self.input.line_interpolators[i][0]]
+        reference = self.input.lines[int(self.referenceLine.currentText().split()[1]) - 1]
+        time_index = int(self.timeSelection.index.text()) - 1
 
         # initialize the progress bar
         process = WriteCSVProcess(self.input.mesh)
@@ -476,10 +497,10 @@ class CSVTab(QWidget):
 
                 if self.intersect.isChecked():
                     process.write_csv(resin, selected_var_IDs, fout,
-                                      self.input.line_interpolators, indices_nonempty)
+                                      self.input.line_interpolators, indices_nonempty, reference, time_index)
                 else:
                     process.write_csv(resin, selected_var_IDs, fout,
-                                      self.input.line_interpolators_internal, indices_nonempty)
+                                      self.input.line_interpolators_internal, indices_nonempty, reference, time_index)
 
         logging.info('Finished writing the output')
         progressBar.setValue(100)
@@ -488,7 +509,7 @@ class CSVTab(QWidget):
         self.parent.outDialog()
 
 
-class MultiVarControlPanel(QWidget):
+class ImageControlPanel(QWidget):
     def __init__(self):
         super().__init__()
         self.timeSelection = SimpleTimeDateSelection()
@@ -499,11 +520,17 @@ class MultiVarControlPanel(QWidget):
         self.lineBox.setMaximumWidth(200)
         self.intersection = QCheckBox()
 
-        self.unitBox = QComboBox()
-        self.unitBox.setFixedHeight(30)
-        self.unitBox.setMaximumWidth(200)
-        self.varList = QListWidget()
-        self.varList.setMaximumWidth(200)
+        # create line-var table
+        self.varTable = QTableWidget()
+        vh = self.varTable.verticalHeader()
+        vh.setSectionResizeMode(QHeaderView.Fixed)
+        vh.setDefaultSectionSize(20)
+        hh = self.varTable.horizontalHeader()
+        hh.setDefaultSectionSize(30)
+        self.varTable.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.varTable.setSelectionMode(QAbstractItemView.NoSelection)
+        self.varTable.setMinimumHeight(300)
+        self.varTable.setMaximumWidth(400)
 
         # create the compute button
         self.btnCompute = QPushButton('Compute', icon=self.style().standardIcon(QStyle.SP_DialogApplyButton))
@@ -515,7 +542,7 @@ class MultiVarControlPanel(QWidget):
         vlayout.addWidget(self.timeSelection)
         vlayout.addItem(QSpacerItem(10, 10))
         hlayout = QHBoxLayout()
-        hlayout.addWidget(QLabel('   Select a polyline'))
+        hlayout.addWidget(QLabel('   Reference line'))
         hlayout.addWidget(self.lineBox)
         hlayout.setAlignment(self.lineBox, Qt.AlignLeft)
         hlayout.addStretch()
@@ -534,11 +561,7 @@ class MultiVarControlPanel(QWidget):
         vlayout.addItem(QSpacerItem(10, 15))
 
         hlayout = QHBoxLayout()
-        vlayout2 = QVBoxLayout()
-        vlayout2.addWidget(self.unitBox)
-        vlayout2.addWidget(self.varList)
-        vlayout2.setSpacing(10)
-        hlayout.addLayout(vlayout2)
+        hlayout.addWidget(self.varTable)
         hlayout.addWidget(self.btnCompute)
         hlayout.setAlignment(self.btnCompute, Qt.AlignRight | Qt.AlignTop)
         hlayout.setSpacing(10)
@@ -547,13 +570,12 @@ class MultiVarControlPanel(QWidget):
         self.setLayout(vlayout)
 
 
-class MultiVariableImageTab(QWidget):
+class ImageTab(QWidget):
     def __init__(self, inputTab):
         super().__init__()
         self.input = inputTab
 
-        self.var_table = {}
-        self.current_vars = []
+        self.current_vars = {}
 
         # set up a custom plot viewer
         self.plotViewer = PlotViewer()
@@ -574,9 +596,8 @@ class MultiVariableImageTab(QWidget):
         self.gb.setStyleSheet('QGroupBox {border: 8px solid rgb(108, 122, 137); border-radius: 6px }')
         self.gb.setMinimumWidth(600)
 
-        self.control = MultiVarControlPanel()
+        self.control = ImageControlPanel()
         self.control.btnCompute.clicked.connect(self.btnComputeEvent)
-        self.control.unitBox.currentTextChanged.connect(self._updateList)
 
         self.splitter = QSplitter()
         self.splitter.addWidget(self.control)
@@ -586,24 +607,17 @@ class MultiVariableImageTab(QWidget):
         mainLayout.addWidget(self.splitter)
         self.setLayout(mainLayout)
 
-    def _updateList(self, text):
-        self.control.varList.clear()
-        unit = text.split(': ')[1]
-        unit = '' if unit == 'None' else unit
-        for var_ID in self.var_table[unit]:
-            item = QListWidgetItem(var_ID)
-            item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
-
-            item.setCheckState(Qt.Unchecked)
-            self.control.varList.addItem(item)
-
     def _getSelection(self):
-        selection = []
-        for row in range(self.control.varList.count()):
-            item = self.control.varList.item(row)
-            if item.checkState() == Qt.Checked:
-                selection.append(item.text().split(' (')[0])
-        return tuple(selection)
+        self.current_vars = {}
+        for row in range(self.control.varTable.rowCount()):
+            for j in range(self.input.header.nb_var):
+                if self.control.varTable.item(row, j+1).checkState() == Qt.Checked:
+                    line_id = int(self.control.varTable.item(row, 0).text()) - 1
+                    if line_id not in self.current_vars:
+                        self.current_vars[line_id] = [self.input.header.var_IDs[j]]
+                    else:
+                        self.current_vars[line_id].append(self.input.header.var_IDs[j])
+        return self.current_vars
 
     def btnComputeEvent(self):
         self.current_vars = self._getSelection()
@@ -611,32 +625,51 @@ class MultiVariableImageTab(QWidget):
             QMessageBox.critical(self, 'Error', 'Select at least one variable to plot.',
                                  QMessageBox.Ok)
             return
-
-        self.plotViewer.current_title = 'Values of variables along line %s' \
-                                        % self.control.lineBox.currentText().split()[1]
-        line_id = int(self.control.lineBox.currentText().split()[1]) - 1
+        ref_id = int(self.control.lineBox.currentText().split()[1]) - 1
+        self.plotViewer.current_title = 'Values of variables along line %d' \
+                                        % (ref_id+1)
+        line_interpolators = {}
         if self.control.intersection.isChecked():
-            line_interpolator, distances = self.input.line_interpolators[line_id]
+            for line_id in self.current_vars:
+                line_interpolator, distances = self.input.line_interpolators[line_id]
+                line_interpolators[line_id] = line_interpolator
         else:
-            line_interpolator, distances = self.input.line_interpolators_internal[line_id]
-        values = []
+            for line_id in self.current_vars:
+                line_interpolator, distances = self.input.line_interpolators_internal[line_id]
+                line_interpolators[line_id] = line_interpolator
+        reference = self.input.lines[ref_id]
+        max_distance = reference.length()
 
         time_index = int(self.control.timeSelection.index.text()) - 1
 
+        distances = {}
+        values = {}
         with Serafin.Read(self.input.filename, self.input.language) as input_stream:
             input_stream.header = self.input.header
             input_stream.time = self.input.time
-            for var in self.current_vars:
-                line_var_values = []
-                var_values = input_stream.read_var_in_frame(time_index, var)
+            for line_id in self.current_vars:
+                distances[line_id] = []
+                values[line_id] = {}
+                for var in self.current_vars[line_id]:
+                    values[line_id][var] = []
 
-                for x, y, (i, j, k), interpolator in line_interpolator:
-                    line_var_values.append(interpolator.dot(var_values[[i, j, k]]))
-                values.append(line_var_values)
+                for x, y, (i, j, k), interpolator in line_interpolators[line_id]:
+                    d = reference.project(Point(x, y))
+                    if d <= 0 or d >= max_distance:
+                        continue
+                    distances[line_id].append(d)
+
+                    for var in self.current_vars[line_id]:
+                        all_values = input_stream.read_var_in_frame(time_index, var)
+                        values[line_id][var].append(interpolator.dot(all_values[[i, j, k]]))
+                distances[line_id] = np.array(distances[line_id])
 
         self.plotViewer.canvas.axes.clear()
-        for i, var in enumerate(self.current_vars):
-            self.plotViewer.canvas.axes.plot(distances, values[i], '-', linewidth=2, label=var)
+
+        for line_id, vars in self.current_vars.items():
+            for var in vars:
+                self.plotViewer.canvas.axes.plot(distances[line_id], values[line_id][var],
+                                                 '-', linewidth=2, label='%s$_%d$' % (var, line_id+1))
         self.plotViewer.canvas.axes.legend()
         self.plotViewer.canvas.axes.grid(linestyle='dotted')
         self.plotViewer.canvas.axes.set_xlabel(self.plotViewer.current_xlabel)
@@ -646,9 +679,8 @@ class MultiVariableImageTab(QWidget):
 
     def reset(self):
         self.control.lineBox.clear()
-        self.var_table = {}
-        self.current_vars = []
-        self.control.varList.clear()
+        self.control.varTable.setRowCount(0)
+        self.current_vars = {}
         self.plotViewer.defaultPlot()
         self.plotViewer.current_title = ''
         self.plotViewer.current_xlabel = 'Cumulative distance (M)'
@@ -664,230 +696,42 @@ class MultiVariableImageTab(QWidget):
         frames = list(map(lambda x: start_time + datetime.timedelta(seconds=x), self.input.time))
         self.control.timeSelection.initTime(self.input.time, frames)
 
-        for i in range(len(self.input.lines)):
-            id_line = str(i+1)
-            if self.input.line_interpolators[i][0]:
-                self.control.lineBox.addItem('Line %s' % id_line)
-        for var_ID, var_name, var_unit in zip(self.input.header.var_IDs, self.input.header.var_names,
-                                              self.input.header.var_units):
-            var_unit = var_unit.decode('utf-8').strip()
-            var_name = var_name.decode('utf-8').strip()
-            if var_unit in self.var_table:
-                self.var_table[var_unit].append('%s (%s)' % (var_ID, var_name))
-            else:
-                self.var_table[var_unit] = ['%s (%s)' % (var_ID, var_name)]
-
-        for var_unit in self.var_table:
-            if not var_unit:
-                self.control.unitBox.addItem('Unit: None')
-            else:
-                self.control.unitBox.addItem('Unit: %s' % var_unit)
-        self._updateList(self.control.unitBox.currentText())
-
-
-class MultiFrameControlPanel(QWidget):
-    def __init__(self):
-        super().__init__()
-        # create widgets plot options
-        self.lineBox = QComboBox()
-        self.lineBox.setFixedHeight(30)
-        self.lineBox.setMaximumWidth(200)
-        self.varBox = QComboBox()
-        self.varBox.setMaximumWidth(200)
-        self.varBox.setFixedHeight(30)
-
-        self.timeTable = QTableWidget()
-        self.timeTable.setColumnCount(3)
-        self.timeTable.setHorizontalHeaderLabels(['Index', 'Value', 'Date'])
-        vh = self.timeTable.verticalHeader()
-        vh.setSectionResizeMode(QHeaderView.Fixed)
-        vh.setDefaultSectionSize(20)
-        hh = self.timeTable.horizontalHeader()
-        hh.setDefaultSectionSize(110)
-        self.timeTable.setEditTriggers(QAbstractItemView.NoEditTriggers)
-        self.timeTable.setSelectionMode(QAbstractItemView.NoSelection)
-        self.timeTable.setMinimumHeight(300)
-        self.timeTable.setMaximumWidth(400)
-
-        # create the compute button
-        self.btnCompute = QPushButton('Compute', icon=self.style().standardIcon(QStyle.SP_DialogApplyButton))
-        self.btnCompute.setFixedSize(105, 50)
-        self.intersection = QCheckBox()
-
-        vlayout = QVBoxLayout()
-        vlayout.addItem(QSpacerItem(10, 10))
-        hlayout = QHBoxLayout()
-        hlayout.addWidget(QLabel('   Select a polyline'))
-        hlayout.addWidget(self.lineBox)
-        hlayout.setAlignment(self.lineBox, Qt.AlignLeft)
-        hlayout.addStretch()
-        vlayout.addLayout(hlayout)
-        vlayout.addItem(QSpacerItem(10, 10))
-        hlayout = QHBoxLayout()
-        hlayout.addWidget(QLabel('   Select a variable'))
-        hlayout.addWidget(self.varBox)
-        hlayout.setAlignment(self.varBox, Qt.AlignLeft)
-        hlayout.addStretch()
-        vlayout.addLayout(hlayout)
-        vlayout.addItem(QSpacerItem(10, 10))
-
-        hlayout = QHBoxLayout()
-        hlayout.addItem(QSpacerItem(10, 10))
-        hlayout.addWidget(self.intersection)
-        lb = QLabel('Add intersection points')
-        hlayout.addWidget(lb)
-        hlayout.setAlignment(lb, Qt.AlignLeft)
-        hlayout.addStretch()
-        vlayout.addLayout(hlayout)
-        vlayout.addItem(QSpacerItem(10, 15))
-
-        hlayout = QHBoxLayout()
-        hlayout.addWidget(self.timeTable)
-
-        hlayout.addWidget(self.btnCompute)
-        hlayout.setAlignment(self.btnCompute, Qt.AlignRight | Qt.AlignTop)
-        vlayout.addLayout(hlayout)
-        self.setLayout(vlayout)
-
-
-class MultiFrameImageTab(QWidget):
-    def __init__(self, inputTab):
-        super().__init__()
-        self.input = inputTab
-
-        # set up a custom plot viewer
-        self.plotViewer = PlotViewer()
-        self.plotViewer.exitAct.setEnabled(False)
-        self.plotViewer.menuBar.setVisible(False)
-        self.plotViewer.toolBar.addAction(self.plotViewer.xLabelAct)
-        self.plotViewer.toolBar.addSeparator()
-        self.plotViewer.toolBar.addAction(self.plotViewer.yLabelAct)
-        self.plotViewer.toolBar.addSeparator()
-        self.plotViewer.toolBar.addAction(self.plotViewer.titleAct)
-        self.plotViewer.canvas.figure.canvas.mpl_connect('motion_notify_event', self.plotViewer.mouseMove)
-
-        # put it in a group box to get a nice border
-        self.gb = QGroupBox()
-        ly = QHBoxLayout()
-        ly.addWidget(self.plotViewer)
-        self.gb.setLayout(ly)
-        self.gb.setStyleSheet('QGroupBox {border: 8px solid rgb(108, 122, 137); border-radius: 6px }')
-        self.gb.setMinimumWidth(600)
-
-        self.control = MultiFrameControlPanel()
-        self.splitter = QSplitter()
-
-        self.splitter.addWidget(self.control)
-        self.splitter.addWidget(self.gb)
-
-        mainLayout = QHBoxLayout()
-
-        mainLayout.addWidget(self.splitter)
-        self.setLayout(mainLayout)
-        self.control.btnCompute.clicked.connect(self.btnComputeEvent)
-
-    def _getTime(self):
-        time_indices = []
-        for row in range(self.control.timeTable.rowCount()):
-            if self.control.timeTable.item(row, 0).checkState() == Qt.Checked:
-                time_indices.append(int(self.control.timeTable.item(row, 0).text()) - 1)
-        return time_indices
-
-    def btnComputeEvent(self):
-        time_indices = self._getTime()
-        if not time_indices:
-            QMessageBox.critical(self, 'Error', 'Select at least one frame to plot.',
-                                 QMessageBox.Ok)
-            return
-
-        current_var = self.control.varBox.currentText().split(' (')[0]
-        self.plotViewer.current_title = 'Values of %s along line %s' % (current_var,
-                                                                        self.control.lineBox.currentText().split()[1])
-        line_id = int(self.control.lineBox.currentText().split()[1]) - 1
-        if self.control.intersection.isChecked():
-            line_interpolator, distances = self.input.line_interpolators[line_id]
-        else:
-            line_interpolator, distances = self.input.line_interpolators_internal[line_id]
-        values = []
-
-
-        with Serafin.Read(self.input.filename, self.input.language) as input_stream:
-            input_stream.header = self.input.header
-            input_stream.time = self.input.time
-            for index in time_indices:
-                line_var_values = []
-                var_values = input_stream.read_var_in_frame(index, current_var)
-
-                for x, y, (i, j, k), interpolator in line_interpolator:
-                    line_var_values.append(interpolator.dot(var_values[[i, j, k]]))
-                values.append(line_var_values)
-
-        self.plotViewer.canvas.axes.clear()
-        for i, index in enumerate(time_indices):
-            self.plotViewer.canvas.axes.plot(distances, values[i], '-', linewidth=2, label='Frame %d' % (index+1))
-        self.plotViewer.canvas.axes.legend()
-        self.plotViewer.canvas.axes.grid(linestyle='dotted')
-        self.plotViewer.canvas.axes.set_xlabel(self.plotViewer.current_xlabel)
-        self.plotViewer.canvas.axes.set_ylabel(self.plotViewer.current_ylabel)
-        self.plotViewer.canvas.axes.set_title(self.plotViewer.current_title)
-        self.plotViewer.canvas.draw()
-
-    def reset(self):
-        self.control.lineBox.clear()
-        self.control.varBox.clear()
-        self.plotViewer.defaultPlot()
-        self.plotViewer.current_title = ''
-        self.plotViewer.current_xlabel = 'Cumulative distance (M)'
-        self.plotViewer.current_ylabel = ''
-        self.control.timeTable.setRowCount(0)
-
-    def getInput(self):
-        if self.input.header.date is not None:
-            year, month, day, hour, minute, second = self.input.header.date
-            start_time = datetime.datetime(year, month, day, hour, minute, second)
-        else:
-            start_time = datetime.datetime(1900, 1, 1, 0, 0, 0)
-        frames = list(map(lambda x: start_time + datetime.timedelta(seconds=x), self.input.time))
-        for index, value, date in zip(range(len(self.input.time)), self.input.time, frames):
-            index_item = QTableWidgetItem(str(1+index))
-            value_item = QTableWidgetItem(str(value))
-            date_item = QTableWidgetItem(str(date))
-            index_item.setCheckState(Qt.Unchecked)
-            self.control.timeTable.insertRow(index)
-            self.control.timeTable.setItem(index, 0, index_item)
-            self.control.timeTable.setItem(index, 1, value_item)
-            self.control.timeTable.setItem(index, 2, date_item)
+        nb_vars = self.input.header.nb_var
+        self.control.varTable.setColumnCount(nb_vars + 1)
+        self.control.varTable.setHorizontalHeaderLabels(['Line'] + self.input.header.var_IDs)
 
         for i in range(len(self.input.lines)):
             id_line = str(i+1)
             if self.input.line_interpolators[i][0]:
                 self.control.lineBox.addItem('Line %s' % id_line)
-        for var_ID, var_name in zip(self.input.header.var_IDs, self.input.header.var_names):
-            var_name = var_name.decode('utf-8').strip()
-            self.control.varBox.addItem('%s (%s)' % (var_ID, var_name))
+
+                offset = self.control.varTable.rowCount()
+                self.control.varTable.insertRow(offset)
+                self.control.varTable.setItem(offset, 0, QTableWidgetItem(id_line))
+                for j, var in enumerate(self.input.header.var_IDs):
+                    var_item = QTableWidgetItem('')
+                    var_item.setCheckState(Qt.Unchecked)
+                    self.control.varTable.setItem(offset, j+1, var_item)
 
 
-class LinesGUI(QWidget):
+class ProjectionGUI(QWidget):
     def __init__(self, parent=None):
         super().__init__()
         self.parent = parent
 
         self.input = InputTab(self)
         self.csvTab = CSVTab(self.input, self)
-        self.multiVarTab = MultiVariableImageTab(self.input)
-        self.multiFrameTab = MultiFrameImageTab(self.input)
+        self.imageTab = ImageTab(self.input)
 
-        self.setWindowTitle('Interpolate values of variables along lines')
+        self.setWindowTitle('Projection along a reference line')
 
         self.tab = QTabWidget()
         self.tab.addTab(self.input, 'Input')
         self.tab.addTab(self.csvTab, 'Output to CSV')
-        self.tab.addTab(self.multiVarTab, 'Visualization (MultiVar)')
-        self.tab.addTab(self.multiFrameTab, 'Visualization (MultiFrame)')
+        self.tab.addTab(self.imageTab, 'Plot projections')
 
         self.tab.setTabEnabled(1, False)
         self.tab.setTabEnabled(2, False)
-        self.tab.setTabEnabled(3, False)
 
         self.tab.setStyleSheet('QTabBar::tab { height: 40px; width: 150px; }')
 
@@ -900,20 +744,16 @@ class LinesGUI(QWidget):
     def getInput(self):
         self.tab.setTabEnabled(1, True)
         self.tab.setTabEnabled(2, True)
-        self.tab.setTabEnabled(3, True)
 
         self.csvTab.getInput()
-        self.multiVarTab.getInput()
-        self.multiFrameTab.getInput()
+        self.imageTab.getInput()
 
     def reset(self):
         self.tab.setTabEnabled(1, False)
         self.tab.setTabEnabled(2, False)
-        self.tab.setTabEnabled(3, False)
 
         self.csvTab.reset()
-        self.multiVarTab.reset()
-        self.multiFrameTab.reset()
+        self.imageTab.reset()
 
     def inDialog(self):
         if self.parent is not None:
@@ -946,6 +786,6 @@ if __name__ == '__main__':
     sys.excepthook = exception_hook
 
     app = QApplication(sys.argv)
-    widget = LinesGUI()
+    widget = ProjectionGUI()
     widget.show()
     app.exec_()

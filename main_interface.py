@@ -6,6 +6,7 @@ from PyQt5.QtCore import *
 from gui.ExtractVariablesGUI import ExtractVariablesGUI
 from gui.PointsGUI import PointsGUI
 from gui.LinesGUI import LinesGUI
+from gui.ProjectionGUI import ProjectionGUI
 from gui.ComputeVolumeGUI import ComputeVolumeGUI
 from gui.CompareResultsGUI import CompareResultsGUI
 from gui.ComputeFluxGUI import ComputeFluxGUI
@@ -17,6 +18,7 @@ class MainPanel(QWidget):
         extract = ExtractVariablesGUI(parent)
         points = PointsGUI(parent)
         lines = LinesGUI(parent)
+        project = ProjectionGUI(parent)
         volume = ComputeVolumeGUI(parent)
         compare = CompareResultsGUI(parent)
         flux = ComputeFluxGUI(parent)
@@ -26,6 +28,7 @@ class MainPanel(QWidget):
         self.stackLayout.addWidget(extract)
         self.stackLayout.addWidget(points)
         self.stackLayout.addWidget(lines)
+        self.stackLayout.addWidget(project)
         self.stackLayout.addWidget(volume)
         self.stackLayout.addWidget(flux)
         self.stackLayout.addWidget(compare)
@@ -43,7 +46,8 @@ class MyMainWindow(QWidget):
         pageList = QListWidget()
         pageList.setMaximumWidth(200)
         for name in ['Start', 'Extract variables', 'Interpolate on points',
-                     'Interpolate along lines', 'Compute volume', 'Compute flux', 'Compare two results']:
+                     'Interpolate along lines', 'Projection along lines',
+                     'Compute volume', 'Compute flux', 'Compare two results']:
             pageList.addItem('\n' + name + '\n')
         pageList.setFlow(QListView.TopToBottom)
         pageList.currentRowChanged.connect(self.panel.layout().setCurrentIndex)
