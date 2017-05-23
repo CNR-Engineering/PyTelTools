@@ -13,7 +13,7 @@ import copy
 from slf import Serafin
 from slf.variables import get_available_variables, \
     do_calculations_in_frame, get_necessary_equations, get_US_equation, add_US
-from gui.util import TableWidgetDragRows, QPlainTextEditLogger, handleOverwrite
+from gui.util import TableWidgetDragRows, QPlainTextEditLogger, handleOverwrite, TimeRangeSlider, OutputProgressDialog
 
 _YELLOW = QColor(245, 255, 207)
 _GREEN = QColor(200, 255, 180)
@@ -154,242 +154,6 @@ class FallVelocityMessage(QDialog):
         self.table.item(nb_row, 2).setFlags(Qt.ItemIsEditable)
 
 
-class TimeRangeSlider(QSlider):
-    """!
-    @brief A slider for ranges.
-        This class provides a dual-slider for ranges, where there is a defined
-        maximum and minimum, as is a normal slider, but instead of having a
-        single slider value, there are 2 slider values.
-    """
-    def __init__(self):
-        super().__init__()
-        self.setOrientation(Qt.Horizontal)
-
-        self.start_time = None
-        self.time_frames = None
-        self.nb_frames = 1000
-
-        self.setMinimum(0)
-        self.setMaximum(self.nb_frames-1)
-        self._low = 0
-        self._high = self.nb_frames-1
-        self.setTickPosition(QSlider.TicksBelow)
-
-        self.pressed_control = QStyle.SC_None
-        self.hover_control = QStyle.SC_None
-        self.click_offset = 0
-
-        # 0 for the low, 1 for the high, -1 for both
-        self.active_slider = 0
-
-        self.info = None
-
-    def reinit(self, start_time, time_frames, info_text):
-        self.start_time = start_time
-        self.time_frames = time_frames
-        self.nb_frames = len(time_frames)
-        self.setMinimum(0)
-        self.setMaximum(self.nb_frames-1)
-        self._low = 0
-        self._high = self.nb_frames-1
-        self.click_offset = 0
-        self.info = info_text
-        self.info.updateText(self._low, self.time_frames[self._low].total_seconds(), self.low(),
-                             self._high, self.time_frames[self._high].total_seconds(), self.high())
-
-    def low(self):
-        return self.start_time + self.time_frames[self._low]
-
-    def setLow(self, low):
-        self._low = low
-        self.update()
-
-    def high(self):
-        return self.start_time + self.time_frames[self._high]
-
-    def setHigh(self, high):
-        self._high = high
-        self.update()
-
-    def paintEvent(self, event):
-        # based on http://qt.gitorious.org/qt/qt/blobs/master/src/gui/widgets/qslider.cpp
-
-        painter = QPainter(self)
-        style = QApplication.style()
-
-        for i, position in enumerate([self._low, self._high]):
-            opt = QStyleOptionSlider()
-            self.initStyleOption(opt)
-
-            # Only draw the groove for the first slider so it doesn't get drawn
-            # on top of the existing ones every time
-            if i == 0:
-                opt.subControls = QStyle.SC_SliderHandle
-            else:
-                opt.subControls = QStyle.SC_SliderHandle
-
-            if self.tickPosition() != self.NoTicks:
-                opt.subControls |= QStyle.SC_SliderTickmarks
-
-            if self.pressed_control:
-                opt.activeSubControls = self.pressed_control
-                opt.state |= QStyle.State_Sunken
-            else:
-                opt.activeSubControls = self.hover_control
-
-            opt.sliderPosition = position
-            opt.sliderValue = position
-            style.drawComplexControl(QStyle.CC_Slider, opt, painter, self)
-
-    def mousePressEvent(self, event):
-        event.accept()
-
-        style = QApplication.style()
-        button = event.button()
-
-        # In a normal slider control, when the user clicks on a point in the
-        # slider's total range, but not on the slider part of the control the
-        # control would jump the slider value to where the user clicked.
-        # For this control, clicks which are not direct hits will slide both
-        # slider parts
-
-        if button:
-            opt = QStyleOptionSlider()
-            self.initStyleOption(opt)
-
-            self.active_slider = -1
-
-            for i, value in enumerate([self._low, self._high]):
-                opt.sliderPosition = value
-                hit = style.hitTestComplexControl(style.CC_Slider, opt, event.pos(), self)
-                if hit == style.SC_SliderHandle:
-                    self.active_slider = i
-                    self.pressed_control = hit
-
-                    self.triggerAction(self.SliderMove)
-                    self.setRepeatAction(self.SliderNoAction)
-                    self.setSliderDown(True)
-                    break
-
-            if self.active_slider < 0:
-                self.pressed_control = QStyle.SC_SliderHandle
-                self.click_offset = self.__pixelPosToRangeValue(self.__pick(event.pos()))
-                self.triggerAction(self.SliderMove)
-                self.setRepeatAction(self.SliderNoAction)
-        else:
-            event.ignore()
-
-    def mouseMoveEvent(self, event):
-        if self.pressed_control != QStyle.SC_SliderHandle:
-            event.ignore()
-            return
-
-        event.accept()
-        new_pos = self.__pixelPosToRangeValue(self.__pick(event.pos()))
-        opt = QStyleOptionSlider()
-        self.initStyleOption(opt)
-
-        if self.active_slider < 0:
-            offset = new_pos - self.click_offset
-            self._high += offset
-            self._low += offset
-            if self._low < self.minimum():
-                diff = self.minimum() - self._low
-                self._low += diff
-                self._high += diff
-            if self._high > self.maximum():
-                diff = self.maximum() - self._high
-                self._low += diff
-                self._high += diff
-        elif self.active_slider == 0:
-            if new_pos >= self._high:
-                new_pos = self._high
-            self._low = new_pos
-        else:
-            if new_pos <= self._low:
-                new_pos = self._low
-            self._high = new_pos
-
-        self.click_offset = new_pos
-
-         # update the tip
-        style = QApplication.style()
-
-        rectHandle = style.subControlRect(style.CC_Slider, opt, style.SC_SliderHandle)
-
-        if self.active_slider == 0:
-            pos_low = rectHandle.topLeft()
-            pos_low.setX(pos_low.x() + self._low)
-            pos_low = self.mapToGlobal(pos_low)
-            QToolTip.showText(pos_low, str(self.low()), self)
-        elif self.active_slider == 1:
-            pos_high = rectHandle.topLeft()
-            pos_high.setX(pos_high.x() + self._high)
-            pos_high = self.mapToGlobal(pos_high)
-            QToolTip.showText(pos_high, str(self.high()), self)
-
-        self.update()
-
-    def mouseReleaseEvent(self, event):
-        self.info.updateText(self._low, self.time_frames[self._low].total_seconds(), self.low(),
-                             self._high, self.time_frames[self._high].total_seconds(), self.high())
-
-    def __pick(self, pt):
-        return pt.x()
-
-    def __pixelPosToRangeValue(self, pos):
-        opt = QStyleOptionSlider()
-        self.initStyleOption(opt)
-        style = QApplication.style()
-
-        gr = style.subControlRect(style.CC_Slider, opt, style.SC_SliderGroove, self)
-        sr = style.subControlRect(style.CC_Slider, opt, style.SC_SliderHandle, self)
-
-        slider_length = sr.width()
-        slider_min = gr.x()
-        slider_max = gr.right() - slider_length + 1
-
-        return style.sliderValueFromPosition(self.minimum(), self.maximum(),
-                                             pos-slider_min, slider_max-slider_min,
-                                             opt.upsideDown)
-
-    def enterIndexEvent(self):
-        try:
-            start_index = int(self.info.startIndex.text())
-            end_index = int(self.info.endIndex.text())
-        except ValueError:
-            self.info.updateText(self._low, self.time_frames[self._low].total_seconds(), self.low(),
-                                 self._high, self.time_frames[self._high].total_seconds(), self.high())
-            return
-        if start_index <= 0 or end_index > self.nb_frames or start_index > end_index:
-            self.info.updateText(self._low, self.time_frames[self._low].total_seconds(), self.low(),
-                                 self._high, self.time_frames[self._high].total_seconds(), self.high())
-            return
-        self.setLow(start_index-1)
-        self.setHigh(end_index-1)
-        self.info.updateText(self._low, self.time_frames[self._low].total_seconds(), self.low(),
-                             self._high, self.time_frames[self._high].total_seconds(), self.high())
-
-    def enterValueEvent(self):
-        try:
-            start_value = float(self.info.startValue.text())
-            end_value = float(self.info.endValue.text())
-            start_index = self.info.parent.input.time.index(start_value) + 1
-            end_index = self.info.parent.input.time.index(end_value) + 1
-        except ValueError:
-            self.info.updateText(self._low, self.time_frames[self._low].total_seconds(), self.low(),
-                                 self._high, self.time_frames[self._high].total_seconds(), self.high())
-            return
-        if start_index <= 0 or end_index > self.nb_frames or start_index > end_index:
-            self.info.updateText(self._low, self.time_frames[self._low].total_seconds(), self.low(),
-                                 self._high, self.time_frames[self._high].total_seconds(), self.high())
-            return
-        self.setLow(start_index-1)
-        self.setHigh(end_index-1)
-        self.info.updateText(self._low, self.time_frames[self._low].total_seconds(), self.low(),
-                             self._high, self.time_frames[self._high].total_seconds(), self.high())
-
-
 class SelectedTimeINFO(QWidget):
     """!
     @brief Text fields for time selection display (with slider)
@@ -449,10 +213,7 @@ class SelectedTimeINFO(QWidget):
         self.endDate.setText(str(end_date))
 
     def clearText(self):
-        for w in [self.startIndex, self.endIndex, self.startValue, self.endValue]:
-            w.clear()
-        for w in [self.startDate, self.endDate]:
-            self.visited = False
+        for w in [self.startIndex, self.endIndex, self.startValue, self.endValue, self.startDate, self.endDate]:
             w.clear()
         self.visited = False
         self.timeSamplig.setText('1')
@@ -593,27 +354,6 @@ class ManualTimeSelection(QWidget):
                 self.firstTable.setItem(row, 2, date_item)
 
 
-class OutputProgressDialog(QProgressDialog):
-    def __init__(self, parent=None):
-        super().__init__('Output in progress', 'OK', 0, 100, parent)
-
-        self.cancelButton = QPushButton('OK')
-        self.setCancelButton(self.cancelButton)
-        self.cancelButton.setEnabled(False)
-
-
-        self.setAutoReset(False)
-        self.setAutoClose(False)
-
-        self.setWindowTitle('Writing the output...')
-        self.setWindowFlags(Qt.WindowTitleHint)
-        self.setFixedSize(300, 150)
-
-        self.open()
-        self.setValue(0)
-        QApplication.processEvents()
-
-
 class InputTab(QWidget):
     def __init__(self, parent):
         super().__init__()
@@ -632,8 +372,6 @@ class InputTab(QWidget):
         self._initWidgets()  # some instance attributes will be set there
         self._setLayout()
         self._bindEvents()
-
-        self.setWindowFlags(self.windowFlags() | Qt.CustomizeWindowHint)
 
     def _initWidgets(self):
         """!
@@ -949,6 +687,8 @@ class TimeTab(QWidget):
         self.timeSelection = SelectedTimeINFO(self)
         self.timeSelection.startIndex.setEnabled(False)
         self.timeSelection.endIndex.setEnabled(False)
+        self.timeSelection.startValue.setEnabled(False)
+        self.timeSelection.endValue.setEnabled(False)
 
         # create the tables for manual selection
         self.manualSelection = ManualTimeSelection(self.input, self)
@@ -1020,6 +760,8 @@ class TimeTab(QWidget):
         self.timeSlider.setEnabled(False)
         self.timeSelection.startIndex.setEnabled(False)
         self.timeSelection.endIndex.setEnabled(False)
+        self.timeSelection.startValue.setEnabled(False)
+        self.timeSelection.endValue.setEnabled(False)
         self.btnManual.setEnabled(False)
         self.manualSelection.hasData = False
         self.manualSelection.time_frames = None
@@ -1042,6 +784,8 @@ class TimeTab(QWidget):
             self.timeSlider.setEnabled(True)
             self.timeSelection.startIndex.setEnabled(True)
             self.timeSelection.endIndex.setEnabled(True)
+            self.timeSelection.startValue.setEnabled(True)
+            self.timeSelection.endValue.setEnabled(True)
             self.btnManual.setEnabled(True)
 
     def regularSelectionEvent(self):
@@ -1094,10 +838,11 @@ class TimeTab(QWidget):
 
 
 class SubmitTab(QWidget):
-    def __init__(self, input, timeSelection):
+    def __init__(self, input, timeSelection, parent):
         super().__init__()
         self.input = input
         self.timeSelection = timeSelection
+        self.parent = parent
 
         # create the widget displaying message logs
         self.logTextBox = QPlainTextEditLogger(self)
@@ -1200,10 +945,8 @@ class SubmitTab(QWidget):
             output_message = 'Writing the output with variables %s between frame %d and %d with sampling frequency %d.' \
                               % (str(output_header.var_IDs), start_index, end_index, sampling_frequency)
 
-        # disable close button
-        self.setWindowFlags(self.windowFlags() & ~Qt.WindowCloseButtonHint)
-        self.show()
 
+        self.parent.inDialog()
         progressBar = OutputProgressDialog()
 
         # do some calculations
@@ -1235,8 +978,7 @@ class SubmitTab(QWidget):
         progressBar.exec_()
 
         # enable close button
-        self.setWindowFlags(self.windowFlags() | Qt.WindowCloseButtonHint)
-        self.show()
+        self.parent.outDialog()
 
 
 class ExtractVariablesGUI(QWidget):
@@ -1246,7 +988,9 @@ class ExtractVariablesGUI(QWidget):
 
         self.input = InputTab(self)
         self.timeTab = TimeTab(self, self.input)
-        self.submitTab = SubmitTab(self.input, self.timeTab)
+        self.submitTab = SubmitTab(self.input, self.timeTab, self)
+
+        self.setWindowTitle('Extract variables and time')
 
         self.tab = QTabWidget()
         self.tab.addTab(self.input, 'Input')

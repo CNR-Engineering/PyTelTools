@@ -783,19 +783,15 @@ class ProjectionGUI(QWidget):
         self.setWindowFlags(self.windowFlags() | Qt.CustomizeWindowHint)
         self.setMinimumWidth(600)
 
-    def getInput(self):
-        self.tab.setTabEnabled(1, True)
-        self.tab.setTabEnabled(2, True)
-
-        self.csvTab.getInput()
-        self.imageTab.getInput()
-
     def reset(self):
-        self.tab.setTabEnabled(1, False)
-        self.tab.setTabEnabled(2, False)
+        for i, tab in enumerate([self.csvTab, self.imageTab]):
+            tab.reset()
+            self.tab.setTabEnabled(i+1, False)
 
-        self.csvTab.reset()
-        self.imageTab.reset()
+    def getInput(self):
+        for i, tab in enumerate([self.csvTab, self.imageTab]):
+            tab.getInput()
+            self.tab.setTabEnabled(i+1, True)
 
     def inDialog(self):
         if self.parent is not None:
