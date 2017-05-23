@@ -332,6 +332,7 @@ class CSVTab(QWidget):
 
         # create the options
         self.intersect = QCheckBox()
+        self.intersect.setChecked(True)
         self.timeSelection = SimpleTimeDateSelection()
         self.referenceLine = QComboBox()
 
@@ -449,6 +450,7 @@ class CSVTab(QWidget):
         self.timeSelection.clearText()
         self.csvNameBox.clear()
         self.referenceLine.clear()
+        self.intersect.setChecked(True)
 
     def btnSubmitEvent(self):
         selected_var_IDs = self.getSelectedVariables()
@@ -521,6 +523,10 @@ class ImageControlPanel(QWidget):
         self.intersection = QCheckBox()
 
         # create line-var table
+        self.unitBox = QComboBox()
+        self.unitBox.setFixedHeight(30)
+        self.unitBox.setMaximumWidth(200)
+
         self.varTable = QTableWidget()
         vh = self.varTable.verticalHeader()
         vh.setSectionResizeMode(QHeaderView.Fixed)
@@ -561,7 +567,11 @@ class ImageControlPanel(QWidget):
         vlayout.addItem(QSpacerItem(10, 15))
 
         hlayout = QHBoxLayout()
-        hlayout.addWidget(self.varTable)
+        vlayout2 = QVBoxLayout()
+        vlayout2.addWidget(self.unitBox)
+        vlayout2.addWidget(self.varTable)
+        vlayout2.setSpacing(10)
+        hlayout.addLayout(vlayout2)
         hlayout.addWidget(self.btnCompute)
         hlayout.setAlignment(self.btnCompute, Qt.AlignRight | Qt.AlignTop)
         hlayout.setSpacing(10)
@@ -575,6 +585,7 @@ class ImageTab(QWidget):
         super().__init__()
         self.input = inputTab
 
+        self.var_table = {}
         self.current_vars = {}
 
         # set up a custom plot viewer
@@ -598,6 +609,7 @@ class ImageTab(QWidget):
 
         self.control = ImageControlPanel()
         self.control.btnCompute.clicked.connect(self.btnComputeEvent)
+        self.control.unitBox.currentTextChanged.connect(self._updateTable)
 
         self.splitter = QSplitter()
         self.splitter.addWidget(self.control)
@@ -609,15 +621,39 @@ class ImageTab(QWidget):
 
     def _getSelection(self):
         self.current_vars = {}
+        unit = self.control.unitBox.currentText().split(': ')[1]
+        unit = '' if unit == 'None' else unit
+        vars = self.var_table[unit]
         for row in range(self.control.varTable.rowCount()):
-            for j in range(self.input.header.nb_var):
+            for j in range(len(vars)):
                 if self.control.varTable.item(row, j+1).checkState() == Qt.Checked:
                     line_id = int(self.control.varTable.item(row, 0).text()) - 1
                     if line_id not in self.current_vars:
-                        self.current_vars[line_id] = [self.input.header.var_IDs[j]]
+                        self.current_vars[line_id] = [vars[j]]
                     else:
-                        self.current_vars[line_id].append(self.input.header.var_IDs[j])
+                        self.current_vars[line_id].append(vars[j])
         return self.current_vars
+
+    def _updateTable(self, text):
+        self.control.varTable.setRowCount(0)
+        unit = text.split(': ')[1]
+        unit = '' if unit == 'None' else unit
+        vars = self.var_table[unit]
+
+        nb_vars = len(vars)
+        self.control.varTable.setColumnCount(nb_vars + 1)
+        self.control.varTable.setHorizontalHeaderLabels(['Line'] + vars)
+
+        for i in range(len(self.input.lines)):
+            id_line = str(i+1)
+            if self.input.line_interpolators[i][0]:
+                offset = self.control.varTable.rowCount()
+                self.control.varTable.insertRow(offset)
+                self.control.varTable.setItem(offset, 0, QTableWidgetItem(id_line))
+                for j, var in enumerate(vars):
+                    var_item = QTableWidgetItem('')
+                    var_item.setCheckState(Qt.Unchecked)
+                    self.control.varTable.setItem(offset, j+1, var_item)
 
     def btnComputeEvent(self):
         self.current_vars = self._getSelection()
@@ -678,6 +714,7 @@ class ImageTab(QWidget):
         self.plotViewer.canvas.draw()
 
     def reset(self):
+        self.control.intersection.setChecked(True)
         self.control.lineBox.clear()
         self.control.varTable.setRowCount(0)
         self.current_vars = {}
@@ -696,22 +733,27 @@ class ImageTab(QWidget):
         frames = list(map(lambda x: start_time + datetime.timedelta(seconds=x), self.input.time))
         self.control.timeSelection.initTime(self.input.time, frames)
 
-        nb_vars = self.input.header.nb_var
-        self.control.varTable.setColumnCount(nb_vars + 1)
-        self.control.varTable.setHorizontalHeaderLabels(['Line'] + self.input.header.var_IDs)
+        for var_ID, var_name, var_unit in zip(self.input.header.var_IDs, self.input.header.var_names,
+                                              self.input.header.var_units):
+            var_unit = var_unit.decode('utf-8').strip()
+            if var_unit in self.var_table:
+                self.var_table[var_unit].append(var_ID)
+            else:
+                self.var_table[var_unit] = [var_ID]
+
+        for var_unit in self.var_table:
+            if not var_unit:
+                self.control.unitBox.addItem('Unit: None')
+            else:
+                self.control.unitBox.addItem('Unit: %s' % var_unit)
+        if 'M' in self.var_table:
+            self.control.unitBox.setCurrentIndex(list(self.var_table.keys()).index('M'))
+        self._updateTable(self.control.unitBox.currentText())
 
         for i in range(len(self.input.lines)):
             id_line = str(i+1)
             if self.input.line_interpolators[i][0]:
                 self.control.lineBox.addItem('Line %s' % id_line)
-
-                offset = self.control.varTable.rowCount()
-                self.control.varTable.insertRow(offset)
-                self.control.varTable.setItem(offset, 0, QTableWidgetItem(id_line))
-                for j, var in enumerate(self.input.header.var_IDs):
-                    var_item = QTableWidgetItem('')
-                    var_item.setCheckState(Qt.Unchecked)
-                    self.control.varTable.setItem(offset, j+1, var_item)
 
 
 class ProjectionGUI(QWidget):

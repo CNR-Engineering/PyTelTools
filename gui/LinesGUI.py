@@ -337,6 +337,7 @@ class CSVTab(QWidget):
 
         # create the options
         self.intersect = QCheckBox()
+        self.intersect.setChecked(True)
 
         # create the submit button
         self.btnSubmit = QPushButton('Submit\nto .csv', self, icon=self.style().standardIcon(QStyle.SP_DialogSaveButton))
@@ -425,6 +426,7 @@ class CSVTab(QWidget):
         self.csvNameBox.clear()
 
     def reset(self):
+        self.intersect.setChecked(True)
         self.firstTable.setRowCount(0)
         self.secondTable.setRowCount(0)
         self.intersect.setChecked(False)
@@ -498,6 +500,7 @@ class MultiVarControlPanel(QWidget):
         self.lineBox.setFixedHeight(30)
         self.lineBox.setMaximumWidth(200)
         self.intersection = QCheckBox()
+        self.intersection.setChecked(True)
 
         self.unitBox = QComboBox()
         self.unitBox.setFixedHeight(30)
@@ -645,6 +648,7 @@ class MultiVariableImageTab(QWidget):
         self.plotViewer.canvas.draw()
 
     def reset(self):
+        self.control.intersection.setChecked(True)
         self.control.lineBox.clear()
         self.var_table = {}
         self.current_vars = []
@@ -682,6 +686,8 @@ class MultiVariableImageTab(QWidget):
                 self.control.unitBox.addItem('Unit: None')
             else:
                 self.control.unitBox.addItem('Unit: %s' % var_unit)
+        if 'M' in self.var_table:
+            self.control.unitBox.setCurrentIndex(list(self.var_table.keys()).index('M'))
         self._updateList(self.control.unitBox.currentText())
 
 
@@ -713,6 +719,7 @@ class MultiFrameControlPanel(QWidget):
         self.btnCompute = QPushButton('Compute', icon=self.style().standardIcon(QStyle.SP_DialogApplyButton))
         self.btnCompute.setFixedSize(105, 50)
         self.intersection = QCheckBox()
+        self.intersection.setChecked(True)
 
         vlayout = QVBoxLayout()
         vlayout.addItem(QSpacerItem(10, 10))
@@ -833,6 +840,7 @@ class MultiFrameImageTab(QWidget):
         self.plotViewer.canvas.draw()
 
     def reset(self):
+        self.control.intersection.setChecked(True)
         self.control.lineBox.clear()
         self.control.varBox.clear()
         self.plotViewer.defaultPlot()
