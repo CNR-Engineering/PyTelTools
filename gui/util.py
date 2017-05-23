@@ -39,7 +39,7 @@ class TimeSlider(QSlider):
         self.display = display
 
         self.setOrientation(Qt.Horizontal)
-        self.setMinimumWidth(500)
+        self.setMaximumWidth(800)
 
         self.start_time = None
         self.time_frames = None

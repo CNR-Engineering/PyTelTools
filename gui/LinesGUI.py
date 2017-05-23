@@ -16,59 +16,6 @@ from gui.util import MapViewer, LineMapCanvas, QPlainTextEditLogger, \
     TableWidgetDragRows, OutputProgressDialog, LoadMeshDialog, handleOverwrite, PlotViewer, TimeSlider
 
 
-class SelectVariablesDialog(QDialog):
-    def __init__(self, var_table):
-        super().__init__()
-        self.var_table = var_table
-
-        self.unitBox = QComboBox()
-        self.varList = QListWidget()
-
-        for var_unit in var_table:
-            self.unitBox.addItem('Unit: %s' % var_unit)
-        self.unitBox.currentTextChanged.connect(self.updateList)
-
-        self.updateList(self.unitBox.currentText())
-
-        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel,
-                                   Qt.Horizontal, self)
-        buttons.accepted.connect(self.checkSelection)
-        buttons.rejected.connect(self.reject)
-        vlayout = QVBoxLayout()
-        vlayout.addWidget(self.unitBox)
-        vlayout.addWidget(self.varList)
-        vlayout.addWidget(buttons)
-        self.setLayout(vlayout)
-        self.setWindowTitle('Select variables to plot')
-        self.resize(550, 500)
-        self.selection = []
-
-    def getSelection(self):
-        selection = []
-        for row in range(self.varList.count()):
-            item = self.varList.item(row)
-            if item.checkState() == Qt.Checked:
-                selection.append(item.text().split(' (')[0])
-        return tuple(selection)
-
-    def updateList(self, text):
-        self.varList.clear()
-        for var_ID in self.var_table[text.split(': ')[1]]:
-            item = QListWidgetItem(var_ID)
-            item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
-
-            item.setCheckState(Qt.Unchecked)
-            self.varList.addItem(item)
-
-    def checkSelection(self):
-        self.selection = self.getSelection(), self.unitBox.currentText().split(': ')[1]
-        if not self.selection:
-            QMessageBox.critical(self, 'Error', 'Select at least one variable to plot.',
-                                 QMessageBox.Ok)
-            return
-        self.accept()
-
-
 class SimpleTimeSelection(QWidget):
     def __init__(self):
         super().__init__()
@@ -77,27 +24,27 @@ class SimpleTimeSelection(QWidget):
         self.dates = []
 
         self.index = QLineEdit('', self)
-        self.index.setMaximumWidth(60)
         self.slider = TimeSlider(self.index)
         self.value = QLineEdit('', self)
         self.date = QLineEdit('', self)
 
-        self.index.setMinimumWidth(30)
-        self.value.setMaximumWidth(100)
-        self.value.setMaximumWidth(100)
-        self.date.setMinimumWidth(110)
+        self.value.setMaximumWidth(60)
+        self.value.setMaximumWidth(80)
+        self.date.setMaximumWidth(120)
 
         mainLayout = QVBoxLayout()
         mainLayout.addWidget(self.slider)
-        glayout = QGridLayout()
-        glayout.addWidget(QLabel('Frame index'), 1, 1)
-        glayout.addWidget(self.index, 1, 2)
-        glayout.addWidget(QLabel('value'), 1, 3)
-        glayout.addWidget(self.value, 1, 4)
-        glayout.addWidget(QLabel('date'), 1, 5)
-        glayout.addWidget(self.date, 1, 6)
-        glayout.setSpacing(10)
-        mainLayout.addLayout(glayout)
+        hlayout = QHBoxLayout()
+        hlayout.addWidget(QLabel('Frame index'))
+        hlayout.addWidget(self.index)
+        hlayout.addWidget(QLabel('value'))
+        hlayout.addWidget(self.value)
+        hlayout.addWidget(QLabel('date'))
+        hlayout.addWidget(self.date)
+        hlayout.addStretch()
+        hlayout.setAlignment(Qt.AlignLeft)
+        hlayout.setSpacing(10)
+        mainLayout.addLayout(hlayout)
         self.setLayout(mainLayout)
         self.index.editingFinished.connect(self.slider.enterIndexEvent)
         self.index.editingFinished.connect(self.updateSelection)
@@ -593,12 +540,69 @@ class CSVTab(QWidget):
         self.parent.outDialog()
 
 
-class MultiVariablesImageTab(QWidget):
+class MultiVarControlPanel(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.timeSelection = SimpleTimeSelection()
+        # create widgets plot options
+        self.lineBox = QComboBox()
+        self.lineBox.setFixedHeight(30)
+        self.lineBox.setMaximumWidth(200)
+        self.intersection = QCheckBox()
+
+        self.unitBox = QComboBox()
+        self.unitBox.setFixedHeight(30)
+        self.unitBox.setMaximumWidth(200)
+        self.varList = QListWidget()
+        self.varList.setMaximumWidth(200)
+
+        # create the compute button
+        self.btnCompute = QPushButton('Compute', icon=self.style().standardIcon(QStyle.SP_DialogApplyButton))
+        self.btnCompute.setFixedSize(105, 50)
+
+        # set layout
+        vlayout = QVBoxLayout()
+        vlayout.addItem(QSpacerItem(10, 10))
+        vlayout.addWidget(self.timeSelection)
+        vlayout.addItem(QSpacerItem(10, 10))
+        hlayout = QHBoxLayout()
+        hlayout.addWidget(QLabel('   Select a polyline'))
+        hlayout.addWidget(self.lineBox)
+        hlayout.setAlignment(self.lineBox, Qt.AlignLeft)
+        hlayout.addStretch()
+        vlayout.addLayout(hlayout)
+        vlayout.addItem(QSpacerItem(10, 10))
+
+        vlayout.addItem(QSpacerItem(10, 10))
+        hlayout = QHBoxLayout()
+        hlayout.addItem(QSpacerItem(10, 10))
+        hlayout.addWidget(self.intersection)
+        lb = QLabel('Add intersection points')
+        hlayout.addWidget(lb)
+        hlayout.setAlignment(lb, Qt.AlignLeft)
+        hlayout.addStretch()
+        vlayout.addLayout(hlayout)
+        vlayout.addItem(QSpacerItem(10, 15))
+
+        hlayout = QHBoxLayout()
+        vlayout2 = QVBoxLayout()
+        vlayout2.addWidget(self.unitBox)
+        vlayout2.addWidget(self.varList)
+        vlayout2.setSpacing(10)
+        hlayout.addLayout(vlayout2)
+        hlayout.addWidget(self.btnCompute)
+        hlayout.setAlignment(self.btnCompute, Qt.AlignRight | Qt.AlignTop)
+        hlayout.setSpacing(10)
+        vlayout.addItem(hlayout)
+
+        self.setLayout(vlayout)
+
+
+class MultiVariableImageTab(QWidget):
     def __init__(self, inputTab):
         super().__init__()
         self.input = inputTab
 
-        self.timeSelection = SimpleTimeSelection()
         self.var_table = {}
         self.current_vars = []
 
@@ -614,75 +618,53 @@ class MultiVariablesImageTab(QWidget):
         self.plotViewer.canvas.figure.canvas.mpl_connect('motion_notify_event', self.plotViewer.mouseMove)
 
         # put it in a group box to get a nice border
-        gb = QGroupBox()
+        self.gb = QGroupBox()
         ly = QHBoxLayout()
         ly.addWidget(self.plotViewer)
-        gb.setLayout(ly)
-        gb.setStyleSheet('QGroupBox {border: 8px solid rgb(108, 122, 137); border-radius: 6px }')
-        gb.setMaximumWidth(900)
-        gb.setMinimumWidth(600)
+        self.gb.setLayout(ly)
+        self.gb.setStyleSheet('QGroupBox {border: 8px solid rgb(108, 122, 137); border-radius: 6px }')
+        self.gb.setMinimumWidth(600)
 
-        # create widgets plot options
-        self.lineBox = QComboBox()
-        self.lineBox.setFixedSize(200, 30)
-        self.btnVars = QPushButton('Select variables')
-        self.btnVars.setFixedSize(120, 30)
-        self.varBox = QLineEdit()
-        self.varBox.setFixedHeight(30)
-        self.varBox.setReadOnly(True)
-        self.intersection = QCheckBox()
+        self.control = MultiVarControlPanel()
+        self.control.btnCompute.clicked.connect(self.btnComputeEvent)
+        self.control.unitBox.currentTextChanged.connect(self._updateList)
 
-        # create the compute button
-        self.btnCompute = QPushButton('Compute', icon=self.style().standardIcon(QStyle.SP_DialogApplyButton))
-        self.btnCompute.setFixedSize(105, 50)
-        self.btnCompute.setEnabled(False)
-        self.btnCompute.clicked.connect(self.btnComputeEvent)
-        self.btnVars.clicked.connect(self.btnVarsEvent)
+        self.splitter = QSplitter()
+        self.splitter.addWidget(self.control)
+        self.splitter.addWidget(self.gb)
 
-        # set layout
         mainLayout = QHBoxLayout()
-        vlayout = QVBoxLayout()
-        vlayout.addItem(QSpacerItem(10, 10))
-        vlayout.addWidget(self.timeSelection)
-        vlayout.addItem(QSpacerItem(10, 10))
-        hlayout = QHBoxLayout()
-        hlayout.addWidget(QLabel('   Select a polyline'))
-        hlayout.addWidget(self.lineBox)
-        hlayout.setAlignment(self.lineBox, Qt.AlignLeft)
-        hlayout.addStretch()
-        vlayout.addLayout(hlayout)
-        vlayout.addItem(QSpacerItem(10, 10))
-
-        hlayout = QHBoxLayout()
-        hlayout.addWidget(self.btnVars)
-        hlayout.addWidget(self.varBox)
-        vlayout.addLayout(hlayout)
-
-        vlayout.addItem(QSpacerItem(10, 10))
-        hlayout = QHBoxLayout()
-        hlayout.addItem(QSpacerItem(10, 10))
-        hlayout.addWidget(self.intersection)
-        lb = QLabel('Add intersection points')
-        hlayout.addWidget(lb)
-        hlayout.setAlignment(lb, Qt.AlignLeft)
-        hlayout.addStretch()
-        vlayout.addLayout(hlayout)
-        vlayout.addItem(QSpacerItem(10, 10))
-
-        vlayout.addItem(QSpacerItem(10, 15))
-        vlayout.addWidget(self.btnCompute)
-        vlayout.setAlignment(self.btnCompute, Qt.AlignRight)
-        mainLayout.addLayout(vlayout)
-        mainLayout.addWidget(gb)
-        mainLayout.setAlignment(vlayout, Qt.AlignTop)
-        mainLayout.setAlignment(Qt.AlignHCenter)
-        mainLayout.setSpacing(10)
+        mainLayout.addWidget(self.splitter)
         self.setLayout(mainLayout)
 
+    def _updateList(self, text):
+        self.control.varList.clear()
+        for var_ID in self.var_table[text.split(': ')[1]]:
+            item = QListWidgetItem(var_ID)
+            item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
+
+            item.setCheckState(Qt.Unchecked)
+            self.control.varList.addItem(item)
+
+    def _getSelection(self):
+        selection = []
+        for row in range(self.control.varList.count()):
+            item = self.control.varList.item(row)
+            if item.checkState() == Qt.Checked:
+                selection.append(item.text().split(' (')[0])
+        return tuple(selection)
+
     def btnComputeEvent(self):
-        self.plotViewer.current_title = 'Values  of variables along line %s' % self.lineBox.currentText().split()[1]
-        line_id = int(self.lineBox.currentText().split()[1]) - 1
-        if self.intersection.isChecked():
+        self.current_vars = self._getSelection()
+        if not self.current_vars:
+            QMessageBox.critical(self, 'Error', 'Select at least one variable to plot.',
+                                 QMessageBox.Ok)
+            return
+
+        self.plotViewer.current_title = 'Values of variables along line %s' \
+                                        % self.control.lineBox.currentText().split()[1]
+        line_id = int(self.control.lineBox.currentText().split()[1]) - 1
+        if self.control.intersection.isChecked():
             line_interpolator, distances = self.input.line_interpolators[line_id]
         else:
             line_interpolator, distances = self.input.line_interpolators_internal[line_id]
@@ -711,27 +693,16 @@ class MultiVariablesImageTab(QWidget):
         self.plotViewer.canvas.axes.set_title(self.plotViewer.current_title)
         self.plotViewer.canvas.draw()
 
-    def btnVarsEvent(self):
-        dialog = SelectVariablesDialog(self.var_table)
-        value = dialog.exec_()
-        if value == QDialog.Rejected:
-            return
-        self.current_vars, current_unit = dialog.selection
-        self.plotViewer.current_ylabel = 'Value (%s)' % current_unit
-        self.varBox.setText('Current selection: %s' % ', '.join(self.current_vars))
-        self.btnCompute.setEnabled(True)
-
     def reset(self):
-        self.lineBox.clear()
+        self.control.lineBox.clear()
         self.var_table = {}
         self.current_vars = []
-        self.varBox.clear()
-        self.btnCompute.setEnabled(False)
+        self.control.varList.clear()
         self.plotViewer.defaultPlot()
         self.plotViewer.current_title = ''
-        self.plotViewer.current_xlabel = 'Cumulative distance'
+        self.plotViewer.current_xlabel = 'Cumulative distance (M)'
         self.plotViewer.current_ylabel = ''
-        self.timeSelection.clearText()
+        self.control.timeSelection.clearText()
 
     def getInput(self):
         if self.input.header.date is not None:
@@ -740,12 +711,12 @@ class MultiVariablesImageTab(QWidget):
         else:
             start_time = datetime.datetime(1900, 1, 1, 0, 0, 0)
         frames = list(map(lambda x: start_time + datetime.timedelta(seconds=x), self.input.time))
-        self.timeSelection.initTime(self.input.time, frames)
+        self.control.timeSelection.initTime(self.input.time, frames)
 
         for i in range(len(self.input.lines)):
             id_line = str(i+1)
             if self.input.line_interpolators[i][0]:
-                self.lineBox.addItem('Line %s' % id_line)
+                self.control.lineBox.addItem('Line %s' % id_line)
         for var_ID, var_name, var_unit in zip(self.input.header.var_IDs, self.input.header.var_names,
                                               self.input.header.var_units):
             var_unit = var_unit.decode('utf-8').strip()
@@ -757,6 +728,179 @@ class MultiVariablesImageTab(QWidget):
             else:
                 self.var_table[var_unit] = ['%s (%s)' % (var_ID, var_name)]
 
+        for var_unit in self.var_table:
+            self.control.unitBox.addItem('Unit: %s' % var_unit)
+        self._updateList(self.control.unitBox.currentText())
+
+
+class MultiFrameControlPanel(QWidget):
+    def __init__(self):
+        super().__init__()
+        # create widgets plot options
+        self.lineBox = QComboBox()
+        self.lineBox.setFixedHeight(30)
+        self.lineBox.setMaximumWidth(200)
+        self.varBox = QComboBox()
+        self.varBox.setMaximumWidth(200)
+        self.varBox.setFixedHeight(30)
+
+        self.timeTalbe = QTableWidget()
+        self.timeTalbe.setColumnCount(3)
+        self.timeTalbe.setHorizontalHeaderLabels(['Index', 'Value', 'Date'])
+        vh = self.timeTalbe.verticalHeader()
+        vh.setSectionResizeMode(QHeaderView.Fixed)
+        vh.setDefaultSectionSize(20)
+        hh = self.timeTalbe.horizontalHeader()
+        hh.setDefaultSectionSize(110)
+        self.timeTalbe.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.timeTalbe.setSelectionMode(QAbstractItemView.NoSelection)
+        self.timeTalbe.setMinimumHeight(300)
+        self.timeTalbe.setMaximumWidth(400)
+
+        # create the compute button
+        self.btnCompute = QPushButton('Compute', icon=self.style().standardIcon(QStyle.SP_DialogApplyButton))
+        self.btnCompute.setFixedSize(105, 50)
+        self.intersection = QCheckBox()
+
+        vlayout = QVBoxLayout()
+        vlayout.addItem(QSpacerItem(10, 10))
+        hlayout = QHBoxLayout()
+        hlayout.addWidget(QLabel('   Select a polyline'))
+        hlayout.addWidget(self.lineBox)
+        hlayout.setAlignment(self.lineBox, Qt.AlignLeft)
+        hlayout.addStretch()
+        vlayout.addLayout(hlayout)
+        vlayout.addItem(QSpacerItem(10, 10))
+        hlayout = QHBoxLayout()
+        hlayout.addWidget(QLabel('   Select a variable'))
+        hlayout.addWidget(self.varBox)
+        hlayout.setAlignment(self.varBox, Qt.AlignLeft)
+        hlayout.addStretch()
+        vlayout.addLayout(hlayout)
+        vlayout.addItem(QSpacerItem(10, 10))
+
+        hlayout = QHBoxLayout()
+        hlayout.addItem(QSpacerItem(10, 10))
+        hlayout.addWidget(self.intersection)
+        lb = QLabel('Add intersection points')
+        hlayout.addWidget(lb)
+        hlayout.setAlignment(lb, Qt.AlignLeft)
+        hlayout.addStretch()
+        vlayout.addLayout(hlayout)
+        vlayout.addItem(QSpacerItem(10, 15))
+
+        hlayout = QHBoxLayout()
+        hlayout.addWidget(self.timeTalbe)
+
+        hlayout.addWidget(self.btnCompute)
+        hlayout.setAlignment(self.btnCompute, Qt.AlignRight | Qt.AlignTop)
+        vlayout.addLayout(hlayout)
+        self.setLayout(vlayout)
+
+
+class MultiFrameImageTab(QWidget):
+    def __init__(self, inputTab):
+        super().__init__()
+        self.input = inputTab
+
+        # set up a custom plot viewer
+        self.plotViewer = PlotViewer()
+        self.plotViewer.exitAct.setEnabled(False)
+        self.plotViewer.menuBar.setVisible(False)
+        self.plotViewer.toolBar.addAction(self.plotViewer.xLabelAct)
+        self.plotViewer.toolBar.addSeparator()
+        self.plotViewer.toolBar.addAction(self.plotViewer.yLabelAct)
+        self.plotViewer.toolBar.addSeparator()
+        self.plotViewer.toolBar.addAction(self.plotViewer.titleAct)
+        self.plotViewer.canvas.figure.canvas.mpl_connect('motion_notify_event', self.plotViewer.mouseMove)
+
+        # put it in a group box to get a nice border
+        self.gb = QGroupBox()
+        ly = QHBoxLayout()
+        ly.addWidget(self.plotViewer)
+        self.gb.setLayout(ly)
+        self.gb.setStyleSheet('QGroupBox {border: 8px solid rgb(108, 122, 137); border-radius: 6px }')
+        self.gb.setMinimumWidth(600)
+
+        self.control = MultiFrameControlPanel()
+        self.splitter = QSplitter()
+
+        self.splitter.addWidget(self.control)
+        self.splitter.addWidget(self.gb)
+        mainLayout = QHBoxLayout()
+
+        mainLayout.addWidget(self.splitter)
+        self.setLayout(mainLayout)
+        self.control.btnCompute.clicked.connect(self.btnComputeEvent)
+
+    def btnComputeEvent(self):
+        current_var = self.control.varBox.currentText().split(' (')[0]
+        self.plotViewer.current_title = 'Values of %s along line %s' % (current_var,
+                                                                        self.control.lineBox.currentText().split()[1])
+        line_id = int(self.lineBox.currentText().split()[1]) - 1
+        if self.intersection.isChecked():
+            line_interpolator, distances = self.input.line_interpolators[line_id]
+        else:
+            line_interpolator, distances = self.input.line_interpolators_internal[line_id]
+        values = []
+
+        time_indices = [0, 1]
+
+        with Serafin.Read(self.input.filename, self.input.language) as input_stream:
+            input_stream.header = self.input.header
+            input_stream.time = self.input.time
+            for index in time_indices:
+                line_var_values = []
+                var_values = input_stream.read_var_in_frame(index, current_var)
+
+                for x, y, (i, j, k), interpolator in line_interpolator:
+                    line_var_values.append(interpolator.dot(var_values[[i, j, k]]))
+                values.append(line_var_values)
+
+        self.plotViewer.canvas.axes.clear()
+        for i, index in enumerate(time_indices):
+            self.plotViewer.canvas.axes.plot(distances, values[i], '-', linewidth=2, label='Frame %d' % (index+1))
+        self.plotViewer.canvas.axes.legend()
+        self.plotViewer.canvas.axes.grid(linestyle='dotted')
+        self.plotViewer.canvas.axes.set_xlabel(self.plotViewer.current_xlabel)
+        self.plotViewer.canvas.axes.set_ylabel(self.plotViewer.current_ylabel)
+        self.plotViewer.canvas.axes.set_title(self.plotViewer.current_title)
+        self.plotViewer.canvas.draw()
+
+    def reset(self):
+        self.control.lineBox.clear()
+        self.control.varBox.clear()
+        self.plotViewer.defaultPlot()
+        self.plotViewer.current_title = ''
+        self.plotViewer.current_xlabel = 'Cumulative distance (M)'
+        self.plotViewer.current_ylabel = ''
+        self.control.timeTalbe.setRowCount(0)
+
+    def getInput(self):
+        if self.input.header.date is not None:
+            year, month, day, hour, minute, second = self.input.header.date
+            start_time = datetime.datetime(year, month, day, hour, minute, second)
+        else:
+            start_time = datetime.datetime(1900, 1, 1, 0, 0, 0)
+        frames = list(map(lambda x: start_time + datetime.timedelta(seconds=x), self.input.time))
+        for index, value, date in zip(range(len(self.input.time)), self.input.time, frames):
+            index_item = QTableWidgetItem(str(1+index))
+            value_item = QTableWidgetItem(str(value))
+            date_item = QTableWidgetItem(str(date))
+            index_item.setCheckState(Qt.Unchecked)
+            self.control.timeTalbe.insertRow(index)
+            self.control.timeTalbe.setItem(index, 0, index_item)
+            self.control.timeTalbe.setItem(index, 1, value_item)
+            self.control.timeTalbe.setItem(index, 2, date_item)
+
+        for i in range(len(self.input.lines)):
+            id_line = str(i+1)
+            if self.input.line_interpolators[i][0]:
+                self.control.lineBox.addItem('Line %s' % id_line)
+        for var_ID, var_name in zip(self.input.header.var_IDs, self.input.header.var_names):
+            var_name = var_name.decode('utf-8').strip()
+            self.control.varBox.addItem('%s (%s)' % (var_ID, var_name))
+
 
 class LinesGUI(QWidget):
     def __init__(self, parent=None):
@@ -765,7 +909,8 @@ class LinesGUI(QWidget):
 
         self.input = InputTab(self)
         self.csvTab = CSVTab(self.input, self)
-        self.multiVarTab = MultiVariablesImageTab(self.input)
+        self.multiVarTab = MultiVariableImageTab(self.input)
+        self.multiFrameTab = MultiFrameImageTab(self.input)
 
         self.setWindowTitle('Interpolate values of variables along lines')
 
@@ -773,9 +918,11 @@ class LinesGUI(QWidget):
         self.tab.addTab(self.input, 'Input')
         self.tab.addTab(self.csvTab, 'Output to CSV')
         self.tab.addTab(self.multiVarTab, 'Visualization (MultiVar)')
+        self.tab.addTab(self.multiFrameTab, 'Visualization (MultiFrame)')
 
         self.tab.setTabEnabled(1, False)
         self.tab.setTabEnabled(2, False)
+        self.tab.setTabEnabled(3, False)
 
         self.tab.setStyleSheet('QTabBar::tab { height: 40px; width: 150px; }')
 
@@ -788,15 +935,20 @@ class LinesGUI(QWidget):
     def getInput(self):
         self.tab.setTabEnabled(1, True)
         self.tab.setTabEnabled(2, True)
+        self.tab.setTabEnabled(3, True)
 
         self.csvTab.getInput()
         self.multiVarTab.getInput()
+        self.multiFrameTab.getInput()
 
     def reset(self):
         self.tab.setTabEnabled(1, False)
         self.tab.setTabEnabled(2, False)
+        self.tab.setTabEnabled(3, False)
+
         self.csvTab.reset()
         self.multiVarTab.reset()
+        self.multiFrameTab.reset()
 
     def inDialog(self):
         if self.parent is not None:

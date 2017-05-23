@@ -11,11 +11,9 @@ from gui.CompareResultsGUI import CompareResultsGUI
 from gui.ComputeFluxGUI import ComputeFluxGUI
 
 
-
-class MyMainWindow(QWidget):
+class MainPanel(QWidget):
     def __init__(self):
         super().__init__()
-
         extract = ExtractVariablesGUI(self)
         points = PointsGUI(self)
         lines = LinesGUI(self)
@@ -31,25 +29,37 @@ class MyMainWindow(QWidget):
         stackLayout.addWidget(volume)
         stackLayout.addWidget(flux)
         stackLayout.addWidget(compare)
+        self.setLayout(stackLayout)
+
+
+class MyMainWindow(QWidget):
+    def __init__(self):
+        super().__init__()
+
+        panel = MainPanel()
 
         pageList = QListWidget()
-        pageList.setFixedWidth(200)
+        pageList.setMaximumWidth(200)
         for name in ['Start', 'Extract variables', 'Interpolate on points',
                      'Interpolate along lines', 'Compute volume', 'Compute flux', 'Compare two results']:
             pageList.addItem('\n' + name + '\n')
         pageList.setFlow(QListView.TopToBottom)
-        pageList.currentRowChanged.connect(stackLayout.setCurrentIndex)
+        pageList.currentRowChanged.connect(panel.layout().setCurrentIndex)
         pageList.setCurrentRow(0)
 
         vline = QFrame()
         vline.setFrameShape(QFrame.VLine)
 
-        mainLayout = QHBoxLayout()
-        mainLayout.addWidget(pageList)
-        mainLayout.addWidget(vline)
-        mainLayout.addLayout(stackLayout)
+        splitter = QSplitter()
+        splitter.addWidget(pageList)
+        splitter.addWidget(panel)
+        splitter.setHandleWidth(10)
+        splitter.setCollapsible(0, False)
 
+        mainLayout = QHBoxLayout()
+        mainLayout.addWidget(splitter)
         self.setLayout(mainLayout)
+
         self.setWindowTitle('Main window')
         self.resize(300, 300)
         self.setWindowFlags(self.windowFlags() | Qt.CustomizeWindowHint)
