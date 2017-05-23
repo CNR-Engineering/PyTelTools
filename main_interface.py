@@ -12,14 +12,14 @@ from gui.ComputeFluxGUI import ComputeFluxGUI
 
 
 class MainPanel(QWidget):
-    def __init__(self):
+    def __init__(self, parent):
         super().__init__()
-        extract = ExtractVariablesGUI(self)
-        points = PointsGUI(self)
-        lines = LinesGUI(self)
-        volume = ComputeVolumeGUI(self)
-        compare = CompareResultsGUI(self)
-        flux = ComputeFluxGUI(self)
+        extract = ExtractVariablesGUI(parent)
+        points = PointsGUI(parent)
+        lines = LinesGUI(parent)
+        volume = ComputeVolumeGUI(parent)
+        compare = CompareResultsGUI(parent)
+        flux = ComputeFluxGUI(parent)
 
         stackLayout = QStackedLayout()
         stackLayout.addWidget(QLabel('Hello! This is the start page (TODO)'))
@@ -36,7 +36,7 @@ class MyMainWindow(QWidget):
     def __init__(self):
         super().__init__()
 
-        panel = MainPanel()
+        panel = MainPanel(self)
 
         pageList = QListWidget()
         pageList.setMaximumWidth(200)
