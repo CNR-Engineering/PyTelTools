@@ -233,19 +233,24 @@ class InputTab(QWidget):
         if 'QSX' in header.var_IDs and 'QSY' in header.var_IDs:
             self.fluxBox.addItem('Solid flux TOTAL (m3/s): (QSX, QSY)')
         if 'QS' in header.var_IDs:
-            self.fluxBox.addItem('Solid flux (m3/s): (QS)')
+            self.fluxBox.addItem('Solid flux TOTAL (m3/s): (QS)')
         if 'QSBLX' in header.var_IDs and 'QSBLY' in header.var_IDs:
-            self.fluxBox.addItem('Solid flux BED LOAD (m3/s): (QSBLX, QSBLY)')
+            self.fluxBox.addItem('Solid flux BEDLOAD (m3/s): (QSBLX, QSBLY)')
         if 'QSBL' in header.var_IDs:
-            self.fluxBox.addItem('Solid flux BED LOAD (m3/s): (QSBL)')
+            self.fluxBox.addItem('Solid flux BEDLOAD (m3/s): (QSBL)')
         if 'QSSUSPX' in header.var_IDs and 'QSSUSPY' in header.var_IDs:
             self.fluxBox.addItem('Solid flux SUSPENSION (m3/s): (QSSUSPX, QSSUSPY)')
         if 'QSSUSP' in header.var_IDs:
             self.fluxBox.addItem('Solid flux SUSPENSION (m3/s): (QSSUSP)')
+
         for name in header.var_names:
             str_name = name.decode('utf-8').strip()
             if 'QS CLASS' in str_name:
-                self.fluxBox.addItem('Solid flux (m3/s): (%s)' % str_name)
+                self.fluxBox.addItem('Solid flux TOTAL (m3/s): (%s)' % str_name)
+            if 'QS BEDLOAD CL' in str_name:
+                self.fluxBox.addItem('Solid flux BEDLOAD (m3/s): (%s)' % str_name)
+            if 'QS SUSP. CL' in str_name:
+                self.fluxBox.addItem('Solid flux SUSPENSION (m3/s): (%s)' % str_name)
 
         return self.fluxBox.count() > 0
 
