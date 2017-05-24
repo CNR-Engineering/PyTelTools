@@ -8,7 +8,7 @@ import numpy as np
 import logging
 import copy
 from slf import Serafin
-from slf.misc import scalars_vectors, scalar_max, scalar_min, mean
+from slf.misc import scalars_vectors, scalar_max, scalar_min, mean, vector_max, vector_min
 from gui.util import TableWidgetDragRows, QPlainTextEditLogger, handleOverwrite, OutputProgressDialog, TimeRangeSlider
 
 
@@ -220,6 +220,7 @@ class MaxMinMeanTab(QWidget):
 
         self.opBox.setLayout(hlayout)
         self.opBox.setMaximumHeight(80)
+        self.opBox.setMaximumWidth(200)
         self.maxButton.setChecked(True)
 
         # create a slider for time selection
@@ -389,7 +390,9 @@ class MaxMinMeanTab(QWidget):
             QMessageBox.critical(self, 'Error', 'Select at least one variable.',
                                  QMessageBox.Ok)
             return
-        scalars, vectors = scalars_vectors(selected_vars)
+
+        # separate scalars and vectors
+        scalars, vectors, additional_equations = scalars_vectors(self.input.header.var_IDs, selected_vars)
 
         # create the save file dialog
         options = QFileDialog.Options()
@@ -418,10 +421,10 @@ class MaxMinMeanTab(QWidget):
         # get the operation type
         if self.maxButton.isChecked():
             scalar_operation = scalar_max
-            vector_operation = scalar_max
+            vector_operation = vector_max
         elif self.minButton.isChecked():
             scalar_operation = scalar_min
-            vector_operation = scalar_min
+            vector_operation = vector_min
         else:
             scalar_operation = mean
             vector_operation = mean
@@ -435,8 +438,9 @@ class MaxMinMeanTab(QWidget):
         end_index = int(self.timeSelection.endIndex.text())
         time_indices = list(range(start_index, end_index))
 
-        output_message = 'Computing Max/Min/Mean of variables %s between frame %d and %d.' \
-                          % (str(output_header.var_IDs), start_index+1, end_index)
+        output_message = 'Computing %s of variables %s between frame %d and %d.' \
+                          % ('Max' if self.maxButton.isChecked() else ('Min' if self.minButton.isChecked() else 'Mean'),
+                             str(output_header.var_IDs), start_index+1, end_index)
 
         # disable close button
         self.parent.inDialog()
@@ -458,7 +462,7 @@ class MaxMinMeanTab(QWidget):
                     scalar_values = scalar_operation(resin, scalars, time_indices)
                     progressBar.setValue(50)
                 if vectors:
-                    vector_values = vector_operation(resin, vectors, time_indices)
+                    vector_values = vector_operation(resin, vectors, time_indices, additional_equations)
 
                 if scalars and not vectors:
                     values = scalar_values
@@ -467,8 +471,6 @@ class MaxMinMeanTab(QWidget):
                 else:
                     values = np.vstack((scalar_values, vector_values))
 
-                if values.shape[0] == 1:
-                    values = values.flatten()
                 resout.write_entire_frame(output_header, self.input.time[0], values)
 
         logging.info('Finished writing the output')

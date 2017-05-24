@@ -441,14 +441,8 @@ class Write(Serafin):
         self.file.write(struct.pack('>%s' % header.float_type, time_to_write))
         self.file.write(struct.pack('>i', 4))
 
-        if header.nb_var == 1:  # special case when values is 1D-array
+        for i in range(header.nb_var):
             self.file.write(struct.pack('>i', header.float_size * header.nb_nodes))
-            self.file.write(struct.pack(nb_values, *values))
+            self.file.write(struct.pack(nb_values, *values[i, :]))
             self.file.write(struct.pack('>i', header.float_size * header.nb_nodes))
-
-        else:
-            for i in range(header.nb_var):
-                self.file.write(struct.pack('>i', header.float_size * header.nb_nodes))
-                self.file.write(struct.pack(nb_values, *values[i, :]))
-                self.file.write(struct.pack('>i', header.float_size * header.nb_nodes))
 

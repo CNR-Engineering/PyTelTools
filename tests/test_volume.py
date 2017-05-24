@@ -76,6 +76,7 @@ class VolumeTestCase(unittest.TestCase):
         with Serafin.Write(self.path, 'fr', True) as f:
             f.write_header(header)
             for time, vals in enumerate(test_values):
+                vals = vals.reshape(1, 4)
                 f.write_entire_frame(header, time, vals)
 
         # create the test polygons

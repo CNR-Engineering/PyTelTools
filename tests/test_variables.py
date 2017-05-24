@@ -47,6 +47,7 @@ class VariablesTestCase(unittest.TestCase):
 
     def test_IJ_equation(self):
         self.assertEqual(equation_name(get_necessary_equations(['U', 'V', 'H', 'B'], ['I'], None)), ['I'])
+        self.assertEqual(equation_name(get_necessary_equations(['I', 'J'], ['Q'], None)), ['Q'])
         self.assertEqual(equation_name(get_necessary_equations(['H', 'U', 'Q', 'J'], ['H', 'I', 'Q'], None)), ['I'])
         self.assertEqual(equation_name(get_necessary_equations(['U', 'V', 'H', 'B', 'M'], ['J'], None)), ['J'])
         self.assertEqual(equation_name(get_necessary_equations(['H', 'U', 'Q', 'V', 'M'], ['M', 'Q', 'J', 'U'], None)), ['J'])
@@ -58,6 +59,7 @@ class VariablesTestCase(unittest.TestCase):
         self.assertEqual(equation_name(get_necessary_equations(['U', 'V', 'H'], ['U', 'Q', 'V'], None)), ['I', 'J', 'Q'])
         self.assertEqual(equation_name(get_necessary_equations(['U', 'V', 'I', 'H'], ['Q', 'I', 'U'], None)), ['J', 'Q'])
         self.assertEqual(equation_name(get_necessary_equations(['I', 'J', 'H', 'U', 'V', 'TAU'], ['I', 'J', 'Q'], None)), ['Q'])
+        self.assertEqual(equation_name(get_necessary_equations(['I', 'S', 'B', 'V'], ['Q'], None)), ['H', 'J', 'Q'])
 
     def test_M_equation(self):
         self.assertEqual(equation_name(get_necessary_equations(['U', 'V', 'J', 'H', 'B', 'I'], ['U', 'H', 'V', 'M'], None)), ['M'])

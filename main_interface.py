@@ -4,6 +4,8 @@ from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 
 from gui.ExtractVariablesGUI import ExtractVariablesGUI
+from gui.MaxMinMeanGUI import MaxMinMeanGUI
+
 from gui.PointsGUI import PointsGUI
 from gui.LinesGUI import LinesGUI
 from gui.ProjectionGUI import ProjectionGUI
@@ -16,6 +18,7 @@ class MainPanel(QWidget):
     def __init__(self, parent):
         super().__init__()
         extract = ExtractVariablesGUI(parent)
+        maxmin = MaxMinMeanGUI(parent)
         points = PointsGUI(parent)
         lines = LinesGUI(parent)
         project = ProjectionGUI(parent)
@@ -26,6 +29,7 @@ class MainPanel(QWidget):
         self.stackLayout = QStackedLayout()
         self.stackLayout.addWidget(QLabel('Hello! This is the start page (TODO)'))
         self.stackLayout.addWidget(extract)
+        self.stackLayout.addWidget(maxmin)
         self.stackLayout.addWidget(points)
         self.stackLayout.addWidget(lines)
         self.stackLayout.addWidget(project)
@@ -45,7 +49,7 @@ class MyMainWindow(QWidget):
 
         pageList = QListWidget()
         pageList.setMaximumWidth(200)
-        for name in ['Start', 'Extract variables', 'Interpolate on points',
+        for name in ['Start', 'Extract variables', 'Max/Min/Mean/Arrival/Duration', 'Interpolate on points',
                      'Interpolate along lines', 'Projection along lines',
                      'Compute volume', 'Compute flux', 'Compare two results']:
             pageList.addItem('\n' + name + '\n')

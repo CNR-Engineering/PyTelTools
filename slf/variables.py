@@ -21,8 +21,8 @@ class Variable():
         self._unit = unit
 
     def __repr__(self):
-        return ', '.join([self.ID, self.name_fr.decode('utf-8'),
-                          self.name_en.decode('utf-8'), self.unit.decode('utf-8')])
+        return ', '.join([self.ID(), self.name_fr,
+                          self.name_en, self.unit()])
 
     def name(self, language):
         if language == 'fr':
@@ -246,8 +246,9 @@ def get_necessary_equations(known_var_IDs, needed_var_IDs, us_equation):
     elif 'H' not in known_var_IDs:
         if 'I' in selected_unknown_var_IDs \
                 or 'J' in selected_unknown_var_IDs \
-                or 'Q' in selected_unknown_var_IDs \
                 or 'C' in selected_unknown_var_IDs:
+            necessary_equations.append(BASIC_EQUATIONS['H'])
+        elif 'Q' in selected_unknown_var_IDs and ('I' not in known_var_IDs or 'J' not in known_var_IDs):
             necessary_equations.append(BASIC_EQUATIONS['H'])
         elif 'C' not in known_var_IDs and 'F' in selected_unknown_var_IDs:
             necessary_equations.append(BASIC_EQUATIONS['H'])
@@ -410,13 +411,6 @@ def do_calculations_in_frame(equations, us_equation, input_serafin, time_index, 
     # reconstruct the output values array in the order of the selected IDs
     nb_selected_vars = len(selected_output_IDs)
 
-    # handle the special case when only one output variable selected (numpy 1D-array)
-    if nb_selected_vars == 1:
-        var_ID = selected_output_IDs[0]
-        if var_ID not in computed_values:
-            return np.array(input_serafin.read_var_in_frame(time_index, var_ID), dtype=output_float_type)
-        return np.array(computed_values[var_ID], dtype=output_float_type)
-    # handle the general case
     output_values = np.empty((nb_selected_vars, input_serafin.header.nb_nodes),
                              dtype=output_float_type)
     for i in range(nb_selected_vars):

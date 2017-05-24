@@ -213,9 +213,11 @@ class SelectedTimeINFO(QWidget):
         self.endDate.setText(str(end_date))
 
     def clearText(self):
-        for w in [self.startIndex, self.endIndex, self.startValue, self.endValue, self.startDate, self.endDate]:
+        for w in [self.startIndex, self.endIndex, self.startValue, self.endValue]:
             w.clear()
-        self.visited = False
+        for w in [self.startDate, self.endDate]:
+            w.clear()
+            self.visited = False
         self.timeSamplig.setText('1')
 
 
