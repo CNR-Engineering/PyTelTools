@@ -66,6 +66,7 @@ class InputTab(QWidget):
     def __init__(self, parent):
         super().__init__()
         self.parent = parent
+        self.old_options = ('1', '')
 
         self.filename = None
         self.header = None
@@ -205,15 +206,27 @@ class InputTab(QWidget):
         self.header = None
         self.time = []
         self.mesh = None
-        self.fluxBox.clear()
         self.csvNameBox.clear()
-        self.btnOpenPolyline.setEnabled(True)
+        self.old_options = (self.timeSampling.text(),
+                            self.fluxBox.currentText())
+        self.btnOpenPolyline.setEnabled(False)
         self.timeSampling.setText('1')
+        self.fluxBox.clear()
 
         if not self.frenchButton.isChecked():
             self.language = 'en'
         else:
             self.language = 'fr'
+
+    def _resetDefaultOptions(self):
+        sampling_frequency, flux_type = self.old_options
+        if int(sampling_frequency) <= len(self.time):
+            self.timeSampling.setText(sampling_frequency)
+        for i in range(self.fluxBox.count()):
+            text = self.fluxBox.itemText(i)
+            if text == flux_type:
+                self.fluxBox.setCurrentIndex(i)
+                break
 
     def _addFluxOptions(self, header):
         if 'U' in header.var_IDs and 'V' in header.var_IDs:
@@ -293,6 +306,17 @@ class InputTab(QWidget):
         if not filename:
             return
 
+        try:
+            with open(filename) as f:
+                pass
+        except PermissionError:
+            QMessageBox.critical(None, 'Permission denied',
+                                 'Permission denied. (Is the file opened by another application?).',
+                                 QMessageBox.Ok, QMessageBox.Ok)
+            return
+
+        self._reinitInput(filename)
+
         with Serafin.Read(filename, self.language) as resin:
             resin.read_header()
 
@@ -302,7 +326,6 @@ class InputTab(QWidget):
                                      QMessageBox.Ok)
                 return
 
-            self._reinitInput(filename)
             flux_added = self._addFluxOptions(resin.header)
             if not flux_added:
                 QMessageBox.critical(self, 'Error', 'No flux is computable from this file.',
@@ -327,6 +350,8 @@ class InputTab(QWidget):
             self.header = copy.deepcopy(resin.header)
             self.time = resin.time[:]
 
+        self._resetDefaultOptions()
+        self.btnOpenPolyline.setEnabled(True)
         self.parent.imageTab.reset()
         self.parent.tab.setTabEnabled(1, False)
 

@@ -175,13 +175,9 @@ class InputTab(QWidget):
         self.summaryTextBox.clear()
         self.header = None
         self.time = []
-        self.lines = []
-        self.line_interpolators = []
-        self.line_interpolators_internal = []
 
         self.btnMap.setEnabled(False)
         self.mesh = None
-        self.linesNameBox.clear()
         self.btnOpenLines.setEnabled(True)
         self.parent.reset()
 
@@ -190,6 +186,40 @@ class InputTab(QWidget):
         else:
             self.language = 'fr'
 
+    def _resetDefaultOptions(self):
+        nb_nonempty = 0
+
+        self.line_interpolators = []
+        self.line_interpolators_internal = []
+
+        for line in self.lines:
+            line_interpolators, distances, \
+                line_interpolators_internal, distances_internal = self.mesh.get_line_interpolators(line)
+            if line_interpolators:
+                nb_nonempty += 1
+            self.line_interpolators.append((line_interpolators, distances))
+            self.line_interpolators_internal.append((line_interpolators_internal, distances_internal))
+
+        if nb_nonempty == 0:
+            self.lines = []
+            self.line_interpolators = []
+            self.line_interpolators_internal = []
+
+            self.linesNameBox.clear()
+            self.parent.reset()
+
+        else:
+            old_filename = self.linesNameBox.toPlainText().split('\n')[0]
+            self.linesNameBox.clear()
+            self.linesNameBox.appendPlainText(old_filename + '\n' + 'The file contains {} open polyline{}.'
+                                              '{} line{} the mesh continuously.'.format(
+                                              len(self.lines), 's' if len(self.lines) > 1 else '',
+                                              nb_nonempty, 's intersect' if nb_nonempty > 1 else ' intersects'))
+
+            self.has_map = False
+            self.btnMap.setEnabled(True)
+            self.parent.getInput()
+
     def btnOpenSerafinEvent(self):
         options = QFileDialog.Options()
         options |= QFileDialog.DontUseNativeDialog
@@ -197,6 +227,17 @@ class InputTab(QWidget):
                                                   'Serafin Files (*.slf);;All Files (*)', QDir.currentPath(), options=options)
         if not filename:
             return
+
+        try:
+            with open(filename) as f:
+                pass
+        except PermissionError:
+            QMessageBox.critical(None, 'Permission denied',
+                                 'Permission denied. (Is the file opened by another application?).',
+                                 QMessageBox.Ok, QMessageBox.Ok)
+            return
+
+        self._reinitInput(filename)
 
         with Serafin.Read(filename, self.language) as resin:
             resin.read_header()
@@ -207,7 +248,6 @@ class InputTab(QWidget):
                                      QMessageBox.Ok)
                 return
 
-            self._reinitInput(filename)
 
             # record the time series
             resin.get_time()
@@ -226,6 +266,8 @@ class InputTab(QWidget):
             # copy to avoid reading the same data in the future
             self.header = copy.deepcopy(resin.header)
             self.time = resin.time[:]
+
+        self._resetDefaultOptions()
 
     def btnOpenLinesEvent(self):
         options = QFileDialog.Options()
@@ -521,6 +563,7 @@ class ImageControlPanel(QWidget):
         self.lineBox.setFixedHeight(30)
         self.lineBox.setMaximumWidth(200)
         self.intersection = QCheckBox()
+        self.addInternal = QCheckBox()
 
         # create line-var table
         self.unitBox = QComboBox()
@@ -564,6 +607,16 @@ class ImageControlPanel(QWidget):
         hlayout.setAlignment(lb, Qt.AlignLeft)
         hlayout.addStretch()
         vlayout.addLayout(hlayout)
+        vlayout.addItem(QSpacerItem(10, 10))
+
+        hlayout = QHBoxLayout()
+        hlayout.addItem(QSpacerItem(10, 10))
+        hlayout.addWidget(self.addInternal)
+        lb = QLabel('Mark original points in plot')
+        hlayout.addWidget(lb)
+        hlayout.setAlignment(lb, Qt.AlignLeft)
+        hlayout.addStretch()
+        vlayout.addLayout(hlayout)
         vlayout.addItem(QSpacerItem(10, 15))
 
         hlayout = QHBoxLayout()
@@ -587,13 +640,19 @@ class ImageTab(QWidget):
 
         self.var_table = {}
         self.current_vars = {}
+        self.line_colors = {}
 
         # set up a custom plot viewer
+        self.editLineColorAct = QAction('Edit line colors', self,
+                                        icon=self.style().standardIcon(QStyle.SP_FileDialogDetailedView),
+                                        triggered=self.editColor)
+
         self.plotViewer = PlotViewer()
         self.plotViewer.exitAct.setEnabled(False)
         self.plotViewer.menuBar.setVisible(False)
-        self.plotViewer.toolBar.addAction(self.plotViewer.xLabelAct)
+        self.plotViewer.toolBar.addAction(self.editLineColorAct)
         self.plotViewer.toolBar.addSeparator()
+        self.plotViewer.toolBar.addAction(self.plotViewer.xLabelAct)
         self.plotViewer.toolBar.addAction(self.plotViewer.yLabelAct)
         self.plotViewer.toolBar.addSeparator()
         self.plotViewer.toolBar.addAction(self.plotViewer.titleAct)
@@ -618,6 +677,9 @@ class ImageTab(QWidget):
         mainLayout = QHBoxLayout()
         mainLayout.addWidget(self.splitter)
         self.setLayout(mainLayout)
+
+    def editColor(self):
+        pass
 
     def _getSelection(self):
         self.current_vars = {}
@@ -655,29 +717,7 @@ class ImageTab(QWidget):
                     var_item.setCheckState(Qt.Unchecked)
                     self.control.varTable.setItem(offset, j+1, var_item)
 
-    def btnComputeEvent(self):
-        self.current_vars = self._getSelection()
-        if not self.current_vars:
-            QMessageBox.critical(self, 'Error', 'Select at least one variable to plot.',
-                                 QMessageBox.Ok)
-            return
-        ref_id = int(self.control.lineBox.currentText().split()[1]) - 1
-        self.plotViewer.current_title = 'Values of variables along line %d' \
-                                        % (ref_id+1)
-        line_interpolators = {}
-        if self.control.intersection.isChecked():
-            for line_id in self.current_vars:
-                line_interpolator, distances = self.input.line_interpolators[line_id]
-                line_interpolators[line_id] = line_interpolator
-        else:
-            for line_id in self.current_vars:
-                line_interpolator, distances = self.input.line_interpolators_internal[line_id]
-                line_interpolators[line_id] = line_interpolator
-        reference = self.input.lines[ref_id]
-        max_distance = reference.length()
-
-        time_index = int(self.control.timeSelection.index.text()) - 1
-
+    def _compute(self, time_index, line_interpolators, reference, max_distance):
         distances = {}
         values = {}
         with Serafin.Read(self.input.filename, self.input.language) as input_stream:
@@ -686,6 +726,7 @@ class ImageTab(QWidget):
             for line_id in self.current_vars:
                 distances[line_id] = []
                 values[line_id] = {}
+
                 for var in self.current_vars[line_id]:
                     values[line_id][var] = []
 
@@ -699,13 +740,67 @@ class ImageTab(QWidget):
                         all_values = input_stream.read_var_in_frame(time_index, var)
                         values[line_id][var].append(interpolator.dot(all_values[[i, j, k]]))
                 distances[line_id] = np.array(distances[line_id])
+        return distances, values
+
+    def btnComputeEvent(self):
+        self.current_vars = self._getSelection()
+        if not self.current_vars:
+            QMessageBox.critical(self, 'Error', 'Select at least one variable to plot.',
+                                 QMessageBox.Ok)
+            return
+        ref_id = int(self.control.lineBox.currentText().split()[1]) - 1
+        self.plotViewer.current_title = 'Values of variables along line %d' \
+                                        % (ref_id+1)
+
+        line_interpolators = {}
+        if self.control.intersection.isChecked():
+            for line_id in self.current_vars:
+                line_interpolator, distances = self.input.line_interpolators[line_id]
+                line_interpolators[line_id] = line_interpolator
+        else:
+            for line_id in self.current_vars:
+                line_interpolator, distances = self.input.line_interpolators_internal[line_id]
+                line_interpolators[line_id] = line_interpolator
+
+        reference = self.input.lines[ref_id]
+        max_distance = reference.length()
+        time_index = int(self.control.timeSelection.index.text()) - 1
+        distances, values = self._compute(time_index, line_interpolators, reference, max_distance)
 
         self.plotViewer.canvas.axes.clear()
 
-        for line_id, vars in self.current_vars.items():
-            for var in vars:
-                self.plotViewer.canvas.axes.plot(distances[line_id], values[line_id][var],
-                                                 '-', linewidth=2, label='%s$_%d$' % (var, line_id+1))
+        if self.control.addInternal.isChecked():
+            if self.control.intersection.isChecked():
+                line_interpolators_internal = {}
+                for line_id in self.current_vars:
+                    line_interpolator, _ = self.input.line_interpolators_internal[line_id]
+                    line_interpolators_internal[line_id] = line_interpolator
+                distances_internal, values_internal = self._compute(time_index,
+                                                                    line_interpolators_internal,
+                                                                    reference, max_distance)
+                for line_id, vars in self.current_vars.items():
+                    for var in vars:
+                        self.plotViewer.canvas.axes.plot(distances[line_id], values[line_id][var], '-',
+                                                         color=self.line_colors[line_id],
+                                                         linewidth=2, label='%s$_%d$' % (var, line_id+1))
+
+                        self.plotViewer.canvas.axes.plot(distances_internal[line_id],
+                                                         values_internal[line_id][var], 'o',
+                                                         color=self.line_colors[line_id])
+            else:
+                for line_id, vars in self.current_vars.items():
+                    for var in vars:
+                        self.plotViewer.canvas.axes.plot(distances[line_id], values[line_id][var], 'o-',
+                                                         color=self.line_colors[line_id], linewidth=2,
+                                                         label='%s$_%d$' % (var, line_id+1))
+
+        else:
+            for line_id, vars in self.current_vars.items():
+                for var in vars:
+                    self.plotViewer.canvas.axes.plot(distances[line_id], values[line_id][var], '-',
+                                                     color=self.line_colors[line_id], linewidth=2,
+                                                     label='%s$_%d$' % (var, line_id+1))
+
         self.plotViewer.canvas.axes.legend()
         self.plotViewer.canvas.axes.grid(linestyle='dotted')
         self.plotViewer.canvas.axes.set_xlabel(self.plotViewer.current_xlabel)
@@ -715,9 +810,11 @@ class ImageTab(QWidget):
 
     def reset(self):
         self.control.intersection.setChecked(True)
+        self.control.addInternal.setChecked(False)
         self.control.lineBox.clear()
         self.control.varTable.setRowCount(0)
         self.current_vars = {}
+        self.line_colors = {}
         self.plotViewer.defaultPlot()
         self.plotViewer.current_title = ''
         self.plotViewer.current_xlabel = 'Cumulative distance (M)'
@@ -750,10 +847,14 @@ class ImageTab(QWidget):
             self.control.unitBox.setCurrentIndex(list(self.var_table.keys()).index('M'))
         self._updateTable(self.control.unitBox.currentText())
 
+        j = 0
         for i in range(len(self.input.lines)):
             id_line = str(i+1)
             if self.input.line_interpolators[i][0]:
+                j %= len(self.plotViewer.defaultColors)
                 self.control.lineBox.addItem('Line %s' % id_line)
+                self.line_colors[i] = self.plotViewer.defaultColors[j]
+                j += 1
 
 
 class ProjectionGUI(QWidget):

@@ -194,7 +194,7 @@ class InputTab(QWidget):
     def __init__(self, parent):
         super().__init__()
         self.parent = parent
-        
+        self.old_options = ('1', '', '0')
         self.filename = None
         self.header = None
         self.language = 'fr'
@@ -354,25 +354,54 @@ class InputTab(QWidget):
         self.header = None
         self.time = []
         self.mesh = None
+        self.old_options = (self.timeSampling.text(),
+                            self.firstVarBox.currentText(),
+                            self.secondVarBox.currentText())
+        self.timeSampling.setText('1')
         self.firstVarBox.clear()
         self.secondVarBox.clear()
         self.csvNameBox.clear()
-        self.btnOpenPolygon.setEnabled(True)
-        self.timeSampling.setText('1')
+        self.btnOpenPolygon.setEnabled(False)
 
         if not self.frenchButton.isChecked():
             self.language = 'en'
         else:
             self.language = 'fr'
 
+    def _resetDefaultOptions(self):
+        sampling_frequency, first_var, second_var = self.old_options
+        if int(sampling_frequency) <= len(self.time):
+            self.timeSampling.setText(sampling_frequency)
+        var_ID = first_var.split('(')[0][:-1]
+        if var_ID in self.header.var_IDs:
+            self.firstVarBox.setCurrentIndex(self.header.var_IDs.index(var_ID))
+        if '(' in second_var:
+            var_ID = second_var.split('(')[0][:-1]
+            if var_ID in self.header.var_IDs:
+                self.secondVarBox.setCurrentIndex(2 + self.header.var_IDs.index(var_ID))
+        elif second_var[:4] == 'Init':
+            self.secondVarBox.setCurrentIndex(1)
+        else:
+            self.secondVarBox.setCurrentIndex(0)
+
     def btnOpenSerafinEvent(self):
         options = QFileDialog.Options()
         options |= QFileDialog.DontUseNativeDialog
         filename, _ = QFileDialog.getOpenFileName(self, 'Open a .slf file', '',
-                                                  'Serafin Files (*.slf);;All Files (*)', QDir.currentPath(), options=options)
+                                                  'Serafin Files (*.slf);;All Files (*)',
+                                                  QDir.currentPath(), options=options)
         if not filename:
             return
+        try:
+            with open(filename) as f:
+                pass
+        except PermissionError:
+            QMessageBox.critical(None, 'Permission denied',
+                                 'Permission denied. (Is the file opened by another application?).',
+                                 QMessageBox.Ok, QMessageBox.Ok)
+            return
 
+        self._reinitInput(filename)
         with Serafin.Read(filename, self.language) as resin:
             resin.read_header()
 
@@ -381,8 +410,6 @@ class InputTab(QWidget):
                 QMessageBox.critical(self, 'Error', 'The file type (TELEMAC 3D) is currently not supported.',
                                      QMessageBox.Ok)
                 return
-
-            self._reinitInput(filename)
 
             # record the time series
             resin.get_time()
@@ -402,12 +429,15 @@ class InputTab(QWidget):
             self.header = copy.deepcopy(resin.header)
             self.time = resin.time[:]
 
+        self.btnOpenPolygon.setEnabled(True)
         self.secondVarBox.addItem('0')
         self.secondVarBox.addItem('Initial values of the first variable')
 
         for var_ID, var_name in zip(self.header.var_IDs, self.header.var_names):
             self.firstVarBox.addItem(var_ID + ' (%s)' % var_name.decode('utf-8').strip())
             self.secondVarBox.addItem(var_ID + ' (%s)' % var_name.decode('utf-8').strip())
+
+        self._resetDefaultOptions()
 
         self.parent.imageTab.reset()
         self.parent.tab.setTabEnabled(1, False)

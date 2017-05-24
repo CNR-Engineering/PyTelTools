@@ -79,6 +79,8 @@ class MeshInterpolator(Mesh2D):
                 segment_intersections.sort(reverse=True)
 
             intersections.extend(segment_intersections)
+            if not segment_intersections:
+                continue
 
             internal_points.append(segment_intersections[0])
             internal_points.append(segment_intersections[-1])
@@ -114,7 +116,8 @@ class MeshInterpolator(Mesh2D):
         intersections = [intersections[i] for i in range(len(intersections)) if not to_remove[i]]
 
         # trim internal points from 2n+2 to n+1
-        internal_points = [internal_points[0]] + internal_points[2:-1:2] + [internal_points[-1]]
+        if internal_points:
+            internal_points = internal_points[0:-1:2] + [internal_points[-1]]
 
         # compute cumulative distance
         distance = offset
@@ -124,6 +127,7 @@ class MeshInterpolator(Mesh2D):
             distance += np.linalg.norm([second[0] - first[0], second[1] - first[1]])
             distances.append(distance)
 
+        distance = offset
         distances_internal = [offset]
         for i in range(len(internal_points)-1):
             first, second = internal_points[i+1], internal_points[i]

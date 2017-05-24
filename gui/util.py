@@ -621,7 +621,7 @@ class PlotColumnsSelector(QDialog):
         buttons.accepted.connect(self.checkSelection)
         buttons.rejected.connect(self.reject)
         vlayout = QVBoxLayout()
-        vlayout.addWidget(QLabel('  Select up to 8 %s to plot' % self.plural))
+        vlayout.addWidget(QLabel('  Select up to 10 %s to plot' % self.plural))
         vlayout.addWidget(self.list)
         vlayout.addWidget(buttons)
         self.setLayout(vlayout)
@@ -644,8 +644,8 @@ class PlotColumnsSelector(QDialog):
             QMessageBox.critical(self, 'Error', 'Select at least one %s to plot.' % self.name,
                                  QMessageBox.Ok)
             return
-        if len(self.selection) > 8:
-            QMessageBox.critical(self, 'Error', 'Select up to 8 %s.' % self.plural,
+        if len(self.selection) > 10:
+            QMessageBox.critical(self, 'Error', 'Select up to 10 %s.' % self.plural,
                                  QMessageBox.Ok)
             return
         self.accept()
@@ -964,6 +964,12 @@ class MapViewer(QWidget):
 class PlotViewer(QWidget):
     def __init__(self):
         super().__init__()
+        self.defaultColors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2',
+                              '#7f7f7f', '#bcbd22', '#17becf']
+        name = ['Blue', 'Orange', 'Green', 'Red', 'Purple', 'Brown', 'Pink', 'DarkGray', 'Yellow', 'Cyan']
+        self.colorToName = {c: n for c, n in zip(self.defaultColors, name)}
+        self.nameToColor = {n: c for c, n in zip(self.defaultColors, name)}
+
         self._initWidgets()
         self._setLayout()
 
@@ -1118,12 +1124,7 @@ class TemporalPlotViewer(PlotViewer):
         self.datetime = []
         self.str_datetime = []
         self.str_datetime_bis = []
-        self.defaultColors = ['b', 'r', 'g', 'y', 'k', 'c', '#F28AD6', 'm']
-        name = ['Blue', 'Red', 'Green', 'Yellow', 'Black', 'Cyan', 'Pink', 'Magenta']
-        self.colorToName = {c: n for c, n in zip(self.defaultColors, name)}
-        self.nameToColor = {n: c for c, n in zip(self.defaultColors, name)}
         self.timeFormat = 0   # 0: second, 1: date, 2: date (alternative), 3: minutes, 4: hours, 5: days
-
 
         self.selectColumnsAct = QAction('Select\n%s' % self.column_name,
                                         self, icon=self.style().standardIcon(QStyle.SP_FileDialogDetailedView),

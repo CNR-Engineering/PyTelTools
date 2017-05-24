@@ -4,11 +4,12 @@ from PyQt5.QtWidgets import *
 from PyQt5.QtGui import *
 from PyQt5.QtCore import *
 
+import re
 import numpy as np
 import logging
 import copy
 from slf import Serafin
-from slf.misc import scalars_vectors, scalar_max, scalar_min, mean, vector_max, vector_min
+from slf.misc import scalars_vectors, scalar_max, scalar_min, mean, vector_max, vector_min, to_postfix, is_valid_postfix
 from gui.util import TableWidgetDragRows, QPlainTextEditLogger, handleOverwrite, OutputProgressDialog, TimeRangeSlider
 
 
@@ -66,6 +67,144 @@ class TimeSelection(QWidget):
     def clearText(self):
         for w in [self.startIndex, self.endIndex, self.startValue, self.endValue, self.startDate, self.endDate]:
             w.clear()
+
+    def enable(self):
+        self.startIndex.setEnabled(True)
+        self.endIndex.setEnabled(True)
+        self.startValue.setEnabled(True)
+        self.endValue.setEnabled(True)
+
+    def disable(self):
+        self.startIndex.setEnabled(False)
+        self.endIndex.setEnabled(False)
+        self.startValue.setEnabled(False)
+        self.endValue.setEnabled(False)
+
+
+class ConditionDialog(QDialog):
+    def __init__(self, input_header):
+        super().__init__()
+        self.var_IDs = input_header.var_IDs
+        self.operators = ['+', '-', '*', '/', 'sqrt', '(', ')']
+
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel,
+                                   Qt.Horizontal, self)
+        buttons.accepted.connect(self.checkCondition)
+        buttons.rejected.connect(self.reject)
+
+        self.expressionBox = QTextEdit()
+        self.expressionBox.setFixedSize(150, 30)
+        self.old_format = self.expressionBox.currentCharFormat()
+        self.expressionBox.cursorPositionChanged.connect(lambda:
+                                                         self.expressionBox.setCurrentCharFormat(self.old_format))
+
+        self.addButton = QPushButton('Add')
+        self.addButton.setFixedSize(50, 30)
+        self.addButton.clicked.connect(self.addButtonEvent)
+
+        self.clearButton = QPushButton('Clear')
+        self.clearButton.setFixedSize(50, 30)
+        self.clearButton.clicked.connect(self.expressionBox.clear)
+
+        self.varBox = QComboBox()
+        self.varBox.setFixedSize(150, 30)
+
+        for var_ID, var_name in zip(input_header.var_IDs, input_header.var_names):
+            var_name = var_name.decode('utf-8').strip()
+            self.varBox.addItem('%s (%s)' % (var_ID, var_name))
+
+        self.comparatorBox = QComboBox()
+        for comparator in ['>', '<', '>=', '<=']:
+            self.comparatorBox.addItem(comparator)
+        self.comparatorBox.setFixedSize(50, 30)
+
+        self.threashold = QLineEdit()
+        self.threashold.setFixedSize(150, 30)
+
+        self.condition = ('', '', 0.0)
+        self.expression = []
+
+        mainLayout = QVBoxLayout()
+        mainLayout.addItem(QSpacerItem(50, 10))
+        mainLayout.addWidget(QLabel('<p style="font-size:10pt">'
+                                    '<b>Help</b>: use <b>Add</b> button to add variables to the expression.<br>'
+                                    'You can also enter operators (<tt>+ - * / ( ) sqrt</tt>) and numbers.'))
+
+        mainLayout.addItem(QSpacerItem(50, 15))
+        hlayout = QHBoxLayout()
+        hlayout.addWidget(QLabel('Edit expression'))
+        hlayout.addWidget(self.clearButton)
+        hlayout.addWidget(self.addButton)
+        hlayout.addWidget(self.varBox)
+        hlayout.setSpacing(10)
+        hlayout.setAlignment(Qt.AlignLeft)
+        mainLayout.addLayout(hlayout)
+        mainLayout.setAlignment(hlayout, Qt.AlignHCenter)
+        mainLayout.addItem(QSpacerItem(50, 20))
+        glayout = QGridLayout()
+        glayout.addWidget(QLabel('Expression'), 1, 1, Qt.AlignHCenter)
+        glayout.addWidget(QLabel('Comparator'), 1, 2, Qt.AlignHCenter)
+        glayout.addWidget(QLabel('Threshold'), 1, 3, Qt.AlignHCenter)
+        glayout.addWidget(self.expressionBox, 2, 1)
+        glayout.addWidget(self.comparatorBox, 2, 2)
+        glayout.addWidget(self.threashold, 2, 3)
+        glayout.setVerticalSpacing(12)
+        glayout.setRowStretch(0, 1)
+        mainLayout.addLayout(glayout)
+        mainLayout.addItem(QSpacerItem(50, 20))
+        mainLayout.addWidget(buttons)
+
+        self.setLayout(mainLayout)
+        self.setWindowTitle('Add new condition')
+        self.resize(self.sizeHint())
+
+    def _processExpression(self, expression):
+        expression = re.sub('\s+', '', expression)
+        infix = filter(None, re.split('([+*()/-]|[A-Z]+|^\d+)', expression))
+        return to_postfix(infix)
+
+    def _validateExpression(self, expression):
+        for item in expression:
+            if item.isupper():  # variable ID
+                if item not in self.var_IDs:
+                    return False
+            elif item in self.operators:
+                continue
+            else:  # is number
+                try:
+                    _ = float(item)
+                except ValueError:
+                    return False
+        return is_valid_postfix(expression)
+
+    def addButtonEvent(self):
+        var_ID = self.varBox.currentText().split(' (')[0]
+        self.expressionBox.insertHtml("<span style=\" font-size:8pt; "
+                                      "font-weight:600; color:#554DF7;\" "
+                                      ">%s</span>" % var_ID)
+        self.expressionBox.setCurrentCharFormat(self.old_format)
+
+    def checkCondition(self):
+        expression = self.expressionBox.toPlainText()
+        comparator = self.comparatorBox.currentText()
+        threshold = self.threashold.text()
+        self.condition = ('', '', 0.0)
+        self.expression = []
+
+        try:
+            threshold = float(threshold)
+        except ValueError:
+            QMessageBox.critical(self, 'Error', 'The threshold is not a number!',
+                                 QMessageBox.Ok)
+            return
+        self.expression = self._processExpression(expression)
+
+        if not self._validateExpression(self.expression):
+            QMessageBox.critical(self, 'Error', 'Invalid expression.',
+                                 QMessageBox.Ok)
+            return
+        self.condition = (expression, comparator, threshold)
+        self.accept()
 
 
 class InputTab(QWidget):
@@ -339,10 +478,7 @@ class MaxMinMeanTab(QWidget):
         self.maxButton.setChecked(True)
         self.firstTable.setRowCount(0)
         self.secondTable.setRowCount(0)
-        self.timeSelection.startIndex.setEnabled(False)
-        self.timeSelection.endIndex.setEnabled(False)
-        self.timeSelection.startValue.setEnabled(False)
-        self.timeSelection.endValue.setEnabled(False)
+        self.timeSelection.disable()
         self.btnSubmit.setEnabled(False)
         self.singlePrecisionBox.setChecked(False)
         self.singlePrecisionBox.setEnabled(False)
@@ -369,19 +505,16 @@ class MaxMinMeanTab(QWidget):
 
         if self.input.header.date is not None:
             year, month, day, hour, minute, second = self.input.header.date
-            self.start_time = datetime.datetime(year, month, day, hour, minute, second)
+            start_time = datetime.datetime(year, month, day, hour, minute, second)
         else:
-            self.start_time = datetime.datetime(1900, 1, 1, 0, 0, 0)
+            start_time = datetime.datetime(1900, 1, 1, 0, 0, 0)
 
         time_frames = list(map(lambda x: datetime.timedelta(seconds=x), self.input.time))
-        self.timeSlider.reinit(self.start_time, time_frames, self.timeSelection)
+        self.timeSlider.reinit(start_time, time_frames, self.timeSelection)
 
         if self.input.header.nb_frames > 1:
             self.timeSlider.setEnabled(True)
-            self.timeSelection.startIndex.setEnabled(True)
-            self.timeSelection.endIndex.setEnabled(True)
-            self.timeSelection.startValue.setEnabled(True)
-            self.timeSelection.endValue.setEnabled(True)
+            self.timeSelection.enable()
 
     def btnSubmitEvent(self):
         # fetch the list of selected variables
@@ -482,6 +615,214 @@ class MaxMinMeanTab(QWidget):
         self.parent.outDialog()
 
 
+class ArrivalDurationTab(QWidget):
+    def __init__(self, input, parent):
+        super().__init__()
+        self.input = input
+        self.parent = parent
+
+        self.conditions = []
+        self.expressions = []
+
+        self._initWidgets()
+        self._setLayout()
+        self._bindEvents()
+
+    def _initWidgets(self):
+        # create a slider for time selection
+        self.timeSlider = TimeRangeSlider()
+        self.timeSlider.setFixedHeight(30)
+        self.timeSlider.setMinimumWidth(600)
+        self.timeSlider.setEnabled(False)
+
+        # create a button for add condition
+        self.btnAdd = QPushButton('Add new condition')
+        self.btnAdd.setFixedSize(135, 50)
+
+        # create a table for created condition
+        self.conditionTable = QTableWidget()
+        self.conditionTable.setColumnCount(3)
+        self.conditionTable .setHorizontalHeaderLabels(['Condition', 'Arrival', 'Duration'])
+        vh = self.conditionTable .verticalHeader()
+        vh.setSectionResizeMode(QHeaderView.Fixed)
+        vh.setDefaultSectionSize(20)
+        hh = self.conditionTable .horizontalHeader()
+        hh.setDefaultSectionSize(150)
+        self.conditionTable.setMaximumHeight(500)
+
+        # create text boxes for displaying the time selection
+        self.timeSelection = TimeSelection(self)
+        self.timeSelection.startIndex.setEnabled(False)
+        self.timeSelection.endIndex.setEnabled(False)
+        self.timeSelection.startValue.setEnabled(False)
+        self.timeSelection.endValue.setEnabled(False)
+
+        # create the widget displaying message logs
+        self.logTextBox = QPlainTextEditLogger(self)
+        self.logTextBox.setFormatter(logging.Formatter('%(asctime)s - [%(levelname)s] - \n%(message)s'))
+        logging.getLogger().addHandler(self.logTextBox)
+        logging.getLogger().setLevel(logging.INFO)
+
+        # create a check box for output file format (simple or double precision)
+        self.singlePrecisionBox = QCheckBox('Convert to SERAFIN \n(single precision)', self)
+        self.singlePrecisionBox.setEnabled(False)
+
+        # create the submit button
+        self.btnSubmit = QPushButton('Submit', self, icon=self.style().standardIcon(QStyle.SP_DialogSaveButton))
+        self.btnSubmit.setToolTip('<b>Submit</b> to write a .slf output')
+        self.btnSubmit.setFixedSize(105, 50)
+        self.btnSubmit.setEnabled(False)
+
+    def _setLayout(self):
+        mainLayout = QVBoxLayout()
+        mainLayout.addItem(QSpacerItem(1, 10))
+        mainLayout.addWidget(self.timeSlider)
+        mainLayout.addWidget(self.timeSelection)
+        mainLayout.addItem(QSpacerItem(1, 10))
+
+        hlayout = QHBoxLayout()
+        hlayout.addItem(QSpacerItem(50, 10))
+        hlayout.addWidget(self.btnAdd)
+        lb = QLabel('Double click on the cells to edit Arrival / Duration variable names')
+        hlayout.addWidget(lb)
+        hlayout.setAlignment(lb, Qt.AlignBottom | Qt.AlignRight)
+        mainLayout.addLayout(hlayout)
+        mainLayout.addItem(QSpacerItem(1, 5))
+        mainLayout.addWidget(self.conditionTable)
+
+        mainLayout.addItem(QSpacerItem(1, 10))
+        hlayout = QHBoxLayout()
+        hlayout.addItem(QSpacerItem(50, 10))
+        hlayout.addWidget(self.btnSubmit)
+        hlayout.addItem(QSpacerItem(10, 10))
+        hlayout.addWidget(self.singlePrecisionBox)
+        hlayout.addItem(QSpacerItem(50, 10))
+        mainLayout.addLayout(hlayout)
+        mainLayout.addItem(QSpacerItem(30, 15))
+        mainLayout.addWidget(QLabel('   Message logs'))
+        mainLayout.addWidget(self.logTextBox.widget)
+        self.setLayout(mainLayout)
+
+    def _bindEvents(self):
+        self.btnAdd.clicked.connect(self.btnAddEvent)
+        self.btnSubmit.clicked.connect(self.btnSubmitEvent)
+        self.conditionTable.cellChanged.connect(self._checkName)
+        self.timeSelection.startIndex.editingFinished.connect(self.timeSlider.enterIndexEvent)
+        self.timeSelection.endIndex.editingFinished.connect(self.timeSlider.enterIndexEvent)
+        self.timeSelection.startValue.editingFinished.connect(self.timeSlider.enterValueEvent)
+        self.timeSelection.endValue.editingFinished.connect(self.timeSlider.enterValueEvent)
+
+    def _checkName(self, row, column):
+        if column == 1 or column == 2:
+            name = self.conditionTable.item(row, column).text()
+            if len(name) < 2 or len(name) > 16:
+                QMessageBox.critical(self, 'Error', 'The variable names should be between 2 and 16 characters!',
+                                     QMessageBox.Ok)
+                # back to default
+                condition = self.conditionTable.item(row, 0).text()
+                condition_tight = re.sub('\s+', '', condition)
+                if column == 1:
+                    self.conditionTable.setItem(row, column, QTableWidgetItem(('A ' + condition_tight)[:16]))
+                else:
+                    self.conditionTable.setItem(row, column, QTableWidgetItem(('D ' + condition_tight)[:16]))
+
+    def reset(self):
+        self.conditions = []
+        self.expressions = []
+        self.conditionTable.setRowCount(0)
+        self.timeSelection.disable()
+        self.btnSubmit.setEnabled(False)
+        self.singlePrecisionBox.setChecked(False)
+        self.singlePrecisionBox.setEnabled(False)
+
+    def getInput(self):
+        self.btnSubmit.setEnabled(True)
+
+        # unlock convert to single precision
+        if self.input.header.float_type == 'd':
+            self.singlePrecisionBox.setEnabled(True)
+
+        if self.input.header.date is not None:
+            year, month, day, hour, minute, second = self.input.header.date
+            start_time = datetime.datetime(year, month, day, hour, minute, second)
+        else:
+            start_time = datetime.datetime(1900, 1, 1, 0, 0, 0)
+
+        time_frames = list(map(lambda x: datetime.timedelta(seconds=x), self.input.time))
+        self.timeSlider.reinit(start_time, time_frames, self.timeSelection)
+
+        if self.input.header.nb_frames > 1:
+            self.timeSlider.setEnabled(True)
+            self.timeSelection.enable()
+
+    def btnAddEvent(self):
+        dlg = ConditionDialog(self.input.header)
+        value = dlg.exec_()
+        if value == QDialog.Rejected:
+            return
+        condition = '%s %s %.4f' % dlg.condition
+        condition_tight = re.sub('\s+', '', condition)  # used to define variable names
+        self.expressions.append(dlg.expression)
+
+        row = self.conditionTable.rowCount()
+        self.conditionTable.insertRow(row)
+        condition_item = QTableWidgetItem(condition)
+        condition_item.setFlags(Qt.ItemIsEditable)
+        self.conditionTable.setItem(row, 0, condition_item)
+        self.conditionTable.setItem(row, 1, QTableWidgetItem(('A ' + condition_tight)[:16]))
+        self.conditionTable.setItem(row, 2, QTableWidgetItem(('D ' + condition_tight)[:16]))
+
+    def btnSubmitEvent(self):
+        # create the save file dialog
+        options = QFileDialog.Options()
+        options |= QFileDialog.DontUseNativeDialog
+        options |= QFileDialog.DontConfirmOverwrite
+        filename, _ = QFileDialog.getSaveFileName(self, 'Choose the output file name', '',
+                                                  'Serafin Files (*.slf)', options=options)
+
+        # check the file name consistency
+        if not filename:
+            return
+        if len(filename) < 5 or filename[-4:] != '.slf':
+            filename += '.slf'
+
+        # overwrite to the input file is forbidden
+        if filename == self.input.filename:
+            QMessageBox.critical(self, 'Error', 'Cannot overwrite to the input file.',
+                                 QMessageBox.Ok)
+            return
+
+        # handle overwrite manually
+        overwrite = handleOverwrite(filename)
+        if overwrite is None:
+            return
+
+        # disable close button
+        self.parent.inDialog()
+        progressBar = OutputProgressDialog()
+
+        # do some calculations
+        with Serafin.Read(self.input.filename, self.input.language) as resin:
+            resin.header = self.input.header
+            resin.time = self.input.time
+
+            progressBar.setValue(5)
+            QApplication.processEvents()
+            with Serafin.Write(filename, self.input.language, overwrite) as resout:
+                pass
+                # logging.info(output_message)
+                #
+                # resout.write_entire_frame(output_header, self.input.time[0], values)
+
+        logging.info('Finished writing the output')
+        progressBar.setValue(100)
+        progressBar.cancelButton.setEnabled(True)
+        progressBar.exec_()
+
+        # enable close button
+        self.parent.outDialog()
+
+
 class MaxMinMeanGUI(QWidget):
     def __init__(self, parent=None):
         super().__init__()
@@ -490,12 +831,15 @@ class MaxMinMeanGUI(QWidget):
 
         self.input = InputTab(self)
         self.maxMinTab = MaxMinMeanTab(self.input, self)
+        self.arrivalDurationTab = ArrivalDurationTab(self.input, self)
 
         self.tab = QTabWidget()
         self.tab.addTab(self.input, 'Input')
         self.tab.addTab(self.maxMinTab, 'Max/Min/Mean')
+        self.tab.addTab(self.arrivalDurationTab, 'Arrival/Duration')
 
         self.tab.setTabEnabled(1, False)
+        self.tab.setTabEnabled(2, False)
 
         self.tab.setStyleSheet('QTabBar::tab { height: 40px; width: 200px; }')
 
@@ -522,12 +866,12 @@ class MaxMinMeanGUI(QWidget):
             self.show()
 
     def reset(self):
-        for i, tab in enumerate([self.maxMinTab]):
+        for i, tab in enumerate([self.maxMinTab, self.arrivalDurationTab]):
             tab.reset()
             self.tab.setTabEnabled(i+1, False)
 
     def getInput(self):
-        for i, tab in enumerate([self.maxMinTab]):
+        for i, tab in enumerate([self.maxMinTab, self.arrivalDurationTab]):
             tab.getInput()
             self.tab.setTabEnabled(i+1, True)
 

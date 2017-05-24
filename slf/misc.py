@@ -2,11 +2,14 @@ import numpy as np
 import logging
 from slf.variables import get_available_variables, get_necessary_equations, do_calculation
 
+_OPERATORS = ['+', '-', '*', '/', 'sqrt']
+_PRECEDENCE = {'(': 1, '-': 2, '+': 2, '*': 3, '/': 3, 'sqrt': 4}
 
 _VECTORS = {'U': ('V', 'M'), 'V': ('U', 'M'), 'QSX': ('QSY', 'QS'), 'QSY': ('QSX', 'QS'),
             'QSBLX': ('QSBLY', 'QSBL'), 'QSBLY': ('QSBLX', 'QSBL'),
             'QSSUSPX': ('QSSUSPY', 'QSSUSP'), 'QSSUSPY': ('QSSUSPX', 'QSSUSP'),
             'I': ('J', 'Q'), 'J': ('I', 'Q')}
+
 module_logger = logging.getLogger(__name__)
 
 
@@ -153,5 +156,61 @@ def vector_min(input_stream, selected_vectors, time_indices, additional_equation
         values[i, :] = current_values[var]
     return values
 
+
+def to_postfix(expression):
+    """!
+    Convert infix to postfix
+    """
+    stack = []
+    post = []
+    for token in expression:
+        if token == '(':
+            stack.append(token)
+
+        elif token == ')':
+            top_token = stack.pop()
+            while top_token != '(':
+                post.append(top_token)
+                top_token = stack.pop()
+
+        elif token in _OPERATORS:
+            while stack and _PRECEDENCE[stack[-1]] >= _PRECEDENCE[token]:
+                post.append(stack.pop())
+
+            stack.append(token)
+        else:
+            post.append(token)
+
+    while stack:
+        op_token = stack.pop()
+        post.append(op_token)
+
+    return post
+
+
+def is_valid_postfix(expression):
+    """!
+    Is my postfix expression valid?
+    """
+    stack = []
+
+    try:  # try to evaluate the expression
+        for symbol in expression:
+            if symbol in _OPERATORS:
+                if symbol == 'sqrt':
+                    stack.pop()
+                else:
+                    stack.pop()
+                    stack.pop()
+                stack.append(0)
+            else:
+                stack.append(0)
+
+        stack.pop()
+        if stack:
+            return False
+        return True
+    except IndexError:
+        return False
 
 

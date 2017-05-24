@@ -179,20 +179,49 @@ class InputTab(QWidget):
         self.summaryTextBox.clear()
         self.header = None
         self.time = []
-        self.lines = []
-        self.line_interpolators = []
-        self.line_interpolators_internal = []
 
         self.btnMap.setEnabled(False)
         self.mesh = None
-        self.linesNameBox.clear()
         self.btnOpenLines.setEnabled(True)
-        self.parent.reset()
 
         if not self.frenchButton.isChecked():
             self.language = 'en'
         else:
             self.language = 'fr'
+
+    def _resetDefaultOptions(self):
+        nb_nonempty = 0
+
+        self.line_interpolators = []
+        self.line_interpolators_internal = []
+
+        for line in self.lines:
+            line_interpolators, distances, \
+                line_interpolators_internal, distances_internal = self.mesh.get_line_interpolators(line)
+            if line_interpolators:
+                nb_nonempty += 1
+            self.line_interpolators.append((line_interpolators, distances))
+            self.line_interpolators_internal.append((line_interpolators_internal, distances_internal))
+
+        if nb_nonempty == 0:
+            self.lines = []
+            self.line_interpolators = []
+            self.line_interpolators_internal = []
+
+            self.linesNameBox.clear()
+            self.parent.reset()
+
+        else:
+            old_filename = self.linesNameBox.toPlainText().split('\n')[0]
+            self.linesNameBox.clear()
+            self.linesNameBox.appendPlainText(old_filename + '\n' + 'The file contains {} open polyline{}.'
+                                              '{} line{} the mesh continuously.'.format(
+                                              len(self.lines), 's' if len(self.lines) > 1 else '',
+                                              nb_nonempty, 's intersect' if nb_nonempty > 1 else ' intersects'))
+
+            self.has_map = False
+            self.btnMap.setEnabled(True)
+            self.parent.getInput()
 
     def btnOpenSerafinEvent(self):
         options = QFileDialog.Options()
@@ -202,6 +231,17 @@ class InputTab(QWidget):
         if not filename:
             return
 
+        try:
+            with open(filename) as f:
+                pass
+        except PermissionError:
+            QMessageBox.critical(None, 'Permission denied',
+                                 'Permission denied. (Is the file opened by another application?).',
+                                 QMessageBox.Ok, QMessageBox.Ok)
+            return
+
+        self._reinitInput(filename)
+
         with Serafin.Read(filename, self.language) as resin:
             resin.read_header()
 
@@ -210,8 +250,6 @@ class InputTab(QWidget):
                 QMessageBox.critical(self, 'Error', 'The file type (TELEMAC 3D) is currently not supported.',
                                      QMessageBox.Ok)
                 return
-
-            self._reinitInput(filename)
 
             # record the time series
             resin.get_time()
@@ -230,6 +268,8 @@ class InputTab(QWidget):
             # copy to avoid reading the same data in the future
             self.header = copy.deepcopy(resin.header)
             self.time = resin.time[:]
+
+        self._resetDefaultOptions()
 
     def btnOpenLinesEvent(self):
         options = QFileDialog.Options()
@@ -501,6 +541,7 @@ class MultiVarControlPanel(QWidget):
         self.lineBox.setMaximumWidth(200)
         self.intersection = QCheckBox()
         self.intersection.setChecked(True)
+        self.addInternal = QCheckBox()
 
         self.unitBox = QComboBox()
         self.unitBox.setFixedHeight(30)
@@ -534,8 +575,17 @@ class MultiVarControlPanel(QWidget):
         hlayout.setAlignment(lb, Qt.AlignLeft)
         hlayout.addStretch()
         vlayout.addLayout(hlayout)
-        vlayout.addItem(QSpacerItem(10, 15))
+        vlayout.addItem(QSpacerItem(10, 10))
 
+        hlayout = QHBoxLayout()
+        hlayout.addItem(QSpacerItem(10, 10))
+        hlayout.addWidget(self.addInternal)
+        lb = QLabel('Mark original points in plot')
+        hlayout.addWidget(lb)
+        hlayout.setAlignment(lb, Qt.AlignLeft)
+        hlayout.addStretch()
+        vlayout.addLayout(hlayout)
+        vlayout.addItem(QSpacerItem(10, 15))
         hlayout = QHBoxLayout()
         vlayout2 = QVBoxLayout()
         vlayout2.addWidget(self.unitBox)
@@ -608,6 +658,20 @@ class MultiVariableImageTab(QWidget):
                 selection.append(item.text().split(' (')[0])
         return tuple(selection)
 
+    def _compute(self, time_index, line_interpolator):
+        values = []
+        with Serafin.Read(self.input.filename, self.input.language) as input_stream:
+            input_stream.header = self.input.header
+            input_stream.time = self.input.time
+            for var in self.current_vars:
+                line_var_values = []
+                var_values = input_stream.read_var_in_frame(time_index, var)
+
+                for x, y, (i, j, k), interpolator in line_interpolator:
+                    line_var_values.append(interpolator.dot(var_values[[i, j, k]]))
+                values.append(line_var_values)
+        return values
+
     def btnComputeEvent(self):
         self.current_vars = self._getSelection()
         if not self.current_vars:
@@ -622,24 +686,30 @@ class MultiVariableImageTab(QWidget):
             line_interpolator, distances = self.input.line_interpolators[line_id]
         else:
             line_interpolator, distances = self.input.line_interpolators_internal[line_id]
-        values = []
 
         time_index = int(self.control.timeSelection.index.text()) - 1
-
-        with Serafin.Read(self.input.filename, self.input.language) as input_stream:
-            input_stream.header = self.input.header
-            input_stream.time = self.input.time
-            for var in self.current_vars:
-                line_var_values = []
-                var_values = input_stream.read_var_in_frame(time_index, var)
-
-                for x, y, (i, j, k), interpolator in line_interpolator:
-                    line_var_values.append(interpolator.dot(var_values[[i, j, k]]))
-                values.append(line_var_values)
+        values = self._compute(time_index, line_interpolator)
 
         self.plotViewer.canvas.axes.clear()
-        for i, var in enumerate(self.current_vars):
-            self.plotViewer.canvas.axes.plot(distances, values[i], '-', linewidth=2, label=var)
+
+        if self.control.addInternal.isChecked():
+            if self.control.intersection.isChecked():
+                line_interpolator_internal, distances_internal = self.input.line_interpolators_internal[line_id]
+                values_internal = self._compute(time_index, line_interpolator_internal)
+
+                for i, var in enumerate(self.current_vars):
+                    self.plotViewer.canvas.axes.plot(distances, values[i], '-', linewidth=2, label=var)
+                    self.plotViewer.canvas.axes.plot(distances_internal, values_internal[i],
+                                                     'o', color=self.plotViewer.defaultColors[i])
+
+            else:
+                for i, var in enumerate(self.current_vars):
+                    self.plotViewer.canvas.axes.plot(distances, values[i], 'o-', linewidth=2, label=var)
+
+        else:
+            for i, var in enumerate(self.current_vars):
+                self.plotViewer.canvas.axes.plot(distances, values[i], '-', linewidth=2, label=var)
+
         self.plotViewer.canvas.axes.legend()
         self.plotViewer.canvas.axes.grid(linestyle='dotted')
         self.plotViewer.canvas.axes.set_xlabel(self.plotViewer.current_xlabel)
@@ -648,6 +718,7 @@ class MultiVariableImageTab(QWidget):
         self.plotViewer.canvas.draw()
 
     def reset(self):
+        self.control.addInternal.setChecked(False)
         self.control.intersection.setChecked(True)
         self.control.lineBox.clear()
         self.var_table = {}
@@ -720,6 +791,7 @@ class MultiFrameControlPanel(QWidget):
         self.btnCompute.setFixedSize(105, 50)
         self.intersection = QCheckBox()
         self.intersection.setChecked(True)
+        self.addInternal = QCheckBox()
 
         vlayout = QVBoxLayout()
         vlayout.addItem(QSpacerItem(10, 10))
@@ -746,8 +818,16 @@ class MultiFrameControlPanel(QWidget):
         hlayout.setAlignment(lb, Qt.AlignLeft)
         hlayout.addStretch()
         vlayout.addLayout(hlayout)
+        vlayout.addItem(QSpacerItem(10, 10))
+        hlayout = QHBoxLayout()
+        hlayout.addItem(QSpacerItem(10, 10))
+        hlayout.addWidget(self.addInternal)
+        lb = QLabel('Mark original points in plot')
+        hlayout.addWidget(lb)
+        hlayout.setAlignment(lb, Qt.AlignLeft)
+        hlayout.addStretch()
+        vlayout.addLayout(hlayout)
         vlayout.addItem(QSpacerItem(10, 15))
-
         hlayout = QHBoxLayout()
         hlayout.addWidget(self.timeTable)
 
@@ -800,6 +880,20 @@ class MultiFrameImageTab(QWidget):
                 time_indices.append(int(self.control.timeTable.item(row, 0).text()) - 1)
         return time_indices
 
+    def _compute(self, time_indices, line_interpolator, current_var):
+        values = []
+        with Serafin.Read(self.input.filename, self.input.language) as input_stream:
+            input_stream.header = self.input.header
+            input_stream.time = self.input.time
+            for index in time_indices:
+                line_var_values = []
+                var_values = input_stream.read_var_in_frame(index, current_var)
+
+                for x, y, (i, j, k), interpolator in line_interpolator:
+                    line_var_values.append(interpolator.dot(var_values[[i, j, k]]))
+                values.append(line_var_values)
+        return values
+
     def btnComputeEvent(self):
         time_indices = self._getTime()
         if not time_indices:
@@ -815,23 +909,32 @@ class MultiFrameImageTab(QWidget):
             line_interpolator, distances = self.input.line_interpolators[line_id]
         else:
             line_interpolator, distances = self.input.line_interpolators_internal[line_id]
-        values = []
 
-
-        with Serafin.Read(self.input.filename, self.input.language) as input_stream:
-            input_stream.header = self.input.header
-            input_stream.time = self.input.time
-            for index in time_indices:
-                line_var_values = []
-                var_values = input_stream.read_var_in_frame(index, current_var)
-
-                for x, y, (i, j, k), interpolator in line_interpolator:
-                    line_var_values.append(interpolator.dot(var_values[[i, j, k]]))
-                values.append(line_var_values)
+        values = self._compute(time_indices, line_interpolator, current_var)
 
         self.plotViewer.canvas.axes.clear()
-        for i, index in enumerate(time_indices):
-            self.plotViewer.canvas.axes.plot(distances, values[i], '-', linewidth=2, label='Frame %d' % (index+1))
+
+        if self.control.addInternal.isChecked():
+            if self.control.intersection.isChecked():
+                line_interpolator_internal, distances_internal = self.input.line_interpolators_internal[line_id]
+                values_internal = self._compute(time_indices, line_interpolator_internal, current_var)
+
+                for i, index in enumerate(time_indices):
+                    self.plotViewer.canvas.axes.plot(distances, values[i], '-', linewidth=2,
+                                                     label='Frame %d' % (index+1))
+                    self.plotViewer.canvas.axes.plot(distances_internal, values_internal[i],
+                                                     'o', color=self.plotViewer.defaultColors[i])
+
+            else:
+                for i, index in enumerate(time_indices):
+                    self.plotViewer.canvas.axes.plot(distances, values[i], 'o-', linewidth=2,
+                                                     label='Frame %d' % (index+1))
+
+        else:
+            for i, index in enumerate(time_indices):
+                self.plotViewer.canvas.axes.plot(distances, values[i], '-', linewidth=2,
+                                                 label='Frame %d' % (index+1))
+
         self.plotViewer.canvas.axes.legend()
         self.plotViewer.canvas.axes.grid(linestyle='dotted')
         self.plotViewer.canvas.axes.set_xlabel(self.plotViewer.current_xlabel)
@@ -840,6 +943,7 @@ class MultiFrameImageTab(QWidget):
         self.plotViewer.canvas.draw()
 
     def reset(self):
+        self.control.addInternal.setChecked(False)
         self.control.intersection.setChecked(True)
         self.control.lineBox.clear()
         self.control.varBox.clear()

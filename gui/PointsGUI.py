@@ -198,6 +198,7 @@ class InputTab(QWidget):
     def __init__(self, parent):
         super().__init__()
         self.parent = parent
+        self.old_frequency = '1'
 
         canvas = MapCanvas()
         self.map = MapViewer(canvas)
@@ -385,24 +386,45 @@ class InputTab(QWidget):
         self.summaryTextBox.clear()
         self.header = None
         self.time = []
-        self.points = []
-        self.point_interpolators = []
         self.firstTable.setRowCount(0)
         self.secondTable.setRowCount(0)
         self.btnMap.setEnabled(False)
         self.btnOpenAttributes.setEnabled(False)
         self.mesh = None
-        self.pointsNameBox.clear()
         self.btnOpenPoints.setEnabled(True)
+        self.old_frequency = self.timeSampling.text()
+
         self.timeSampling.setText('1')
         self.btnSubmit.setEnabled(False)
         self.csvNameBox.clear()
-        self.parent.imageTab.reset()
+        self.parent.tab.setTabEnabled(1, False)
 
         if not self.frenchButton.isChecked():
             self.language = 'en'
         else:
             self.language = 'fr'
+
+    def _resetDefaultOptions(self):
+        if int(self.old_frequency) <= len(self.time):
+            self.timeSampling.setText(self.old_frequency)
+
+        is_inside, self.point_interpolators = self.mesh.get_point_interpolators(self.points)
+        nb_inside = sum(map(int, is_inside))
+        if nb_inside == 0:
+            self.pointsNameBox.clear()
+            self.points = []
+            self.point_interpolators = []
+        else:
+            self.attribute_table.getData(self.points, is_inside, self.fields, self.attributes)
+            old_filename = self.pointsNameBox.toPlainText().split('\n')[0]
+            self.pointsNameBox.clear()
+            self.pointsNameBox.appendPlainText(old_filename + '\n' + 'The file contains {} point{}.'
+                                                                     '{} point{} inside the mesh.'.format(
+                                               len(self.points), 's' if len(self.points) > 1 else '',
+                                               nb_inside, 's are' if nb_inside > 1 else ' is'))
+            self.btnSubmit.setEnabled(True)
+            self.btnOpenAttributes.setEnabled(True)
+            self.btnMap.setEnabled(True)
 
     def _initVarTables(self):
         for i, (id, name, unit) in enumerate(zip(self.header.var_IDs, self.header.var_names, self.header.var_units)):
@@ -441,6 +463,16 @@ class InputTab(QWidget):
                                                   'Serafin Files (*.slf);;All Files (*)', QDir.currentPath(), options=options)
         if not filename:
             return
+        try:
+            with open(filename) as f:
+                pass
+        except PermissionError:
+            QMessageBox.critical(None, 'Permission denied',
+                                 'Permission denied. (Is the file opened by another application?).',
+                                 QMessageBox.Ok, QMessageBox.Ok)
+            return
+
+        self._reinitInput(filename)
 
         with Serafin.Read(filename, self.language) as resin:
             resin.read_header()
@@ -451,7 +483,6 @@ class InputTab(QWidget):
                                      QMessageBox.Ok)
                 return
 
-            self._reinitInput(filename)
 
             # record the time series
             resin.get_time()
@@ -470,6 +501,9 @@ class InputTab(QWidget):
             # copy to avoid reading the same data in the future
             self.header = copy.deepcopy(resin.header)
             self.time = resin.time[:]
+
+        self._resetDefaultOptions()
+        self.parent.imageTab.reset()
 
         # displaying the available variables
         self._initVarTables()
@@ -523,6 +557,7 @@ class InputTab(QWidget):
         self.btnSubmit.setEnabled(True)
         self.csvNameBox.clear()
         self.parent.imageTab.reset()
+        self.parent.tab.setTabEnabled(1, False)
 
     def btnOpenAttributesEvent(self):
         self.attribute_table.show()

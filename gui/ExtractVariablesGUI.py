@@ -88,7 +88,7 @@ class FallVelocityMessage(QDialog):
         self.buttonAdd.clicked.connect(self.btnAddEvent)
 
         vlayout = QVBoxLayout()
-        vlayout.addWidget(QLabel('Click on the cell to edit name'))
+        vlayout.addWidget(QLabel('Double click on the cells to edit name'))
         vlayout.addWidget(self.table)
         vlayout.addWidget(self.buttonAdd)
         vlayout.addItem(QSpacerItem(10, 20))
@@ -145,13 +145,13 @@ class FallVelocityMessage(QDialog):
         nb_row = self.table.rowCount()
         self.table.insertRow(nb_row)
         id_item = QTableWidgetItem(value_ID)
+        id_item.setFlags(Qt.ItemIsEditable)
         name_item = QTableWidgetItem(value_ID)
         unit_item = QTableWidgetItem('')
+        unit_item.setFlags(Qt.ItemIsEditable)
         self.table.setItem(nb_row, 0, id_item)
         self.table.setItem(nb_row, 1, name_item)
         self.table.setItem(nb_row, 2, unit_item)
-        self.table.item(nb_row, 0).setFlags(Qt.ItemIsEditable)
-        self.table.item(nb_row, 2).setFlags(Qt.ItemIsEditable)
 
 
 class SelectedTimeINFO(QWidget):
