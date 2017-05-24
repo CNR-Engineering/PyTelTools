@@ -733,9 +733,44 @@ class ColorTable(QTableWidget):
         event.accept()
 
 
+class HTMLDelegate(QStyledItemDelegate):
+    def paint(self, painter, option, index):
+        options = QStyleOptionViewItem(option)
+        self.initStyleOption(options, index)
+
+        style = QApplication.style() if options.widget is None else options.widget.style()
+
+        doc = QTextDocument()
+        doc.setHtml(options.text)
+
+        options.text = ""
+        style.drawControl(QStyle.CE_ItemViewItem, options, painter)
+
+        ctx = QAbstractTextDocumentLayout.PaintContext()
+
+        textRect = style.subElementRect(QStyle.SE_ItemViewItemText, options)
+        painter.save()
+        painter.translate(textRect.topLeft())
+        painter.setClipRect(textRect.translated(-textRect.topLeft()))
+        doc.documentLayout().draw(painter, ctx)
+
+        painter.restore()
+
+    def sizeHint(self, option, index):
+        options = QStyleOptionViewItem(option)
+        self.initStyleOption(options,index)
+
+        doc = QTextDocument()
+        doc.setHtml(options.text)
+        doc.setTextWidth(options.rect.width())
+        return QSize(doc.idealWidth(), doc.size().height())
+
+
 class ColumnColorEditor(QDialog):
     def __init__(self, parent):
         super().__init__()
+
+        delegate = HTMLDelegate()
 
         self.table = ColorTable(parent.column_name)
         self.table.setFixedHeight(300)
@@ -745,14 +780,18 @@ class ColumnColorEditor(QDialog):
         row = 0
         for column in parent.current_columns:
             label = parent.column_labels[column]
-            color = parent.colorToName[parent.column_colors[column]]
+            color = parent.column_colors[column]
+            color_name = parent.colorToName[color]
+            color_display = "<span style=\"color:%s;\">%s</span> " % (color, u"\u25A0")
             used_colors.append(color)
             self.table.insertRow(row)
             lab = QTableWidgetItem(label)
-            col = QTableWidgetItem(color)
+            col = QTableWidgetItem(color_display + color_name)
             self.table.setItem(row, 0, lab)
             self.table.setItem(row, 1, col)
             row += 1
+        self.table.setItemDelegateForColumn(1, delegate)
+
         self.available_colors = TableWidgetDragRows()
         self.available_colors.setSelectionMode(QAbstractItemView.SingleSelection)
         self.available_colors.setColumnCount(1)
@@ -766,10 +805,12 @@ class ColumnColorEditor(QDialog):
         row = 0
         for color in parent.defaultColors:
             color_name = parent.colorToName[color]
+            color_display = "<span style=\"color:%s;\">%s</span> " % (color, u"\u25A0")
             self.available_colors.insertRow(row)
-            col = QTableWidgetItem(color_name)
+            col = QTableWidgetItem(color_display + color_name)
             self.available_colors.setItem(row, 0, col)
             row += 1
+        self.available_colors.setItemDelegateForColumn(0, delegate)
 
         buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel,
                                    Qt.Horizontal, self)
@@ -791,7 +832,7 @@ class ColumnColorEditor(QDialog):
         label_to_column = {b: a for a, b, in column_labels.items()}
         for row in range(self.table.rowCount()):
             label = self.table.item(row, 0).text()
-            color = self.table.item(row, 1).text()
+            color = self.table.item(row, 1).text().split('> ')[1]
             old_colors[label_to_column[label]] = name_to_color[color]
 
 

@@ -67,7 +67,7 @@ def scalar_min(input_stream, selected_scalars, time_indices):
     return current_values
 
 
-def mean(input_stream, selected_vars, time_indices, dummy=None):
+def mean(input_stream, selected_vars, time_indices, _=None):
     nb_var = len(selected_vars)
     nb_nodes = input_stream.header.nb_nodes
     current_values = np.zeros((nb_var, nb_nodes))
@@ -86,8 +86,8 @@ def vector_max(input_stream, selected_vectors, time_indices, additional_equation
     current_values = {}
     for var, _, _ in selected_vectors:
         current_values[var] = np.ones((nb_nodes,)) * (-float('Inf'))
-        parent = _VECTORS[var][1]
-        current_values[parent] = np.ones((nb_nodes,)) * (-float('Inf'))
+        mother = _VECTORS[var][1]
+        current_values[mother] = np.ones((nb_nodes,)) * (-float('Inf'))
 
     for index in time_indices:
         computed_values = {}
@@ -105,13 +105,13 @@ def vector_max(input_stream, selected_vectors, time_indices, additional_equation
         for var, _, _ in selected_vectors:
             parent = _VECTORS[var][1]
 
-            if parent not in computed_values:
-                computed_values[parent] = input_stream.read_var_in_frame(index, parent)
+            if mother not in computed_values:
+                computed_values[mother] = input_stream.read_var_in_frame(index, parent)
             if var not in computed_values:
                 computed_values[var] = input_stream.read_var_in_frame(index, var)
 
-            new_max = computed_values[parent] >= current_values[parent]
-            current_values[var][new_max] = computed_values[var]
+            current_values[var] = np.where(computed_values[mother] > current_values[mother],
+                                           computed_values[var], current_values[var])
 
     values = np.empty((len(selected_vectors), nb_nodes))
     for i, (var, _, _) in enumerate(selected_vectors):
@@ -124,8 +124,8 @@ def vector_min(input_stream, selected_vectors, time_indices, additional_equation
     current_values = {}
     for var, _, _ in selected_vectors:
         current_values[var] = np.ones((nb_nodes,)) * float('Inf')
-        parent = _VECTORS[var][1]
-        current_values[parent] = np.ones((nb_nodes,)) * float('Inf')
+        mother = _VECTORS[var][1]
+        current_values[mother] = np.ones((nb_nodes,)) * float('Inf')
 
     for index in time_indices:
         computed_values = {}
@@ -141,15 +141,15 @@ def vector_min(input_stream, selected_vectors, time_indices, additional_equation
             computed_values[equation.output.ID()] = output_values
 
         for var, _, _ in selected_vectors:
-            parent = _VECTORS[var][1]
+            mother = _VECTORS[var][1]
 
-            if parent not in computed_values:
-                computed_values[parent] = input_stream.read_var_in_frame(index, parent)
+            if mother not in computed_values:
+                computed_values[mother] = input_stream.read_var_in_frame(index, mother)
             if var not in computed_values:
                 computed_values[var] = input_stream.read_var_in_frame(index, var)
 
-            new_min = computed_values[parent] <= current_values[parent]
-            current_values[var][new_min] = computed_values[var]
+            current_values[var] = np.where(computed_values[mother] < current_values[mother],
+                                           computed_values[var], current_values[var])
 
     values = np.empty((len(selected_vectors), nb_nodes))
     for i, (var, _, _) in enumerate(selected_vectors):
