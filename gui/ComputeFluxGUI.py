@@ -563,7 +563,7 @@ class ComputeFluxGUI(QWidget):
         self.tab.addTab(self.imageTab, 'Visualize results')
 
         self.tab.setTabEnabled(1, False)
-        self.tab.setStyleSheet('QTabBar::tab { height: 40px; width: 300px; }')
+        self.tab.setStyleSheet('QTabBar::tab { height: 40px; min-width: 200px; }')
 
         mainLayout = QVBoxLayout()
         mainLayout.addWidget(self.tab)

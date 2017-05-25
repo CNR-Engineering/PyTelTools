@@ -934,7 +934,7 @@ class CompareResultsGUI(QWidget):
         self.setWindowTitle('Compare two results on identical meshes')
 
         self.tab = QTabWidget()
-        self.tab.setStyleSheet('QTabBar::tab { height: 40px; width: 160px; }')
+        self.tab.setStyleSheet('QTabBar::tab { height: 40px; min-width: 150px; }')
 
         self.input = InputTab(self)
         errorEvolutionTab = ErrorEvolutionTab(self.input)

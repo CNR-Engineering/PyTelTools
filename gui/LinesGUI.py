@@ -997,7 +997,7 @@ class LinesGUI(QWidget):
         self.tab.setTabEnabled(2, False)
         self.tab.setTabEnabled(3, False)
 
-        self.tab.setStyleSheet('QTabBar::tab { height: 40px; width: 150px; }')
+        self.tab.setStyleSheet('QTabBar::tab { height: 40px; min-width: 200px; }')
 
         mainLayout = QVBoxLayout()
         mainLayout.addWidget(self.tab)

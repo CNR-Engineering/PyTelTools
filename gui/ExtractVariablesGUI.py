@@ -1006,7 +1006,7 @@ class ExtractVariablesGUI(QWidget):
         self.tab.setTabEnabled(1, False)
         self.tab.setTabEnabled(2, False)
 
-        self.tab.setStyleSheet('QTabBar::tab { height: 40px; width: 200px; }')
+        self.tab.setStyleSheet('QTabBar::tab { height: 40px; min-width: 200px; }')
         self.tab.currentChanged.connect(self.switch_tab)
 
         mainLayout = QVBoxLayout()
