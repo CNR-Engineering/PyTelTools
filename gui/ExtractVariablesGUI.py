@@ -13,7 +13,8 @@ import copy
 from slf import Serafin
 from slf.variables import get_available_variables, \
     do_calculations_in_frame, get_necessary_equations, get_US_equation, add_US
-from gui.util import TableWidgetDragRows, QPlainTextEditLogger, handleOverwrite, TimeRangeSlider, OutputProgressDialog
+from gui.util import TableWidgetDragRows, QPlainTextEditLogger, handleOverwrite, \
+    TimeRangeSlider, OutputProgressDialog, testOpen
 
 _YELLOW = QColor(245, 255, 207)
 _GREEN = QColor(200, 255, 180)
@@ -625,6 +626,9 @@ class InputTab(QWidget):
         filename, _ = QFileDialog.getOpenFileName(self, 'Open a .slf file', '',
                                                   'Serafin Files (*.slf);;All Files (*)', options=options)
         if not filename:
+            return
+
+        if not testOpen(filename):
             return
 
         # reinitialize input file data

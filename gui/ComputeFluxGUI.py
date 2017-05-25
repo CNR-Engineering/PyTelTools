@@ -11,7 +11,7 @@ from slf import Serafin
 from slf.flux import FluxCalculator
 from geom import BlueKenue, Shapefile
 from gui.util import TemporalPlotViewer, QPlainTextEditLogger, LineMapCanvas, MapViewer, \
-    OutputProgressDialog, LoadMeshDialog, handleOverwrite
+    OutputProgressDialog, LoadMeshDialog, handleOverwrite, testOpen
 
 
 class FluxCalculatorThread(QThread):
@@ -305,14 +305,7 @@ class InputTab(QWidget):
                                                   'Serafin Files (*.slf);;All Files (*)', QDir.currentPath(), options=options)
         if not filename:
             return
-
-        try:
-            with open(filename) as f:
-                pass
-        except PermissionError:
-            QMessageBox.critical(None, 'Permission denied',
-                                 'Permission denied. (Is the file opened by another application?).',
-                                 QMessageBox.Ok, QMessageBox.Ok)
+        if not testOpen(filename):
             return
 
         self._reinitInput(filename)
@@ -361,6 +354,8 @@ class InputTab(QWidget):
         filename, _ = QFileDialog.getOpenFileName(self, 'Open a .i2s or .shp file', '',
                                                   'Line sets (*.i2s);;Shapefile (*.shp);;All Files (*)', options=options)
         if not filename:
+            return
+        if not testOpen(filename):
             return
         is_i2s = filename[-4:] == '.i2s'
         is_shp = filename[-4:] == '.shp'

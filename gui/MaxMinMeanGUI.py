@@ -9,8 +9,9 @@ import numpy as np
 import logging
 import copy
 from slf import Serafin
-from slf.misc import scalars_vectors, scalar_max, scalar_min, mean, vector_max, vector_min, to_postfix, is_valid_postfix
-from gui.util import TableWidgetDragRows, QPlainTextEditLogger, handleOverwrite, OutputProgressDialog, TimeRangeSlider
+import slf.misc as operations
+from gui.util import TableWidgetDragRows, QPlainTextEditLogger, handleOverwrite, \
+    OutputProgressDialog, TimeRangeSlider, testOpen
 
 
 class TimeSelection(QWidget):
@@ -85,7 +86,6 @@ class ConditionDialog(QDialog):
     def __init__(self, input_header):
         super().__init__()
         self.var_IDs = input_header.var_IDs
-        self.operators = ['+', '-', '*', '/', 'sqrt', '(', ')']
 
         buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel,
                                    Qt.Horizontal, self)
@@ -128,7 +128,8 @@ class ConditionDialog(QDialog):
         mainLayout.addItem(QSpacerItem(50, 10))
         mainLayout.addWidget(QLabel('<p style="font-size:10pt">'
                                     '<b>Help</b>: use <b>Add</b> button to add variables to the expression.<br>'
-                                    'You can also enter operators (<tt>+ - * / ( ) sqrt</tt>) and numbers.'))
+                                    'You can also enter operators, parentheses and numbers.<br>'
+                                    'Supported operators: <tt>+ - * / ^ sqrt</tt>.'))
 
         mainLayout.addItem(QSpacerItem(50, 15))
         hlayout = QHBoxLayout()
@@ -159,23 +160,22 @@ class ConditionDialog(QDialog):
         self.resize(self.sizeHint())
 
     def _processExpression(self, expression):
-        expression = re.sub('\s+', '', expression)
-        infix = filter(None, re.split('([+*()/-]|[A-Z]+|^\d+)', expression))
-        return to_postfix(infix)
+        infix = operations.to_infix(expression)
+        return operations.infix_to_postfix(infix)
 
     def _validateExpression(self, expression):
         for item in expression:
             if item.isupper():  # variable ID
                 if item not in self.var_IDs:
                     return False
-            elif item in self.operators:
+            elif item in operations.OPERATORS:
                 continue
             else:  # is number
                 try:
                     _ = float(item)
                 except ValueError:
                     return False
-        return is_valid_postfix(expression)
+        return operations.is_valid_postfix(expression)
 
     def addButtonEvent(self):
         var_ID = self.varBox.currentText().split(' (')[0]
@@ -303,6 +303,8 @@ class InputTab(QWidget):
         filename, _ = QFileDialog.getOpenFileName(self, 'Open a .slf file', '',
                                                   'Serafin Files (*.slf);;All Files (*)', options=options)
         if not filename:
+            return
+        if not testOpen(filename):
             return
 
         # reinitialize input file data
@@ -553,14 +555,14 @@ class MaxMinMeanTab(QWidget):
 
         # get the operation type
         if self.maxButton.isChecked():
-            scalar_operation = scalar_max
-            vector_operation = vector_max
+            scalar_operation = operations.scalar_max
+            vector_operation = operations.vector_max
         elif self.minButton.isChecked():
-            scalar_operation = scalar_min
-            vector_operation = vector_min
+            scalar_operation = operations.scalar_min
+            vector_operation = operations.vector_min
         else:
-            scalar_operation = mean
-            vector_operation = mean
+            scalar_operation = operations.mean
+            vector_operation = operations.mean
         scalar_values, vector_values = None, None
 
         # deduce header from selected variable IDs and write header
@@ -720,7 +722,7 @@ class ArrivalDurationTab(QWidget):
                                      QMessageBox.Ok)
                 # back to default
                 condition = self.conditionTable.item(row, 0).text()
-                condition_tight = re.sub('\s+', '', condition)
+                condition_tight = operations.remove_spaces(condition)
                 if column == 1:
                     self.conditionTable.setItem(row, column, QTableWidgetItem(('A ' + condition_tight)[:16]))
                 else:
@@ -761,7 +763,7 @@ class ArrivalDurationTab(QWidget):
         if value == QDialog.Rejected:
             return
         condition = '%s %s %.4f' % dlg.condition
-        condition_tight = re.sub('\s+', '', condition)  # used to define variable names
+        condition_tight = operations.remove_spaces(condition)  # used to define variable names
         self.expressions.append(dlg.expression)
 
         row = self.conditionTable.rowCount()

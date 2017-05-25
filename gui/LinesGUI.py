@@ -12,7 +12,7 @@ from itertools import islice, cycle
 
 from slf import Serafin
 from geom import Shapefile, BlueKenue
-from gui.util import MapViewer, LineMapCanvas, QPlainTextEditLogger, \
+from gui.util import MapViewer, LineMapCanvas, QPlainTextEditLogger, testOpen, \
     TableWidgetDragRows, OutputProgressDialog, LoadMeshDialog, handleOverwrite, PlotViewer, SimpleTimeDateSelection
 
 
@@ -230,14 +230,7 @@ class InputTab(QWidget):
                                                   'Serafin Files (*.slf);;All Files (*)', QDir.currentPath(), options=options)
         if not filename:
             return
-
-        try:
-            with open(filename) as f:
-                pass
-        except PermissionError:
-            QMessageBox.critical(None, 'Permission denied',
-                                 'Permission denied. (Is the file opened by another application?).',
-                                 QMessageBox.Ok, QMessageBox.Ok)
+        if not testOpen(filename):
             return
 
         self._reinitInput(filename)
@@ -279,6 +272,9 @@ class InputTab(QWidget):
                                                   options=options)
         if not filename:
             return
+        if not testOpen(filename):
+            return
+
         is_i2s = filename[-4:] == '.i2s'
         is_shp = filename[-4:] == '.shp'
 

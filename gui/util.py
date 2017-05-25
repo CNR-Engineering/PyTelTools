@@ -1270,6 +1270,18 @@ class TemporalPlotViewer(PlotViewer):
         self.replot()
 
 
+def testOpen(filename):
+    try:
+        with open(filename, 'rb') as f:
+            pass
+    except PermissionError:
+        QMessageBox.critical(None, 'Permission denied',
+                             'Permission denied. (Is the file opened by another application?).',
+                             QMessageBox.Ok, QMessageBox.Ok)
+        return False
+    return True
+
+
 def handleOverwrite(filename):
     """!
     @brief Handle manually the overwrite option when saving output file

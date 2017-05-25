@@ -6,7 +6,7 @@ from PyQt5.QtCore import *
 
 import numpy as np
 
-from gui.util import PlotViewer, MapViewer, PolygonMapCanvas, ColorMapCanvas, LoadMeshDialog, TimeSlider
+from gui.util import PlotViewer, MapViewer, PolygonMapCanvas, ColorMapCanvas, LoadMeshDialog, TimeSlider, testOpen
 from slf import Serafin
 from geom import BlueKenue, Shapefile
 
@@ -301,6 +301,8 @@ class InputTab(QWidget):
                                                   options=options)
         if not filename:
             return
+        if not testOpen(filename):
+            return
 
         self._reinitRef(filename)
 
@@ -342,6 +344,8 @@ class InputTab(QWidget):
                                                   'Serafin Files (*.slf);;All Files (*)', QDir.currentPath(),
                                                   options=options)
         if not filename:
+            return
+        if not testOpen(filename):
             return
 
         self._reinitTest(filename)

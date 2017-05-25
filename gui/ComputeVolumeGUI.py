@@ -11,7 +11,7 @@ from slf import Serafin
 from slf.volume import VolumeCalculator
 from geom import BlueKenue, Shapefile
 from gui.util import TemporalPlotViewer, QPlainTextEditLogger, MapViewer, PolygonMapCanvas, \
-    OutputProgressDialog, LoadMeshDialog, handleOverwrite
+    OutputProgressDialog, LoadMeshDialog, testOpen, handleOverwrite
 
 
 class VolumeCalculatorThread(QThread):
@@ -392,13 +392,8 @@ class InputTab(QWidget):
                                                   QDir.currentPath(), options=options)
         if not filename:
             return
-        try:
-            with open(filename) as f:
-                pass
-        except PermissionError:
-            QMessageBox.critical(None, 'Permission denied',
-                                 'Permission denied. (Is the file opened by another application?).',
-                                 QMessageBox.Ok, QMessageBox.Ok)
+
+        if not testOpen(filename):
             return
 
         self._reinitInput(filename)
@@ -449,6 +444,9 @@ class InputTab(QWidget):
                                                   'Line sets (*.i2s);;Shapefile (*.shp);;All Files (*)', options=options)
         if not filename:
             return
+        if not testOpen(filename):
+            return
+
         is_i2s = filename[-4:] == '.i2s'
         is_shp = filename[-4:] == '.shp'
 
