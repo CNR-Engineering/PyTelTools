@@ -855,7 +855,7 @@ class ImageTab(QWidget):
                 j += 1
 
 
-class ProjectionGUI(QWidget):
+class ProjectLinesGUI(QWidget):
     def __init__(self, parent=None):
         super().__init__()
         self.parent = parent
@@ -923,6 +923,6 @@ if __name__ == '__main__':
     sys.excepthook = exception_hook
 
     app = QApplication(sys.argv)
-    widget = ProjectionGUI()
+    widget = ProjectLinesGUI()
     widget.show()
     app.exec_()

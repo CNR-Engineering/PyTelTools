@@ -8,7 +8,7 @@ from gui.MaxMinMeanGUI import MaxMinMeanGUI
 
 from gui.PointsGUI import PointsGUI
 from gui.LinesGUI import LinesGUI
-from gui.ProjectionGUI import ProjectionGUI
+from gui.ProjectLinesGUI import ProjectLinesGUI
 from gui.ComputeVolumeGUI import ComputeVolumeGUI
 from gui.CompareResultsGUI import CompareResultsGUI
 from gui.ComputeFluxGUI import ComputeFluxGUI
@@ -21,7 +21,7 @@ class MainPanel(QWidget):
         maxmin = MaxMinMeanGUI(parent)
         points = PointsGUI(parent)
         lines = LinesGUI(parent)
-        project = ProjectionGUI(parent)
+        project = ProjectLinesGUI(parent)
         volume = ComputeVolumeGUI(parent)
         compare = CompareResultsGUI(parent)
         flux = ComputeFluxGUI(parent)
@@ -50,7 +50,7 @@ class MyMainWindow(QWidget):
         pageList = QListWidget()
         pageList.setMaximumWidth(200)
         for name in ['Start', 'Extract variables', 'Max/Min/Mean/Arrival/Duration', 'Interpolate on points',
-                     'Interpolate along lines', 'Projection along lines',
+                     'Interpolate along lines', 'Project along lines',
                      'Compute volume', 'Compute flux', 'Compare two results']:
             pageList.addItem('\n' + name + '\n')
         pageList.setFlow(QListView.TopToBottom)
