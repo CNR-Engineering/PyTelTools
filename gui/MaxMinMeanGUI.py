@@ -527,7 +527,7 @@ class MaxMinMeanTab(QWidget):
             return
 
         # separate scalars and vectors
-        scalars, vectors, additional_equations = scalars_vectors(self.input.header.var_IDs, selected_vars)
+        scalars, vectors, additional_equations = operations.scalars_vectors(self.input.header.var_IDs, selected_vars)
 
         # create the save file dialog
         options = QFileDialog.Options()

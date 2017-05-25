@@ -677,6 +677,9 @@ class MultiVariableImageTab(QWidget):
 
         self.plotViewer.current_title = 'Values of variables along line %s' \
                                         % self.control.lineBox.currentText().split()[1]
+        self.plotViewer.current_ylabel = 'Value (%s)' \
+                                        % self.control.unitBox.currentText().split(': ')[1]
+
         line_id = int(self.control.lineBox.currentText().split()[1]) - 1
         if self.control.intersection.isChecked():
             line_interpolator, distances = self.input.line_interpolators[line_id]
@@ -771,7 +774,7 @@ class MultiFrameControlPanel(QWidget):
 
         self.timeTable = QTableWidget()
         self.timeTable.setColumnCount(3)
-        self.timeTable.setHorizontalHeaderLabels(['Index', 'Value', 'Date'])
+        self.timeTable.setHorizontalHeaderLabels(['Index', 'Time (s)', 'Date'])
         vh = self.timeTable.verticalHeader()
         vh.setSectionResizeMode(QHeaderView.Fixed)
         vh.setDefaultSectionSize(20)
@@ -900,6 +903,8 @@ class MultiFrameImageTab(QWidget):
         current_var = self.control.varBox.currentText().split(' (')[0]
         self.plotViewer.current_title = 'Values of %s along line %s' % (current_var,
                                                                         self.control.lineBox.currentText().split()[1])
+        self.plotViewer.current_ylabel = current_var  #FIXME: use complete variable name and specify unit
+
         line_id = int(self.control.lineBox.currentText().split()[1]) - 1
         if self.control.intersection.isChecked():
             line_interpolator, distances = self.input.line_interpolators[line_id]

@@ -747,6 +747,8 @@ class ImageTab(QWidget):
         ref_id = int(self.control.lineBox.currentText().split()[1]) - 1
         self.plotViewer.current_title = 'Values of variables along line %d' \
                                         % (ref_id+1)
+        self.plotViewer.current_ylabel = 'Value (%s)' \
+                                        % (self.control.unitBox.currentText().split(': ')[1])
 
         line_interpolators = {}
         if self.control.intersection.isChecked():

@@ -28,7 +28,7 @@ class FrictionLawMessage(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
 
-        self.chezy = QRadioButton('Chezy')
+        self.chezy = QRadioButton('Chézy')
         self.chezy.setChecked(True)
         self.strickler = QRadioButton('Strickler')
         self.manning = QRadioButton('Manning')
@@ -273,7 +273,7 @@ class ManualTimeSelection(QWidget):
         self.secondTable = TimeTable()
         for tw in [self.firstTable, self.secondTable]:
             tw.setColumnCount(3)
-            tw.setHorizontalHeaderLabels(['Index', 'Value', 'Date'])
+            tw.setHorizontalHeaderLabels(['Index', 'Time (s)', 'Date'])
             vh = tw.verticalHeader()
             vh.setSectionResizeMode(QHeaderView.Fixed)
             vh.setDefaultSectionSize(20)
