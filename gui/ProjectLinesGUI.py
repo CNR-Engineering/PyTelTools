@@ -24,7 +24,7 @@ class WriteCSVProcess(QThread):
 
     def write_header(self, output_stream, selected_vars):
         output_stream.write('Line')
-        for header in ['X projected'] + selected_vars:
+        for header in ['x', 'y', 'distance'] + selected_vars:
             output_stream.write(';')
             output_stream.write(header)
         output_stream.write('\n')
@@ -50,6 +50,10 @@ class WriteCSVProcess(QThread):
                 if distance <= 0 or distance >= max_distance:
                     continue
                 output_stream.write(str(id_line+1))
+                output_stream.write(';')
+                output_stream.write('%.6f' % x)
+                output_stream.write(';')
+                output_stream.write('%.6f' % y)
                 output_stream.write(';')
                 output_stream.write('%.6f' % distance)
 

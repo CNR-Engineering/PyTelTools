@@ -1,10 +1,12 @@
 import sys
 import logging
 import datetime
+import numpy as np
+import pandas as pd
+
 from PyQt5.QtWidgets import *
 from PyQt5.QtGui import *
 from PyQt5.QtCore import *
-import pandas as pd
 
 from slf import Serafin
 from slf.flux import FluxCalculator
@@ -451,12 +453,17 @@ class FluxPlotViewer(TemporalPlotViewer):
 
         self.setWindowTitle('Visualize the temporal evolution of volumes')
 
+        self.flux_title = ''
         self.var_IDs = []
         self.has_map = False
+        self.cumulative = False
 
         self.locateSections = QAction('Locate sections\non map', self, icon=self.style().standardIcon(QStyle.SP_DialogHelpButton),
                                       triggered=self.locateSectionsEvent)
         self.map.closeEvent = lambda event: self.locateSections.setEnabled(True)
+        self.cumulativeFluxAct = QAction('Show\ncumulative flux', self, checkable=True,
+                                          icon=self.style().standardIcon(QStyle.SP_DialogApplyButton))
+        self.cumulativeFluxAct.toggled.connect(self.changeFluxType)
 
         self.toolBar.addAction(self.locateSections)
         self.toolBar.addSeparator()
@@ -466,6 +473,8 @@ class FluxPlotViewer(TemporalPlotViewer):
         self.toolBar.addSeparator()
         self.toolBar.addAction(self.convertTimeAct)
         self.toolBar.addAction(self.changeDateAct)
+        self.toolBar.addSeparator()
+        self.toolBar.addAction(self.cumulativeFluxAct)
 
         self.mapMenu = QMenu('&Map', self)
         self.mapMenu.addAction(self.locateSections)
@@ -477,11 +486,21 @@ class FluxPlotViewer(TemporalPlotViewer):
         self.menuBar.addMenu(self.mapMenu)
         self.menuBar.addMenu(self.polyMenu)
 
+    def changeFluxType(self):
+        self.cumulative = not self.cumulative
+        self.current_ylabel = 'Cumulative ' + self.flux_title
+        self.replot()
+
     def replot(self):
         self.canvas.axes.clear()
         for column in self.current_columns:
-            self.canvas.axes.plot(self.time[self.timeFormat], self.data[column], '-', color=self.column_colors[column],
-                                  linewidth=2, label=self.column_labels[column])
+            if not self.cumulative:
+                self.canvas.axes.plot(self.time[self.timeFormat], self.data[column], '-', color=self.column_colors[column],
+                                      linewidth=2, label=self.column_labels[column])
+            else:
+                self.canvas.axes.plot(self.time[self.timeFormat], np.cumsum(self.data[column]), '-', color=self.column_colors[column],
+                                      linewidth=2, label=self.column_labels[column])
+
         self.canvas.axes.legend()
         self.canvas.axes.grid(linestyle='dotted')
         self.canvas.axes.set_xlabel(self.current_xlabel)
@@ -495,6 +514,8 @@ class FluxPlotViewer(TemporalPlotViewer):
         self.canvas.draw()
 
     def getData(self, flux_title):
+        self.flux_title = flux_title
+
         # get the new data
         csv_file = self.input.csvNameBox.text()
         self.data = pd.read_csv(csv_file, header=0, sep=';')
@@ -521,7 +542,7 @@ class FluxPlotViewer(TemporalPlotViewer):
         self.time = [self.data['time'], self.data['time'], self.data['time'],
                      self.data['time'] / 60, self.data['time'] / 3600, self.data['time'] / 86400]
         self.current_xlabel = self._defaultXLabel(self.input.language)
-        self.current_ylabel = flux_title
+        self.current_ylabel = self.flux_title
         self.current_title = ''
         self.replot()
 
