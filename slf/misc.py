@@ -4,6 +4,7 @@ import re
 from slf.variables import get_available_variables, get_necessary_equations, do_calculation
 
 OPERATORS = ['+', '-', '*', '/', '^', 'sqrt']
+_OPERATIONS = {'+': np.add, '-': np.subtract, '*': np.multiply, '/': np.divide, '^': np.power, 'sqrt': np.sqrt}
 _PRECEDENCE = {'(': 1, '-': 2, '+': 2, '*': 3, '/': 3, '^': 4, 'sqrt': 5}
 
 _VECTORS = {'U': ('V', 'M'), 'V': ('U', 'M'), 'QSX': ('QSY', 'QS'), 'QSY': ('QSX', 'QS'),
@@ -163,7 +164,7 @@ def remove_spaces(expression):
 
 
 def to_infix(expression):
-    return list(filter(None, re.split('([+*()^/-]|[A-Z]+|^\d+)', remove_spaces(expression))))
+    return list(filter(None, map(lambda x: x.strip(), re.split('([+*()^/-]|\[[A-Z]+\]|^\d+)', expression))))
 
 
 def infix_to_postfix(expression):
@@ -216,5 +217,75 @@ def is_valid_postfix(expression):
         return True
     except IndexError:
         return False
+
+
+def test_condition(value, comparator, threshold):
+    if comparator == '>':
+        return value > threshold
+    elif comparator == '<':
+        return value < threshold
+    elif comparator == '>=':
+        return value >= threshold
+    else:
+        return value <= threshold
+
+
+def evaluate_expression(input_stream, time_index, expression):
+    nb_nodes = input_stream.header.nb_nodes
+    stack = []
+
+    for symbol in expression:
+        if symbol in OPERATORS:
+            if symbol == 'sqrt':
+                operand = stack.pop()
+                stack.append(_OPERATIONS[symbol](operand))
+            else:
+                first_operand = stack.pop()
+                second_operand = stack.pop()
+                stack.append(_OPERATIONS[symbol](first_operand, second_operand))
+        else:
+            if symbol[0] == '[':
+                stack.append(input_stream.read_var_in_frame(time_index, symbol[1:-1]))
+            else:
+                stack.append(np.ones((nb_nodes,)) * float(symbol))
+
+    return stack.pop()
+
+
+def arrival_duration(input_stream, time_indices, expression, comparator, threshold):
+    # first
+    previous_time = input_stream.time[time_indices[0]]
+    previous_value = evaluate_expression(input_stream, time_indices[0], expression)
+
+    previous_flag = test_condition(previous_value, comparator, threshold)
+    previous_flip = np.where(previous_flag, previous_time, 0)
+    arrival = np.where(previous_flag, previous_time, float('Inf'))
+
+    duration = np.zeros((input_stream.header.nb_nodes,))
+
+    # iteration
+    for index in time_indices[1:]:
+        current_time = input_stream.time[index]
+        current_value = evaluate_expression(input_stream, index, expression)
+        with np.errstate(divide='ignore'):
+            t_star = (current_value * previous_time - previous_value * current_time) / (current_value - previous_value)
+
+        current_flag = test_condition(current_value, comparator, threshold)
+
+        previous_flip = np.where(np.logical_and(current_flag, np.logical_not(previous_flag)),
+                                 t_star, previous_flip)
+
+        flip_back = np.logical_and(previous_flag, np.logical_not(current_flag))
+
+        duration = np.where(flip_back, duration + t_star - previous_flip, duration)
+        arrival = np.where(flip_back, previous_flip, arrival)
+
+        previous_flag = current_flag
+        previous_value = current_value
+        previous_time = current_time
+
+    # last
+    duration = np.where(previous_flag, duration + input_stream.time[time_indices[-1]] - previous_flip, duration)
+    return arrival, duration
 
 

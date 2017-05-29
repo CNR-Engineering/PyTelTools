@@ -121,8 +121,7 @@ class ConditionDialog(QDialog):
         self.threashold = QLineEdit()
         self.threashold.setFixedSize(150, 30)
 
-        self.condition = ('', '', 0.0)
-        self.expression = []
+        self.condition = ([], '', 0.0)
 
         mainLayout = QVBoxLayout()
         mainLayout.addItem(QSpacerItem(50, 10))
@@ -165,8 +164,8 @@ class ConditionDialog(QDialog):
 
     def _validateExpression(self, expression):
         for item in expression:
-            if item.isupper():  # variable ID
-                if item not in self.var_IDs:
+            if item[0] == '[':  # variable ID
+                if item[1:-1] not in self.var_IDs:
                     return False
             elif item in operations.OPERATORS:
                 continue
@@ -181,15 +180,14 @@ class ConditionDialog(QDialog):
         var_ID = self.varBox.currentText().split(' (')[0]
         self.expressionBox.insertHtml("<span style=\" font-size:8pt; "
                                       "font-weight:600; color:#554DF7;\" "
-                                      ">%s</span>" % var_ID)
+                                      ">[%s]</span>" % var_ID)
         self.expressionBox.setCurrentCharFormat(self.old_format)
 
     def checkCondition(self):
         expression = self.expressionBox.toPlainText()
         comparator = self.comparatorBox.currentText()
         threshold = self.threashold.text()
-        self.condition = ('', '', 0.0)
-        self.expression = []
+        self.condition = ([], '', 0.0)
 
         try:
             threshold = float(threshold)
@@ -197,9 +195,9 @@ class ConditionDialog(QDialog):
             QMessageBox.critical(self, 'Error', 'The threshold is not a number!',
                                  QMessageBox.Ok)
             return
-        self.expression = self._processExpression(expression)
+        expression = self._processExpression(expression)
 
-        if not self._validateExpression(self.expression):
+        if not self._validateExpression(expression):
             QMessageBox.critical(self, 'Error', 'Invalid expression.',
                                  QMessageBox.Ok)
             return
@@ -568,7 +566,6 @@ class MaxMinMeanTab(QWidget):
         # deduce header from selected variable IDs and write header
         output_header = self.getOutputHeader(scalars, vectors)
 
-
         start_index = int(self.timeSelection.startIndex.text()) - 1
         end_index = int(self.timeSelection.endIndex.text())
         time_indices = list(range(start_index, end_index))
@@ -624,7 +621,6 @@ class ArrivalDurationTab(QWidget):
         self.parent = parent
 
         self.conditions = []
-        self.expressions = []
 
         self._initWidgets()
         self._setLayout()
@@ -730,7 +726,6 @@ class ArrivalDurationTab(QWidget):
 
     def reset(self):
         self.conditions = []
-        self.expressions = []
         self.conditionTable.setRowCount(0)
         self.timeSelection.disable()
         self.btnSubmit.setEnabled(False)
@@ -757,14 +752,29 @@ class ArrivalDurationTab(QWidget):
             self.timeSlider.setEnabled(True)
             self.timeSelection.enable()
 
+    def getOutputHeader(self):
+        output_header = self.input.header.copy()
+        output_header.nb_var = 2 * len(self.conditions)
+        output_header.var_IDs, output_header.var_names, output_header.var_units = [], [], []
+        for row in range(self.conditionTable.rowCount()):
+            a_name = self.conditionTable.item(row, 1).text()
+            d_name = self.conditionTable.item(row, 2).text()
+            for name in [a_name, d_name]:
+                output_header.var_IDs.append('')
+                output_header.var_names.append(bytes(name, 'utf-8').ljust(16))
+                output_header.var_units.append(bytes('S', 'utf-8').ljust(16))
+        if self.singlePrecisionBox.isChecked():
+            output_header.to_single_precision()
+        return output_header
+
     def btnAddEvent(self):
         dlg = ConditionDialog(self.input.header)
         value = dlg.exec_()
         if value == QDialog.Rejected:
             return
-        condition = '%s %s %.4f' % dlg.condition
+        condition = '%s %s %.4f' % (''.join(dlg.condition[0]), dlg.condition[1], dlg.condition[2])
         condition_tight = operations.remove_spaces(condition)  # used to define variable names
-        self.expressions.append(dlg.expression)
+        self.conditions.append(dlg.condition)
 
         row = self.conditionTable.rowCount()
         self.conditionTable.insertRow(row)
@@ -803,6 +813,17 @@ class ArrivalDurationTab(QWidget):
         self.parent.inDialog()
         progressBar = OutputProgressDialog()
 
+        # deduce header from selected variable IDs and write header
+        output_header = self.getOutputHeader()
+
+        start_index = int(self.timeSelection.startIndex.text()) - 1
+        end_index = int(self.timeSelection.endIndex.text())
+        time_indices = list(range(start_index, end_index))
+
+        output_message = 'Computing Arrival / Duration between frame %d and %d.' \
+                          % (start_index+1, end_index)
+        nb_conditions = len(self.conditions)
+
         # do some calculations
         with Serafin.Read(self.input.filename, self.input.language) as resin:
             resin.header = self.input.header
@@ -811,10 +832,20 @@ class ArrivalDurationTab(QWidget):
             progressBar.setValue(5)
             QApplication.processEvents()
             with Serafin.Write(filename, self.input.language, overwrite) as resout:
-                pass
-                # logging.info(output_message)
-                #
-                # resout.write_entire_frame(output_header, self.input.time[0], values)
+                logging.info(output_message)
+
+                resout.write_header(output_header)
+
+                values = np.empty((2*nb_conditions, self.input.header.nb_nodes))
+                for i, (expression, comparator, threshold) in enumerate(self.conditions):
+                    arrival, duration = operations.arrival_duration(resin, time_indices,
+                                                                    expression, comparator, threshold)
+                    values[2*i, :] = arrival
+                    values[2*i+1, :] = duration
+
+                resout.write_entire_frame(output_header, self.input.time[0], values)
+                progressBar.setValue(5 + 95 * (i+1) / nb_conditions)
+                QApplication.processEvents()
 
         logging.info('Finished writing the output')
         progressBar.setValue(100)
