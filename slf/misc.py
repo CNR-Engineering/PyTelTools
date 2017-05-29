@@ -159,8 +159,11 @@ def vector_min(input_stream, selected_vectors, time_indices, additional_equation
     return values
 
 
-def remove_spaces(expression):
-    return re.sub('\s+', '', expression)
+def tighten_expression(expression):
+    """
+    Remove the spaces and brackets to get a nice expression
+    """
+    return re.sub('(\s+|\[|\])', '', expression)
 
 
 def to_infix(expression):
@@ -254,15 +257,15 @@ def evaluate_expression(input_stream, time_index, expression):
 
 
 def arrival_duration(input_stream, time_indices, expression, comparator, threshold):
+    print(comparator, threshold)
     # first
     previous_time = input_stream.time[time_indices[0]]
     previous_value = evaluate_expression(input_stream, time_indices[0], expression)
-
     previous_flag = test_condition(previous_value, comparator, threshold)
-    previous_flip = np.where(previous_flag, previous_time, 0)
-    arrival = np.where(previous_flag, previous_time, float('Inf'))
 
     duration = np.zeros((input_stream.header.nb_nodes,))
+    arrival = np.where(previous_flag, previous_time, float('Inf'))
+    previous_flip = np.ones((input_stream.header.nb_nodes,)) * previous_time
 
     # iteration
     for index in time_indices[1:]:
@@ -272,20 +275,21 @@ def arrival_duration(input_stream, time_indices, expression, comparator, thresho
             t_star = (current_value * previous_time - previous_value * current_time) / (current_value - previous_value)
 
         current_flag = test_condition(current_value, comparator, threshold)
+        flip_forward = np.logical_and(current_flag, np.logical_not(previous_flag))
+        flip_backward = np.logical_and(previous_flag, np.logical_not(current_flag))
 
-        previous_flip = np.where(np.logical_and(current_flag, np.logical_not(previous_flag)),
-                                 t_star, previous_flip)
+        if index == time_indices[-1]:  # last
+            duration = np.where(np.logical_and(previous_flag, current_flag),
+                                duration + input_stream.time[index] - previous_flip, duration)
+        else:
+            duration = np.where(flip_backward, duration + t_star - previous_flip, duration)
 
-        flip_back = np.logical_and(previous_flag, np.logical_not(current_flag))
-
-        duration = np.where(flip_back, duration + t_star - previous_flip, duration)
-        arrival = np.where(flip_back, previous_flip, arrival)
+        arrival = np.where(flip_forward, np.minimum(arrival, t_star), arrival)
+        previous_flip = np.where(flip_forward, t_star, previous_flip)
 
         previous_flag = current_flag
         previous_value = current_value
         previous_time = current_time
 
-    # last
-    duration = np.where(previous_flag, duration + input_stream.time[time_indices[-1]] - previous_flip, duration)
     return arrival, duration
 

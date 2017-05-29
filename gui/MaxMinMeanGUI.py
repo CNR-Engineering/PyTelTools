@@ -4,10 +4,8 @@ from PyQt5.QtWidgets import *
 from PyQt5.QtGui import *
 from PyQt5.QtCore import *
 
-import re
 import numpy as np
 import logging
-import copy
 from slf import Serafin
 import slf.misc as operations
 from gui.util import TableWidgetDragRows, QPlainTextEditLogger, handleOverwrite, \
@@ -121,7 +119,7 @@ class ConditionDialog(QDialog):
         self.threashold = QLineEdit()
         self.threashold.setFixedSize(150, 30)
 
-        self.condition = ([], '', 0.0)
+        self.condition = ([], '', '', 0.0)
 
         mainLayout = QVBoxLayout()
         mainLayout.addItem(QSpacerItem(50, 10))
@@ -184,10 +182,10 @@ class ConditionDialog(QDialog):
         self.expressionBox.setCurrentCharFormat(self.old_format)
 
     def checkCondition(self):
-        expression = self.expressionBox.toPlainText()
+        literal_expression = self.expressionBox.toPlainText()
         comparator = self.comparatorBox.currentText()
         threshold = self.threashold.text()
-        self.condition = ([], '', 0.0)
+        self.condition = ([], '', '', 0.0)
 
         try:
             threshold = float(threshold)
@@ -195,13 +193,13 @@ class ConditionDialog(QDialog):
             QMessageBox.critical(self, 'Error', 'The threshold is not a number!',
                                  QMessageBox.Ok)
             return
-        expression = self._processExpression(expression)
+        expression = self._processExpression(literal_expression)
 
         if not self._validateExpression(expression):
             QMessageBox.critical(self, 'Error', 'Invalid expression.',
                                  QMessageBox.Ok)
             return
-        self.condition = (expression, comparator, threshold)
+        self.condition = (expression, literal_expression, comparator, threshold)
         self.accept()
 
 
@@ -327,7 +325,7 @@ class InputTab(QWidget):
             resin.get_time()
 
             # copy to avoid reading the same data in the future
-            self.header = copy.deepcopy(resin.header)
+            self.header = resin.header.copy()
             self.time = resin.time[:]
 
         logging.info('Finished reading the input file')
@@ -730,7 +728,7 @@ class ArrivalDurationTab(QWidget):
                                      QMessageBox.Ok)
                 # back to default
                 condition = self.conditionTable.item(row, 0).text()
-                condition_tight = operations.remove_spaces(condition)
+                condition_tight = operations.tighten_expression(condition)
                 if column == 1:
                     self.conditionTable.setItem(row, column, QTableWidgetItem(('A ' + condition_tight)[:16]))
                 else:
@@ -784,8 +782,8 @@ class ArrivalDurationTab(QWidget):
         value = dlg.exec_()
         if value == QDialog.Rejected:
             return
-        condition = '%s %s %.4f' % (''.join(dlg.condition[0]), dlg.condition[1], dlg.condition[2])
-        condition_tight = operations.remove_spaces(condition)  # used to define variable names
+        condition = '%s %s %.4f' % (''.join(dlg.condition[1]), dlg.condition[2], dlg.condition[3])
+        condition_tight = operations.tighten_expression(condition)  # used to define variable names
         self.conditions.append(dlg.condition)
 
         row = self.conditionTable.rowCount()
@@ -859,7 +857,7 @@ class ArrivalDurationTab(QWidget):
                 resout.write_header(output_header)
 
                 values = np.empty((2*nb_conditions, self.input.header.nb_nodes))
-                for i, (expression, comparator, threshold) in enumerate(self.conditions):
+                for i, (expression, _, comparator, threshold) in enumerate(self.conditions):
                     arrival, duration = operations.arrival_duration(resin, time_indices,
                                                                     expression, comparator, threshold)
                     values[2*i, :] = arrival

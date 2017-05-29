@@ -1,6 +1,5 @@
 import sys
 import logging
-import copy
 import datetime
 from PyQt5.QtWidgets import *
 from PyQt5.QtGui import *
@@ -340,7 +339,7 @@ class InputTab(QWidget):
             self.summaryTextBox.appendPlainText(resin.get_summary())
 
             # copy to avoid reading the same data in the future
-            self.header = copy.deepcopy(resin.header)
+            self.header = resin.header.copy()
             self.time = resin.time[:]
 
         self._resetDefaultOptions()

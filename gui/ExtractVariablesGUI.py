@@ -9,7 +9,6 @@ from PyQt5.QtGui import *
 from PyQt5.QtCore import *
 
 import logging
-import copy
 from slf import Serafin
 from slf.variables import get_available_variables, \
     do_calculations_in_frame, get_necessary_equations, get_US_equation, add_US
@@ -653,7 +652,7 @@ class InputTab(QWidget):
             resin.get_time()
 
             # copy to avoid reading the same data in the future
-            self.header = copy.deepcopy(resin.header)
+            self.header = resin.header.copy()
             self.time = resin.time[:]
 
         logging.info('Finished reading the input file')

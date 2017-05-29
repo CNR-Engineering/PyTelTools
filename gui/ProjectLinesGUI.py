@@ -1,6 +1,5 @@
 import sys
 import logging
-import copy
 import datetime
 import numpy as np
 from shapely.geometry import Point
@@ -257,7 +256,7 @@ class InputTab(QWidget):
             logging.info('Finished processing the mesh')
 
             # copy to avoid reading the same data in the future
-            self.header = copy.deepcopy(resin.header)
+            self.header = resin.header
             self.time = resin.time[:]
 
         self._resetDefaultOptions()

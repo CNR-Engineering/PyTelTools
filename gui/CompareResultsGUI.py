@@ -1,5 +1,4 @@
 import sys
-import copy
 from PyQt5.QtWidgets import *
 from PyQt5.QtGui import *
 from PyQt5.QtCore import *
@@ -328,7 +327,7 @@ class InputTab(QWidget):
             self.refSummaryTextBox.appendPlainText(resin.get_summary())
 
             # copy to avoid reading the same data in the future
-            self.ref_header = copy.deepcopy(resin.header)
+            self.ref_header = resin.header.copy()
             self.ref_time = resin.time[:]
 
         self.parent.add_reference()

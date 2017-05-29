@@ -1,6 +1,5 @@
 import sys
 import logging
-import copy
 import datetime
 from PyQt5.QtWidgets import *
 from PyQt5.QtGui import *
@@ -421,7 +420,7 @@ class InputTab(QWidget):
             logging.info('Finished processing the mesh')
 
             # copy to avoid reading the same data in the future
-            self.header = copy.deepcopy(resin.header)
+            self.header = resin.header.copy()
             self.time = resin.time[:]
 
         self.btnOpenPolygon.setEnabled(True)
