@@ -661,6 +661,13 @@ class ArrivalDurationTab(QWidget):
         logging.getLogger().addHandler(self.logTextBox)
         logging.getLogger().setLevel(logging.INFO)
 
+        # create a combo box for time unit
+        self.unitBox = QComboBox()
+        for unit in ['second', 'minute', 'hour', 'day']:
+            self.unitBox.addItem(unit)
+        self.unitBox.setFixedHeight(30)
+        self.unitBox.setMaximumWidth(200)
+
         # create a check box for output file format (simple or double precision)
         self.singlePrecisionBox = QCheckBox('Convert to SERAFIN \n(single precision)', self)
         self.singlePrecisionBox.setEnabled(False)
@@ -692,6 +699,11 @@ class ArrivalDurationTab(QWidget):
         hlayout = QHBoxLayout()
         hlayout.addItem(QSpacerItem(50, 10))
         hlayout.addWidget(self.btnSubmit)
+        hlayout.addItem(QSpacerItem(10, 10))
+        vlayout = QVBoxLayout()
+        vlayout.addWidget(QLabel('Time unit'))
+        vlayout.addWidget(self.unitBox)
+        hlayout.addLayout(vlayout)
         hlayout.addItem(QSpacerItem(10, 10))
         hlayout.addWidget(self.singlePrecisionBox)
         hlayout.addItem(QSpacerItem(50, 10))
@@ -762,7 +774,7 @@ class ArrivalDurationTab(QWidget):
             for name in [a_name, d_name]:
                 output_header.var_IDs.append('')
                 output_header.var_names.append(bytes(name, 'utf-8').ljust(16))
-                output_header.var_units.append(bytes('S', 'utf-8').ljust(16))
+                output_header.var_units.append(bytes(self.unitBox.currentText().upper(), 'utf-8').ljust(16))
         if self.singlePrecisionBox.isChecked():
             output_header.to_single_precision()
         return output_header
@@ -785,6 +797,11 @@ class ArrivalDurationTab(QWidget):
         self.conditionTable.setItem(row, 2, QTableWidgetItem(('D ' + condition_tight)[:16]))
 
     def btnSubmitEvent(self):
+        if not self.conditions:
+            QMessageBox.critical(self, 'Error', 'Add at least one condition.',
+                                 QMessageBox.Ok)
+            return
+
         # create the save file dialog
         options = QFileDialog.Options()
         options |= QFileDialog.DontUseNativeDialog
@@ -842,6 +859,14 @@ class ArrivalDurationTab(QWidget):
                                                                     expression, comparator, threshold)
                     values[2*i, :] = arrival
                     values[2*i+1, :] = duration
+
+                time_unit = self.unitBox.currentText()
+                if time_unit == 'minute':
+                    values /= 60
+                elif time_unit == 'hour':
+                    values /= 3600
+                elif time_unit == 'day':
+                    values /= 86400
 
                 resout.write_entire_frame(output_header, self.input.time[0], values)
                 progressBar.setValue(5 + 95 * (i+1) / nb_conditions)
