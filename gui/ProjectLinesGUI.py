@@ -11,8 +11,8 @@ from itertools import islice, cycle
 
 from slf import Serafin
 from geom import Shapefile, BlueKenue
-from gui.util import MapViewer, LineMapCanvas, QPlainTextEditLogger, TelToolWidget, testOpen, \
-    TableWidgetDragRows, OutputProgressDialog, LoadMeshDialog, handleOverwrite, PlotViewer, SimpleTimeDateSelection
+from gui.util import MapViewer, LineMapCanvas, QPlainTextEditLogger, TelToolWidget, testOpen, ColumnColorEditor,\
+    TableWidgetDropRows, TableWidgetDragRows, OutputProgressDialog, LoadMeshDialog, handleOverwrite, PlotViewer, SimpleTimeDateSelection
 
 
 class WriteCSVProcess(QThread):
@@ -61,6 +61,62 @@ class WriteCSVProcess(QThread):
 
             self.tick.emit(int(100 * (u+1) / nb_lines))
             QApplication.processEvents()
+
+
+class LineStyleEditor(QDialog):
+    def __init__(self, all_linestyles, current_linestyles):
+        super().__init__()
+        self.table = TableWidgetDropRows()
+        self.table.setColumnCount(2)
+        self.table.setHorizontalHeaderLabels(['Variable', 'Line style'])
+        self.table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+
+        self.table.setFixedHeight(300)
+        self.table.setMaximumWidth(300)
+        row = 0
+        for var, style in current_linestyles.items():
+            self.table.insertRow(row)
+            self.table.setItem(row, 0, QTableWidgetItem(var))
+            self.table.setItem(row, 1, QTableWidgetItem(style))
+            row += 1
+
+        self.available_linestyles = TableWidgetDragRows()
+        self.available_linestyles.setSelectionMode(QAbstractItemView.SingleSelection)
+        self.available_linestyles.setColumnCount(1)
+        self.available_linestyles.setHorizontalHeaderLabels(['Available styles'])
+        self.available_linestyles.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.available_linestyles.setAcceptDrops(False)
+        self.available_linestyles.setFixedHeight(300)
+        self.available_linestyles.setMinimumWidth(150)
+        self.available_linestyles.setMaximumWidth(300)
+        self.available_linestyles.horizontalHeader().setDefaultSectionSize(150)
+        row = 0
+        for style in all_linestyles:
+            self.available_linestyles.insertRow(row)
+            self.available_linestyles.setItem(row, 0,QTableWidgetItem(style))
+            row += 1
+
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel,
+                                   Qt.Horizontal, self)
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        vlayout = QVBoxLayout()
+        vlayout.addWidget(QLabel('Drag and drop line styles on the %s variables'))
+        hlayout = QHBoxLayout()
+        hlayout.addWidget(self.available_linestyles)
+        hlayout.addWidget(self.table)
+        vlayout.addLayout(hlayout)
+        vlayout.addWidget(buttons)
+        self.setLayout(vlayout)
+
+        self.setFixedSize(500, 400)
+        self.setWindowTitle('Change variable line styles')
+
+    def getLineStyles(self, old_linestyles):
+        for row in range(self.table.rowCount()):
+            label = self.table.item(row, 0).text()
+            style = self.table.item(row, 1).text()
+            old_linestyles[label] = style
 
 
 class InputTab(QWidget):
@@ -636,16 +692,22 @@ class ImageTab(QWidget):
         self.var_table = {}
         self.current_vars = {}
         self.line_colors = {}
+        self.current_linestyles = {}
+
+        self.lineStyles = ['solid', 'dashed', 'dashdot', 'dotted']
 
         # set up a custom plot viewer
         self.editLineColorAct = QAction('Edit line colors', self,
                                         icon=self.style().standardIcon(QStyle.SP_FileDialogDetailedView),
                                         triggered=self.editColor)
-
+        self.editLineStyleAct = QAction('Edit line type', self,
+                                        icon=self.style().standardIcon(QStyle.SP_FileDialogDetailedView),
+                                        triggered=self.editLineStyle)
         self.plotViewer = PlotViewer()
         self.plotViewer.exitAct.setEnabled(False)
         self.plotViewer.menuBar.setVisible(False)
         self.plotViewer.toolBar.addAction(self.editLineColorAct)
+        self.plotViewer.toolBar.addAction(self.editLineStyleAct)
         self.plotViewer.toolBar.addSeparator()
         self.plotViewer.toolBar.addAction(self.plotViewer.xLabelAct)
         self.plotViewer.toolBar.addAction(self.plotViewer.yLabelAct)
@@ -674,7 +736,23 @@ class ImageTab(QWidget):
         self.setLayout(mainLayout)
 
     def editColor(self):
-        pass
+        line_labels = {i: 'Line %d' % (i+1) for i in self.line_colors}
+        msg = ColumnColorEditor('Line', list(self._getSelection().keys()),
+                                line_labels, self.line_colors,
+                                self.plotViewer.defaultColors, self.plotViewer.colorToName)
+        value = msg.exec_()
+        if value == QDialog.Rejected:
+            return
+        msg.getColors(self.line_colors, line_labels, self.plotViewer.nameToColor)
+        self.btnComputeEvent()
+
+    def editLineStyle(self):
+        msg = LineStyleEditor(self.lineStyles, self.current_linestyles)
+        value = msg.exec_()
+        if value == QDialog.Rejected:
+            return
+        msg.getLineStyles(self.current_linestyles)
+        self.btnComputeEvent()
 
     def _getSelection(self):
         self.current_vars = {}
@@ -692,10 +770,18 @@ class ImageTab(QWidget):
         return self.current_vars
 
     def _updateTable(self, text):
+        self.current_linestyles = {}
         self.control.varTable.setRowCount(0)
         unit = text.split(': ')[1]
         unit = '' if unit == 'None' else unit
         vars = self.var_table[unit]
+
+        # initialize default linestyles
+        j = 0
+        for var in vars:
+            j %= len(self.lineStyles)
+            self.current_linestyles[var] = self.lineStyles[j]
+            j += 1
 
         nb_vars = len(vars)
         self.control.varTable.setColumnCount(nb_vars + 1)
@@ -747,7 +833,7 @@ class ImageTab(QWidget):
         self.plotViewer.current_title = 'Values of variables along line %d' \
                                         % (ref_id+1)
         self.plotViewer.current_ylabel = 'Value (%s)' \
-                                        % (self.control.unitBox.currentText().split(': ')[1])
+                                         % (self.control.unitBox.currentText().split(': ')[1])
 
         line_interpolators = {}
         if self.control.intersection.isChecked():
@@ -777,7 +863,8 @@ class ImageTab(QWidget):
                                                                     reference, max_distance)
                 for line_id, vars in self.current_vars.items():
                     for var in vars:
-                        self.plotViewer.canvas.axes.plot(distances[line_id], values[line_id][var], '-',
+                        self.plotViewer.canvas.axes.plot(distances[line_id], values[line_id][var],
+                                                         linestyle=self.current_linestyles[var],
                                                          color=self.line_colors[line_id],
                                                          linewidth=2, label='%s$_%d$' % (var, line_id+1))
 
@@ -787,14 +874,16 @@ class ImageTab(QWidget):
             else:
                 for line_id, vars in self.current_vars.items():
                     for var in vars:
-                        self.plotViewer.canvas.axes.plot(distances[line_id], values[line_id][var], 'o-',
+                        self.plotViewer.canvas.axes.plot(distances[line_id], values[line_id][var],
+                                                         marker='o', linestyle=self.current_linestyles[var],
                                                          color=self.line_colors[line_id], linewidth=2,
                                                          label='%s$_%d$' % (var, line_id+1))
 
         else:
             for line_id, vars in self.current_vars.items():
                 for var in vars:
-                    self.plotViewer.canvas.axes.plot(distances[line_id], values[line_id][var], '-',
+                    self.plotViewer.canvas.axes.plot(distances[line_id], values[line_id][var],
+                                                     linestyle=self.current_linestyles[var],
                                                      color=self.line_colors[line_id], linewidth=2,
                                                      label='%s$_%d$' % (var, line_id+1))
 
@@ -812,6 +901,7 @@ class ImageTab(QWidget):
         self.control.varTable.setRowCount(0)
         self.current_vars = {}
         self.line_colors = {}
+        self.current_linestyles = {}
         self.plotViewer.defaultPlot()
         self.plotViewer.current_title = ''
         self.plotViewer.current_xlabel = 'Cumulative distance (M)'
@@ -850,7 +940,7 @@ class ImageTab(QWidget):
             if self.input.line_interpolators[i][0]:
                 j %= len(self.plotViewer.defaultColors)
                 self.control.lineBox.addItem('Line %s' % id_line)
-                self.line_colors[i] = self.plotViewer.defaultColors[j]
+                self.line_colors[i] = self.plotViewer.defaultColors[j]   # initialize default line colors
                 j += 1
 
 

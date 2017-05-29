@@ -11,7 +11,7 @@ from itertools import islice, cycle
 
 from slf import Serafin
 from geom import Shapefile, BlueKenue
-from gui.util import MapViewer, LineMapCanvas, QPlainTextEditLogger, TelToolWidget, testOpen, \
+from gui.util import MapViewer, LineMapCanvas, QPlainTextEditLogger, ColumnColorEditor, TelToolWidget, testOpen, \
     TableWidgetDragRows, OutputProgressDialog, LoadMeshDialog, handleOverwrite, PlotViewer, SimpleTimeDateSelection
 
 
@@ -602,11 +602,17 @@ class MultiVariableImageTab(QWidget):
 
         self.var_table = {}
         self.current_vars = []
+        self.var_colors = {}
 
         # set up a custom plot viewer
+        self.editVarColorAct = QAction('Edit variable colors', self,
+                                        icon=self.style().standardIcon(QStyle.SP_FileDialogDetailedView),
+                                        triggered=self.editColor)
         self.plotViewer = PlotViewer()
         self.plotViewer.exitAct.setEnabled(False)
         self.plotViewer.menuBar.setVisible(False)
+        self.plotViewer.toolBar.addAction(self.editVarColorAct)
+        self.plotViewer.toolBar.addSeparator()
         self.plotViewer.toolBar.addAction(self.plotViewer.xLabelAct)
         self.plotViewer.toolBar.addSeparator()
         self.plotViewer.toolBar.addAction(self.plotViewer.yLabelAct)
@@ -651,7 +657,18 @@ class MultiVariableImageTab(QWidget):
             item = self.control.varList.item(row)
             if item.checkState() == Qt.Checked:
                 selection.append(item.text().split(' (')[0])
-        return tuple(selection)
+        return selection
+
+    def editColor(self):
+        var_labels = {var: var for var in self.var_colors}
+        msg = ColumnColorEditor('Variable', self._getSelection(),
+                                var_labels, self.var_colors,
+                                self.plotViewer.defaultColors, self.plotViewer.colorToName)
+        value = msg.exec_()
+        if value == QDialog.Rejected:
+            return
+        msg.getColors(self.var_colors, var_labels, self.plotViewer.nameToColor)
+        self.btnComputeEvent()
 
     def _compute(self, time_index, line_interpolator):
         values = []
@@ -696,17 +713,20 @@ class MultiVariableImageTab(QWidget):
                 values_internal = self._compute(time_index, line_interpolator_internal)
 
                 for i, var in enumerate(self.current_vars):
-                    self.plotViewer.canvas.axes.plot(distances, values[i], '-', linewidth=2, label=var)
+                    self.plotViewer.canvas.axes.plot(distances, values[i], '-', linewidth=2, label=var,
+                                                     color=self.var_colors[var])
                     self.plotViewer.canvas.axes.plot(distances_internal, values_internal[i],
-                                                     'o', color=self.plotViewer.defaultColors[i])
+                                                     'o', color=self.var_colors[var])
 
             else:
                 for i, var in enumerate(self.current_vars):
-                    self.plotViewer.canvas.axes.plot(distances, values[i], 'o-', linewidth=2, label=var)
+                    self.plotViewer.canvas.axes.plot(distances, values[i], 'o-', linewidth=2, label=var,
+                                                     color=self.var_colors[var])
 
         else:
             for i, var in enumerate(self.current_vars):
-                self.plotViewer.canvas.axes.plot(distances, values[i], '-', linewidth=2, label=var)
+                self.plotViewer.canvas.axes.plot(distances, values[i], '-', linewidth=2, label=var,
+                                                 color=self.var_colors[var])
 
         self.plotViewer.canvas.axes.legend()
         self.plotViewer.canvas.axes.grid(linestyle='dotted')
@@ -721,6 +741,7 @@ class MultiVariableImageTab(QWidget):
         self.control.lineBox.clear()
         self.var_table = {}
         self.current_vars = []
+        self.var_colors = {}
         self.control.varList.clear()
         self.plotViewer.defaultPlot()
         self.plotViewer.current_title = ''
@@ -758,6 +779,13 @@ class MultiVariableImageTab(QWidget):
         if 'M' in self.var_table:
             self.control.unitBox.setCurrentIndex(list(self.var_table.keys()).index('M'))
         self._updateList(self.control.unitBox.currentText())
+
+        # initialize default variable colors
+        j = 0
+        for var_ID in self.input.header.var_IDs:
+            j %= len(self.plotViewer.defaultColors)
+            self.var_colors[var_ID] = self.plotViewer.defaultColors[j]
+            j += 1
 
 
 class MultiFrameControlPanel(QWidget):
@@ -841,15 +869,22 @@ class MultiFrameImageTab(QWidget):
         self.input = inputTab
 
         # set up a custom plot viewer
+        self.editFrameColorAct = QAction('Edit frame colors', self,
+                                        icon=self.style().standardIcon(QStyle.SP_FileDialogDetailedView),
+                                        triggered=self.editColor)
         self.plotViewer = PlotViewer()
         self.plotViewer.exitAct.setEnabled(False)
         self.plotViewer.menuBar.setVisible(False)
+        self.plotViewer.toolBar.addAction(self.editFrameColorAct)
+        self.plotViewer.toolBar.addSeparator()
         self.plotViewer.toolBar.addAction(self.plotViewer.xLabelAct)
         self.plotViewer.toolBar.addSeparator()
         self.plotViewer.toolBar.addAction(self.plotViewer.yLabelAct)
         self.plotViewer.toolBar.addSeparator()
         self.plotViewer.toolBar.addAction(self.plotViewer.titleAct)
         self.plotViewer.canvas.figure.canvas.mpl_connect('motion_notify_event', self.plotViewer.mouseMove)
+
+        self.frame_colors = {}
 
         # put it in a group box to get a nice border
         self.gb = QGroupBox()
@@ -892,6 +927,17 @@ class MultiFrameImageTab(QWidget):
                 values.append(line_var_values)
         return values
 
+    def editColor(self):
+        frame_labels = {i: 'Frame %d' % (i+1) for i in self.frame_colors}
+        msg = ColumnColorEditor('Frame', self._getTime(),
+                                frame_labels, self.frame_colors,
+                                self.plotViewer.defaultColors, self.plotViewer.colorToName)
+        value = msg.exec_()
+        if value == QDialog.Rejected:
+            return
+        msg.getColors(self.frame_colors, frame_labels, self.plotViewer.nameToColor)
+        self.btnComputeEvent()
+
     def btnComputeEvent(self):
         time_indices = self._getTime()
         if not time_indices:
@@ -902,7 +948,9 @@ class MultiFrameImageTab(QWidget):
         current_var = self.control.varBox.currentText().split(' (')[0]
         self.plotViewer.current_title = 'Values of %s along line %s' % (current_var,
                                                                         self.control.lineBox.currentText().split()[1])
-        self.plotViewer.current_ylabel = current_var  #FIXME: use complete variable name and specify unit
+        var_index = self.input.header.var_IDs.index(current_var)
+        self.plotViewer.current_ylabel = '%s (%s)' % (self.input.header.var_names[var_index].decode('utf-8').strip(),
+                                                      self.input.header.var_units[var_index].decode('utf-8').strip())
 
         line_id = int(self.control.lineBox.currentText().split()[1]) - 1
         if self.control.intersection.isChecked():
@@ -921,19 +969,19 @@ class MultiFrameImageTab(QWidget):
 
                 for i, index in enumerate(time_indices):
                     self.plotViewer.canvas.axes.plot(distances, values[i], '-', linewidth=2,
-                                                     label='Frame %d' % (index+1))
+                                                     label='Frame %d' % (index+1), color=self.frame_colors[index])
                     self.plotViewer.canvas.axes.plot(distances_internal, values_internal[i],
-                                                     'o', color=self.plotViewer.defaultColors[i])
+                                                     'o', color=self.frame_colors[index])
 
             else:
                 for i, index in enumerate(time_indices):
                     self.plotViewer.canvas.axes.plot(distances, values[i], 'o-', linewidth=2,
-                                                     label='Frame %d' % (index+1))
+                                                     label='Frame %d' % (index+1), color=self.frame_colors[index])
 
         else:
             for i, index in enumerate(time_indices):
                 self.plotViewer.canvas.axes.plot(distances, values[i], '-', linewidth=2,
-                                                 label='Frame %d' % (index+1))
+                                                 label='Frame %d' % (index+1), color=self.frame_colors[index])
 
         self.plotViewer.canvas.axes.legend()
         self.plotViewer.canvas.axes.grid(linestyle='dotted')
@@ -952,6 +1000,7 @@ class MultiFrameImageTab(QWidget):
         self.plotViewer.current_xlabel = 'Cumulative distance (M)'
         self.plotViewer.current_ylabel = ''
         self.control.timeTable.setRowCount(0)
+        self.frame_colors = {}
 
     def getInput(self):
         if self.input.header.date is not None:
@@ -960,6 +1009,8 @@ class MultiFrameImageTab(QWidget):
         else:
             start_time = datetime.datetime(1900, 1, 1, 0, 0, 0)
         frames = list(map(lambda x: start_time + datetime.timedelta(seconds=x), self.input.time))
+
+        j = 0
         for index, value, date in zip(range(len(self.input.time)), self.input.time, frames):
             index_item = QTableWidgetItem(str(1+index))
             value_item = QTableWidgetItem(str(value))
@@ -969,6 +1020,11 @@ class MultiFrameImageTab(QWidget):
             self.control.timeTable.setItem(index, 0, index_item)
             self.control.timeTable.setItem(index, 1, value_item)
             self.control.timeTable.setItem(index, 2, date_item)
+
+            # initialize default frame colors
+            j %= len(self.plotViewer.defaultColors)
+            self.frame_colors[index] = self.plotViewer.defaultColors[j]
+            j += 1
 
         for i in range(len(self.input.lines)):
             id_line = str(i+1)

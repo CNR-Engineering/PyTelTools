@@ -523,6 +523,46 @@ class TableWidgetDragRows(QTableWidget):
         return selectedRows
 
 
+class TableWidgetDropRows(QTableWidget):
+    def __init__(self):
+        super().__init__()
+        self.setAcceptDrops(True)
+        self.setDragEnabled(True)
+        self.setDragDropOverwriteMode(False)
+        self.setSelectionBehavior(QAbstractItemView.SelectItems)
+        self.setSelectionMode(QAbstractItemView.SingleSelection)
+        self.last_drop_row = None
+
+    def dropMimeData(self, row, col, mimeData, action):
+        self.last_drop_row = row
+        return True
+
+    def getselectedRow(self):
+        for item in self.selectedItems():
+            return item.row()
+
+    def dropEvent(self, event):
+        sender = event.source()
+        super().dropEvent(event)
+        dropRow = self.last_drop_row
+        if dropRow > self.rowCount()-1:
+            return
+
+        if self != sender:
+            selectedRows = sender.getselectedRowsFast()
+            selectedRow = selectedRows[0]
+
+            item = sender.item(selectedRow, 0)
+            source = QTableWidgetItem(item)
+            self.setItem(dropRow, 1, source)
+        else:
+            selectedRow = self.getselectedRow()
+            source = self.item(selectedRow, 1).text()
+            self.item(selectedRow, 1).setText(self.item(dropRow, 1).text())
+            self.item(dropRow, 1).setText(source)
+        event.accept()
+
+
 class OutputProgressDialog(QProgressDialog):
     def __init__(self, message='Output in progress', title='Writing the output...', parent=None):
         super().__init__(message, 'OK', 0, 100, parent)
@@ -690,49 +730,6 @@ class ColumnLabelEditor(QDialog):
             old_labels[column] = label
 
 
-class ColorTable(QTableWidget):
-    def __init__(self, column_name):
-        super().__init__()
-        self.setColumnCount(2)
-        self.setHorizontalHeaderLabels([column_name, 'Color'])
-        self.setEditTriggers(QAbstractItemView.NoEditTriggers)
-        self.setAcceptDrops(True)
-        self.setDragEnabled(True)
-        self.setDragDropOverwriteMode(False)
-        self.setSelectionBehavior(QAbstractItemView.SelectItems)
-        self.setSelectionMode(QAbstractItemView.SingleSelection)
-        self.last_drop_row = None
-
-    def dropMimeData(self, row, col, mimeData, action):
-        self.last_drop_row = row
-        return True
-
-    def getselectedRow(self):
-        for item in self.selectedItems():
-            return item.row()
-
-    def dropEvent(self, event):
-        sender = event.source()
-        super().dropEvent(event)
-        dropRow = self.last_drop_row
-        if dropRow > self.rowCount()-1:
-            return
-
-        if self != sender:
-            selectedRows = sender.getselectedRowsFast()
-            selectedRow = selectedRows[0]
-
-            item = sender.item(selectedRow, 0)
-            source = QTableWidgetItem(item)
-            self.setItem(dropRow, 1, source)
-        else:
-            selectedRow = self.getselectedRow()
-            source = self.item(selectedRow, 1).text()
-            self.item(selectedRow, 1).setText(self.item(dropRow, 1).text())
-            self.item(dropRow, 1).setText(source)
-        event.accept()
-
-
 class HTMLDelegate(QStyledItemDelegate):
     def paint(self, painter, option, index):
         options = QStyleOptionViewItem(option)
@@ -766,58 +763,69 @@ class HTMLDelegate(QStyledItemDelegate):
         return QSize(doc.idealWidth(), doc.size().height())
 
 
-class ColumnColorEditor(QDialog):
-    def __init__(self, parent):
+class SelectedColorTable(TableWidgetDropRows):
+    def __init__(self, column_name, current_columns, column_labels, column_colors, color_to_name):
         super().__init__()
+        self.setColumnCount(2)
+        self.setHorizontalHeaderLabels([column_name, 'Color'])
+        self.setEditTriggers(QAbstractItemView.NoEditTriggers)
 
         delegate = HTMLDelegate()
 
-        self.table = ColorTable(parent.column_name)
-        self.table.setFixedHeight(300)
-        self.table.setMaximumWidth(300)
-        self.table.setMaximumWidth(500)
-        used_colors = []
+        self.setFixedHeight(300)
+        self.setMaximumWidth(300)
         row = 0
-        for column in parent.current_columns:
-            label = parent.column_labels[column]
-            color = parent.column_colors[column]
-            color_name = parent.colorToName[color]
+        for column in current_columns:
+            label = column_labels[column]
+            color = column_colors[column]
+            color_name = color_to_name[color]
             color_display = "<span style=\"color:%s;\">%s</span> " % (color, u"\u25A0")
-            used_colors.append(color)
-            self.table.insertRow(row)
+            self.insertRow(row)
             lab = QTableWidgetItem(label)
             col = QTableWidgetItem(color_display + color_name)
-            self.table.setItem(row, 0, lab)
-            self.table.setItem(row, 1, col)
+            self.setItem(row, 0, lab)
+            self.setItem(row, 1, col)
             row += 1
-        self.table.setItemDelegateForColumn(1, delegate)
+        self.setItemDelegateForColumn(1, delegate)
 
-        self.available_colors = TableWidgetDragRows()
-        self.available_colors.setSelectionMode(QAbstractItemView.SingleSelection)
-        self.available_colors.setColumnCount(1)
-        self.available_colors.setHorizontalHeaderLabels(['Available colors'])
-        self.available_colors.setEditTriggers(QAbstractItemView.NoEditTriggers)
-        self.available_colors.setAcceptDrops(False)
-        self.available_colors.setFixedHeight(300)
-        self.available_colors.setMinimumWidth(150)
-        self.available_colors.setMaximumWidth(300)
-        self.available_colors.horizontalHeader().setDefaultSectionSize(150)
+
+class AvailableColorTable(TableWidgetDragRows):
+    def __init__(self, colors, color_to_name):
+        super().__init__()
+        delegate = HTMLDelegate()
+        self.setSelectionMode(QAbstractItemView.SingleSelection)
+        self.setColumnCount(1)
+        self.setHorizontalHeaderLabels(['Available colors'])
+        self.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.setAcceptDrops(False)
+        self.setFixedHeight(300)
+        self.setMinimumWidth(150)
+        self.setMaximumWidth(300)
+        self.horizontalHeader().setDefaultSectionSize(150)
         row = 0
-        for color in parent.defaultColors:
-            color_name = parent.colorToName[color]
+        for color in colors:
+            color_name = color_to_name[color]
             color_display = "<span style=\"color:%s;\">%s</span> " % (color, u"\u25A0")
-            self.available_colors.insertRow(row)
+            self.insertRow(row)
             col = QTableWidgetItem(color_display + color_name)
-            self.available_colors.setItem(row, 0, col)
+            self.setItem(row, 0, col)
             row += 1
-        self.available_colors.setItemDelegateForColumn(0, delegate)
+        self.setItemDelegateForColumn(0, delegate)
+
+
+class ColumnColorEditor(QDialog):
+    def __init__(self, column_name, current_columns, column_labels, column_colors,
+                 all_colors, color_to_name):
+        super().__init__()
+        self.table = SelectedColorTable(column_name, current_columns, column_labels, column_colors, color_to_name)
+        self.available_colors = AvailableColorTable(all_colors, color_to_name)
 
         buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel,
                                    Qt.Horizontal, self)
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
         vlayout = QVBoxLayout()
-        vlayout.addWidget(QLabel('Drag and drop colors on the %ss' % parent.column_name))
+        vlayout.addWidget(QLabel('Drag and drop colors on the %ss' % column_name))
         hlayout = QHBoxLayout()
         hlayout.addWidget(self.available_colors)
         hlayout.addWidget(self.table)
@@ -826,7 +834,7 @@ class ColumnColorEditor(QDialog):
         self.setLayout(vlayout)
 
         self.setFixedSize(500, 400)
-        self.setWindowTitle('Change %s color' % parent.column_name)
+        self.setWindowTitle('Change %s color' % column_name)
 
     def getColors(self, old_colors, column_labels, name_to_color):
         label_to_column = {b: a for a, b, in column_labels.items()}
@@ -1207,7 +1215,8 @@ class TemporalPlotViewer(PlotViewer):
         self.replot()
 
     def editColor(self):
-        msg = ColumnColorEditor(self)
+        msg = ColumnColorEditor(self.column_name, self.current_columns, self.column_labels, self.column_colors,
+                                self.defaultColors, self.colorToName)
         value = msg.exec_()
         if value == QDialog.Rejected:
             return
