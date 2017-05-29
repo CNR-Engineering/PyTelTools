@@ -663,7 +663,7 @@ class ArrivalDurationTab(QWidget):
 
         # create a combo box for time unit
         self.unitBox = QComboBox()
-        for unit in ['second', 'minute', 'hour', 'day']:
+        for unit in ['second', 'minute', 'hour', 'day', 'percentage']:
             self.unitBox.addItem(unit)
         self.unitBox.setFixedHeight(30)
         self.unitBox.setMaximumWidth(200)
@@ -802,6 +802,15 @@ class ArrivalDurationTab(QWidget):
                                  QMessageBox.Ok)
             return
 
+        start_index = int(self.timeSelection.startIndex.text()) - 1
+        end_index = int(self.timeSelection.endIndex.text())
+        time_indices = list(range(start_index, end_index))
+
+        if len(time_indices) == 1:
+            QMessageBox.critical(self, 'Error', 'Start and end frame cannot be the same.',
+                                 QMessageBox.Ok)
+            return
+
         # create the save file dialog
         options = QFileDialog.Options()
         options |= QFileDialog.DontUseNativeDialog
@@ -833,10 +842,6 @@ class ArrivalDurationTab(QWidget):
         # deduce header from selected variable IDs and write header
         output_header = self.getOutputHeader()
 
-        start_index = int(self.timeSelection.startIndex.text()) - 1
-        end_index = int(self.timeSelection.endIndex.text())
-        time_indices = list(range(start_index, end_index))
-
         output_message = 'Computing Arrival / Duration between frame %d and %d.' \
                           % (start_index+1, end_index)
         nb_conditions = len(self.conditions)
@@ -867,6 +872,8 @@ class ArrivalDurationTab(QWidget):
                     values /= 3600
                 elif time_unit == 'day':
                     values /= 86400
+                elif time_unit == 'percentage':
+                    values *= 100 / (self.input.time[time_indices[-1]] - self.input.time[time_indices[0]])
 
                 resout.write_entire_frame(output_header, self.input.time[0], values)
                 progressBar.setValue(5 + 95 * (i+1) / nb_conditions)

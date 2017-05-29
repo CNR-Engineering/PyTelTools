@@ -164,7 +164,8 @@ def remove_spaces(expression):
 
 
 def to_infix(expression):
-    return list(filter(None, map(lambda x: x.strip(), re.split('([+*()^/-]|\[[A-Z]+\]|^\d+)', expression))))
+    return list(filter(None, map(lambda x: x.strip(), re.split('(\d+\.*\d+E*e*-*\d+|(?!e)-|(?!E)-'
+                                                               '|[+*()^/]|\[[A-Z]+\])', expression))))
 
 
 def infix_to_postfix(expression):
@@ -287,5 +288,4 @@ def arrival_duration(input_stream, time_indices, expression, comparator, thresho
     # last
     duration = np.where(previous_flag, duration + input_stream.time[time_indices[-1]] - previous_flip, duration)
     return arrival, duration
-
 
