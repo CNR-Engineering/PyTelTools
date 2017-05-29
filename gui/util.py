@@ -563,13 +563,22 @@ class TableWidgetDropRows(QTableWidget):
         event.accept()
 
 
+class OutputThread(QThread):
+    tick = pyqtSignal(int, name='changed')
+
+    def __init__(self):
+        super().__init__()
+        self.canceled = False
+
+
 class OutputProgressDialog(QProgressDialog):
     def __init__(self, message='Output in progress', title='Writing the output...', parent=None):
         super().__init__(message, 'OK', 0, 100, parent)
+        self.setMinimumDuration(0)
 
-        self.cancelButton = QPushButton('OK')
+        self.cancelButton = QPushButton('Cancel')
         self.setCancelButton(self.cancelButton)
-        self.cancelButton.setEnabled(False)
+        self.canceled.connect(self.cancel)
 
         self.setAutoReset(False)
         self.setAutoClose(False)
@@ -577,18 +586,29 @@ class OutputProgressDialog(QProgressDialog):
         self.setWindowTitle(title)
         self.setWindowFlags(Qt.WindowTitleHint)
         self.setFixedSize(300, 150)
+        self.thread = None
 
         self.open()
         self.setValue(0)
         QApplication.processEvents()
 
+    def outputFinished(self):
+        self.setValue(100)
+        self.setCancelButtonText('OK')
+        logging.info('Finished writing the output.')
+
     def connectToThread(self, thread):
+        self.thread = thread
         thread.tick.connect(self.setValue)
 
+    def cancel(self):
+        if self.cancelButton.text() == 'Cancel':
+            if not self.thread.canceled:
+                self.thread.canceled = True
+                logging.info('Output canceled.')
 
-class ConstructIndexThread(QThread):
-    tick = pyqtSignal(int, name='changed')
 
+class ConstructIndexThread(OutputThread):
     def __init__(self, mesh_type, input_header):
         super().__init__()
         self.input_header = input_header
@@ -603,6 +623,7 @@ class ConstructIndexThread(QThread):
             self.mesh = MeshInterpolator(input_header, False)
 
     def run(self):
+        logging.info('Processing the mesh')
         self.mesh.index = Index()
 
         # emit a signal for every five percent of triangles processed
@@ -611,6 +632,9 @@ class ConstructIndexThread(QThread):
         current_percent = 0
 
         for i, j, k in self.mesh.ikle:
+            if self.canceled:
+                return
+
             t = shapely.geometry.Polygon([self.mesh.points[i], self.mesh.points[j], self.mesh.points[k]])
             self.mesh.triangles[i, j, k] = t
             self.mesh.index.insert(i, t.bounds, obj=(i, j, k))
@@ -621,19 +645,29 @@ class ConstructIndexThread(QThread):
                 current_percent += 5
                 self.tick.emit(current_percent)
                 QApplication.processEvents()
-        return self.mesh
 
 
 class LoadMeshDialog(OutputProgressDialog):
     def __init__(self, mesh_type, input_header):
         super().__init__('Processing the mesh. Please wait.', 'Processing the mesh...')
-        self.thread = ConstructIndexThread(mesh_type, input_header)
-        self.connectToThread(self.thread)
+        thread = ConstructIndexThread(mesh_type, input_header)
+        self.connectToThread(thread)
+
+    def outputFinished(self):
+        self.setValue(100)
+        self.setCancelButtonText('OK')
+        logging.info('Finished processing the mesh')
+
+    def cancel(self):
+        if self.cancelButton.text() == 'Cancel':
+            if not self.thread.canceled:
+                self.thread.canceled = True
+                logging.info('Input canceled.')
 
     def run(self):
         self.thread.run()
-        self.setValue(100)
-        self.cancelButton.setEnabled(True)
+        if not self.thread.canceled:
+            self.outputFinished()
         self.exec_()
         return self.thread.mesh
 

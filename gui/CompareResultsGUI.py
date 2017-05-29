@@ -322,6 +322,8 @@ class InputTab(QWidget):
             meshLoader = LoadMeshDialog('comparison', resin.header)
             self.ref_mesh = meshLoader.run()
             self.parent.outDialog()
+            if meshLoader.thread.canceled:
+                return
 
             # update the file summary
             self.refSummaryTextBox.appendPlainText(resin.get_summary())
@@ -382,7 +384,7 @@ class InputTab(QWidget):
             self.testSummaryTextBox.appendPlainText(resin.get_summary())
 
             # copy to avoid reading the same data in the future
-            self.test_header = copy.deepcopy(resin.header)
+            self.test_header = resin.header.copy()
             self.test_time = resin.time[:]
 
         self.parent.add_test()

@@ -9,13 +9,11 @@ import pandas as pd
 from slf import Serafin
 from slf.volume import VolumeCalculator
 from geom import BlueKenue, Shapefile
-from gui.util import TemporalPlotViewer, QPlainTextEditLogger, MapViewer, PolygonMapCanvas, \
+from gui.util import TemporalPlotViewer, QPlainTextEditLogger, MapViewer, PolygonMapCanvas, OutputThread,\
     OutputProgressDialog, LoadMeshDialog, TelToolWidget, testOpen, handleOverwrite
 
 
-class VolumeCalculatorThread(QThread):
-    tick = pyqtSignal(int, name='changed')
-
+class VolumeCalculatorThread(OutputThread):
     def __init__(self, volume_type, var_ID, second_var_ID, input_stream, polynames, polygons,
                  time_sampling_frequency, mesh):
         super().__init__()
@@ -44,6 +42,8 @@ class VolumeCalculatorThread(QThread):
             init_values = self.calculator.input_stream.read_var_in_frame(0, self.calculator.var_ID)
 
         for i, time_index in enumerate(self.calculator.time_indices):
+            if self.canceled:
+                return []
             i_result = [str(self.calculator.input_stream.time[time_index])]
 
             values = self.calculator.input_stream.read_var_in_frame(time_index, self.calculator.var_ID)
@@ -56,6 +56,8 @@ class VolumeCalculatorThread(QThread):
                     values -= second_values
 
             for j in range(len(self.calculator.polygons)):
+                if self.canceled:
+                    return []
                 weight = self.calculator.weights[j]
                 volume = self.calculator.volume_in_frame_in_polygon(weight, values, self.calculator.polygons[j])
                 if self.calculator.volume_type == VolumeCalculator.POSITIVE:
@@ -412,12 +414,13 @@ class InputTab(QWidget):
             self.summaryTextBox.appendPlainText(resin.get_summary())
 
             # record the mesh for future visualization and calculations
-            logging.info('Processing the mesh')
             self.parent.inDialog()
             meshLoader = LoadMeshDialog('volume', resin.header)
             self.mesh = meshLoader.run()
             self.parent.outDialog()
-            logging.info('Finished processing the mesh')
+            if meshLoader.thread.canceled:
+                self.polygonNameBox.clear()
+                return
 
             # copy to avoid reading the same data in the future
             self.header = resin.header.copy()
@@ -526,16 +529,19 @@ class InputTab(QWidget):
 
             progressBar.setValue(5)
             QApplication.processEvents()
-            progressBar.connectToThread(calculator)
 
             with open(filename, 'w') as f2:
+                progressBar.connectToThread(calculator)
                 calculator.write_csv(f2)
 
-        logging.info('Finished writing the output')
-        progressBar.setValue(100)
-        progressBar.cancelButton.setEnabled(True)
+        if not calculator.canceled:
+            progressBar.outputFinished()
         progressBar.exec_()
         self.parent.outDialog()
+
+        if calculator.canceled:
+            self.csvNameBox.clear()
+            return
 
         # unlock the image viewer
         self.parent.imageTab.getData()

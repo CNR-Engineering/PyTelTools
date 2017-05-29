@@ -11,13 +11,11 @@ from PyQt5.QtCore import *
 from slf import Serafin
 from slf.flux import FluxCalculator
 from geom import BlueKenue, Shapefile
-from gui.util import TemporalPlotViewer, QPlainTextEditLogger, LineMapCanvas, MapViewer, \
+from gui.util import TemporalPlotViewer, QPlainTextEditLogger, LineMapCanvas, MapViewer, OutputThread, \
     OutputProgressDialog, LoadMeshDialog, TelToolWidget, handleOverwrite, testOpen
 
 
-class FluxCalculatorThread(QThread):
-    tick = pyqtSignal(int, name='changed')
-
+class FluxCalculatorThread(OutputThread):
     def __init__(self, flux_type, var_IDs, input_stream, section_names, sections,
                  time_sampling_frequency, mesh):
         super().__init__()
@@ -43,6 +41,9 @@ class FluxCalculatorThread(QThread):
         result = []
 
         for i, time_index in enumerate(self.calculator.time_indices):
+            if self.canceled:
+                return []
+
             i_result = [str(self.calculator.input_stream.time[time_index])]
             values = []
             for var_ID in self.calculator.var_IDs:
@@ -213,6 +214,7 @@ class InputTab(QWidget):
         self.btnOpenPolyline.setEnabled(False)
         self.timeSampling.setText('1')
         self.fluxBox.clear()
+        self.btnSubmit.setEnabled(False)
 
         if not self.frenchButton.isChecked():
             self.language = 'en'
@@ -329,13 +331,16 @@ class InputTab(QWidget):
             # record the time series
             resin.get_time()
 
+
             # record the mesh for future visualization and calculations
-            logging.info('Processing the mesh')
             self.parent.inDialog()
             meshLoader = LoadMeshDialog('flux', resin.header)
             self.mesh = meshLoader.run()
             self.parent.outDialog()
-            logging.info('Finished processing the mesh')
+            if meshLoader.thread.canceled:
+                self.fluxBox.clear()
+                self.polygonNameBox.clear()
+                return
 
             # update the file summary
             self.summaryTextBox.appendPlainText(resin.get_summary())
@@ -408,6 +413,7 @@ class InputTab(QWidget):
             return
 
         flux_type, self.var_IDs, flux_title = self._getFluxSection()
+        self.parent.tab.setTabEnabled(1, False)
 
         self.csvNameBox.setText(filename)
         logging.info('Writing the output to %s' % filename)
@@ -426,16 +432,19 @@ class InputTab(QWidget):
                                               resin, names, self.polylines, sampling_frequency, self.mesh)
             progressBar.setValue(5)
             QApplication.processEvents()
-            progressBar.connectToThread(calculator)
 
             with open(filename, 'w') as f2:
+                progressBar.connectToThread(calculator)
                 calculator.write_csv(f2)
 
-        logging.info('Finished writing the output')
-        progressBar.setValue(100)
-        progressBar.cancelButton.setEnabled(True)
+        if not calculator.canceled:
+            progressBar.outputFinished()
         progressBar.exec_()
         self.parent.outDialog()
+
+        if calculator.canceled:
+            self.csvNameBox.clear()
+            return
 
         # unlock the image viewer
         self.parent.imageTab.getData(flux_title)

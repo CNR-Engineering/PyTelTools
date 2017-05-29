@@ -195,6 +195,8 @@ class InputTab(QWidget):
             meshLoader = LoadMeshDialog('comparison', resin.header)
             self.first_mesh = meshLoader.run()
             self.parent.outDialog()
+            if meshLoader.thread.canceled:
+                return
 
             # update the file summary
             self.firstSummaryTextBox.appendPlainText(resin.get_summary())
@@ -233,7 +235,8 @@ class InputTab(QWidget):
             meshLoader = LoadMeshDialog('comparison', resin.header)
             self.second_mesh = meshLoader.run()
             self.parent.outDialog()
-
+            if meshLoader.thread.canceled:
+                return
             # 
             # # check if the mesh is identical to the reference
             # if not np.all(self.ref_header.x == resin.header.x) or \

@@ -9,13 +9,11 @@ import pandas as pd
 
 from slf import Serafin
 from geom import Shapefile
-from gui.util import TemporalPlotViewer, MapViewer, MapCanvas, QPlainTextEditLogger, \
+from gui.util import TemporalPlotViewer, MapViewer, MapCanvas, QPlainTextEditLogger, OutputThread,\
     TableWidgetDragRows, OutputProgressDialog, LoadMeshDialog, handleOverwrite, TelToolWidget, testOpen
 
 
-class WriteCSVProcess(QThread):
-    tick = pyqtSignal(int, name='changed')
-
+class WriteCSVProcess(OutputThread):
     def __init__(self, mesh):
         super().__init__()
         self.mesh = mesh
@@ -35,6 +33,8 @@ class WriteCSVProcess(QThread):
         nb_frames = len(output_time)
 
         for index, time in enumerate(output_time):
+            if self.canceled:
+                return
             output_stream.write(str(time))
 
             var_values = []
@@ -42,6 +42,8 @@ class WriteCSVProcess(QThread):
                 var_values.append(input_stream.read_var_in_frame(index, var))
 
             for (i, j, k), interpolator in point_interpolators:
+                if self.canceled:
+                    return
                 for index_var in range(nb_selected_vars):
                     output_stream.write(';')
                     output_stream.write('%.6f' % interpolator.dot(var_values[index_var][[i, j, k]]))
@@ -390,7 +392,7 @@ class InputTab(QWidget):
         self.btnMap.setEnabled(False)
         self.btnOpenAttributes.setEnabled(False)
         self.mesh = None
-        self.btnOpenPoints.setEnabled(True)
+        self.btnOpenPoints.setEnabled(False)
         self.old_frequency = self.timeSampling.text()
 
         self.timeSampling.setText('1')
@@ -480,21 +482,23 @@ class InputTab(QWidget):
             # record the time series
             resin.get_time()
 
-            # update the file summary
-            self.summaryTextBox.appendPlainText(resin.get_summary())
-
             # record the mesh for future visualization and calculations
-            logging.info('Processing the mesh')
             self.parent.inDialog()
             meshLoader = LoadMeshDialog('interpolation', resin.header)
             self.mesh = meshLoader.run()
             self.parent.outDialog()
-            logging.info('Finished processing the mesh')
+            if meshLoader.thread.canceled:
+                self.pointsNameBox.clear()
+                return
+
+            # update the file summary
+            self.summaryTextBox.appendPlainText(resin.get_summary())
 
             # copy to avoid reading the same data in the future
             self.header = resin.header.copy()
             self.time = resin.time[:]
 
+        self.btnOpenPoints.setEnabled(True)
         self._resetDefaultOptions()
         self.parent.imageTab.reset()
 
@@ -608,7 +612,6 @@ class InputTab(QWidget):
         # initialize the progress bar
         process = WriteCSVProcess(self.mesh)
         progressBar = OutputProgressDialog()
-        progressBar.connectToThread(process)
 
         with Serafin.Read(self.filename, self.language) as resin:
             resin.header = self.header
@@ -618,15 +621,19 @@ class InputTab(QWidget):
             QApplication.processEvents()
 
             with open(filename, 'w') as fout:
+                progressBar.connectToThread(process)
                 process.write_csv(resin, selected_time, selected_var_IDs, fout,
                                   [self.points[i] for i in indices_inside],
                                   [self.point_interpolators[i] for i in indices_inside])
-
-        logging.info('Finished writing the output')
-        progressBar.setValue(100)
-        progressBar.cancelButton.setEnabled(True)
+        if not process.canceled:
+            progressBar.outputFinished()
         progressBar.exec_()
         self.parent.outDialog()
+
+        if process.canceled:
+            self.csvNameBox.clear()
+            return
+
         self.parent.imageTab.getData(selected_var_IDs, indices_inside)
         self.parent.tab.setTabEnabled(1, True)
 

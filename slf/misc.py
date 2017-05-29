@@ -257,7 +257,6 @@ def evaluate_expression(input_stream, time_index, expression):
 
 
 def arrival_duration(input_stream, time_indices, expression, comparator, threshold):
-    print(comparator, threshold)
     # first
     previous_time = input_stream.time[time_indices[0]]
     previous_value = evaluate_expression(input_stream, time_indices[0], expression)

@@ -12,12 +12,11 @@ from itertools import islice, cycle
 from slf import Serafin
 from geom import Shapefile, BlueKenue
 from gui.util import MapViewer, LineMapCanvas, QPlainTextEditLogger, TelToolWidget, testOpen, ColumnColorEditor,\
-    TableWidgetDropRows, TableWidgetDragRows, OutputProgressDialog, LoadMeshDialog, handleOverwrite, PlotViewer, SimpleTimeDateSelection
+    TableWidgetDropRows, TableWidgetDragRows, OutputProgressDialog, LoadMeshDialog, handleOverwrite, PlotViewer, \
+    SimpleTimeDateSelection, OutputThread
 
 
-class WriteCSVProcess(QThread):
-    tick = pyqtSignal(int, name='changed')
-
+class WriteCSVProcess(OutputThread):
     def __init__(self, mesh):
         super().__init__()
         self.mesh = mesh
@@ -47,6 +46,9 @@ class WriteCSVProcess(QThread):
                 distances.append(reference.project(Point(x, y)))
 
             for (x, y, (i, j, k), interpolator), distance in zip(line_interpolator, distances):
+                if self.canceled:
+                    return
+
                 if distance <= 0 or distance >= max_distance:
                     continue
                 output_stream.write(str(id_line+1))
@@ -237,7 +239,7 @@ class InputTab(QWidget):
 
         self.btnMap.setEnabled(False)
         self.mesh = None
-        self.btnOpenLines.setEnabled(True)
+        self.btnOpenLines.setEnabled(False)
         self.parent.reset()
 
         if not self.frenchButton.isChecked():
@@ -304,21 +306,24 @@ class InputTab(QWidget):
             # record the time series
             resin.get_time()
 
-            # update the file summary
-            self.summaryTextBox.appendPlainText(resin.get_summary())
-
             # record the mesh for future visualization and calculations
-            logging.info('Processing the mesh')
             self.parent.inDialog()
             meshLoader = LoadMeshDialog('interpolation', resin.header)
             self.mesh = meshLoader.run()
             self.parent.outDialog()
-            logging.info('Finished processing the mesh')
+            if meshLoader.thread.canceled:
+                self.linesNameBox.clear()
+                self.parent.reset()
+                return
+
+            # update the file summary
+            self.summaryTextBox.appendPlainText(resin.get_summary())
 
             # copy to avoid reading the same data in the future
             self.header = resin.header
             self.time = resin.time[:]
 
+        self.btnOpenLines.setEnabled(True)
         self._resetDefaultOptions()
 
     def btnOpenLinesEvent(self):
@@ -583,7 +588,6 @@ class CSVTab(QWidget):
         # initialize the progress bar
         process = WriteCSVProcess(self.input.mesh)
         progressBar = OutputProgressDialog()
-        progressBar.connectToThread(process)
 
         with Serafin.Read(self.input.filename, self.input.language) as resin:
             resin.header = self.input.header
@@ -593,6 +597,7 @@ class CSVTab(QWidget):
             QApplication.processEvents()
 
             with open(filename, 'w') as fout:
+                progressBar.connectToThread(process)
 
                 if self.intersect.isChecked():
                     process.write_csv(resin, selected_var_IDs, fout,
@@ -600,12 +605,13 @@ class CSVTab(QWidget):
                 else:
                     process.write_csv(resin, selected_var_IDs, fout,
                                       self.input.line_interpolators_internal, indices_nonempty, reference, time_index)
-
-        logging.info('Finished writing the output')
-        progressBar.setValue(100)
-        progressBar.cancelButton.setEnabled(True)
+        if not process.canceled:
+            progressBar.outputFinished()
         progressBar.exec_()
         self.parent.outDialog()
+        if process.canceled:
+            self.csvNameBox.clear()
+            return
 
 
 class ImageControlPanel(QWidget):
