@@ -1270,6 +1270,30 @@ class TemporalPlotViewer(PlotViewer):
         self.replot()
 
 
+class TelToolWidget(QWidget):
+    def __init__(self, parent):
+        super().__init__()
+        self.parent = parent
+        self.setMinimumWidth(600)
+        self.setWindowFlags(self.windowFlags() | Qt.CustomizeWindowHint)
+
+    def inDialog(self):
+        if self.parent is not None:
+            self.parent.inDialog()
+        else:
+            self.setWindowFlags(self.windowFlags() & ~Qt.WindowCloseButtonHint)
+            self.setEnabled(False)
+            self.show()
+
+    def outDialog(self):
+        if self.parent is not None:
+            self.parent.outDialog()
+        else:
+            self.setWindowFlags(self.windowFlags() | Qt.WindowCloseButtonHint)
+            self.setEnabled(True)
+            self.show()
+
+
 def testOpen(filename):
     try:
         with open(filename, 'rb') as f:

@@ -6,7 +6,7 @@ from PyQt5.QtCore import *
 
 import numpy as np
 
-from gui.util import PlotViewer, MapViewer, PolygonMapCanvas, ColorMapCanvas, LoadMeshDialog, TimeSlider, testOpen
+from gui.util import PlotViewer, MapViewer, PolygonMapCanvas, ColorMapCanvas, LoadMeshDialog, TimeSlider, TelToolWidget, testOpen
 from slf import Serafin
 from geom import BlueKenue, Shapefile
 
@@ -924,13 +924,11 @@ class BSSTab(QWidget):
         self.resultTextBox.appendPlainText(self.template.format(ref_time+1, test_time+1, init_time+1, bss))
 
 
-class CompareResultsGUI(QWidget):
+class CompareResultsGUI(TelToolWidget):
     def __init__(self, parent=None):
-        super().__init__()
-        self.parent = parent
+        super().__init__(parent)
 
         self.setMinimumWidth(800)
-        self.setWindowFlags(self.windowFlags() | Qt.CustomizeWindowHint)
         self.setWindowTitle('Compare two results on identical meshes')
 
         self.tab = QTabWidget()
@@ -981,22 +979,6 @@ class CompareResultsGUI(QWidget):
             self.tab.setTabEnabled(i+1, True)
         if self.input.ref_filename == self.input.test_filename:
             self.tab.setTabEnabled(4, False)
-
-    def inDialog(self):
-        if self.parent is not None:
-            self.parent.inDialog()
-        else:
-            self.setWindowFlags(self.windowFlags() & ~Qt.WindowCloseButtonHint)
-            self.setEnabled(False)
-            self.show()
-
-    def outDialog(self):
-        if self.parent is not None:
-            self.parent.outDialog()
-        else:
-            self.setWindowFlags(self.windowFlags() | Qt.WindowCloseButtonHint)
-            self.setEnabled(True)
-            self.show()
 
 
 def exception_hook(exctype, value, traceback):

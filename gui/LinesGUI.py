@@ -12,7 +12,7 @@ from itertools import islice, cycle
 
 from slf import Serafin
 from geom import Shapefile, BlueKenue
-from gui.util import MapViewer, LineMapCanvas, QPlainTextEditLogger, testOpen, \
+from gui.util import MapViewer, LineMapCanvas, QPlainTextEditLogger, TelToolWidget, testOpen, \
     TableWidgetDragRows, OutputProgressDialog, LoadMeshDialog, handleOverwrite, PlotViewer, SimpleTimeDateSelection
 
 
@@ -980,10 +980,9 @@ class MultiFrameImageTab(QWidget):
             self.control.varBox.addItem('%s (%s)' % (var_ID, var_name))
 
 
-class LinesGUI(QWidget):
+class LinesGUI(TelToolWidget):
     def __init__(self, parent=None):
-        super().__init__()
-        self.parent = parent
+        super().__init__(parent)
 
         self.input = InputTab(self)
         self.csvTab = CSVTab(self.input, self)
@@ -1007,8 +1006,6 @@ class LinesGUI(QWidget):
         mainLayout = QVBoxLayout()
         mainLayout.addWidget(self.tab)
         self.setLayout(mainLayout)
-        self.setWindowFlags(self.windowFlags() | Qt.CustomizeWindowHint)
-        self.setMinimumWidth(600)
 
     def reset(self):
         for i, tab in enumerate([self.csvTab, self.multiVarTab, self.multiFrameTab]):
@@ -1019,22 +1016,6 @@ class LinesGUI(QWidget):
         for i, tab in enumerate([self.csvTab, self.multiVarTab, self.multiFrameTab]):
             tab.getInput()
             self.tab.setTabEnabled(i+1, True)
-
-    def inDialog(self):
-        if self.parent is not None:
-            self.parent.inDialog()
-        else:
-            self.setWindowFlags(self.windowFlags() & ~Qt.WindowCloseButtonHint)
-            self.setEnabled(False)
-            self.show()
-
-    def outDialog(self):
-        if self.parent is not None:
-            self.parent.outDialog()
-        else:
-            self.setWindowFlags(self.windowFlags() | Qt.WindowCloseButtonHint)
-            self.setEnabled(True)
-            self.show()
 
 
 def exception_hook(exctype, value, traceback):

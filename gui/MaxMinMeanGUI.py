@@ -11,7 +11,7 @@ import copy
 from slf import Serafin
 import slf.misc as operations
 from gui.util import TableWidgetDragRows, QPlainTextEditLogger, handleOverwrite, \
-    OutputProgressDialog, TimeRangeSlider, testOpen
+    OutputProgressDialog, TimeRangeSlider, TelToolWidget, testOpen
 
 
 class TimeSelection(QWidget):
@@ -888,10 +888,9 @@ class ArrivalDurationTab(QWidget):
         self.parent.outDialog()
 
 
-class MaxMinMeanGUI(QWidget):
+class MaxMinMeanGUI(TelToolWidget):
     def __init__(self, parent=None):
-        super().__init__()
-        self.parent = parent
+        super().__init__(parent)
         self.setWindowTitle('Compute Max/Min/Mean')
 
         self.input = InputTab(self)
@@ -911,24 +910,6 @@ class MaxMinMeanGUI(QWidget):
         mainLayout = QVBoxLayout()
         mainLayout.addWidget(self.tab)
         self.setLayout(mainLayout)
-        self.setWindowFlags(self.windowFlags() | Qt.CustomizeWindowHint)
-        self.setMinimumWidth(600)
-
-    def inDialog(self):
-        if self.parent is not None:
-            self.parent.inDialog()
-        else:
-            self.setWindowFlags(self.windowFlags() & ~Qt.WindowCloseButtonHint)
-            self.setEnabled(False)
-            self.show()
-
-    def outDialog(self):
-        if self.parent is not None:
-            self.parent.outDialog()
-        else:
-            self.setWindowFlags(self.windowFlags() | Qt.WindowCloseButtonHint)
-            self.setEnabled(True)
-            self.show()
 
     def reset(self):
         for i, tab in enumerate([self.maxMinTab, self.arrivalDurationTab]):

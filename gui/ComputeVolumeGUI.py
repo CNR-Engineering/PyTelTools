@@ -11,7 +11,7 @@ from slf import Serafin
 from slf.volume import VolumeCalculator
 from geom import BlueKenue, Shapefile
 from gui.util import TemporalPlotViewer, QPlainTextEditLogger, MapViewer, PolygonMapCanvas, \
-    OutputProgressDialog, LoadMeshDialog, testOpen, handleOverwrite
+    OutputProgressDialog, LoadMeshDialog, TelToolWidget, testOpen, handleOverwrite
 
 
 class VolumeCalculatorThread(QThread):
@@ -543,11 +543,10 @@ class InputTab(QWidget):
         self.parent.tab.setTabEnabled(1, True)
 
 
-class ComputeVolumeGUI(QWidget):
+class ComputeVolumeGUI(TelToolWidget):
     def __init__(self, parent=None):
-        super().__init__()
-        self.parent = parent
-        
+        super().__init__(parent)
+
         self.input = InputTab(self)
         self.imageTab = VolumePlotViewer(self.input)
         self.setWindowTitle('Compute the volume of a variable inside polygons')
@@ -562,24 +561,6 @@ class ComputeVolumeGUI(QWidget):
         mainLayout = QVBoxLayout()
         mainLayout.addWidget(self.tab)
         self.setLayout(mainLayout)
-        self.setWindowFlags(self.windowFlags() | Qt.CustomizeWindowHint)
-        self.setMinimumWidth(600)
-
-    def inDialog(self):
-        if self.parent is not None:
-            self.parent.inDialog()
-        else:
-            self.setWindowFlags(self.windowFlags() & ~Qt.WindowCloseButtonHint)
-            self.setEnabled(False)
-            self.show()
-
-    def outDialog(self):
-        if self.parent is not None:
-            self.parent.outDialog()
-        else:
-            self.setWindowFlags(self.windowFlags() | Qt.WindowCloseButtonHint)
-            self.setEnabled(True)
-            self.show()
 
 
 def exception_hook(exctype, value, traceback):

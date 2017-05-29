@@ -11,7 +11,7 @@ from slf import Serafin
 from slf.flux import FluxCalculator
 from geom import BlueKenue, Shapefile
 from gui.util import TemporalPlotViewer, QPlainTextEditLogger, LineMapCanvas, MapViewer, \
-    OutputProgressDialog, LoadMeshDialog, handleOverwrite, testOpen
+    OutputProgressDialog, LoadMeshDialog, TelToolWidget, handleOverwrite, testOpen
 
 
 class FluxCalculatorThread(QThread):
@@ -547,12 +547,10 @@ class FluxPlotViewer(TemporalPlotViewer):
         self.current_columns = ('Section 1',)
 
 
-class ComputeFluxGUI(QWidget):
+class ComputeFluxGUI(TelToolWidget):
     def __init__(self, parent=None):
-        super().__init__()
-        self.parent = parent
+        super().__init__(parent)
 
-        self.setMinimumWidth(600)
         self.setWindowTitle('Compute the flux of a vector field across sections')
 
         self.input = InputTab(self)
@@ -568,23 +566,6 @@ class ComputeFluxGUI(QWidget):
         mainLayout = QVBoxLayout()
         mainLayout.addWidget(self.tab)
         self.setLayout(mainLayout)
-        self.setWindowFlags(self.windowFlags() | Qt.CustomizeWindowHint)
-
-    def inDialog(self):
-        if self.parent is not None:
-            self.parent.inDialog()
-        else:
-            self.setWindowFlags(self.windowFlags() & ~Qt.WindowCloseButtonHint)
-            self.setEnabled(False)
-            self.show()
-
-    def outDialog(self):
-        if self.parent is not None:
-            self.parent.outDialog()
-        else:
-            self.setWindowFlags(self.windowFlags() | Qt.WindowCloseButtonHint)
-            self.setEnabled(True)
-            self.show()
 
 
 def exception_hook(exctype, value, traceback):

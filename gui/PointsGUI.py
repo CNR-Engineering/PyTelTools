@@ -11,7 +11,7 @@ import pandas as pd
 from slf import Serafin
 from geom import Shapefile
 from gui.util import TemporalPlotViewer, MapViewer, MapCanvas, QPlainTextEditLogger, \
-    TableWidgetDragRows, OutputProgressDialog, LoadMeshDialog, handleOverwrite, testOpen
+    TableWidgetDragRows, OutputProgressDialog, LoadMeshDialog, handleOverwrite, TelToolWidget, testOpen
 
 
 class WriteCSVProcess(QThread):
@@ -786,10 +786,9 @@ class ImageTab(TemporalPlotViewer):
         self.current_columns = ('Point 1',)
 
 
-class PointsGUI(QWidget):
+class PointsGUI(TelToolWidget):
     def __init__(self, parent=None):
-        super().__init__()
-        self.parent = parent
+        super().__init__(parent)
 
         self.input = InputTab(self)
         self.imageTab = ImageTab(self.input)
@@ -805,24 +804,6 @@ class PointsGUI(QWidget):
         mainLayout = QVBoxLayout()
         mainLayout.addWidget(self.tab)
         self.setLayout(mainLayout)
-        self.setWindowFlags(self.windowFlags() | Qt.CustomizeWindowHint)
-        self.setMinimumWidth(600)
-
-    def inDialog(self):
-        if self.parent is not None:
-            self.parent.inDialog()
-        else:
-            self.setWindowFlags(self.windowFlags() & ~Qt.WindowCloseButtonHint)
-            self.setEnabled(False)
-            self.show()
-
-    def outDialog(self):
-        if self.parent is not None:
-            self.parent.outDialog()
-        else:
-            self.setWindowFlags(self.windowFlags() | Qt.WindowCloseButtonHint)
-            self.setEnabled(True)
-            self.show()
 
 
 def exception_hook(exctype, value, traceback):

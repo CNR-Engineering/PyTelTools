@@ -14,7 +14,7 @@ from slf import Serafin
 from slf.variables import get_available_variables, \
     do_calculations_in_frame, get_necessary_equations, get_US_equation, add_US
 from gui.util import TableWidgetDragRows, QPlainTextEditLogger, handleOverwrite, \
-    TimeRangeSlider, OutputProgressDialog, testOpen
+    TimeRangeSlider, OutputProgressDialog, TelToolWidget, testOpen
 
 _YELLOW = QColor(245, 255, 207)
 _GREEN = QColor(200, 255, 180)
@@ -987,10 +987,9 @@ class SubmitTab(QWidget):
         self.parent.outDialog()
 
 
-class ExtractVariablesGUI(QWidget):
+class ExtractVariablesGUI(TelToolWidget):
     def __init__(self, parent=None):
-        super().__init__()
-        self.parent = parent
+        super().__init__(parent)
 
         self.input = InputTab(self)
         self.timeTab = TimeTab(self, self.input)
@@ -1012,24 +1011,6 @@ class ExtractVariablesGUI(QWidget):
         mainLayout = QVBoxLayout()
         mainLayout.addWidget(self.tab)
         self.setLayout(mainLayout)
-        self.setWindowFlags(self.windowFlags() | Qt.CustomizeWindowHint)
-        self.setMinimumWidth(600)
-
-    def inDialog(self):
-        if self.parent is not None:
-            self.parent.inDialog()
-        else:
-            self.setWindowFlags(self.windowFlags() & ~Qt.WindowCloseButtonHint)
-            self.setEnabled(False)
-            self.show()
-
-    def outDialog(self):
-        if self.parent is not None:
-            self.parent.outDialog()
-        else:
-            self.setWindowFlags(self.windowFlags() | Qt.WindowCloseButtonHint)
-            self.setEnabled(True)
-            self.show()
 
     def switch_tab(self, index):
         if index == 2:
