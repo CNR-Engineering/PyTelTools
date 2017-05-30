@@ -13,11 +13,33 @@ from slf import Serafin
 from slf.variables import get_available_variables, \
     do_calculations_in_frame, get_necessary_equations, get_US_equation, add_US
 from gui.util import TableWidgetDragRows, QPlainTextEditLogger, handleOverwrite, \
-    TimeRangeSlider, OutputProgressDialog, TelToolWidget, testOpen
+    TimeRangeSlider, OutputProgressDialog, OutputThread, TelToolWidget, testOpen
 
 _YELLOW = QColor(245, 255, 207)
 _GREEN = QColor(200, 255, 180)
 _BLUE = QColor(200, 230, 250)
+
+
+class ExtractVariablesThread(OutputThread):
+    def __init__(self, necessary_equations, us_equation, input_stream, output_stream,
+                 output_header, time_indices):
+        super().__init__()
+        self.necessary_equations = necessary_equations
+        self.us_equation = us_equation
+        self.input_stream = input_stream
+        self.output_stream = output_stream
+        self.output_header = output_header
+        self.time_indices = time_indices
+        self.nb_frames = len(time_indices)
+
+    def run(self):
+        for i, time_index in enumerate(self.time_indices):
+            if self.canceled:
+                return
+            values = do_calculations_in_frame(self.necessary_equations, self.us_equation, self.input_stream, time_index,
+                                             self.output_header.var_IDs, self.output_header.np_float_type)
+            self.output_stream.write_entire_frame(self.output_header, self.input_stream.time[i], values)
+            self.tick.emit(5 + int(95 * (i+1) / self.nb_frames))
 
 
 class FrictionLawMessage(QDialog):
@@ -516,11 +538,11 @@ class InputTab(QWidget):
         """
 
         # add original variables to the table
-        for i, (id, name, unit) in enumerate(zip(self.header.var_IDs, self.header.var_names, self.header.var_units)):
+        for i, (var_ID, var_name, var_unit) in enumerate(zip(self.header.var_IDs, self.header.var_names, self.header.var_units)):
             self.firstTable.insertRow(self.firstTable.rowCount())
-            id_item = QTableWidgetItem(id.strip())
-            name_item = QTableWidgetItem(name.decode('utf-8').strip())
-            unit_item = QTableWidgetItem(unit.decode('utf-8').strip())
+            id_item = QTableWidgetItem(var_ID.strip())
+            name_item = QTableWidgetItem(var_name.decode('utf-8').strip())
+            unit_item = QTableWidgetItem(var_unit.decode('utf-8').strip())
             self.firstTable.setItem(i, 0, id_item)
             self.firstTable.setItem(i, 1, name_item)
             self.firstTable.setItem(i, 2, unit_item)
@@ -843,9 +865,9 @@ class TimeTab(QWidget):
 
 
 class SubmitTab(QWidget):
-    def __init__(self, input, timeSelection, parent):
+    def __init__(self, inputTab, timeSelection, parent):
         super().__init__()
-        self.input = input
+        self.input = inputTab
         self.timeSelection = timeSelection
         self.parent = parent
 
@@ -971,19 +993,15 @@ class SubmitTab(QWidget):
                 necessary_equations = get_necessary_equations(self.input.header.var_IDs, output_header.var_IDs,
                                                               self.input.us_equation)
 
-                for i in output_time_indices:
-                    vals = do_calculations_in_frame(necessary_equations, self.input.us_equation, resin, i,
-                                                    output_header.var_IDs, output_header.np_float_type)
-                    resout.write_entire_frame(output_header, self.input.time[i], vals)
-                    progressBar.setValue(5 + int(95 * (i+1) / len(output_time_indices)))
+                process = ExtractVariablesThread(necessary_equations, self.input.us_equation, resin, resout,
+                                                 output_header, output_time_indices)
+                progressBar.connectToThread(process)
+                process.run()
 
-        logging.info('Finished writing the output')
-        progressBar.setValue(100)
-        progressBar.cancelButton.setEnabled(True)
-        progressBar.exec_()
-
-        # enable close button
-        self.parent.outDialog()
+                if not process.canceled:
+                    progressBar.outputFinished()
+                progressBar.exec_()
+                self.parent.outDialog()
 
 
 class ExtractVariablesGUI(TelToolWidget):

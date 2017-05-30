@@ -12,6 +12,7 @@ from gui.ProjectLinesGUI import ProjectLinesGUI
 from gui.ComputeVolumeGUI import ComputeVolumeGUI
 from gui.CompareResultsGUI import CompareResultsGUI
 from gui.ComputeFluxGUI import ComputeFluxGUI
+from gui.ProjectMeshGUI import ProjectMeshGUI
 
 
 class MainPanel(QWidget):
@@ -22,6 +23,7 @@ class MainPanel(QWidget):
         points = PointsGUI(parent)
         lines = LinesGUI(parent)
         project = ProjectLinesGUI(parent)
+        mesh = ProjectMeshGUI(parent)
         volume = ComputeVolumeGUI(parent)
         compare = CompareResultsGUI(parent)
         flux = ComputeFluxGUI(parent)
@@ -33,6 +35,7 @@ class MainPanel(QWidget):
         self.stackLayout.addWidget(points)
         self.stackLayout.addWidget(lines)
         self.stackLayout.addWidget(project)
+        self.stackLayout.addWidget(mesh)
         self.stackLayout.addWidget(volume)
         self.stackLayout.addWidget(flux)
         self.stackLayout.addWidget(compare)
@@ -50,7 +53,7 @@ class MyMainWindow(QWidget):
         pageList = QListWidget()
         pageList.setMaximumWidth(200)
         for name in ['Start', 'Extract variables', 'Max/Min/Mean/Arrival/Duration', 'Interpolate on points',
-                     'Interpolate along lines', 'Project along lines',
+                     'Interpolate along lines', 'Project along lines', 'Project mesh',
                      'Compute volume', 'Compute flux', 'Compare two results']:
             pageList.addItem('\n' + name + '\n')
         pageList.setFlow(QListView.TopToBottom)
