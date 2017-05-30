@@ -45,15 +45,7 @@ class VolumeCalculatorThread(OutputThread):
             if self.canceled:
                 return []
             i_result = [str(self.calculator.input_stream.time[time_index])]
-
-            values = self.calculator.input_stream.read_var_in_frame(time_index, self.calculator.var_ID)
-            if self.calculator.second_var_ID is not None:
-                if self.calculator.second_var_ID == VolumeCalculator.INIT_VALUE:
-                    values -= init_values
-                else:
-                    second_values = self.calculator.input_stream.read_var_in_frame(time_index,
-                                                                                   self.calculator.second_var_ID)
-                    values -= second_values
+            values = self.calculator.read_values_in_frame(time_index, init_values)
 
             for j in range(len(self.calculator.polygons)):
                 if self.canceled:

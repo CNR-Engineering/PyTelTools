@@ -253,6 +253,16 @@ class VolumeCalculator:
                                                                                                    values[[a, b, c]])
             return volume_net, volume_positive, volume_net - volume_positive
 
+    def read_values_in_frame(self, time_index, init_values):
+        values = self.input_stream.read_var_in_frame(time_index, self.var_ID)
+        if self.second_var_ID is not None:
+            if self.second_var_ID == VolumeCalculator.INIT_VALUE:
+                values -= init_values
+            else:
+                second_values = self.input_stream.read_var_in_frame(time_index, self.second_var_ID)
+                values -= second_values
+        return values
+
     def run(self):
         self.construct_triangles()
         self.construct_weights()
@@ -265,14 +275,7 @@ class VolumeCalculator:
         for time_index in self.time_indices:
             i_result = [str(self.input_stream.time[time_index])]
 
-            values = self.input_stream.read_var_in_frame(time_index, self.var_ID)
-            if self.second_var_ID is not None:
-                if self.second_var_ID == VolumeCalculator.INIT_VALUE:
-                    values -= init_values
-                else:
-                    second_values = self.input_stream.read_var_in_frame(time_index, self.second_var_ID)
-                    values -= second_values
-
+            values = self.read_values_in_frame(time_index, init_values)
             for j in range(len(self.polygons)):
                 weight = self.weights[j]
                 volume = self.volume_in_frame_in_polygon(weight, values, self.polygons[j])

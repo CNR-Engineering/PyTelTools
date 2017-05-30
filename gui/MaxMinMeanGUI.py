@@ -9,7 +9,78 @@ import logging
 from slf import Serafin
 import slf.misc as operations
 from gui.util import TableWidgetDragRows, QPlainTextEditLogger, handleOverwrite, \
-    OutputProgressDialog, TimeRangeSlider, TelToolWidget, testOpen
+    OutputProgressDialog, TimeRangeSlider, TelToolWidget, testOpen, OutputThread
+
+
+class MaxMinMeanThread(OutputThread):
+    def __init__(self, max_min_type, input_stream, selected_scalars, selected_vectors,
+                 time_indices, additional_equations):
+        super().__init__()
+        self.has_scalar, self.has_vector = False, False
+        if selected_scalars:
+            self.has_scalar = True
+            self.scalar_calculator = operations.ScalarMaxMinMeanCalculator(max_min_type, input_stream,
+                                                                           selected_scalars, time_indices)
+        if selected_vectors:
+            self.has_vector = True
+            self.vector_calculator = operations.VectorMaxMinMeanCalculator(max_min_type, input_stream,
+                                                                           selected_vectors, time_indices,
+                                                                           additional_equations)
+        self.time_indices = time_indices
+        self.nb_frames = len(time_indices)
+
+    def run(self):
+        for i, time_index in enumerate(self.time_indices):
+            if self.canceled:
+                return []
+            if self.has_scalar:
+                self.scalar_calculator.max_min_mean_in_frame(time_index)
+            if self.has_vector:
+                self.vector_calculator.max_min_mean_in_frame(time_index)
+
+            self.tick.emit(int(95 * (i+1) / self.nb_frames))
+            QApplication.processEvents()
+
+        if self.has_scalar and not self.has_vector:
+            values = self.scalar_calculator.finishing_up()
+        elif not self.has_scalar and self.has_vector:
+            values = self.vector_calculator.finishing_up()
+        else:
+            values = np.vstack((self.scalar_calculator.finishing_up(), self.vector_calculator.finishing_up()))
+        return values
+
+
+class ArrivalDurationThread(OutputThread):
+    def __init__(self, input_stream, conditions, time_indices):
+        super().__init__()
+        self.input_stream = input_stream
+        self.time_indices = time_indices
+        self.conditions = conditions
+        self.nb_conditions = len(self.conditions)
+        self.nb_frames = len(time_indices)
+        self.calculators = []
+
+        for i, (expression, _, comparator, threshold) in enumerate(self.conditions):
+            self.calculators.append(operations.ArrivalDurationCalculator(self.input_stream, self.time_indices,
+                                                                         expression, comparator, threshold))
+
+    def run(self):
+
+        for i, index in enumerate(self.time_indices[1:]):
+            if self.canceled:
+                return []
+
+            for calculator in self.calculators:
+                calculator.arrival_duration_in_frame(index)
+
+            self.tick.emit(int(95 * (i+1) / self.nb_frames))
+            QApplication.processEvents()
+
+        values = np.empty((2*self.nb_conditions, self.input_stream.header.nb_nodes))
+        for i, calculator in enumerate(self.calculators):
+            values[2*i, :] = calculator.arrival
+            values[2*i+1, :] = calculator.duration
+        return values
 
 
 class TimeSelection(QWidget):
@@ -551,15 +622,11 @@ class MaxMinMeanTab(QWidget):
 
         # get the operation type
         if self.maxButton.isChecked():
-            scalar_operation = operations.scalar_max
-            vector_operation = operations.vector_max
+            max_min_type = operations.MAX
         elif self.minButton.isChecked():
-            scalar_operation = operations.scalar_min
-            vector_operation = operations.vector_min
+            max_min_type = operations.MIN
         else:
-            scalar_operation = operations.mean
-            vector_operation = operations.mean
-        scalar_values, vector_values = None, None
+            max_min_type = operations.MEAN
 
         # deduce header from selected variable IDs and write header
         output_header = self.getOutputHeader(scalars, vectors)
@@ -571,9 +638,8 @@ class MaxMinMeanTab(QWidget):
         output_message = 'Computing %s of variables %s between frame %d and %d.' \
                           % ('Max' if self.maxButton.isChecked() else ('Min' if self.minButton.isChecked() else 'Mean'),
                              str(output_header.var_IDs), start_index+1, end_index)
-
-        # disable close button
         self.parent.inDialog()
+        logging.info(output_message)
         progressBar = OutputProgressDialog()
 
         # do some calculations
@@ -585,30 +651,16 @@ class MaxMinMeanTab(QWidget):
             QApplication.processEvents()
 
             with Serafin.Write(filename, self.input.language, overwrite) as resout:
-                logging.info(output_message)
+                process = MaxMinMeanThread(max_min_type, resin, scalars, vectors, time_indices, additional_equations)
+                progressBar.connectToThread(process)
+                values = process.run()
 
-                resout.write_header(output_header)
-                if scalars:
-                    scalar_values = scalar_operation(resin, scalars, time_indices)
-                    progressBar.setValue(50)
-                if vectors:
-                    vector_values = vector_operation(resin, vectors, time_indices, additional_equations)
+                if not process.canceled:
+                    resout.write_header(output_header)
+                    resout.write_entire_frame(output_header, self.input.time[0], values)
+                    progressBar.outputFinished()
 
-                if scalars and not vectors:
-                    values = scalar_values
-                elif not scalars and vectors:
-                    values = vector_values
-                else:
-                    values = np.vstack((scalar_values, vector_values))
-
-                resout.write_entire_frame(output_header, self.input.time[0], values)
-
-        logging.info('Finished writing the output')
-        progressBar.setValue(100)
-        progressBar.cancelButton.setEnabled(True)
         progressBar.exec_()
-
-        # enable close button
         self.parent.outDialog()
 
 
@@ -734,6 +786,18 @@ class ArrivalDurationTab(QWidget):
                 else:
                     self.conditionTable.setItem(row, column, QTableWidgetItem(('D ' + condition_tight)[:16]))
 
+    def _convertTimeUnit(self, time_indices, values):
+        time_unit = self.unitBox.currentText()
+        if time_unit == 'minute':
+            values /= 60
+        elif time_unit == 'hour':
+            values /= 3600
+        elif time_unit == 'day':
+            values /= 86400
+        elif time_unit == 'percentage':
+            values *= 100 / (self.input.time[time_indices[-1]] - self.input.time[time_indices[0]])
+        return values
+
     def reset(self):
         self.conditions = []
         self.conditionTable.setRowCount(0)
@@ -809,6 +873,9 @@ class ArrivalDurationTab(QWidget):
                                  QMessageBox.Ok)
             return
 
+        # deduce header from selected variable IDs and write header
+        output_header = self.getOutputHeader()
+
         # create the save file dialog
         options = QFileDialog.Options()
         options |= QFileDialog.DontUseNativeDialog
@@ -833,16 +900,11 @@ class ArrivalDurationTab(QWidget):
         if overwrite is None:
             return
 
-        # disable close button
-        self.parent.inDialog()
-        progressBar = OutputProgressDialog()
-
-        # deduce header from selected variable IDs and write header
-        output_header = self.getOutputHeader()
-
         output_message = 'Computing Arrival / Duration between frame %d and %d.' \
                           % (start_index+1, end_index)
-        nb_conditions = len(self.conditions)
+        self.parent.inDialog()
+        logging.info(output_message)
+        progressBar = OutputProgressDialog()
 
         # do some calculations
         with Serafin.Read(self.input.filename, self.input.language) as resin:
@@ -851,38 +913,19 @@ class ArrivalDurationTab(QWidget):
 
             progressBar.setValue(5)
             QApplication.processEvents()
+
             with Serafin.Write(filename, self.input.language, overwrite) as resout:
-                logging.info(output_message)
+                process = ArrivalDurationThread(resin, self.conditions, time_indices)
+                progressBar.connectToThread(process)
+                values = process.run()
 
-                resout.write_header(output_header)
+                if not process.canceled:
+                    values = self._convertTimeUnit(time_indices, values)
+                    resout.write_header(output_header)
+                    resout.write_entire_frame(output_header, self.input.time[0], values)
+                    progressBar.outputFinished()
 
-                values = np.empty((2*nb_conditions, self.input.header.nb_nodes))
-                for i, (expression, _, comparator, threshold) in enumerate(self.conditions):
-                    arrival, duration = operations.arrival_duration(resin, time_indices,
-                                                                    expression, comparator, threshold)
-                    values[2*i, :] = arrival
-                    values[2*i+1, :] = duration
-
-                time_unit = self.unitBox.currentText()
-                if time_unit == 'minute':
-                    values /= 60
-                elif time_unit == 'hour':
-                    values /= 3600
-                elif time_unit == 'day':
-                    values /= 86400
-                elif time_unit == 'percentage':
-                    values *= 100 / (self.input.time[time_indices[-1]] - self.input.time[time_indices[0]])
-
-                resout.write_entire_frame(output_header, self.input.time[0], values)
-                progressBar.setValue(5 + 95 * (i+1) / nb_conditions)
-                QApplication.processEvents()
-
-        logging.info('Finished writing the output')
-        progressBar.setValue(100)
-        progressBar.cancelButton.setEnabled(True)
         progressBar.exec_()
-
-        # enable close button
         self.parent.outDialog()
 
 
