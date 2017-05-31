@@ -279,7 +279,10 @@ class InputTab(QWidget):
                 self._reinitSecond('')
             else:
                 self._reinitCommonFrames()
-                self.parent.getSecond(True, [])
+                if not self.common_frames:
+                    self._reinitSecond('')
+                else:
+                    self.parent.getSecond(True, [])
 
     def btnOpenSecondEvent(self):
         options = QFileDialog.Options()

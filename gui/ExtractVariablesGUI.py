@@ -15,10 +15,6 @@ from slf.variables import get_available_variables, \
 from gui.util import TableWidgetDragRows, QPlainTextEditLogger, handleOverwrite, \
     TimeRangeSlider, OutputProgressDialog, OutputThread, TelToolWidget, testOpen
 
-_YELLOW = QColor(245, 255, 207)
-_GREEN = QColor(200, 255, 180)
-_BLUE = QColor(200, 230, 250)
-
 
 class ExtractVariablesThread(OutputThread):
     def __init__(self, necessary_equations, us_equation, input_stream, output_stream,
@@ -393,6 +389,9 @@ class InputTab(QWidget):
         self.us_equation = None
         self.fall_velocities = []
 
+        self.YELLOW = QColor(245, 255, 207)
+        self.GREEN = QColor(200, 255, 180)
+        self.BLUE = QColor(200, 230, 250)
         self._initWidgets()  # some instance attributes will be set there
         self._setLayout()
         self._bindEvents()
@@ -560,9 +559,9 @@ class InputTab(QWidget):
             self.firstTable.setItem(offset+i, 0, id_item)
             self.firstTable.setItem(offset+i, 1, name_item)
             self.firstTable.setItem(offset+i, 2, unit_item)
-            self.firstTable.item(offset+i, 0).setBackground(_YELLOW)  # set new variables colors to yellow
-            self.firstTable.item(offset+i, 1).setBackground(_YELLOW)
-            self.firstTable.item(offset+i, 2).setBackground(_YELLOW)
+            self.firstTable.item(offset+i, 0).setBackground(self.YELLOW)  # set new variables colors to yellow
+            self.firstTable.item(offset+i, 1).setBackground(self.YELLOW)
+            self.firstTable.item(offset+i, 2).setBackground(self.YELLOW)
 
     def _reinitInput(self):
         """!
@@ -615,9 +614,9 @@ class InputTab(QWidget):
             self.firstTable.setItem(offset+i, 0, id_item)
             self.firstTable.setItem(offset+i, 1, name_item)
             self.firstTable.setItem(offset+i, 2, unit_item)
-            self.firstTable.item(offset+i, 0).setBackground(_GREEN)  # set new US color to green
-            self.firstTable.item(offset+i, 1).setBackground(_GREEN)
-            self.firstTable.item(offset+i, 2).setBackground(_GREEN)
+            self.firstTable.item(offset+i, 0).setBackground(self.GREEN)  # set new US color to green
+            self.firstTable.item(offset+i, 1).setBackground(self.GREEN)
+            self.firstTable.item(offset+i, 2).setBackground(self.GREEN)
 
         # lock the add US button again
         self.btnAddUS.setEnabled(False)
@@ -637,7 +636,7 @@ class InputTab(QWidget):
             for j in range(3):
                 item = QTableWidgetItem(table[i][j])
                 self.secondTable.setItem(offset+i, j, item)
-                self.secondTable.item(offset+i, j).setBackground(_BLUE)
+                self.secondTable.item(offset+i, j).setBackground(self.BLUE)
         for i in range(len(table)):
             self.fall_velocities.append(float(table[i][0][6:]))
 
