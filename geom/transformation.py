@@ -26,10 +26,11 @@ class Transformation:
         inverse_rotation = self.rotation.inverse()
         inverse_scaling = self.scaling.inverse()
         inverse_translation = self.translation.inverse()
-
+        inverse_dx, inverse_dy, inverse_dz = inverse_scaling.vector * \
+                                             inverse_rotation.rotation_matrix.dot(inverse_translation.vector)
         return Transformation(inverse_rotation.angle,
                               inverse_scaling.horizontal_factor, inverse_scaling.vertical_factor,
-                              inverse_translation.dx, inverse_translation.dy, inverse_translation.dz)
+                              inverse_dx, inverse_dy, inverse_dz)
 
 
 class Rotation:
@@ -138,6 +139,7 @@ def six_parameters_optimization(from_points, to_points):
     transform = Transformation(angle, horizontal_factor, vertical_factor, dx, dy, dz)
     final_value = sum([sum(np.square(transform(p1)-p2)) for p1, p2 in zip(from_points, to_points)])
     return transform, final_value, res.success, res.message
+
 
 
 

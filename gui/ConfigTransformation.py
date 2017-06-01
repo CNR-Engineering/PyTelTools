@@ -304,14 +304,13 @@ class AddTransformationDialog(QDialog):
 class EditTransformationDialog(QDialog):
     def __init__(self, from_label, to_label, trans, inverse_trans):
         super().__init__()
-        self.transformation = None
         self.deleted = False
 
         self.trans = trans
         self.inverse_trans = inverse_trans
         buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel,
                                    Qt.Horizontal, self)
-        buttons.accepted.connect(self.editDone)
+        buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
 
         deleteButton = QPushButton('Delete')
@@ -416,29 +415,29 @@ class EditTransformationDialog(QDialog):
 
     def edit_dx(self):
         try:
-            dx = float(self.dx.text())
-            self.inv_dx.setText(str(-dx))
+            _ = float(self.dx.text())
+            self.update()
         except ValueError:
             self.dx.setText(str(self.trans.translation.dx))
 
     def edit_dy(self):
         try:
-            dy = float(self.dy.text())
-            self.inv_dy.setText(str(-dy))
+            _ = float(self.dy.text())
+            self.update()
         except ValueError:
             self.dy.setText(str(self.trans.translation.dy))
 
     def edit_dz(self):
         try:
-            dz = float(self.dz.text())
-            self.inv_dz.setText(str(-dz))
+            _ = float(self.dz.text())
+            self.update()
         except ValueError:
             self.dz.setText(str(self.trans.translation.dz))
 
     def edit_angle(self):
         try:
-            angle = float(self.angle.text())
-            self.inv_angle.setText(str(-angle))
+            _ = float(self.angle.text())
+            self.update()
         except ValueError:
             self.angle.setText(str(self.trans.rotation.angle))
 
@@ -448,7 +447,7 @@ class EditTransformationDialog(QDialog):
             if scalexy == 0:
                 self.scalexy.setText(str(self.trans.scaling.horizontal_factor))
             else:
-                self.inv_scalexy.setText(str(1/scalexy))
+                self.update()
         except ValueError:
             self.scalexy.setText(str(self.trans.scaling.horizontal_factor))
 
@@ -456,37 +455,37 @@ class EditTransformationDialog(QDialog):
         try:
             scalez = float(self.scalez.text())
             if scalez == 0:
-                self.scalexy.setText(str(self.trans.scaling.vertical_factor))
+                self.scalez.setText(str(self.trans.scaling.vertical_factor))
             else:
-                self.inv_scalez.setText(str(1/scalez))
+                self.update()
         except ValueError:
             self.scalez.setText(str(self.trans.scaling.vertical_factor))
 
     def edit_inv_dx(self):
         try:
-            dx = float(self.inv_dx.text())
-            self.dx.setText(str(-dx))
+            _ = float(self.inv_dx.text())
+            self.update_inverse()
         except ValueError:
             self.inv_dx.setText(str(self.inverse_trans.translation.dx))
 
     def edit_inv_dy(self):
         try:
-            dy = float(self.inv_dy.text())
-            self.dy.setText(str(-dy))
+            _ = float(self.inv_dy.text())
+            self.update_inverse()
         except ValueError:
             self.inv_dy.setText(str(self.inverse_trans.translation.dy))
 
     def edit_inv_dz(self):
         try:
-            dz = float(self.inv_dz.text())
-            self.dz.setText(str(-dz))
+            _ = float(self.inv_dz.text())
+            self.update_inverse()
         except ValueError:
             self.inv_dz.setText(str(self.inverse_trans.translation.dz))
 
     def edit_inv_angle(self):
         try:
-            angle = float(self.inv_angle.text())
-            self.angle.setText(str(-angle))
+            _ = float(self.inv_angle.text())
+            self.update_inverse()
         except ValueError:
             self.inv_angle.setText(str(self.inverse_trans.rotation.angle))
 
@@ -496,7 +495,7 @@ class EditTransformationDialog(QDialog):
             if scalexy == 0:
                 self.inv_scalexy.setText(str(self.inverse_trans.scaling.horizontal_factor))
             else:
-                self.scalexy.setText(str(1/scalexy))
+                self.update_inverse()
         except ValueError:
             self.inv_scalexy.setText(str(self.inverse_trans.scaling.horizontal_factor))
 
@@ -506,16 +505,37 @@ class EditTransformationDialog(QDialog):
             if scalez == 0:
                 self.inv_scalez.setText(str(self.inverse_trans.scaling.vertical_factor))
             else:
-                self.scalez.setText(str(1/scalez))
+                self.update_inverse()
         except ValueError:
             self.inv_scalez.setText(str(self.inverse_trans.scaling.vertical_factor))
 
-    def editDone(self):
+    def update(self):
         angle, scalexy, scalez, dx, dy, dz = map(float, [box.text() for box in [self.angle,
                                                                                 self.scalexy, self.scalez,
                                                                                 self.dx, self.dy, self.dz]])
-        self.transformation = Transformation(angle, scalexy, scalez, dx, dy, dz)
-        self.accept()
+        self.trans = Transformation(angle, scalexy, scalez, dx, dy, dz)
+        self.inverse_trans = self.trans.inverse()
+
+        self.inv_dx.setText(str(self.inverse_trans.translation.dx))
+        self.inv_dy.setText(str(self.inverse_trans.translation.dy))
+        self.inv_dz.setText(str(self.inverse_trans.translation.dz))
+        self.inv_angle.setText(str(self.inverse_trans.rotation.angle))
+        self.inv_scalexy.setText(str(self.inverse_trans.scaling.horizontal_factor))
+        self.inv_scalez .setText(str(self.inverse_trans.scaling.vertical_factor))
+
+    def update_inverse(self):
+        angle, scalexy, scalez, dx, dy, dz = map(float, [box.text() for box in [self.inv_angle,
+                                                                                self.inv_scalexy, self.inv_scalez,
+                                                                                self.inv_dx, self.inv_dy, self.inv_dz]])
+        self.inverse_trans = Transformation(angle, scalexy, scalez, dx, dy, dz)
+        self.trans = self.inverse_trans.inverse()
+
+        self.dx.setText(str(self.trans.translation.dx))
+        self.dy.setText(str(self.trans.translation.dy))
+        self.dz.setText(str(self.trans.translation.dz))
+        self.angle.setText(str(self.trans.rotation.angle))
+        self.scalexy.setText(str(self.trans.scaling.horizontal_factor))
+        self.scalez .setText(str(self.trans.scaling.vertical_factor))
 
     def deleteEvent(self):
         msg = QMessageBox.warning(None, 'Confirm delete',
@@ -799,8 +819,8 @@ class TransformationMap(QWidget):
                                                    self.transformations[i, j], self.transformations[j, i])
                     value = dlg.exec_()
                     if value == QDialog.Accepted:
-                        self.transformations[i, j] = dlg.transformation
-                        self.transformations[j, i] = dlg.transformation.inverse()
+                        self.transformations[i, j] = dlg.trans
+                        self.transformations[j, i] = dlg.inverse_trans
                     elif value == QDialog.Rejected and dlg.deleted:
                         del self.transformations[i, j]
                         del self.transformations[j, i]
