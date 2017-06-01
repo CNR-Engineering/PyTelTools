@@ -302,6 +302,8 @@ class InputTab(QWidget):
         # create some text fields displaying the IO files info
         self.inNameBox = QLineEdit()
         self.inNameBox.setReadOnly(True)
+        self.inNameBox.setFixedHeight(30)
+
         self.summaryTextBox = QPlainTextEdit()
         self.summaryTextBox.setFixedHeight(50)
         self.summaryTextBox.setReadOnly(True)

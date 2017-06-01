@@ -1,7 +1,8 @@
+import numpy as np
 from .Geometry import Polyline
 
 
-class BKi2s:
+class BlueKenue:
     def __init__(self, filename, mode):
         self.filename = filename
         self.mode = mode
@@ -16,17 +17,22 @@ class BKi2s:
         self.file.close()
 
 
-class Read(BKi2s):
+class Read(BlueKenue):
     def __init__(self, filename):
         super().__init__(filename, 'r')
 
     def read_header(self):
         self.header = []
         while True:
-            line = self.file.readline().rstrip()
+            line = self.file.readline()
             self.header.append(line)
-            if line == ':EndHeader':
+            if line == ':EndHeader\n':
                 break
+            if not line:
+                self.header = []
+                self.file.seek(0)
+                return False
+        return True
 
     def get_polygons(self):
         while True:
@@ -74,6 +80,29 @@ class Read(BKi2s):
             # return only open polyline
             yield line_header, poly
 
+    def get_points(self):
+        for line in self.file.readlines():
+            if line == '\n':
+                continue
+            try:
+                x, y, z = tuple(map(float, line.rstrip().split()))
+            except ValueError:
+                continue
+            yield np.array([x, y, z])
+
+
+class Write(BlueKenue):
+    def __init__(self, filename):
+        super().__init__(filename, 'w')
+
+    def write_header(self, header):
+        for line in header:
+            self.file.write(line)
+
+    def write_points(self, points):
+        for p in points:
+            self.file.write(' '.join(map(str, p)))
+            self.file.write('\n')
 
 
 

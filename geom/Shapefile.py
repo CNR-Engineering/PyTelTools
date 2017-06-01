@@ -49,3 +49,12 @@ def get_points(input_filename, indices=None):
                 decoded_attributes = [decoded_attributes[i] for i in indices]
             yield tuple(record.shape.points[0]), decoded_attributes
 
+
+def write_points(output_filename, z_name, points):
+    w = shapefile.Writer(shapeType=1)
+    w.field(z_name, 'N', decimal=6)
+    for x, y, z in points:
+        w.point(x, y)
+        w.record(z)
+    w.save(output_filename)
+

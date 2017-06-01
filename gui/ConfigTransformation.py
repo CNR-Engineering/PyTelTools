@@ -4,29 +4,7 @@ from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 
-from geom.transformation import Transformation, transformation_optimization as optimize
-
-
-def is_connected(nodes, edge_list):
-    """ad hoc function for checking if an undirected graph is connected"""
-    adj = {}
-    for i in nodes:
-        adj[i] = set()
-    for u, v in edge_list:
-        adj[u].add(v)
-
-    visited = {}
-    for node in nodes:
-        visited[node] = False
-
-    stack = [nodes[0]]
-    while stack:
-        current_node = stack.pop()
-        if not visited[current_node]:
-            visited[current_node] = True
-            for neighbor in adj[current_node]:
-                stack.append(neighbor)
-    return all(visited.values())
+from geom.transformation import Transformation, is_connected, transformation_optimization as optimize
 
 
 class OptimizationDialog(QDialog):
@@ -727,6 +705,8 @@ class TransformationMap(QWidget):
                     angle, scalexy, scalez, dx, dy, dz = map(float, params.split())
                     new_transformations[i, j] = Transformation(angle, scalexy, scalez, dx, dy, dz)
                     new_transformations[j, i] = new_transformations[i, j].inverse()
+            if not is_connected(list(range(len(new_labels))), new_transformations.keys()):
+                raise ValueError
         except (ValueError, IndexError):
             QMessageBox.critical(self, 'Error', 'The configuration is not valid.',
                                  QMessageBox.Ok)

@@ -65,6 +65,52 @@ class Translation:
         return Translation(-self.dx, -self.dy, -self.dz)
 
 
+IDENTITY = Transformation(0, 1, 1, 0, 0, 0)
+
+
+class TransformationMap:
+    def __init__(self, labels, transformations):
+        self.labels = labels
+        self.transformations = transformations
+        self.nodes = list(range(len(labels)))
+
+        self.adj = {}
+        for i in self.nodes:
+            self.adj[i] = set()
+        for u, v in self.transformations.keys():
+            self.adj[u].add(v)
+
+    def _path(self, from_node, to_node):
+        visited = {}
+        for node in self.nodes:
+            visited[node] = False
+
+        stack = [from_node]
+        parent = {}
+        while stack:
+            current_node = stack.pop()
+            visited[current_node] = True
+            for neighbor in self.adj[current_node]:
+                if not visited[neighbor]:
+                    stack.append(neighbor)
+                    parent[neighbor] = current_node
+
+        path = []
+        current_node = to_node
+        while current_node != from_node:
+            previous_node = parent[current_node]
+            path.append((previous_node, current_node))
+            current_node = previous_node
+        path.reverse()
+        return path
+
+    def get_transformation(self, from_index, to_index):
+        if from_index == to_index:
+            return [IDENTITY]
+        path = self._path(from_index, to_index)
+        return [self.transformations[i, j] for i, j in path]
+
+
 def transformation_optimization(from_points, to_points, ignore_z):
     if ignore_z:
         return four_parameters_optimization(from_points, to_points)
@@ -141,5 +187,42 @@ def six_parameters_optimization(from_points, to_points):
     return transform, final_value, res.success, res.message
 
 
+def is_connected(nodes, edge_list):
+    """ad hoc function for checking if an undirected graph is connected"""
+    adj = {}
+    for i in nodes:
+        adj[i] = set()
+    for u, v in edge_list:
+        adj[u].add(v)
+
+    visited = {}
+    for node in nodes:
+        visited[node] = False
+
+    stack = [nodes[0]]
+    while stack:
+        current_node = stack.pop()
+        if not visited[current_node]:
+            visited[current_node] = True
+            for neighbor in adj[current_node]:
+                stack.append(neighbor)
+    return all(visited.values())
 
 
+def load_transformation_map(filename):
+    try:
+        with open(filename, 'r') as f:
+            labels = f.readline().rstrip().split('|')
+            f.readline()  # line for graphical objects
+            transformations = {}
+            for line in f.readlines():
+                i, j, params = line.rstrip().split('|')
+                i, j = int(i), int(j)
+                angle, scalexy, scalez, dx, dy, dz = map(float, params.split())
+                transformations[i, j] = Transformation(angle, scalexy, scalez, dx, dy, dz)
+                transformations[j, i] = transformations[i, j].inverse()
+        if not is_connected(list(range(len(labels))), transformations.keys()):
+            raise ValueError
+    except (ValueError, IndexError):
+        return False, None
+    return True, TransformationMap(labels, transformations)
