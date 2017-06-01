@@ -1,9 +1,10 @@
 Rtree
-descartes
-matplotlib
+shapely
 numpy
+scipy
+matplotlib
+descartes
 pandas
 PyQt5
 pyshp
 pytest
-shapely
