@@ -14,6 +14,7 @@ from gui.CompareResultsGUI import CompareResultsGUI
 from gui.ComputeFluxGUI import ComputeFluxGUI
 from gui.ProjectMeshGUI import ProjectMeshGUI
 from gui.ConfigTransformation import TransformationMap
+from gui.FileConverterGUI import FileConverterGUI
 
 
 class MainPanel(QWidget):
@@ -30,6 +31,7 @@ class MainPanel(QWidget):
         flux = ComputeFluxGUI(parent)
 
         trans = TransformationMap()
+        conv = FileConverterGUI(parent)
 
         self.stackLayout = QStackedLayout()
         self.stackLayout.addWidget(QLabel('Hello! This is the start page (TODO)'))
@@ -43,6 +45,7 @@ class MainPanel(QWidget):
         self.stackLayout.addWidget(flux)
         self.stackLayout.addWidget(compare)
         self.stackLayout.addWidget(trans)
+        self.stackLayout.addWidget(conv)
         self.setLayout(self.stackLayout)
 
         self.stackLayout.currentChanged.connect(parent.autoResize)
@@ -58,7 +61,8 @@ class MyMainWindow(QWidget):
         pageList.setMaximumWidth(200)
         for name in ['Start', 'Extract variables', 'Max/Min/Mean/Arrival/Duration', 'Interpolate on points',
                      'Interpolate along lines', 'Project along lines', 'Project mesh',
-                     'Compute volume', 'Compute flux', 'Compare two results', 'Transform coordinate systems']:
+                     'Compute volume', 'Compute flux', 'Compare two results',
+                     'Transform coordinate systems', 'Convert geom file formats']:
             pageList.addItem('\n' + name + '\n')
         pageList.setFlow(QListView.TopToBottom)
         pageList.currentRowChanged.connect(self.panel.layout().setCurrentIndex)
