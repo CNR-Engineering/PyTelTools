@@ -41,12 +41,12 @@ class MeshTransformThread(OutputThread):
         output_header.x = np.array([p[0] for p in points])
         output_header.y = np.array([p[1] for p in points])
 
-        self.tick.emit(5)
+        self.tick.emit(10)
         QApplication.processEvents()
 
         # write header
         self.output_stream.write_header(output_header)
-        self.tick.emit(10)
+        self.tick.emit(20)
         QApplication.processEvents()
 
         # copy values
@@ -58,7 +58,7 @@ class MeshTransformThread(OutputThread):
                 values[i, :] = self.input_stream.read_var_in_frame(time_index, var_ID)
             self.output_stream.write_entire_frame(output_header, time_value, values)
 
-            self.tick.emit(10 + 90 * (i+1) / self.nb_frames)
+            self.tick.emit(20 + 80 * (time_index+1) / self.nb_frames)
             QApplication.processEvents()
 
 
@@ -718,7 +718,7 @@ class MeshTransformTab(QWidget):
 class GeometryConverterGUI(TelToolWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle('Conversion between file formats')
+        self.setWindowTitle('Conversion between file formats and coordinate transformations')
 
         self.point = PointConverterTab()
         self.line = LineConverterTab()
