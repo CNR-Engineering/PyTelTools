@@ -210,7 +210,7 @@ class SerafinHeader:
         else:
             self.ikle_2d = self.ikle.reshape(self.nb_elements, self.nb_nodes_per_elem)
 
-        module_logger.info('Finished reading the header')
+        module_logger.debug('Finished reading the header')
 
     def summary(self):
         template = 'The file is of type {} {}. It has {} variable{},\non {} nodes and {} elements for {} time frames.'
@@ -336,8 +336,7 @@ class Read(Serafin):
         """
         # appropriate warning when trying to exact a single variable
         if not isinstance(var_ID, str):
-            module_logger.warn('ERROR: (use read_vars_in_frame instead?) Cannot read multiple variables')
-            raise SerafinRequestError('(use read_vars_in_frame instead?) Cannot read multiple variables')
+            raise SerafinRequestError('Cannot read multiple variables')
 
         nb_values = '>%i%s' % (self.header.nb_nodes, self.header.float_type)
         pos_var = self.var_ID_to_index(var_ID)
@@ -434,7 +433,7 @@ class Write(Serafin):
         """!
         @brief write all variables/nodes values
         @param time_to_write <float>: time in second
-        @param values <numpy 2D-array>: values to write
+        @param values <numpy 2D-array>: values to write, of dimension (nb_var, nb_nodes)
         """
         nb_values = '>%i%s' % (header.nb_nodes, header.float_type)
         self.file.write(struct.pack('>i', 4))

@@ -1,5 +1,5 @@
 """!
-Handle variables and their relationships in .slf files
+Handle variables and their relationships in .slf files for additional variable computation
 """
 
 
@@ -93,7 +93,7 @@ basic_vars_IDs = ['H', 'U', 'V', 'M', 'S', 'B', 'I', 'J', 'Q', 'C', 'F', 'US', '
 build_variables()
 H, U, V, M, S, B, I, J, Q, C, F, US, TAU, DMAX, HD, RB, \
 QS, QSX, QSY, QSBL, QSBLX, QSBLY, QSSUSP, QSSUSPX, QSSUSPY, EF, DF, W, ROUSE = [VARIABLES[var] for var in
-                                                                               basic_vars_IDs + ['W', 'ROUSE']]
+                                                                                basic_vars_IDs + ['W', 'ROUSE']]
 
 
 # define some special operators
@@ -171,15 +171,15 @@ def is_basic_variable(var_ID):
     """!
     @brief Determine if the input variable is a basic variable
     @param var_ID <str>: the ID (short name) of the variable
-    @return <bool>: True if the variable is one of the nine basic variables
+    @return <bool>: True if the variable is one of the basic variables
     """
     return var_ID in basic_vars_IDs
 
 
 def do_calculation(equation, input_values):
     """!
-    @brief Apply explicitly a ternary operator on input values
-    @param equation <Equation>: an equation containing a ternary operator
+    @brief Apply an equation on input values
+    @param equation <Equation>: an equation object
     @param input_values <[numpy 1D-array]>: the values of the input variables
     @return <numpy 1D-array>: the values of the output variable
     """

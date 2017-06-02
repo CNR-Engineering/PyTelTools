@@ -1,5 +1,5 @@
 """!
-Comparison between two .slf files
+Comparison between two .slf files with identical meshes
 """
 
 import numpy as np
@@ -9,13 +9,16 @@ from slf.volume import TruncatedTriangularPrisms
 
 class ReferenceMesh(TruncatedTriangularPrisms):
     """!
-    Compute different error measures when comparing a test mesh to a reference mesh
+    @brief Wrapper for computing error measures when comparing a test mesh to a reference mesh
+
+    The test mesh should have identical geometry to the reference mesh. Only the values are different.
+    The comparison region can be the whole mesh or the interior of a polygon.
     """
     def __init__(self, input_header, construct_index):
         super().__init__(input_header, construct_index)
         self.area = {}
-        self.point_weight = None
-        self.inverse_total_area = None
+        self.point_weight = []
+        self.inverse_total_area = 1
 
         self.nb_triangles_inside = 0
         self.inside_polygon = False
@@ -23,6 +26,10 @@ class ReferenceMesh(TruncatedTriangularPrisms):
         self.triangle_polygon_intersection = {}
 
     def add_polygon(self, polygon):
+        """!
+        @brief Initialize the weight on all points of the mesh depending on the comparison region
+        @param <geom.geometry.Polyline>: A polygon defining the comparison region or None if it is the whole mesh
+        """
         self.area = {}
         self.point_weight = np.zeros((self.nb_points,), dtype=np.float64)
 
@@ -66,6 +73,11 @@ class ReferenceMesh(TruncatedTriangularPrisms):
         self.inverse_total_area = 1 / total_area
 
     def mean_signed_deviation(self, values):
+        """!
+        @brief Compute the mean signed deviation between two meshes
+        @param <numpy.1D-array> values: The difference between the test mesh and the reference mesh
+        @return <float>: The value of the mean signed deviation
+        """
         if not self.inside_polygon:
             return self.point_weight.dot(values) * self.inverse_total_area
         else:
@@ -74,6 +86,11 @@ class ReferenceMesh(TruncatedTriangularPrisms):
             return (volume_boundary + self.point_weight.dot(values)) * self.inverse_total_area
 
     def mean_absolute_deviation(self, values):
+        """!
+        @brief Compute the mean absolute deviation between two meshes
+        @param <numpy.1D-array> values: The difference between the test mesh and the reference mesh
+        @return <float>: The value of the mean absolute deviation
+        """
         if not self.inside_polygon:
             return self.point_weight.dot(np.abs(values)) * self.inverse_total_area
         else:
@@ -83,6 +100,11 @@ class ReferenceMesh(TruncatedTriangularPrisms):
             return (volume_boundary + self.point_weight.dot(abs_values)) * self.inverse_total_area
 
     def root_mean_square_deviation(self, values):
+        """!
+        @brief Compute the root mean square deviation between two meshes
+        @param <numpy.1D-array> values: The difference between the test mesh and the reference mesh
+        @return <float>: The value of the root mean square deviation
+        """
         if not self.inside_polygon:
             return np.sqrt(self.point_weight.dot(np.square(values)) * self.inverse_total_area)
         else:
@@ -92,6 +114,11 @@ class ReferenceMesh(TruncatedTriangularPrisms):
             return np.sqrt((volume_boundary + self.point_weight.dot(squared_values)) * self.inverse_total_area)
 
     def element_wise_signed_deviation(self, values):
+        """!
+        @brief Compute the element wise signed deviation (signed deviation distribution) between two meshes
+        @param <numpy.1D-array> values: The difference between the test mesh and the reference mesh
+        @return <dict>: The value of the signed deviation for every triangles in the comparison area
+        """
         ewsd = {}
         for i, j, k in self.area:
             ewsd[i, j, k] = sum(values[[i, j, k]]) * self.area[i, j, k] / 3.0 * self.nb_triangles_inside \
@@ -104,6 +131,11 @@ class ReferenceMesh(TruncatedTriangularPrisms):
         return ewsd
 
     def quadratic_volume(self, values):
+        """!
+        @brief (Used in BSS calculations) Compute the quadratic volume between two meshes
+        @param <numpy.1D-array> values: The difference between the test mesh and the reference mesh
+        @return <float>: The value of the quadratic volume
+        """
         if not self.inside_polygon:
             return self.point_weight.dot(np.square(values))
         else:

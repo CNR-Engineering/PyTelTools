@@ -160,6 +160,10 @@ class OptimizationDialog(QDialog):
             QMessageBox.critical(self, 'Error', 'Two systems should have the same number of coordinates!',
                                  QMessageBox.Ok)
             return False, [], []
+        if len(from_points) < 3:
+            QMessageBox.critical(self, 'Error', 'Please enter the coordinates of at least 3 points.',
+                                 QMessageBox.Ok)
+            return False, [], []
         return True, from_points, to_points
 
     def run(self):
@@ -705,13 +709,16 @@ class TransformationMap(QWidget):
                     angle, scalexy, scalez, dx, dy, dz = map(float, params.split())
                     new_transformations[i, j] = Transformation(angle, scalexy, scalez, dx, dy, dz)
                     new_transformations[j, i] = new_transformations[i, j].inverse()
+            if len(new_labels) < 2:
+                raise ValueError
             if not is_connected(list(range(len(new_labels))), new_transformations.keys()):
                 raise ValueError
         except (ValueError, IndexError):
             QMessageBox.critical(self, 'Error', 'The configuration is not valid.',
                                  QMessageBox.Ok)
             return
-
+        self.btnAddConnect.setEnabled(False)
+        self.btnSave.setEnabled(True)
         self.labels = new_labels
         self.rectangles = new_rectangles
         self.transformations = new_transformations

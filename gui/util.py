@@ -22,7 +22,6 @@ import matplotlib.lines as mlines
 
 from matplotlib.colors import Normalize, colorConverter
 from mpl_toolkits.axes_grid1 import make_axes_locatable
-from rtree.index import Index
 
 from slf.volume import TruncatedTriangularPrisms
 from slf.flux import TriangularVectorField
@@ -624,8 +623,6 @@ class ConstructIndexThread(OutputThread):
 
     def run(self):
         logging.info('Processing the mesh')
-        self.mesh.index = Index()
-
         # emit a signal for every five percent of triangles processed
         five_percent = 0.05 * self.mesh.nb_triangles
         nb_processed = 0

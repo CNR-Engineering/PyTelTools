@@ -1,6 +1,5 @@
 """!
 Barycentric interpolation in triangles
-
 """
 
 import numpy as np
@@ -8,8 +7,9 @@ from slf.mesh2D import Mesh2D
 
 
 class Interpolator:
-    VEC0 = np.array([1, 0, 0])
-
+    """!
+    Wrapper for calculating the barycentric coordinates of 2d points in a 2d triangle
+    """
     def __init__(self, triangle):
         p1, p2, p3 = tuple(map(list, list(triangle.exterior.coords)[:-1]))
         self.x1, self.y1 = p1
@@ -17,14 +17,21 @@ class Interpolator:
         x3, y3 = p3
         self.vec_x = np.array([x2-x3, x3-self.x1, self.x1-x2])
         self.vec_y = np.array([y2-y3, y3-self.y1, self.y1-y2])
-        self.norm_z = (x2-self.x1) * (y3-self.y1) - (y2-self.y1) * (x3-self.x1)
-        self.inv_norm_z = 1 / self.norm_z
+        norm_z = (x2-self.x1) * (y3-self.y1) - (y2-self.y1) * (x3-self.x1)
+        self.vec_norm_z = np.array([norm_z, 0, 0])
+        self.inv_norm_z = 1 / norm_z
 
     def get_interpolator_at(self, x, y):
-        return (Interpolator.VEC0 * self.norm_z + (x-self.x1) * self.vec_y - (y-self.y1) * self.vec_x) * self.inv_norm_z
+        """!
+        @brief Return the barycentric coordinates of the point (x, y)
+        """
+        return (self.vec_norm_z + (x-self.x1) * self.vec_y - (y-self.y1) * self.vec_x) * self.inv_norm_z
 
     def is_in_triangle(self, x, y):
-        coord = (Interpolator.VEC0 * self.norm_z + (x-self.x1) * self.vec_y - (y-self.y1) * self.vec_x) * self.inv_norm_z
+        """!
+        @brief Return a boolean indicating if the point (x, y) is in the triangle, and its barycentric coordinates
+        """
+        coord = (self.vec_norm_z + (x-self.x1) * self.vec_y - (y-self.y1) * self.vec_x) * self.inv_norm_z
         return np.all(coord >= 0) and np.all(coord <= 1), coord
 
 

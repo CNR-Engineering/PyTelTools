@@ -11,6 +11,11 @@ from slf.mesh2D import Mesh2D
 class TriangularVectorField(Mesh2D):
     """!
     @brief The representation of Mesh2D in Serafin file when one computes the flux across sections of some vectors
+
+    The integral of scalars along a line can also be computed.
+
+    The flux across a section (or integral along a line) is the sum of the flux (or integral) on
+    all intersected segments between the mesh and the section.
     """
     def __init__(self, input_header, construct_index):
         super().__init__(input_header, construct_index)
@@ -18,7 +23,7 @@ class TriangularVectorField(Mesh2D):
     def section_intersection(self, section):
         """!
         @brief Return the intersections (normal vectors and interpolators) of the mesh with a open polyline
-        @param <geom.Polyline> section: An open polyline
+        @param <geom.geometry.Polyline> section: An open polyline
         @return <dict>: The list of tuples (normal vector, interpolator) of every intersected segments in triangles
         """
         intersections = {}
@@ -30,7 +35,7 @@ class TriangularVectorField(Mesh2D):
                 interpolator = Interpolator(t)
                 intersections[i, j, k] = []
                 for intersection in t_intersections:
-                    line = []
+                    line = []   # the list of tuple (normal_vector, interpolator) for all start/end/turning points
                     prev_x, prev_y = None, None
                     for x, y in intersection.coords:
                         if prev_x is None:  # the first point doesn't have a normal vector
@@ -48,33 +53,33 @@ class TriangularVectorField(Mesh2D):
         @brief The line integral of a scalar field along a line (not really a flux)
         """
         flux = 0
-        for i, j, k in intersections:
+        for i, j, k in intersections:  # iterating through triangles in the intersection
             f_vals = scalar_flux_values[[i, j, k]]
 
             for endpoints in intersections[i, j, k]:
                 endpoints_f = []
 
-                for normal, interpolator in endpoints:
+                for normal, interpolator in endpoints:  # pre-compute the values on each start/turning/end points
                     endpoints_f.append(interpolator.dot(f_vals))
 
-                for p in range(len(endpoints)-1):
+                for p in range(len(endpoints)-1):  # iterating through intersecting segments inside the triangle
                     flux += (endpoints_f[p] + endpoints_f[p+1]) * np.linalg.norm(endpoints[p+1][0])
         return flux / 2
 
     @staticmethod
     def line_double_integral(intersections, height_values, scalar_flux_values):
         """!
-        @brief The line integral of a scalar field across a section (not really a flux)
+        @brief The line integral of a scalar field (product of two scalars) across a section (not really a flux)
         """
         flux = 0
-        for i, j, k in intersections:
+        for i, j, k in intersections:  # iterating through triangles in the intersection
             h_vals = height_values[[i, j, k]]
             f_vals = scalar_flux_values[[i, j, k]]
 
             for endpoints in intersections[i, j, k]:
                 endpoints_h, endpoints_f = [], []
 
-                for normal, interpolator in endpoints:
+                for normal, interpolator in endpoints:  # pre-compute the values on each start/turning/end points
                     endpoints_h.append(interpolator.dot(h_vals))
                     endpoints_f.append(interpolator.dot(f_vals))
 
@@ -93,14 +98,14 @@ class TriangularVectorField(Mesh2D):
         @brief The flux of a vector field across a line
         """
         flux = 0
-        for i, j, k in intersections:
+        for i, j, k in intersections:  # iterating through triangles in the intersection
             x_vals = x_vector_values[[i, j, k]]
             y_vals = y_vector_values[[i, j, k]]
 
             for endpoints in intersections[i, j, k]:
                 endpoints_x, endpoints_y = [], []
 
-                for normal, interpolator in endpoints:
+                for normal, interpolator in endpoints:  # pre-compute the values on each start/turning/end points
                     endpoints_x.append(interpolator.dot(x_vals))
                     endpoints_y.append(interpolator.dot(y_vals))
 
@@ -117,10 +122,10 @@ class TriangularVectorField(Mesh2D):
     @staticmethod
     def area_flux(intersections, x_vector_values, y_vector_values, height_values):
         """!
-        @brief The flux of a vector field across a section (length times height)
+        @brief The flux of a vector field across a section (the surface height is a scalar field)
         """
         flux = 0
-        for i, j, k in intersections:
+        for i, j, k in intersections:  # iterating through triangles in the intersection
             x_vals = x_vector_values[[i, j, k]]
             y_vals = y_vector_values[[i, j, k]]
             h_vals = height_values[[i, j, k]]
@@ -128,7 +133,7 @@ class TriangularVectorField(Mesh2D):
             for endpoints in intersections[i, j, k]:
                 endpoints_x, endpoints_y, endpoints_h = [], [], []
 
-                for normal, interpolator in endpoints:
+                for normal, interpolator in endpoints:  # pre-compute the values on each start/turning/end points
                     endpoints_x.append(interpolator.dot(x_vals))
                     endpoints_y.append(interpolator.dot(y_vals))
                     endpoints_h.append(interpolator.dot(h_vals))
@@ -149,10 +154,10 @@ class TriangularVectorField(Mesh2D):
     @staticmethod
     def mass_flux(intersections, x_vector_values, y_vector_values, height_values, density_values):
         """!
-        @brief The mass-flux of a vector field across a section (length times height times density)
+        @brief The mass-flux of a vector field across a section (with surface height and density, two scalars fields)
         """
         flux = 0
-        for i, j, k in intersections:
+        for i, j, k in intersections:  # iterating through triangles in the intersection
             x_vals = x_vector_values[[i, j, k]]
             y_vals = y_vector_values[[i, j, k]]
             h_vals = height_values[[i, j, k]]
@@ -161,7 +166,7 @@ class TriangularVectorField(Mesh2D):
             for endpoints in intersections[i, j, k]:
                 endpoints_x, endpoints_y, endpoints_h, endpoints_d = [], [], [], []
 
-                for normal, interpolator in endpoints:
+                for normal, interpolator in endpoints:  # pre-compute the values on each start/turning/end points
                     endpoints_x.append(interpolator.dot(x_vals))
                     endpoints_y.append(interpolator.dot(y_vals))
                     endpoints_h.append(interpolator.dot(h_vals))
@@ -184,6 +189,10 @@ class TriangularVectorField(Mesh2D):
 
 
 class FluxCalculator:
+    """!
+    Compute flux across sections (integral along lines) from a .slf input stream
+    """
+
     LINE_INTEGRAL, DOUBLE_LINE_INTEGRAL, LINE_FLUX, AREA_FLUX, MASS_FLUX = 0, 1, 2, 3, 4
 
     def __init__(self, flux_type, var_IDs, input_stream, section_names, sections, time_sampling_frequency):
@@ -203,10 +212,18 @@ class FluxCalculator:
         self.mesh = TriangularVectorField(self.input_stream.header, True)
 
     def construct_intersections(self):
+        """!
+        Construct the intersections between the mesh and all input sections
+        """
         for section in self.sections:
             self.intersections.append(self.mesh.section_intersection(section))
 
     def flux_in_frame(self, intersections, values):
+        """!
+        @brief Do the flux computation in a single frame, depending on the flux type
+        @param <numpy.1D-array> values: The values of the scalar/vector fields
+        @return <float>: The value of the flux
+        """
         if self.flux_type == FluxCalculator.LINE_INTEGRAL:
             return TriangularVectorField.line_integral(intersections, values[0])
         elif self.flux_type == FluxCalculator.DOUBLE_LINE_INTEGRAL:
@@ -219,6 +236,9 @@ class FluxCalculator:
             return TriangularVectorField.mass_flux(intersections, values[0], values[1], values[2], values[3])
 
     def run(self):
+        """!
+        Separate the major part of the computation, allowing a GUI override
+        """
         self.construct_triangles()
         self.construct_intersections()
         result = []

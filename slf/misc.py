@@ -1,7 +1,13 @@
+"""!
+Simple computation/evaluation of variable values in .slf
+"""
+
 import numpy as np
 import logging
 import re
 from slf.variables import get_available_variables, get_necessary_equations, do_calculation
+
+module_logger = logging.getLogger(__name__)
 
 # constants
 OPERATORS = ['+', '-', '*', '/', '^', 'sqrt']
@@ -15,10 +21,12 @@ _VECTORS = {'U': ('V', 'M'), 'V': ('U', 'M'), 'QSX': ('QSY', 'QS'), 'QSY': ('QSX
             'QSSUSPX': ('QSSUSPY', 'QSSUSP'), 'QSSUSPY': ('QSSUSPX', 'QSSUSP'),
             'I': ('J', 'Q'), 'J': ('I', 'Q')}
 
-module_logger = logging.getLogger(__name__)
-
 
 class ScalarMaxMinMeanCalculator:
+    """!
+    Compute max/min/mean of scalar variables from a .slf input stream
+    """
+
     def __init__(self, max_min_type, input_stream, selected_scalars, time_indices):
         self.maxmin = max_min_type
         self.input_stream = input_stream
@@ -58,6 +66,10 @@ class ScalarMaxMinMeanCalculator:
 
 
 class VectorMaxMinMeanCalculator:
+    """!
+    Compute max/min/mean of vector variables from a .slf input stream
+    """
+
     def __init__(self, max_min_type, input_stream, selected_vectors, time_indices, additional_equations):
         self.maxmin = max_min_type
         self.input_stream = input_stream
@@ -131,6 +143,9 @@ class VectorMaxMinMeanCalculator:
 
 
 class ArrivalDurationCalculator:
+    """!
+    Compute arrival/duration of conditions (defined by an expression, a comparator and a threshold) from a .slf input stream
+    """
     def __init__(self, input_stream, time_indices, expression, comparator, threshold):
         self.input_stream = input_stream
         self.time_indices = time_indices
@@ -188,19 +203,25 @@ class ArrivalDurationCalculator:
 
 
 def scalars_vectors(known_vars, selected_vars):
+    """!
+    @brief Separate the scalars from vectors, allowing different max/min computations
+    @param <list> known_vars: the list of variable IDs with known values
+    @param <str> selected_vars: the selected variables IDs
+    @return <tuple>: the list of scalars, the list of vectors, the list of additional equations for magnitudes
+    """
     scalars = []
     vectors = []
     additional_equations = {}
     for var, name, unit in selected_vars:
         if var in _VECTORS:
             brother, mother = _VECTORS[var]
-            if mother in known_vars:
+            if mother in known_vars:  # if the magnitude is known
                 vectors.append((var, name, unit))
-            elif brother in known_vars:
+            elif brother in known_vars:  # if the magnitude is unknown but the orthogonal field is known
                 vectors.append((var, name, unit))
                 additional_equations[mother] = get_necessary_equations(known_vars, [mother], None)
             else:
-                # handle the special case for I and J
+                # handle the special case for I and J (the magnitude may be computed from U, V, H, S, B, RB, HD)
                 if var == 'I' or var == 'J':
                     computable_variables = get_available_variables(known_vars)
                     if 'Q' in map(lambda x: x.ID(), computable_variables):
@@ -216,13 +237,16 @@ def scalars_vectors(known_vars, selected_vars):
 
 
 def tighten_expression(expression):
-    """
-    Remove the spaces and brackets to get a nice expression
+    """!
+    Remove the spaces and brackets to get a nice and short expression for display
     """
     return re.sub('(\s+|\[|\])', '', expression)
 
 
 def to_infix(expression):
+    """!
+    Convert an expression string to an infix expression (list of varIDs, constants, parenthesis and operators)
+    """
     return list(filter(None, map(lambda x: x.strip(), re.split('(\d+\.*\d+E*e*-*\d+|(?!e)-|(?!E)-'
                                                                '|[+*()^/]|\[[A-Z]+\])', expression))))
 
@@ -280,6 +304,13 @@ def is_valid_postfix(expression):
 
 
 def evaluate_expression(input_stream, time_index, expression):
+    """!
+    @brief Evaluate a postfix expression on the input stream for a single frame
+    @param <slf.Serafin.Read> input_stream: the input .slf
+    @param <int> time_index: the index of the frame
+    @param <list> expression: the expression to evaluate in postfix format
+    @return <numpy.1D-array>: the value of the expression
+    """
     nb_nodes = input_stream.header.nb_nodes
     stack = []
 
@@ -293,9 +324,9 @@ def evaluate_expression(input_stream, time_index, expression):
                 second_operand = stack.pop()
                 stack.append(_OPERATIONS[symbol](first_operand, second_operand))
         else:
-            if symbol[0] == '[':
+            if symbol[0] == '[':  # variable ID
                 stack.append(input_stream.read_var_in_frame(time_index, symbol[1:-1]))
-            else:
+            else:  # constant
                 stack.append(np.ones((nb_nodes,)) * float(symbol))
 
     return stack.pop()

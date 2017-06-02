@@ -1,5 +1,9 @@
+"""!
+Read and write .shp files
+"""
+
 import shapefile
-from .Geometry import Polyline
+from .geometry import Polyline
 
 
 def get_open_polylines(input_filename):
@@ -50,11 +54,11 @@ def get_points(input_filename, indices=None):
             yield tuple(record.shape.points[0]), decoded_attributes
 
 
-def write_points(output_filename, z_name, points):
-    w = shapefile.Writer(shapeType=1)
+def write_xyz_points(output_filename, z_name, points):
+    w = shapefile.Writer(shapeType=11)
     w.field(z_name, 'N', decimal=6)
     for x, y, z in points:
-        w.point(x, y)
+        w.point(x, y, z)
         w.record(z)
     w.save(output_filename)
 

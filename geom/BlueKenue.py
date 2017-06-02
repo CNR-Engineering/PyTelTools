@@ -1,5 +1,9 @@
+"""!
+Read and write .i2s/.i3s/.xyz files
+"""
+
 import numpy as np
-from .Geometry import Polyline
+from .geometry import Polyline
 
 
 class BlueKenue:

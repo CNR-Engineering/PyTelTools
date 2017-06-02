@@ -1,8 +1,17 @@
+"""!
+Similarity transformations between multiple coordinate systems
+"""
+
+
 import numpy as np
 import scipy.optimize
 
 
 class Transformation:
+    """!
+    @brief Transformation between two coordinate systems
+    A transformation is a composition of rotation, scaling and translation on 3d vectors.
+    """
     def __init__(self, angle, horizontal_factor, vertical_factor, dx, dy, dz):
         self.rotation = Rotation(angle)
         self.scaling = Scaling(horizontal_factor, vertical_factor)
@@ -23,6 +32,12 @@ class Transformation:
                           (self.translation.dx, self.translation.dy, self.translation.dz)])
 
     def inverse(self):
+        """!
+        @brief The inverse transformation
+        The inverse transformation is a transformation with inverse rotation, inverse scaling
+        and a translation vector that is equal to the result of inverse rotation and inverse scaling
+        of the inverse translation vector
+        """
         inverse_rotation = self.rotation.inverse()
         inverse_scaling = self.scaling.inverse()
         inverse_translation = self.translation.inverse()
@@ -34,6 +49,9 @@ class Transformation:
 
 
 class Rotation:
+    """!
+    @brief Rotation around z axis
+    """
     def __init__(self, angle):
         self.angle = angle
         cos = np.cos(self.angle)
@@ -45,6 +63,10 @@ class Rotation:
 
 
 class Scaling:
+    """!
+    @brief Heterogeneous scaling along xy axis and along z axis
+    The scaling factors along x and along y are restricted to be equal
+    """
     def __init__(self, horizontal_factor, vertical_factor):
         self.horizontal_factor = horizontal_factor
         self.vertical_factor = vertical_factor
@@ -55,6 +77,9 @@ class Scaling:
 
 
 class Translation:
+    """!
+    @brief Translation of 3d vectors
+    """
     def __init__(self, dx, dy, dz):
         self.dx = dx
         self.dy = dy
@@ -65,10 +90,16 @@ class Translation:
         return Translation(-self.dx, -self.dy, -self.dz)
 
 
+# the identity transformation
 IDENTITY = Transformation(0, 1, 1, 0, 0, 0)
 
 
 class TransformationMap:
+    """!
+    @brief Transformations between multiple coordinate systems
+    A transformation has a list of coordinate systems with labels
+    and a spanning tree of transformations (between two systems)
+    """
     def __init__(self, labels, transformations):
         self.labels = labels
         self.transformations = transformations
@@ -81,6 +112,9 @@ class TransformationMap:
             self.adj[u].add(v)
 
     def _path(self, from_node, to_node):
+        """!
+        @brief ad hoc function for finding the path from from_node to to_node in the spanning tree
+        """
         visited = {}
         for node in self.nodes:
             visited[node] = False
@@ -105,6 +139,12 @@ class TransformationMap:
         return path
 
     def get_transformation(self, from_index, to_index):
+        """!
+        @brief Get the series of transformations needed to transform coordinates in the first system to the second
+        @param <int> from_index: the index of the first coordinate system
+        @param <int> to_index: the index of the second coordinate system
+        @return <list of Transformation>: the list of transformations from the first system to the second
+        """
         if from_index == to_index:
             return [IDENTITY]
         path = self._path(from_index, to_index)
@@ -112,12 +152,25 @@ class TransformationMap:
 
 
 def transformation_optimization(from_points, to_points, ignore_z):
+    """!
+    @brief Wrapper for optimization methods for transformations from one coordinate system to another
+    @param <list> from_points: coordinates of points in the first coordinate system
+    @param <list> to_points: the coordinates of the same points in the second coordinate system
+    @param <bool> ignore_z: if True, optimize for 4 parameters instead of 6 (identity along z-axis)
+    @return <tuple>: the final transformation, final cost function value, boolean indicating success and a message
+    """
     if ignore_z:
         return four_parameters_optimization(from_points, to_points)
     return six_parameters_optimization(from_points, to_points)
 
 
 def four_parameters_optimization(from_points, to_points):
+    """!
+    @brief Optimize four parameters of the transformation from one coordinate system to another (identity along z-axis)
+    @param <list> from_points: coordinates of points in the first coordinate system
+    @param <list> to_points: the coordinates of the same points in the second coordinate system
+    @return <tuple>: the final transformation, final cost function value, boolean indicating success and a message
+    """
     def sum_square_error(x):
         angle, horizontal_factor, dx, dy = x
         transform = Transformation(angle, horizontal_factor, 1, dx, dy, 0)
@@ -152,6 +205,12 @@ def four_parameters_optimization(from_points, to_points):
 
 
 def six_parameters_optimization(from_points, to_points):
+    """!
+    @brief Optimize all six parameters of the transformation from one coordinate system to another
+    @param <list> from_points: coordinates of points in the first coordinate system
+    @param <list> to_points: the coordinates of the same points in the second coordinate system
+    @return <tuple>: the final transformation, final cost function value, boolean indicating success and a message
+    """
     def sum_square_error(x):
         angle, horizontal_factor, vertical_factor, dx, dy, dz = x
         transform = Transformation(angle, horizontal_factor, vertical_factor, dx, dy, dz)
@@ -188,7 +247,12 @@ def six_parameters_optimization(from_points, to_points):
 
 
 def is_connected(nodes, edge_list):
-    """ad hoc function for checking if an undirected graph is connected"""
+    """!
+    @brief ad hoc function for checking if an undirected graph is connected
+    @param <list> nodes: the list of nodes in the graph
+    @param <iterable> edge_list: edges in the graph
+    @return <bool>: True if the graph is connected
+    """
     adj = {}
     for i in nodes:
         adj[i] = set()
@@ -210,6 +274,11 @@ def is_connected(nodes, edge_list):
 
 
 def load_transformation_map(filename):
+    """!
+    @brief Load and build the transformation map from configuration file
+    @param <str> filename: path to the input file
+    @return <tuple>: boolean indicating if the file is valid, and the TransformationMap object
+    """
     try:
         with open(filename, 'r') as f:
             labels = f.readline().rstrip().split('|')
@@ -221,6 +290,8 @@ def load_transformation_map(filename):
                 angle, scalexy, scalez, dx, dy, dz = map(float, params.split())
                 transformations[i, j] = Transformation(angle, scalexy, scalez, dx, dy, dz)
                 transformations[j, i] = transformations[i, j].inverse()
+        if len(labels) < 2:
+                raise ValueError
         if not is_connected(list(range(len(labels))), transformations.keys()):
             raise ValueError
     except (ValueError, IndexError):

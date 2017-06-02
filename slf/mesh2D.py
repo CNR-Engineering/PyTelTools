@@ -20,11 +20,14 @@ class Mesh2D:
         self.nb_triangles = self.ikle.shape[0]
         self.points = np.stack([self.x, self.y], axis=1)
         if not construct_index:
-            self.index = None
+            self.index = Index()
         else:
             self._construct_index()
 
     def _construct_index(self):
+        """!
+        Separate the index construction from the constructor, allowing a GUI override
+        """
         self.index = Index()
         for i, j, k in self.ikle:
             t = geom.Polygon([self.points[i], self.points[j], self.points[k]])
@@ -32,6 +35,11 @@ class Mesh2D:
             self.index.insert(i, t.bounds, obj=(i, j, k))
 
     def get_intersecting_elements(self, bounding_box):
+        """!
+        @brief Return the triangles in the mesh intersecting the bounding box
+        @param <tuple> bounding_box: (left, bottom, right, top) of a 2d geometrical object
+        @return <list of tuple>: The list of triangles (i,j,k) intersecting the bounding box
+        """
         return list(self.index.intersection(bounding_box, objects='raw'))
 
 

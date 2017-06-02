@@ -7,7 +7,7 @@ import numpy as np
 import shapely.geometry as geom
 from slf.interpolation import Interpolator
 from slf.mesh2D import Mesh2D
-from geom import Geometry
+from geom import geometry
 
 
 class TruncatedTriangularPrisms(Mesh2D):
@@ -34,7 +34,7 @@ class TruncatedTriangularPrisms(Mesh2D):
     def polygon_intersection_strict(self, polygon):
         """!
         @brief Return the weight carried by the triangle nodes entirely contained in polygon
-        @param <geom.Polyline> polygon: A polygon
+        @param <geom.geometry.Polyline> polygon: A polygon
         @return <numpy.1D-array>: The weight carried by the triangle nodes
         """
         potential_elements = self.get_intersecting_elements(polygon.bounds())
@@ -48,7 +48,7 @@ class TruncatedTriangularPrisms(Mesh2D):
     def polygon_intersection(self, polygon):
         """!
         @brief Return the weight carried by the triangle nodes entirely contained in polygon and info about boundary triangles
-        @param <geom.Polyline> polygon: A polygon
+        @param <geom.geometry.Polyline> polygon: A polygon
         @return <numpy.1D-array, dict>: The weight carried by the triangle nodes, and the dictionary of tuple (area, centroid value) for boundary triangles
         """
         potential_elements = self.get_intersecting_elements(polygon.bounds())
@@ -69,7 +69,7 @@ class TruncatedTriangularPrisms(Mesh2D):
     def polygon_intersection_all(self, polygon):
         """!
         @brief Return all triangles entirely contained in polygon and all boundary triangle-polygon intersections
-        @param <geom.Polyline> polygon: A polygon
+        @param <geom.geometry.Polyline> polygon: A polygon
         @return <dict, dict>: The dictionaries of all triangles contained in polygon, and of tuples (base triangle, intersection) for boundary triangles
         """
         potential_elements = self.get_intersecting_elements(polygon.bounds())
@@ -186,7 +186,7 @@ class TruncatedTriangularPrisms(Mesh2D):
             else:
                 # volume sup = (volume net intersected)
                 #              - (volume negative tetrahedron - volume in tetrahedron but not in polygon)
-                is_intersected, new_difference = Geometry.Polyline.triangle_difference(new_triangle, polygon)
+                is_intersected, new_difference = geometry.Polyline.triangle_difference(new_triangle, polygon)
                 if not is_intersected:
                     return 0
                 centroid = new_difference.centroid
@@ -196,8 +196,12 @@ class TruncatedTriangularPrisms(Mesh2D):
 
 
 class VolumeCalculator:
+    """!
+    Compute volumes inside polygons from a .slf input stream
+    """
+
     NET_STRICT, NET, POSITIVE = 0, 1, 2
-    INIT_VALUE = '+'
+    INIT_VALUE = '+'  # special variable ID for the option 'Initial values of the first variable'
 
     def __init__(self, volume_type, var_ID, second_var_ID, input_stream, polynames, polygons,
                  time_sampling_frequency):
@@ -218,6 +222,9 @@ class VolumeCalculator:
         self.mesh = TruncatedTriangularPrisms(self.input_stream.header, True)
 
     def construct_weights(self):
+        """!
+        Construct the point weights/intersections etc. depending on the volume type, for every polygons
+        """
         if self.volume_type == VolumeCalculator.NET_STRICT:
             for poly in self.polygons:
                 self.weights.append(self.mesh.polygon_intersection_strict(poly))
@@ -230,6 +237,13 @@ class VolumeCalculator:
                 self.weights.append(self.mesh.polygon_intersection_all(poly))
 
     def volume_in_frame_in_polygon(self, weight, values, polygon):
+        """!
+        @brief Do the volume computation in a single frame, depending on the volume type
+        @param <tuple> weight: the point weights/intersections etc. depending on the polygon and on the volume type
+        @param <numpy.1D-array> values: the values of the variable for which the volume will be computed
+        @param <geom.geometry.Polylin> polygon: the polygon in which the volume will be computed
+        @return <float>: The value of the volume
+        """
         if self.volume_type == VolumeCalculator.NET_STRICT:
             return weight.dot(values)
         elif self.volume_type == VolumeCalculator.NET:
@@ -254,6 +268,9 @@ class VolumeCalculator:
             return volume_net, volume_positive, volume_net - volume_positive
 
     def read_values_in_frame(self, time_index, init_values):
+        """!
+        Read variable values in a single frame, depending on the first/second variable choice
+        """
         values = self.input_stream.read_var_in_frame(time_index, self.var_ID)
         if self.second_var_ID is not None:
             if self.second_var_ID == VolumeCalculator.INIT_VALUE:
@@ -264,6 +281,9 @@ class VolumeCalculator:
         return values
 
     def run(self):
+        """!
+        Separate the major part of the computation, allowing a GUI override
+        """
         self.construct_triangles()
         self.construct_weights()
         result = []

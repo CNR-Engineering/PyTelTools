@@ -1,3 +1,7 @@
+"""!
+File format converter for geometrical objects
+"""
+
 import numpy as np
 
 from geom import BlueKenue
@@ -55,7 +59,7 @@ class PointSetConverter:
 
     def write_shp(self):
         to_points = self.transform()
-        shp.write_points(self.to_file, self.z_name, to_points)
+        shp.write_xyz_points(self.to_file, self.z_name, to_points)
 
     def write_xyz(self, header):
         to_points = self.transform()

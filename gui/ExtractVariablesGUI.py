@@ -1,7 +1,3 @@
-"""!
-A GUI for extracting variables and time frames from .slf file
-"""
-
 import sys
 import datetime
 from PyQt5.QtWidgets import *
