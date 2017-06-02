@@ -337,7 +337,6 @@ class InputTab(QWidget):
             # locate all points of the first mesh in the second mesh
             self.is_inside, self.point_interpolators \
                 = self.second_mesh.get_point_interpolators(list(zip(self.first_header.x, self.first_header.y)))
-            print(self.first_header.x[56521], self.first_header.y[56521],self.is_inside[56521], self.point_interpolators[56521])
             self.parent.outDialog()
             if meshLoader.thread.canceled:
                 return
