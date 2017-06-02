@@ -14,7 +14,7 @@ from gui.CompareResultsGUI import CompareResultsGUI
 from gui.ComputeFluxGUI import ComputeFluxGUI
 from gui.ProjectMeshGUI import ProjectMeshGUI
 from gui.ConfigTransformation import TransformationMap
-from gui.FileConverterGUI import FileConverterGUI
+from gui.GeometryConverterGUI import GeometryConverterGUI
 
 
 class MainPanel(QWidget):
@@ -31,7 +31,7 @@ class MainPanel(QWidget):
         flux = ComputeFluxGUI(parent)
 
         trans = TransformationMap()
-        conv = FileConverterGUI(parent)
+        conv = GeometryConverterGUI(parent)
 
         self.stackLayout = QStackedLayout()
         self.stackLayout.addWidget(QLabel('Hello! This is the start page (TODO)'))
