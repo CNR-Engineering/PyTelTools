@@ -38,13 +38,16 @@ class MeshInterpolator(Mesh2D):
         point_interpolators = [None] * nb_points
 
         for index, (x, y) in enumerate(points):
-            potential_element = self.get_intersecting_elements((x, y, x, y))
-            if not potential_element:
+            potential_elements = self.get_intersecting_elements((x, y, x, y))
+            if not potential_elements:
                 continue
-            is_inside[index] = True
-            i, j, k = potential_element[0]
-            t = self.triangles[i, j, k]
-            point_interpolators[index] = ((i, j, k), Interpolator(t).get_interpolator_at(x, y))
+            for i, j, k in potential_elements:
+                t = self.triangles[i, j, k]
+                is_in, point_interpolator = Interpolator(t).is_in_triangle(x, y)
+                if is_in:
+                    is_inside[index] = True
+                    point_interpolators[index] = ((i, j, k), point_interpolator)
+                    break
 
         return is_inside, point_interpolators
 

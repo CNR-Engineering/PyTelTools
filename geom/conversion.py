@@ -64,6 +64,30 @@ class PointSetConverter:
             fout.write_points(to_points)
 
 
+class LineSet2DConverter:
+    def __init__(self, from_file, to_file, transformations, is_closed, z_method):
+        self.from_file = from_file
+        self.to_file = to_file
+        self.is_closed =is_closed
+
+        self.z_method = z_method
+
+        self.transformations = transformations
+        self.from_lines = []
+
+    def read_shp_open(self):
+        for p in shp.get_open_polylines(self.from_file):
+            points = []
+            for x, y in p.coords():
+                points.append(np.array([x, y, 0]))
+            self.from_lines.append(points)
+
+    def read_shp_closed(self):
+        for p in shp.get_polygons(self.from_file):
+            points = []
+            for x, y in p.coords():
+                points.append(np.array([x, y, 0]))
+            self.from_lines.append(points)
 
 
 
