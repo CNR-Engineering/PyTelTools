@@ -810,7 +810,7 @@ class SelectedColorTable(TableWidgetDropRows):
             label = column_labels[column]
             color = column_colors[column]
             color_name = color_to_name[color]
-            color_display = "<span style=\"color:%s;\">%s</span> " % (color, u"\u25A0")
+            color_display = "<span style=\"color:%s;\">%s</span> " % (color, u"\u2B1B")
             self.insertRow(row)
             lab = QTableWidgetItem(label)
             col = QTableWidgetItem(color_display + color_name)
@@ -836,7 +836,7 @@ class AvailableColorTable(TableWidgetDragRows):
         row = 0
         for color in colors:
             color_name = color_to_name[color]
-            color_display = "<span style=\"color:%s;\">%s</span> " % (color, u"\u25A0")
+            color_display = "<span style=\"color:%s;\">%s</span> " % (color, u"\u2B1B")
             self.insertRow(row)
             col = QTableWidgetItem(color_display + color_name)
             self.setItem(row, 0, col)
