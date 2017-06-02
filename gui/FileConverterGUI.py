@@ -120,7 +120,6 @@ class PointConverterTab(QWidget):
         hlayout.setAlignment(Qt.AlignLeft)
         mainLayout.addLayout(hlayout)
 
-
         hlayout = QHBoxLayout()
         hlayout.addWidget(self.btnSubmit)
         hlayout.addWidget(self.outNameBox)
@@ -339,7 +338,6 @@ class LineConverterTab(QWidget):
         hlayout.addWidget(self.znameBox)
         hlayout.setAlignment(Qt.AlignLeft)
         mainLayout.addLayout(hlayout)
-
 
         hlayout = QHBoxLayout()
         hlayout.addWidget(self.btnSubmit)

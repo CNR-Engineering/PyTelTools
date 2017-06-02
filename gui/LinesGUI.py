@@ -420,7 +420,6 @@ class CSVTab(QWidget):
         vlayout.setAlignment(lb, Qt.AlignHCenter)
         vlayout.addWidget(self.secondTable)
         hlayout.addLayout(vlayout)
-        hlayout.addLayout(vlayout)
         hlayout.addItem(QSpacerItem(30, 1))
         glayout.addLayout(hlayout, 1, 1)
         glayout.setAlignment(Qt.AlignLeft)

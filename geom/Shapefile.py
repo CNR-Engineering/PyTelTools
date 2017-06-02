@@ -55,10 +55,11 @@ def get_points(input_filename, indices=None):
 
 
 def write_xyz_points(output_filename, z_name, points):
-    w = shapefile.Writer(shapeType=11)
+    w = shapefile.Writer(shapefile.POINTZ)
     w.field(z_name, 'N', decimal=6)
     for x, y, z in points:
         w.point(x, y, z)
         w.record(z)
+    for s in w.shapes():
+        s.shapeType = shapefile.POINTZ
     w.save(output_filename)
-
