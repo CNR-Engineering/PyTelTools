@@ -6,7 +6,7 @@ from PyQt5.QtCore import *
 
 import numpy as np
 import logging
-from geom.Shapefile import get_attribute_names
+import geom.Shapefile as shp
 from geom.transformation import IDENTITY, load_transformation_map
 import geom.conversion as convert
 from slf import Serafin
@@ -66,6 +66,7 @@ class PointConverterTab(QWidget):
     def __init__(self):
         super().__init__()
         self.transformation = None
+        self.converter = None
 
         self._initWidgets()
         self._setLayout()
@@ -110,7 +111,7 @@ class PointConverterTab(QWidget):
         self.outFileType.setFixedHeight(30)
         self.zfield = QComboBox()
         self.zfield.setFixedHeight(30)
-        self.znameBox = QLineEdit('Z')
+        self.znameBox = QLineEdit()
         self.znameBox.setFixedHeight(30)
         self.zfield.setEnabled(False)
         self.znameBox.setEnabled(False)
@@ -224,17 +225,28 @@ class PointConverterTab(QWidget):
             return
 
         self.zfield.clear()
+        self.zfield.setEnabled(False)
         self.inNameBox.setText(filename)
-        if filename[-4:] == '.shp':
-            self.zfield.setEnabled(True)
-            fields, _ = get_attribute_names(filename)
-            for field in fields:
-                self.zfield.addItem(field)
-        elif filename[-4:] == '.xyz':
-            self.zfield.setEnabled(False)
+
+        self.converter = convert.PointSetConverter(filename)
+        success, message = self.converter.read()
+        if success:
+            if not self.converter.from_xyz:
+                if message == 'native':
+                    self.zfield.addItem('Z coord')
+                for index, field in shp.get_numeric_attribute_names(filename):
+                    self.zfield.addItem('Attribute %d - %s' % (index, field))
+                if self.zfield.count() == 0:
+                    QMessageBox.critical(self, 'Error',
+                                         'The input file has neither Z coordinates nor numeric attributes.',
+                                         QMessageBox.Ok)
+                    return
+                self.zfield.setEnabled(True)
+            self.btnSubmit.setEnabled(True)
         else:
+            QMessageBox.critical(self, 'Error',
+                                 "The input file doesn't contain any point.", QMessageBox.Ok)
             return
-        self.btnSubmit.setEnabled(True)
 
     def btnSubmitEvent(self):
         output_type = self.outFileType.currentText()
@@ -255,36 +267,29 @@ class PointConverterTab(QWidget):
         if overwrite is None:
             return
 
-        if self.transformation is None:
-            trans = [IDENTITY]
-        else:
+        # getting the converter options right
+        if self.transformation is not None:
             from_index, to_index = self.fromBox.currentIndex(), self.toBox.currentIndex()
             trans = self.transformation.get_transformation(from_index, to_index)
+            self.converter.set_transformations(trans)
+        if '-' in self.zfield.currentText():
+            index = int(self.zfield.currentText().split(' - ')[0].split()[1])
+            self.converter.set_z_index(index)
 
         self.outNameBox.setText(filename)
         from_file = self.inNameBox.text()
         to_file = filename
 
         logging.info('Start conversion from %s\nto %s' % (from_file, to_file))
-        converter = convert.PointSetConverter(from_file, to_file, trans,
-                                              self.znameBox.text(), self.zfield.currentIndex())
-        success, cause = converter.convert()
-        if not success:
-            if cause == 'number':
-                QMessageBox.critical(self, 'Error', 'The input Z column is not numeric.',
-                                     QMessageBox.Ok)
-            else:
-                QMessageBox.critical(self, 'Error', "The input file doesn't contain any point.",
-                                     QMessageBox.Ok)
-            logging.info('Conversion failed.')
-            return
-        logging.info('Conversion finished with success.')
+        self.converter.convert(to_file, self.znameBox.text())
+        logging.info('Done.')
 
 
 class LineConverterTab(QWidget):
     def __init__(self):
         super().__init__()
         self.transformation = None
+        self.converter = None
 
         self._initWidgets()
         self._setLayout()
@@ -328,12 +333,27 @@ class LineConverterTab(QWidget):
         self.outFileType.addItem('.i2s/.i3s')
         self.outFileType.addItem('.shp')
         self.outFileType.setFixedHeight(30)
-        self.zfield = QComboBox()
-        self.zfield.setFixedHeight(30)
-        self.znameBox = QLineEdit('Z')
-        self.znameBox.setFixedHeight(30)
-        self.zfield.setEnabled(False)
-        self.znameBox.setEnabled(False)
+        self.outFileType.setEnabled(False)
+
+        self.attributeField = QComboBox()
+        self.attributeField.setFixedHeight(30)
+
+        self.attributeNameBox = QLineEdit()
+        self.attributeNameBox.setFixedHeight(30)
+
+        self.stack = QStackedLayout()
+        self.stack.addWidget(self.attributeField)
+        self.stack.addWidget(self.attributeNameBox)
+
+        self.closedBox = QGroupBox('Line type')
+        hlayout = QHBoxLayout()
+        self.closedButton = QRadioButton('Closed')
+        hlayout.addWidget(self.closedButton)
+        hlayout.addWidget(QRadioButton('Open'))
+        self.closedBox.setLayout(hlayout)
+        self.closedBox.setMaximumHeight(80)
+        self.closedBox.setMaximumWidth(200)
+        self.closedButton.setChecked(True)
 
         # create the submit button
         self.btnSubmit = QPushButton('Submit', self, icon=self.style().standardIcon(QStyle.SP_DialogSaveButton))
@@ -371,24 +391,26 @@ class LineConverterTab(QWidget):
 
         mainLayout.addItem(QSpacerItem(10, 15))
         hlayout = QHBoxLayout()
+        hlayout.addItem(QSpacerItem(10, 10))
+        hlayout.addWidget(self.closedBox)
+        mainLayout.addLayout(hlayout)
+        mainLayout.setAlignment(hlayout, Qt.AlignLeft)
+        mainLayout.addItem(QSpacerItem(10, 10))
+
+        hlayout = QHBoxLayout()
         hlayout.addWidget(self.btnOpen)
         hlayout.addWidget(self.inNameBox)
         mainLayout.addLayout(hlayout)
-
         mainLayout.addItem(QSpacerItem(10, 10))
-        hlayout = QHBoxLayout()
-        hlayout.addWidget(QLabel('    Input Z column name'))
-        hlayout.addWidget(self.zfield)
-        mainLayout.addLayout(hlayout)
-        hlayout.setAlignment(Qt.AlignLeft)
         hlayout = QHBoxLayout()
         hlayout.addWidget(QLabel('    Output format'))
         hlayout.addWidget(self.outFileType)
-        hlayout.addWidget(QLabel('Output Z column name'))
-        hlayout.addWidget(self.znameBox)
+        hlayout.addWidget(QLabel('Output attribute'))
+        hlayout.addLayout(self.stack)
         hlayout.setAlignment(Qt.AlignLeft)
         mainLayout.addLayout(hlayout)
 
+        mainLayout.addItem(QSpacerItem(10, 10))
         hlayout = QHBoxLayout()
         hlayout.addWidget(self.btnSubmit)
         hlayout.addWidget(self.outNameBox)
@@ -426,12 +448,19 @@ class LineConverterTab(QWidget):
             self.toBox.addItem(label)
 
     def outfileTypeChanged(self, index):
-        if index == 1:
-            self.znameBox.setEnabled(True)
-            self.znameBox.setText('Z')
+        self.stack.setCurrentIndex(index)
+        if self.inNameBox.text()[-4:] == '.shp':
+            if index == 1:  # shp to shp
+                self.attributeNameBox.clear()
+                self.attributeNameBox.setEnabled(False)
+            else:  # shp to i2s/i3s
+                pass
         else:
-            self.znameBox.clear()
-            self.znameBox.setEnabled(False)
+            if index == 1:  # i2s/i3s to shp
+                self.attributeNameBox.setEnabled(True)
+                self.attributeNameBox.setText('Value')
+            else:  # i2s/i3s to i2s/i3s
+                self.attributeNameBox.clear()
 
     def btnOpenEvent(self):
         options = QFileDialog.Options()
@@ -443,22 +472,38 @@ class LineConverterTab(QWidget):
             return
         if not testOpen(filename):
             return
-
-        self.zfield.clear()
+        self.outFileType.setEnabled(False)
+        self.attributeField.clear()
         self.inNameBox.setText(filename)
-        if filename[-4:] == '.shp':
-            self.zfield.setEnabled(True)
-            fields, _ = get_attribute_names(filename)
-            for field in fields:
-                self.zfield.addItem(field)
-        elif filename[-4:] == '.i2s' or filename[-4:] == '.i3s':
-            self.zfield.setEnabled(False)
-        else:
+
+        is_closed = self.closedButton.isChecked()
+        self.converter = convert.LineSetsConverter(filename, is_closed)
+        success = self.converter.read()
+        if not success:
+            QMessageBox.critical(self, 'Error',
+                                 "The input file doesn't contain any %s line." % ['open', 'closed'][is_closed],
+                                 QMessageBox.Ok)
             return
+        if filename[-4:] == '.shp':
+            for index, field in shp.get_numeric_attribute_names(filename):
+                self.attributeField.addItem('Attribute %d - %s' % (index, field))
+        else:
+            self.attributeField.addItem('Attribute value')
+        self.attributeField.addItem('0')
+        self.attributeField.addItem('Iteration')
+
+        self.outFileType.setEnabled(True)
+        self.outfileTypeChanged(self.outFileType.currentIndex())
         self.btnSubmit.setEnabled(True)
 
     def btnSubmitEvent(self):
         output_type = self.outFileType.currentText()
+        if output_type != '.shp':
+            if self.converter.is_2d:
+                output_type = '.i2s'
+            else:
+                output_type = '.i3s'
+
         options = QFileDialog.Options()
         options |= QFileDialog.DontUseNativeDialog
         filename, _ = QFileDialog.getSaveFileName(self, 'Choose the output file name', '',
@@ -476,30 +521,18 @@ class LineConverterTab(QWidget):
         if overwrite is None:
             return
 
-        if self.transformation is None:
-            trans = [IDENTITY]
-        else:
+        if self.transformation is not None:
             from_index, to_index = self.fromBox.currentIndex(), self.toBox.currentIndex()
             trans = self.transformation.get_transformation(from_index, to_index)
+            self.converter.set_transformations(trans)
 
         self.outNameBox.setText(filename)
         from_file = self.inNameBox.text()
         to_file = filename
 
         logging.info('Start conversion from %s\nto %s' % (from_file, to_file))
-        converter = convert.PointSetConverter(from_file, to_file, trans,
-                                              self.znameBox.text(), self.zfield.currentIndex())
-        success, cause = converter.convert()
-        if not success:
-            if cause == 'number':
-                QMessageBox.critical(self, 'Error', 'The input Z column is not numeric.',
-                                     QMessageBox.Ok)
-            else:
-                QMessageBox.critical(self, 'Error', "The input file doesn't contain any point.",
-                                     QMessageBox.Ok)
-            logging.info('Conversion failed.')
-            return
-        logging.info('Conversion finished with success.')
+        self.converter.convert(to_file, self.attributeNameBox.text(), self.attributeField.currentText())
+        logging.info('Done.')
 
 
 class MeshTransformTab(QWidget):

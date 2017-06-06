@@ -38,7 +38,7 @@ class Read(BlueKenue):
                 return False
         return True
 
-    def get_polygons(self):
+    def get_lines(self, closed):
         while True:
             line = self.file.readline()
             if not line:  # EOF
@@ -55,34 +55,17 @@ class Read(BlueKenue):
                 line = self.file.readline()
                 coordinates.append(tuple(map(float, line.rstrip().split())))
             poly = Polyline(coordinates)
+            poly.add_attribute(float(line_header[1]))
+            if poly.is_closed() == closed:
+                yield poly
 
-            if not poly.is_closed():
-                continue
-            # return only closed polyline
-            yield line_header, poly
+    def get_polygons(self):
+        for poly in self.get_lines(True):
+            yield poly
 
     def get_open_polylines(self):
-        while True:
-            line = self.file.readline()
-            if not line:  # EOF
-                break
-            if line == '\n':  # there could be blank lines between line sets
-                continue
-            line_header = tuple(line.rstrip().split())
-            try:
-                nb_points = int(line_header[0])
-            except ValueError:
-                continue
-            coordinates = []
-            for i in range(nb_points):
-                line = self.file.readline()
-                coordinates.append(tuple(map(float, line.rstrip().split())))
-            poly = Polyline(coordinates)
-
-            if poly.is_closed():
-                continue
-            # return only open polyline
-            yield line_header, poly
+        for poly in self.get_lines(False):
+            yield poly
 
     def get_points(self):
         for line in self.file.readlines():
@@ -102,6 +85,14 @@ class Write(BlueKenue):
     def write_header(self, header):
         for line in header:
             self.file.write(line)
+
+    def write_lines(self, lines, attributes):
+        for poly, attribute in zip(lines, attributes):
+            nb_points = len(list(poly.coords()))
+            self.file.write('%d %s\n' % (nb_points, str(attribute)))
+            for p in poly.coords():
+                self.file.write(' '.join(map(str, p)))
+                self.file.write('\n')
 
     def write_points(self, points):
         for p in points:

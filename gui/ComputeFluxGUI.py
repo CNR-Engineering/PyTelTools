@@ -375,7 +375,7 @@ class InputTab(QWidget):
         if is_i2s:
             with BlueKenue.Read(filename) as f:
                 f.read_header()
-                for poly_name, poly in f.get_open_polylines():
+                for poly in f.get_open_polylines():
                     self.polylines.append(poly)
         else:
             for poly in Shapefile.get_open_polylines(filename):

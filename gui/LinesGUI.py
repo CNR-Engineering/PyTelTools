@@ -293,7 +293,7 @@ class InputTab(QWidget):
         if is_i2s:
             with BlueKenue.Read(filename) as f:
                 f.read_header()
-                for poly_name, poly in f.get_open_polylines():
+                for poly in f.get_open_polylines():
                     line_interpolators, distances, \
                         line_interpolators_internal, distances_internal = self.mesh.get_line_interpolators(poly)
                     if line_interpolators:

@@ -6,40 +6,76 @@ import numpy as np
 
 from geom import BlueKenue
 import geom.Shapefile as shp
+from geom.transformation import IDENTITY
 
 
-class PointSetConverter:
-    def __init__(self, from_file, to_file, transformations, z_name, z_index):
+class GeomFileConverter:
+    def __init__(self, from_file):
         self.from_file = from_file
-        self.to_file = to_file
-        self.z_name = z_name
-        self.z_index = z_index
+        self.fields = []
+        self.transformations = [IDENTITY]
+        self.shapes = []
 
+    def set_transformations(self, transformations):
         self.transformations = transformations
-        self.from_points = []
+
+
+class PointSetConverter(GeomFileConverter):
+    def __init__(self, from_file):
+        super().__init__(from_file)
+
+        self.from_xyz = False
+        self.attributes = []
+
+        self.z_index = None
+        self.transformations = [IDENTITY]
+        self.header = []
+
+    def set_z_index(self, index):
+        self.z_index = index
 
     def transform(self):
-        to_points = self.from_points[:]
+        transformed_points = self.shapes[:]
         for t in self.transformations:
-            to_points = [t(p) for p in to_points]
-        return to_points
+            transformed_points = [t(p) for p in transformed_points]
+        self.shapes = transformed_points
 
-    def convert(self):
+    def read(self):
         if self.from_file[-4:] == '.xyz':
-            header = self.read_xyz()
+            self.from_xyz = True
+            self.read_xyz()
+            if not self.shapes:
+                return False, 'empty'
         else:
-            header = []
-            try:
-                self.read_shp()
-            except ValueError:
-                return False, 'number'
-        if not self.from_points:
-            return False, 'empty'
-        if self.to_file[-4:] == '.xyz':
-            self.write_xyz(header)
-        else:
-            self.write_shp()
+            native_z, non_empty = self.try_shp()
+            if not non_empty:
+                return False, 'empty'
+            return True, 'native'
         return True, ''
+
+    def try_shp(self):
+        self.fields = shp.get_all_fields(self.from_file)
+        for (x, y, z), attributes in shp.get_points(self.from_file, with_z=True):
+            self.shapes.append(np.array([x, y, z]))
+            self.attributes.append(attributes)
+        if not self.shapes:
+            for (x, y), attributes in shp.get_points(self.from_file):
+                self.shapes.append(np.array([x, y]))
+                self.attributes.append(attributes)
+            if not self.shapes:
+                return False, False
+            return False, True
+        return True, True
+
+    def convert(self, to_file, z_name):
+        if self.z_index is not None:
+            self.read_shp()
+
+        self.transform()
+        if to_file[-4:] == '.xyz':
+            self.write_xyz(to_file)
+        else:
+            self.write_shp(to_file, z_name)
 
     def read_shp(self):
         for (x, y), attributes in shp.get_points(self.from_file):
@@ -47,51 +83,86 @@ class PointSetConverter:
                 z = float(attributes[self.z_index])
             except ValueError:
                 raise ValueError
-            self.from_points.append(np.array([x, y, z]))
+            self.shapes.append(np.array([x, y, z]))
 
     def read_xyz(self):
         with BlueKenue.Read(self.from_file) as fin:
             fin.read_header()
             for p in fin.get_points():
-                self.from_points.append(p)
-            header = fin.header
-        return header
+                self.shapes.append(p)
+            self.header = fin.header
 
-    def write_shp(self):
-        to_points = self.transform()
-        shp.write_xyz_points(self.to_file, self.z_name, to_points)
+    def write_shp(self, to_file, z_name):
+        shp.write_xyz_points(to_file, z_name, self.shapes, self.fields, self.attributes)
 
-    def write_xyz(self, header):
-        to_points = self.transform()
-        with BlueKenue.Write(self.to_file) as fout:
-            fout.write_header(header)
-            fout.write_points(to_points)
+    def write_xyz(self, to_file):
+        with BlueKenue.Write(to_file) as fout:
+            fout.write_header(self.header)
+            fout.write_points(self.shapes)
 
 
-class LineSet2DConverter:
-    def __init__(self, from_file, to_file, transformations, is_closed, z_method):
-        self.from_file = from_file
-        self.to_file = to_file
-        self.is_closed =is_closed
+class LineSetsConverter(GeomFileConverter):
+    def __init__(self, from_file, is_closed):
+        super().__init__(from_file)
+        self.is_2d = False
+        self.is_closed = is_closed
+        self.from_shp = False
+        self.transformations = [IDENTITY]
+        self.z_name = None
+        self.z_value = None
+        self.header = [':FileType i2s  ASCII  EnSim 1.0\n', ':EndHeader\n']
 
-        self.z_method = z_method
+    def read(self):
+        if self.from_file[-4:] == '.shp':
+            self.from_shp = True
+            self.read_shp()
+        else:
+            self.read_bk()
+        if not self.shapes:
+            return False
+        self.is_2d = self.shapes[0].is_2d()
+        return True
 
-        self.transformations = transformations
-        self.from_lines = []
+    def read_shp(self):
+        self.fields = shp.get_all_fields(self.from_file)
+        for line in shp.get_lines(self.from_file, self.is_closed):
+            self.shapes.append(line)
 
-    def read_shp_open(self):
-        for p in shp.get_open_polylines(self.from_file):
-            points = []
-            for x, y in p.coords():
-                points.append(np.array([x, y, 0]))
-            self.from_lines.append(points)
+    def read_bk(self):
+        with BlueKenue.Read(self.from_file) as fin:
+            fin.read_header()
+            for poly in fin.get_lines(self.is_closed):
+                self.shapes.append(poly)
+            self.header = fin.header
 
-    def read_shp_closed(self):
-        for p in shp.get_polygons(self.from_file):
-            points = []
-            for x, y in p.coords():
-                points.append(np.array([x, y, 0]))
-            self.from_lines.append(points)
+    def transform(self):
+        for poly in self.shapes:
+            poly.apply_transformations(self.transformations)
 
+    def write_shp(self, to_file, z_name):
+        shp.write_lines(to_file, self.shapes, self.fields, z_name)
 
+    def write_bk(self, to_file, z_field):
+        if z_field == '0':
+            attributes = [0] * len(self.shapes)
+        elif z_field == 'Iteration':
+            attributes = [i+1 for i in range(len(self.shapes))]
+        elif z_field == 'Attribute value':
+            attributes = [poly.attributes()[0] for poly in self.shapes]
+        else:
+            index = int(z_field.split(' - ')[0].split()[1])
+            attributes = []
+            for poly in self.shapes:
+                attributes.append(poly.attributes()[index])
+        with BlueKenue.Write(to_file) as fout:
+            fout.write_header(self.header)
+            fout.write_lines(self.shapes, attributes)
+
+    def convert(self, to_file, z_name, z_field):
+        self.transform()
+
+        if to_file[-4:] == '.shp':
+            self.write_shp(to_file, z_name)
+        else:
+            self.write_bk(to_file, z_field)
 

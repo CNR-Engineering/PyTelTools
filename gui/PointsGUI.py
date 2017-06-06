@@ -76,7 +76,7 @@ class AttributeTable(QTableWidget):
             self.setItem(i, 1, QTableWidgetItem('%.4f' % y))
             self.setItem(i, 2, QTableWidgetItem(true_false[inside]))
             for j, a in enumerate(attributes):
-                self.setItem(i, j+3, QTableWidgetItem(a))
+                self.setItem(i, j+3, QTableWidgetItem(str(a)))
             i += 1
 
 
@@ -272,7 +272,7 @@ class InputTab(QWidget):
             hh.setDefaultSectionSize(110)
             tw.setEditTriggers(QAbstractItemView.NoEditTriggers)
             tw.setMaximumHeight(800)
-            tw.setMinimumHeight(150)
+            tw.setMinimumHeight(100)
 
         self.timeSampling = QLineEdit('1')
         self.timeSampling.setFixedWidth(50)

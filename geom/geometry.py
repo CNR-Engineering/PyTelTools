@@ -2,6 +2,7 @@
 Geometrical objects
 """
 
+import numpy as np
 from shapely.geometry import LineString as OpenPolyline, Polygon as ClosedPolyline, MultiPolygon
 
 
@@ -9,20 +10,34 @@ class Polyline:
     """!
     @brief Custom (open or closed) polyline class
     """
-    def __init__(self, coordinates):
+    def __init__(self, coordinates, attributes=None):
         self._nb_points = len(coordinates)
+        self._is_2d = len(coordinates[0]) == 2
         if coordinates[0] == coordinates[-1]:
             self._polyline = ClosedPolyline(coordinates)
             self._is_closed = True
         else:
             self._polyline = OpenPolyline(coordinates)
             self._is_closed = False
+        if attributes is None:
+            self._attributes = []
+        else:
+            self._attributes = attributes
+
+    def is_2d(self):
+        return self._is_2d
 
     def is_closed(self):
         return self._is_closed
 
     def nb_points(self):
         return self._nb_points
+
+    def attributes(self):
+        return self._attributes
+
+    def add_attribute(self, attribute):
+        self._attributes.append(attribute)
 
     def coords(self):
         if self.is_closed():
@@ -105,4 +120,18 @@ class Polyline:
             return True, list(filter(lambda x: x.geom_type == 'LineString', inter.geoms))
         return False, None
 
+    def apply_transformations(self, transformations):
+        new_coords = np.array(list(self.coords()))
+        is_2d = False
+        if self.is_2d():
+            new_coords = np.hstack((new_coords, np.zeros((new_coords.shape[0], 1))))
 
+        for t in transformations:
+            new_coords = np.apply_along_axis(t, 1, new_coords)
+        if self.is_2d():
+            new_coords = new_coords[:, :2]
+
+        if self.is_closed():
+            self._polyline = ClosedPolyline(new_coords)
+        else:
+            self._polyline = OpenPolyline(new_coords)
