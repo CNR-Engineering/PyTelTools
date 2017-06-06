@@ -190,6 +190,8 @@ class PointConverterTab(QWidget):
                                                   options=QFileDialog.Options() | QFileDialog.DontUseNativeDialog)
         if not filename:
             return
+        self.fromBox.clear()
+        self.toBox.clear()
         self.confNameBox.clear()
         self.transformation = None
 
@@ -409,6 +411,8 @@ class LineConverterTab(QWidget):
         if not filename:
             return
         self.confNameBox.clear()
+        self.fromBox.clear()
+        self.toBox.clear()
         self.transformation = None
 
         success, self.transformation = load_transformation_map(filename)
@@ -616,6 +620,8 @@ class MeshTransformTab(QWidget):
         if not filename:
             return
         self.confNameBox.clear()
+        self.fromBox.clear()
+        self.toBox.clear()
         self.transformation = None
 
         success, self.transformation = load_transformation_map(filename)
