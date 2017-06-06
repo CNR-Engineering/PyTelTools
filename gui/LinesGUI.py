@@ -764,6 +764,8 @@ class MultiVariableImageTab(QWidget):
             id_line = str(i+1)
             if self.input.line_interpolators[i][0]:
                 self.control.lineBox.addItem('Line %s' % id_line)
+
+        self.var_table = {}
         for var_ID, var_name, var_unit in zip(self.input.header.var_IDs, self.input.header.var_names,
                                               self.input.header.var_units):
             var_unit = var_unit.decode('utf-8').strip()

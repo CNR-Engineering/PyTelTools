@@ -926,6 +926,7 @@ class ImageTab(QWidget):
         frames = list(map(lambda x: start_time + datetime.timedelta(seconds=x), self.input.time))
         self.control.timeSelection.initTime(self.input.time, frames)
 
+        self.var_table = {}
         for var_ID, var_name, var_unit in zip(self.input.header.var_IDs, self.input.header.var_names,
                                               self.input.header.var_units):
             var_unit = var_unit.decode('utf-8').strip()
