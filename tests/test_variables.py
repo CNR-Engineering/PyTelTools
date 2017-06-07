@@ -82,6 +82,14 @@ class VariablesTestCase(unittest.TestCase):
         self.assertEqual(equation_name(get_necessary_equations(['US', 'I', 'H', 'U', 'V'], ['M', 'DMAX', 'Q'], None)), ['M', 'J', 'Q', 'TAU', 'DMAX'])
         self.assertEqual(equation_name(get_necessary_equations(['US', 'I', 'H', 'U', 'V'], ['M', 'DMAX', 'Q'], None)), ['M', 'J', 'Q', 'TAU', 'DMAX'])
 
+    def test_FROPT_equation(self):
+        self.assertEqual(equation_name(get_necessary_equations(['US', 'MU'], ['FROTP'], None)), ['TAU', 'FROTP'])
+        self.assertEqual(equation_name(get_necessary_equations(['U', 'MU', 'H', 'W', 'TAU', 'US'], ['FROTP'], None)), ['FROTP'])
+        self.assertEqual(equation_name(get_necessary_equations(['U', 'V', 'J', 'W', 'H', 'MU', 'I'], ['FROTP'], CHEZY_EQUATION)), ['M', 'US', 'TAU', 'FROTP'])
+        self.assertEqual(equation_name(get_necessary_equations(['U', 'MU', 'M', 'B', 'Q', 'W', 'S'], ['FROTP', 'DMAX', 'H', 'Q', 'TAU', 'U', 'V'], STRICKLER_EQUATION)), ['H', 'US', 'TAU', 'DMAX', 'FROTP'])
+        self.assertEqual(equation_name(get_necessary_equations(['US', 'I', 'H', 'MU', 'V'], ['M', 'DMAX', 'Q', 'FROTP'], None)), ['M', 'J', 'Q', 'TAU', 'DMAX', 'FROTP'])
+        self.assertEqual(equation_name(get_necessary_equations(['US', 'MU', 'H', 'U', 'V'], ['FROTP', 'M', 'DMAX', 'Q'], None)), ['M', 'I', 'J', 'Q', 'TAU', 'DMAX', 'FROTP'])
+
     def test_QS_equation(self):
         self.assertEqual(equation_name(get_necessary_equations(['HD', 'EF', 'B', 'DF'], ['B', 'QS'], None)), ['QS'])
         self.assertEqual(equation_name(get_necessary_equations(['EF', 'H', 'S', 'DF'], ['QS', 'S'], None)), ['QS'])

@@ -78,7 +78,9 @@ QSSUSP,QS SUSPENSION,QS SUSPENSION,M2/S
 QSSUSPX,QS SUSPENSION X,QS SUSPENSION X,M2/S
 QSSUSPY,QS SUSPENSION Y,QS SUSPENSION Y,M2/S
 EF,FLUX D'EROSION,EROSION FLUX,KG/M2/S
-DF,FLUX DE DEPOT,DEPOSITION FLUX,KG/M2/S"""
+DF,FLUX DE DEPOT,DEPOSITION FLUX,KG/M2/S
+MU,CORR FROTT PEAU,FROT. PEAU MU,
+FROTP,FROT. PEAU,FROT. PEAU,PASCAL"""
 
     for i, row in enumerate(spec.split('\n')):
         ID, name_fr, name_en, unit = row.split(',')
@@ -88,12 +90,13 @@ DF,FLUX DE DEPOT,DEPOSITION FLUX,KG/M2/S"""
 # all variable entities involved in computations are stored as constants in a dictionary with ordered keys
 VARIABLES = {}
 basic_vars_IDs = ['H', 'U', 'V', 'M', 'S', 'B', 'I', 'J', 'Q', 'C', 'F', 'US', 'TAU', 'DMAX', 'HD', 'RB',
-                  'QS', 'QSX', 'QSY', 'QSBL', 'QSBLX', 'QSBLY', 'QSSUSP', 'QSSUSPX', 'QSSUSPY', 'EF', 'DF']
+                  'QS', 'QSX', 'QSY', 'QSBL', 'QSBLX', 'QSBLY', 'QSSUSP', 'QSSUSPX', 'QSSUSPY', 'EF',
+                  'DF', 'MU', 'FROTP']
 
 build_variables()
 H, U, V, M, S, B, I, J, Q, C, F, US, TAU, DMAX, HD, RB, \
-QS, QSX, QSY, QSBL, QSBLX, QSBLY, QSSUSP, QSSUSPX, QSSUSPY, EF, DF, W, ROUSE = [VARIABLES[var] for var in
-                                                                                basic_vars_IDs + ['W', 'ROUSE']]
+QS, QSX, QSY, QSBL, QSBLX, QSBLY, QSSUSP, QSSUSPX, QSSUSPY, EF, DF, MU, FROTP, W, ROUSE =\
+    [VARIABLES[var] for var in basic_vars_IDs + ['W', 'ROUSE']]
 
 
 # define some special operators
@@ -155,7 +158,8 @@ BASIC_EQUATIONS = {'H': Equation((S, B), H, MINUS), 'S': Equation((H, B), S, PLU
                    'QSBL': Equation((QSBLX, QSBLY), QSBL, NORM2),
                    'QSSUSP': Equation((QSSUSP, QSSUSPY), QSSUSP, NORM2),
                    'TAU': Equation((US,), TAU, COMPUTE_TAU),
-                   'DMAX': Equation((TAU,), DMAX, COMPUTE_DMAX)}
+                   'DMAX': Equation((TAU,), DMAX, COMPUTE_DMAX),
+                   'FROTP': Equation((TAU, MU), FROTP, TIMES)}
 
 # define special equations
 CHEZY_EQUATION = Equation((W, H, M), US, COMPUTE_CHEZY)
@@ -257,8 +261,9 @@ def get_necessary_equations(known_var_IDs, needed_var_IDs, us_equation):
         elif 'US' not in known_var_IDs:
             if 'TAU' in selected_unknown_var_IDs:
                 necessary_equations.append(BASIC_EQUATIONS['H'])
-            elif 'DMAX' in selected_unknown_var_IDs and 'TAU' not in known_var_IDs:
-                necessary_equations.append(BASIC_EQUATIONS['H'])
+            elif 'TAU' not in known_var_IDs:
+                if 'FROTP' in selected_unknown_var_IDs or 'DMAX' in selected_unknown_var_IDs:
+                    necessary_equations.append(BASIC_EQUATIONS['H'])
             elif is_rouse:
                 necessary_equations.append(BASIC_EQUATIONS['H'])
 
@@ -273,8 +278,9 @@ def get_necessary_equations(known_var_IDs, needed_var_IDs, us_equation):
         elif 'US' not in known_var_IDs:
             if 'TAU' in selected_unknown_var_IDs:
                 necessary_equations.append(BASIC_EQUATIONS['M'])
-            elif 'DMAX' in selected_unknown_var_IDs and 'TAU' not in known_var_IDs:
-                necessary_equations.append(BASIC_EQUATIONS['M'])
+            elif 'TAU' not in known_var_IDs:
+                if 'FROTP' in selected_unknown_var_IDs or 'DMAX' in selected_unknown_var_IDs:
+                    necessary_equations.append(BASIC_EQUATIONS['M'])
             elif is_rouse:
                 necessary_equations.append(BASIC_EQUATIONS['M'])
 
@@ -310,20 +316,26 @@ def get_necessary_equations(known_var_IDs, needed_var_IDs, us_equation):
     elif 'US' not in known_var_IDs:
         if 'TAU' in selected_unknown_var_IDs:
             necessary_equations.append(us_equation)
-        elif 'DMAX' in selected_unknown_var_IDs and 'TAU' not in known_var_IDs:
-            necessary_equations.append(us_equation)
+        elif 'TAU' not in known_var_IDs:
+            if 'FROTP' in selected_unknown_var_IDs or 'DMAX' in selected_unknown_var_IDs:
+                necessary_equations.append(us_equation)
         elif is_rouse:
             necessary_equations.append(us_equation)
 
     # add TAU
     if 'TAU' in selected_unknown_var_IDs:
         necessary_equations.append(BASIC_EQUATIONS['TAU'])
-    elif 'DMAX' in selected_unknown_var_IDs and 'TAU' not in known_var_IDs:
-        necessary_equations.append(BASIC_EQUATIONS['TAU'])
+    elif 'TAU' not in known_var_IDs:
+        if 'FROTP' in selected_unknown_var_IDs or 'DMAX' in selected_unknown_var_IDs:
+            necessary_equations.append(BASIC_EQUATIONS['TAU'])
 
     # add DMAX
     if 'DMAX' in selected_unknown_var_IDs:
         necessary_equations.append(BASIC_EQUATIONS['DMAX'])
+
+    # add FROTP
+    if 'FROTP' in selected_unknown_var_IDs:
+        necessary_equations.append(BASIC_EQUATIONS['FROTP'])
 
     # add ROUSE
     for var_ID in selected_unknown_var_IDs:
