@@ -69,9 +69,6 @@ class MyMainWindow(QWidget):
 
         pageList.setCurrentRow(0)
 
-        vline = QFrame()
-        vline.setFrameShape(QFrame.VLine)
-
         splitter = QSplitter()
         splitter.addWidget(pageList)
         splitter.addWidget(self.panel)

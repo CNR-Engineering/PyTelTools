@@ -1,53 +1,37 @@
-import sys
-from collections import defaultdict
-
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 
-from workflow.Node import Port
-from workflow.nodes_io import ReadSerafinNode, WriteSerafinNode
+from workflow.Node import Port, Box, Node
+from workflow.nodes_io import LoadSerafinNode
 from workflow.Link import Link
 
 
-class WorkflowTree:
-    def __init__(self, nodes):
-        super().__init__()
-        self.nodes = nodes
-        self.nb_nodes = len(nodes)
-        self.tree = defaultdict(set)
-
-    def add_edge(self, first_node, first_port, second_node, second_port):
-        p1 = self.nodes[first_node].ports[first_port]
-        p2 = self.nodes[second_node].ports[second_port]
-        if p1.type == Port.INPUT and p2.type == Port.OUTPUT:
-            if p1.data_type == p2.data_type:
-                if (second_node, second_port) not in self.tree[first_node, first_port]:
-                    self.tree[first_node, first_port].add((second_node, second_port))
-                    return True, ''
-                return False, 'already'
-            return False, 'type'
-        if p1.type == Port.OUTPUT and p2.type == Port.INPUT:
-            if p1.data_type == p2.data_type:
-                if (first_node, first_port) not in self.tree[second_node, second_port]:
-                    self.tree[second_node, second_port].add((first_node, first_port))
-                    return True, ''
-                return False, 'already'
-            return False, 'type'
-        return False, 'io'
-
-    def remove_edge(self, from_node, from_port, to_node, to_port):
-        self.tree[from_node, from_port].remove((to_node, to_port))
+def add_link(from_port, to_port):
+    if to_port.is_connected_to(from_port) and from_port.is_connected_to(to_port):
+        return False, 'already'
+    elif to_port.data_type != from_port.data_type:
+        return False, 'type'
+    elif to_port.has_mother():
+        return False, 'another'
+    from_port.connect(to_port)
+    to_port.connect(from_port)
+    return True, ''
 
 
 class TreeScene(QGraphicsScene):
     def __init__(self):
         super().__init__()
+        self.language = 'fr'
+        self.overwrite = True
+
         self.setSceneRect(QRectF(0, 0, 800, 600))
         self.transform = QTransform()
+        self.selectionChanged.connect(self.selection_changed)
 
-        self.tree = WorkflowTree([ReadSerafinNode(0),
-                                  WriteSerafinNode(1)])
+        self.nodes = {0: LoadSerafinNode(0)}
+        self.nodes[0].moveBy(50, 50)
+        self.nb_nodes = 1
 
         self.current_line = QGraphicsLineItem()
         self.addItem(self.current_line)
@@ -57,12 +41,12 @@ class TreeScene(QGraphicsScene):
         self.current_line.setPen(pen)
         self.current_port = None
 
-        for node in self.tree.nodes:
+        for node in self.nodes.values():
             self.addItem(node)
 
     def mousePressEvent(self, event):
         super().mousePressEvent(event)
-        for node_index, node in enumerate(self.tree.nodes):
+        for node_index, node in enumerate(self.nodes.values()):
             for port_index, port in enumerate(node.ports):
                 if port.isSelected():
                     self.current_port = (node_index, port_index)
@@ -70,7 +54,7 @@ class TreeScene(QGraphicsScene):
     def mouseMoveEvent(self, event):
         super().mouseMoveEvent(event)
         if self.current_port is not None:
-            port = self.tree.nodes[self.current_port[0]].ports[self.current_port[1]]
+            port = self.nodes[self.current_port[0]].ports[self.current_port[1]]
             self.current_line.setLine(QLineF(port.mapToScene(port.rect().center()), event.scenePos()))
             self.current_line.setVisible(True)
 
@@ -88,21 +72,47 @@ class TreeScene(QGraphicsScene):
         target_item = self.itemAt(event.scenePos(), self.transform)
         if isinstance(target_item, Link):
             self._handle_remove_link(target_item)
+        elif isinstance(target_item, Box):
+            node = target_item.parentItem()
+            node.configure()
+            self.selection_changed()
+
+    def selection_changed(self):
+        view = self.views()[0]
+        selected = self.selectedItems()
+        if not selected:
+            view.deselect_node()
+            return
+        selected = selected[0]
+        if isinstance(selected, Node):
+            view.select_node(selected)
+        else:
+            view.deselect_node()
+
+    def add_node(self, node, pos):
+        self.addItem(node)
+        self.nodes[node.index()] = node
+        self.nb_nodes += 1
+        node.moveBy(pos.x(), pos.y())
 
     def _handle_add_link(self, target_item):
-        port_index = target_item.index
-        node_index = target_item.parentItem().index
+        port_index = target_item.index()
+        node_index = target_item.parentItem().index()
         if node_index == self.current_port[0]:
             return
-        success, cause = self.tree.add_edge(self.current_port[0], self.current_port[1], node_index, port_index)
+
+        from_node, to_node, from_port, to_port = self._permute(self.current_port[0], self.current_port[1],
+                                                               node_index, port_index)
+        if from_port is None:
+            QMessageBox.critical(None, 'Error',
+                                 'Connections can only be established between Output and Input ports!',
+                                 QMessageBox.Ok)
+            return
+        success, cause = add_link(from_port, to_port)
         if success:
-            first_node = self.tree.nodes[self.current_port[0]]
-            first_port = first_node.ports[self.current_port[1]]
-            second_node = self.tree.nodes[node_index]
-            second_port = second_node.ports[port_index]
-            link = Link(first_port, second_port)
-            first_node.add_link(link)
-            second_node.add_link(link)
+            link = Link(from_port, to_port)
+            from_node.add_link(link)
+            to_node.add_link(link)
             self.addItem(link)
             link.setZValue(-1)
         else:
@@ -114,7 +124,7 @@ class TreeScene(QGraphicsScene):
                                      QMessageBox.Ok)
             else:
                 QMessageBox.critical(None, 'Error',
-                                     'Connections can only be established between Input and Output ports!',
+                                     'The input port is already connected to another port.',
                                      QMessageBox.Ok)
 
     def _handle_remove_link(self, target_item):
@@ -124,40 +134,37 @@ class TreeScene(QGraphicsScene):
                                   QMessageBox.Ok)
         if msg == QMessageBox.Cancel:
             return
-        from_port, to_port = target_item.from_port, target_item.to_port
-        from_node, to_node = from_port.parentItem(), from_port.parentItem()
-        from_node.remove_link(target_item)
-        to_node.remove_link(target_item)
-        self.tree.remove_edge(from_node.index, from_node.ports.index(from_port),
-                              to_node.index, to_node.ports.index(to_port))
+        target_item.remove()
         self.removeItem(target_item)
 
+    def handle_remove_node(self, node):
+        msg = QMessageBox.warning(None, 'Confirm delete',
+                                  'Do you want to delete this node?',
+                                  QMessageBox.Ok | QMessageBox.Cancel,
+                                  QMessageBox.Ok)
+        if msg == QMessageBox.Cancel:
+            return
+        self.removeItem(node)
+        for link in node.links.copy():
+            link.remove()
+            self.removeItem(link)
+        del self.nodes[node.index()]
 
-class TreeView(QGraphicsView):
-    def __init__(self):
-        super().__init__(TreeScene())
-        self.setAlignment(Qt.AlignTop | Qt.AlignLeft)
+        new_nodes = {}
+        self.nb_nodes -= 1
 
-    def resizeEvent(self, event):
-        self.scene().setSceneRect(QRectF(0, 0, self.width()-10, self.height()-10))
+        for index, node in zip(range(self.nb_nodes), self.nodes.values()):
+            new_nodes[index] = node
+            node.set_index(index)
+        self.nodes = new_nodes
 
-
-def exception_hook(exctype, value, traceback):
-    """!
-    @brief Needed for suppressing traceback silencing in newer version of PyQt5
-    """
-    sys._excepthook(exctype, value, traceback)
-    sys.exit(1)
-
-
-if __name__ == '__main__':
-    # suppress explicitly traceback silencing
-    sys._excepthook = sys.excepthook
-    sys.excepthook = exception_hook
-
-    app = QApplication(sys.argv)
-    view = TreeView()
-    view.show()
-    app.exec_()
-
-
+    def _permute(self, first_node_index, first_port_index, second_node_index, second_port_index):
+        first_node = self.nodes[first_node_index]
+        second_node = self.nodes[second_node_index]
+        p1 = first_node.ports[first_port_index]
+        p2 = second_node.ports[second_port_index]
+        if p1.type == Port.OUTPUT and p2.type == Port.INPUT:
+            return first_node, second_node, p1, p2
+        elif p1.type == Port.INPUT and p2.type == Port.OUTPUT:
+            return second_node, first_node, p2, p1
+        return None, None, None, None
