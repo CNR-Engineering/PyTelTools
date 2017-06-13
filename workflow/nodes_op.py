@@ -276,6 +276,102 @@ class SelectVariablesNode(OneInOneOutNode):
         self.message = 'Successful.'
 
 
+class AddRouseNode(OneInOneOutNode):
+    def __init__(self, index):
+        super().__init__(index, 'Add Rouse')
+        self.out_port.data_type = 'slf'
+        self.in_port.data_type = 'slf'
+        self.in_data = None
+        self.data = None
+        self.table = []
+        self.fall_velocities = []
+
+    def _configure(self):
+        msg = FallVelocityMessage(self.fall_velocities, self.table)
+        value = msg.exec_()
+        if value != QDialog.Accepted:
+            return False
+        self.table = msg.get_table()
+        for i in range(len(self.table)):
+            self.fall_velocities.append(float(self.table[i][0][6:]))
+        return True
+
+    def reconfigure(self):
+        super().reconfigure()
+        if self.fall_velocities and self.in_port.has_mother():
+            parent_node = self.in_port.mother.parentItem()
+            if parent_node.ready_to_run():
+                parent_node.run()
+                if parent_node.state == Node.SUCCESS:
+                    if 'US' in parent_node.selected_vars:
+                        self.data = None
+                        return
+
+        self.in_data = None
+        self.state = Node.NOT_CONFIGURED
+        self.update()
+
+    def configure(self):
+        if not self.in_port.has_mother():
+            QMessageBox.critical(None, 'Error', 'Connect and run the input before configure this node!',
+                                 QMessageBox.Ok)
+            return
+
+        parent_node = self.in_port.mother.parentItem()
+        if parent_node.state != Node.SUCCESS:
+            if not self.fall_velocities:
+                if parent_node.ready_to_run():
+                    parent_node.run()
+                else:
+                    QMessageBox.critical(None, 'Error', 'Configure and run the input before configure this node!',
+                                         QMessageBox.Ok)
+                    return
+                if parent_node.state == Node.SUCCESS:
+                    self.in_data = parent_node.data
+                    if 'US' not in self.in_data.selected_vars:
+                        QMessageBox.critical(None, 'Error', 'US not found.',
+                                             QMessageBox.Ok)
+                        return
+                else:
+                    QMessageBox.critical(None, 'Error', 'Configure and run the input before configure this node!',
+                                         QMessageBox.Ok)
+                    return
+            else:
+                self.in_data = parent_node.data
+                if 'US' not in self.in_data.selected_vars:
+                    QMessageBox.critical(None, 'Error', 'US not found.',
+                                         QMessageBox.Ok)
+                    return
+                old_rouse = [self.table[i][0] for i in range(len(self.table))]
+                for rouse in old_rouse:
+                    if rouse in self.in_data.selected_vars:
+                        QMessageBox.critical(self, 'Error', 'Duplicated values found.',
+                                             QMessageBox.Ok)
+                        return
+
+        if self._configure():
+            self.state = Node.READY
+
+    def run(self):
+        self.data = self.in_data.copy()
+        self.data.selected_vars.extend([self.table[i][0] for i in range(len(self.table))])
+        for i in range(len(self.table)):
+            self.data.selected_vars_names[self.table[i][0]] = (bytes(self.table[i][1], 'utf-8').ljust(16),
+                                                               bytes(self.table[i][2], 'utf-8').ljust(16))
+        self.data.equations = get_necessary_equations(self.in_data.header.var_IDs, self.data.selected_vars,
+                                                      self.data.us_equation)
+        self.data.output_header.nb_var = len(self.in_data.selected_vars)
+        self.data.output_header.var_IDs, self.data.output_header.var_names, \
+                                         self.data.output_header.var_units = [], [], []
+        for var_ID, (var_name, var_unit) in self.data.selected_vars_names.items():
+            self.data.output_header.var_IDs.append(var_ID)
+            self.data.output_header.var_names.append(var_name)
+            self.data.output_header.var_units.append(var_unit)
+        self.state = Node.SUCCESS
+        self.update()
+        self.message = 'Successful.'
+
+
 class SelectTimeNode(OneInOneOutNode):
     def __init__(self, index):
         super().__init__(index, 'Select\nTime')
@@ -401,100 +497,3 @@ class SelectTimeNode(OneInOneOutNode):
         self.state = Node.SUCCESS
         self.update()
         self.message = 'Successful.'
-
-
-class AddRouseNode(OneInOneOutNode):
-    def __init__(self, index):
-        super().__init__(index, 'Add Rouse')
-        self.out_port.data_type = 'slf'
-        self.in_port.data_type = 'slf'
-        self.in_data = None
-        self.data = None
-        self.table = []
-        self.fall_velocities = []
-
-    def _configure(self):
-        msg = FallVelocityMessage(self.fall_velocities, self.table)
-        value = msg.exec_()
-        if value != QDialog.Accepted:
-            return False
-        self.table = msg.get_table()
-        for i in range(len(self.table)):
-            self.fall_velocities.append(float(self.table[i][0][6:]))
-        return True
-
-    def reconfigure(self):
-        super().reconfigure()
-        if self.fall_velocities and self.in_port.has_mother():
-            parent_node = self.in_port.mother.parentItem()
-            if parent_node.ready_to_run():
-                parent_node.run()
-                if parent_node.state == Node.SUCCESS:
-                    if 'US' in parent_node.selected_vars:
-                        self.data = None
-                        return
-
-        self.in_data = None
-        self.state = Node.NOT_CONFIGURED
-        self.update()
-
-    def configure(self):
-        if not self.in_port.has_mother():
-            QMessageBox.critical(None, 'Error', 'Connect and run the input before configure this node!',
-                                 QMessageBox.Ok)
-            return
-
-        parent_node = self.in_port.mother.parentItem()
-        if parent_node.state != Node.SUCCESS:
-            if not self.fall_velocities:
-                if parent_node.ready_to_run():
-                    parent_node.run()
-                else:
-                    QMessageBox.critical(None, 'Error', 'Configure and run the input before configure this node!',
-                                         QMessageBox.Ok)
-                    return
-                if parent_node.state == Node.SUCCESS:
-                    self.in_data = parent_node.data
-                    if 'US' not in self.in_data.selected_vars:
-                        QMessageBox.critical(None, 'Error', 'US not found.',
-                                             QMessageBox.Ok)
-                        return
-                else:
-                    QMessageBox.critical(None, 'Error', 'Configure and run the input before configure this node!',
-                                         QMessageBox.Ok)
-                    return
-            else:
-                self.in_data = parent_node.data
-                if 'US' not in self.in_data.selected_vars:
-                    QMessageBox.critical(None, 'Error', 'US not found.',
-                                         QMessageBox.Ok)
-                    return
-                old_rouse = [self.table[i][0] for i in range(len(self.table))]
-                for rouse in old_rouse:
-                    if rouse in self.in_data.selected_vars:
-                        QMessageBox.critical(self, 'Error', 'Duplicated values found.',
-                                             QMessageBox.Ok)
-                        return
-
-        if self._configure():
-            self.state = Node.READY
-
-    def run(self):
-        self.data = self.in_data.copy()
-        self.data.selected_vars.extend([self.table[i][0] for i in range(len(self.table))])
-        for i in range(len(self.table)):
-            self.data.selected_vars_names[self.table[i][0]] = (bytes(self.table[i][1], 'utf-8').ljust(16),
-                                                               bytes(self.table[i][2], 'utf-8').ljust(16))
-        self.data.equations = get_necessary_equations(self.in_data.header.var_IDs, self.data.selected_vars,
-                                                      self.data.us_equation)
-        self.data.output_header.nb_var = len(self.in_data.selected_vars)
-        self.data.output_header.var_IDs, self.data.output_header.var_names, \
-                                         self.data.output_header.var_units = [], [], []
-        for var_ID, (var_name, var_unit) in self.data.selected_vars_names.items():
-            self.data.output_header.var_IDs.append(var_ID)
-            self.data.output_header.var_names.append(var_name)
-            self.data.output_header.var_units.append(var_unit)
-        self.state = Node.SUCCESS
-        self.update()
-        self.message = 'Successful.'
-

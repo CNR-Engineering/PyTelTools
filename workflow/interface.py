@@ -132,9 +132,6 @@ class NodeTree(QTreeWidget):
         nodes_calc = QTreeWidgetItem(self, ['Calculations'])
         nodes_calc.addChild(NodeItem('Compute Volume'))
 
-        for item in [nodes_io, nodes_calc]:
-            self.addTopLevelItem(item)
-
         self.setDragEnabled(True)
         self.setMaximumWidth(200)
         self.setColumnCount(1)

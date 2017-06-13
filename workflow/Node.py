@@ -197,6 +197,7 @@ class Node(QGraphicsItem):
         return False
 
     def reconfigure(self):
+        self.message = ''
         if self.state != Node.NOT_CONFIGURED:
             self.state = Node.READY
 
