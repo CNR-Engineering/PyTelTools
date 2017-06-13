@@ -147,4 +147,5 @@ class Link(QGraphicsLineItem):
         self.to_port.disconnect()
         self.from_port.parentItem().remove_link(self)
         self.to_port.parentItem().remove_link(self)
+        self.to_port.parentItem().reconfigure()
 

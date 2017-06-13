@@ -5,9 +5,12 @@ from PyQt5.QtGui import *
 
 from workflow.Tree import TreeScene
 from workflow.nodes_io import *
+from workflow.nodes_op import *
 from workflow.nodes_calc import *
 
 _NODES = {'Load Serafin': LoadSerafinNode, 'Write Serafin': WriteSerafinNode,
+          'Select Variables': SelectVariablesNode, 'Select Time': SelectTimeNode,
+          'Add Rouse': AddRouseNode,
           'Compute Volume': ComputeVolumeNode}
 
 
@@ -98,6 +101,8 @@ class TreePanel(QWidget):
             act.setEnabled(True)
         if self.view.current_node.ready_to_run():
             self.run_act.setEnabled(True)
+        else:
+            self.run_act.setEnabled(False)
 
     def disable_toolbar(self):
         self.node_label.clear()
@@ -118,6 +123,11 @@ class NodeTree(QTreeWidget):
         for text in ['Load Serafin', 'Write Serafin']:
             item = NodeItem(text)
             nodes_io.addChild(item)
+
+        nodes_op = QTreeWidgetItem(self, ['Basic operations'])
+        for text in ['Select Variables', 'Select Time', 'Add Rouse']:
+            item = NodeItem(text)
+            nodes_op.addChild(item)
 
         nodes_calc = QTreeWidgetItem(self, ['Calculations'])
         nodes_calc.addChild(NodeItem('Compute Volume'))

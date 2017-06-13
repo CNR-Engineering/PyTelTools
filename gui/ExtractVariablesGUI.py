@@ -8,8 +8,8 @@ import logging
 from slf import Serafin
 from slf.variables import get_available_variables, \
     do_calculations_in_frame, get_necessary_equations, get_US_equation, add_US
-from gui.util import TableWidgetDragRows, QPlainTextEditLogger, handleOverwrite, \
-    TimeRangeSlider, OutputProgressDialog, OutputThread, TelToolWidget, testOpen
+from gui.util import TableWidgetDragRows, QPlainTextEditLogger, FallVelocityMessage, FrictionLawMessage, \
+    TimeRangeSlider, DoubleSliderBox, OutputProgressDialog, OutputThread, TelToolWidget, testOpen, handleOverwrite
 
 
 class ExtractVariablesThread(OutputThread):
@@ -32,207 +32,6 @@ class ExtractVariablesThread(OutputThread):
                                              self.output_header.var_IDs, self.output_header.np_float_type)
             self.output_stream.write_entire_frame(self.output_header, self.input_stream.time[i], values)
             self.tick.emit(5 + int(95 * (i+1) / self.nb_frames))
-
-
-class FrictionLawMessage(QDialog):
-    """!
-    @brief Message dialog for choosing one of the friction laws
-    """
-    def __init__(self, parent=None):
-        super().__init__(parent)
-
-        self.chezy = QRadioButton('Chézy')
-        self.chezy.setChecked(True)
-        self.strickler = QRadioButton('Strickler')
-        self.manning = QRadioButton('Manning')
-        self.nikuradse = QRadioButton('Nikuradse')
-        hlayout = QHBoxLayout()
-        hlayout.addWidget(self.chezy)
-        hlayout.addWidget(self.strickler)
-        hlayout.addWidget(self.manning)
-        hlayout.addWidget(self.nikuradse)
-
-        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel,
-                                   Qt.Horizontal, self)
-        buttons.accepted.connect(self.accept)
-        buttons.rejected.connect(self.reject)
-        vlayout = QVBoxLayout()
-        vlayout.addLayout(hlayout)
-        vlayout.addWidget(buttons)
-        self.setLayout(vlayout)
-
-        self.resize(self.sizeHint())
-        self.setWindowTitle('Select a friction law')
-
-    def getChoice(self):
-        if self.chezy.isChecked():
-            return 0
-        elif self.strickler.isChecked():
-            return 1
-        elif self.manning.isChecked():
-            return 2
-        elif self.nikuradse.isChecked():
-            return 3
-        return -1
-
-
-class FallVelocityMessage(QDialog):
-    """!
-    @brief Message dialog for adding fall velocities
-    """
-    def __init__(self, old_velocities, parent=None):
-        super().__init__(parent)
-        self.values = old_velocities[:]
-        self.names = []
-
-        self.table = TableWidgetDragRows(self)
-        self.table.setDragEnabled(False)
-        self.table.setColumnCount(3)
-        self.table.setHorizontalHeaderLabels(['ID', 'Name', 'Unit'])
-        vh = self.table.verticalHeader()
-        vh.setSectionResizeMode(QHeaderView.Fixed)
-        vh.setDefaultSectionSize(50)
-
-        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel,
-                                   Qt.Horizontal, self)
-        buttons.accepted.connect(self.check)
-        buttons.rejected.connect(self.reject)
-
-        self.buttonAdd = QPushButton('Add a fall velocity', self)
-        self.buttonAdd.clicked.connect(self.btnAddEvent)
-
-        vlayout = QVBoxLayout()
-        vlayout.addWidget(QLabel('Double click on the cells to edit name'))
-        vlayout.addWidget(self.table)
-        vlayout.addWidget(self.buttonAdd)
-        vlayout.addItem(QSpacerItem(10, 20))
-        vlayout.addWidget(buttons)
-        self.setLayout(vlayout)
-
-        self.setFixedSize(350, 400)
-        self.setWindowTitle('Add fall velocities')
-
-    def check_name_length(self):
-        for name in self.names:
-            if len(name) < 2 or len(name) > 16:
-                return False
-        return True
-
-    def check(self):
-        if self.table.rowCount() == 0:
-            return
-        self.names = []
-        for i in range(self.table.rowCount()):
-            self.names.append(self.table.item(i, 1).text())
-
-        if not self.check_name_length():
-            QMessageBox.critical(self, 'Error', 'The variable names should be between 2 and 16 characters!',
-                                 QMessageBox.Ok)
-            return
-        elif len(set(self.names)) != len(self.names):
-            QMessageBox.critical(self, 'Error', 'Two variables cannot share the same name!',
-                                 QMessageBox.Ok)
-            return
-        else:
-            self.accept()
-
-    def get_table(self):
-        return [[self.table.item(i, j).text() for j in range(3)] for i in range(self.table.rowCount())]
-
-    def btnAddEvent(self):
-        value, ok = QInputDialog.getText(self, 'New value',
-                                         'Fall velocity value (up to 5 significant figures):', text='1e-5')
-        if not ok:
-            return
-        try:
-            value = float(value)
-        except ValueError:
-             QMessageBox.critical(self, 'Error', 'You must enter a number!',
-                                 QMessageBox.Ok)
-             return
-        if value in self.values:
-            QMessageBox.critical(self, 'Error', 'The value %.4E is already added!' % value,
-                                 QMessageBox.Ok)
-            return
-        self.values.append(value)
-        value_ID = 'ROUSE %.4E' % value
-        nb_row = self.table.rowCount()
-        self.table.insertRow(nb_row)
-        id_item = QTableWidgetItem(value_ID)
-        id_item.setFlags(Qt.ItemIsEditable)
-        name_item = QTableWidgetItem(value_ID)
-        unit_item = QTableWidgetItem('')
-        unit_item.setFlags(Qt.ItemIsEditable)
-        self.table.setItem(nb_row, 0, id_item)
-        self.table.setItem(nb_row, 1, name_item)
-        self.table.setItem(nb_row, 2, unit_item)
-
-
-class SelectedTimeINFO(QWidget):
-    """!
-    @brief Text fields for time selection display (with slider)
-    """
-    def __init__(self, parent):
-        super().__init__()
-        self.parent = parent
-        self.visited = False  # avoid redundant text display at initialization
-
-        self.startIndex = QLineEdit('', self)
-        self.endIndex = QLineEdit('', self)
-        self.startValue = QLineEdit('', self)
-        self.endValue = QLineEdit('', self)
-        self.startDate = QLineEdit('', self)
-        self.endDate = QLineEdit('', self)
-        for w in [self.startDate, self.endDate]:
-            w.setReadOnly(True)
-
-        self.startIndex.setMinimumWidth(30)
-        self.startIndex.setMaximumWidth(50)
-        self.endIndex.setMinimumWidth(30)
-        self.endIndex.setMaximumWidth(50)
-        self.startValue.setMaximumWidth(100)
-        self.endValue.setMaximumWidth(100)
-        self.startDate.setMinimumWidth(110)
-        self.endDate.setMinimumWidth(110)
-
-        self.timeSamplig = QLineEdit('1', self)
-        self.timeSamplig.setMinimumWidth(30)
-        self.timeSamplig.setMaximumWidth(50)
-
-        glayout = QGridLayout()
-        glayout.addWidget(QLabel('Sampling frequency'), 1, 1)
-        glayout.addWidget(self.timeSamplig, 1, 2)
-        glayout.addWidget(QLabel('Start time index'), 2, 1)
-        glayout.addWidget(self.startIndex, 2, 2)
-        glayout.addWidget(QLabel('value'), 2, 3)
-        glayout.addWidget(self.startValue, 2, 4)
-        glayout.addWidget(QLabel('date'), 2, 5)
-        glayout.addWidget(self.startDate, 2, 6)
-
-        glayout.addWidget(QLabel('End time index'), 3, 1)
-        glayout.addWidget(self.endIndex, 3, 2)
-        glayout.addWidget(QLabel('value'), 3, 3)
-        glayout.addWidget(self.endValue, 3, 4)
-        glayout.addWidget(QLabel('date'), 3, 5)
-        glayout.addWidget(self.endDate, 3, 6)
-
-        self.setLayout(glayout)
-
-    def updateText(self, start_index, start_value, start_date, end_index, end_value, end_date):
-        self.startIndex.setText(str(start_index+1))
-        self.endIndex.setText((str(end_index+1)))
-        self.startValue.setText(str(start_value))
-        self.endValue.setText(str(end_value))
-        self.startDate.setText(str(start_date))
-        self.endDate.setText(str(end_date))
-
-    def clearText(self):
-        for w in [self.startIndex, self.endIndex, self.startValue, self.endValue]:
-            w.clear()
-        for w in [self.startDate, self.endDate]:
-            w.clear()
-            self.visited = False
-        self.timeSamplig.setText('1')
 
 
 class TimeTable(TableWidgetDragRows):
@@ -597,12 +396,13 @@ class InputTab(QWidget):
 
         friction_law = msg.getChoice()
         self.us_equation = get_US_equation(friction_law)
-        add_US(self.available_vars)
+        new_vars = []
+        add_US(new_vars, self.header.var_IDs)
 
         # add US, TAU and DMAX to available variable
         offset = self.firstTable.rowCount()
-        for i in range(3):
-            var = self.available_vars[-3+i]
+        for i in range(len(new_vars)):
+            var = self.new_vars[i]
             self.firstTable.insertRow(self.firstTable.rowCount())
             id_item = QTableWidgetItem(var.ID().strip())
             name_item = QTableWidgetItem(var.name(self.language))
@@ -706,7 +506,7 @@ class TimeTab(QWidget):
         self.last_sampling_frequency = 1
 
         # create text boxes for displaying the time selection and sampling
-        self.timeSelection = SelectedTimeINFO(self)
+        self.timeSelection = DoubleSliderBox(self)
         self.timeSelection.startIndex.setEnabled(False)
         self.timeSelection.endIndex.setEnabled(False)
         self.timeSelection.startValue.setEnabled(False)

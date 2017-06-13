@@ -95,6 +95,15 @@ class Node(QGraphicsItem):
         self._index = index
         self.box = Box(self)
 
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setTextVisible(False)
+        self.progress_bar.setMinimum(0)
+        self.progress_bar.setMaximum(100)
+        self.proxy = QGraphicsProxyWidget(self)
+        self.proxy.setWidget(self.progress_bar)
+        self.proxy.setGeometry(QRectF(self.boundingRect().topLeft(), self.boundingRect().topRight()+QPointF(0, 30)))
+        self.progress_bar.setVisible(False)
+
         self.setAcceptedMouseButtons(Qt.LeftButton)
         self.setFlag(QGraphicsItem.ItemIsMovable)
         self.setFlag(QGraphicsItem.ItemSendsGeometryChanges)
@@ -104,6 +113,7 @@ class Node(QGraphicsItem):
 
         self.label = label
         self.state = Node.NOT_CONFIGURED
+        self.message = ''
 
         self.ports = []
         self.links = set()
@@ -167,17 +177,28 @@ class Node(QGraphicsItem):
             self.update_links()
         return result
 
+    def get_option_panel(self):
+        return None
+
     def ready_to_run(self):
         pass
 
     def configure(self):
-        pass
-
-    def run(self):
-        pass
+        configure_dialog = ConfigureDialog(self.get_option_panel(), self.label)
+        configure_dialog.message_field.appendPlainText(self.message)
+        if configure_dialog.exec_() == QDialog.Accepted:
+            self.state = Node.READY
+            self.message = ''
+            for port in self.ports:
+                if port.type == Port.OUTPUT:
+                    for child in port.children:
+                        child.parentItem().reconfigure()
+            return True
+        return False
 
     def reconfigure(self):
-        pass
+        if self.state != Node.NOT_CONFIGURED:
+            self.state = Node.READY
 
 
 class SingleInputNode(Node):
@@ -194,7 +215,13 @@ class SingleInputNode(Node):
         return self.in_port.mother.parentItem().ready_to_run()
 
     def reconfigure(self):
-        pass
+        super().reconfigure()
+
+    def run_parent(self):
+        if self.in_port.mother.parentItem().state != Node.SUCCESS:
+            self.in_port.mother.parentItem().run()
+            QApplication.processEvents()
+        return self.in_port.mother.parentItem().state == Node.SUCCESS
 
 
 class SingleOutputNode(Node):
@@ -207,6 +234,7 @@ class SingleOutputNode(Node):
         return self.state != Node.NOT_CONFIGURED
 
     def reconfigure(self):
+        super().reconfigure()
         if self.out_port.has_children():
             for child in self.out_port.children:
                 child.parentItem().reconfigure()
@@ -228,9 +256,16 @@ class OneInOneOutNode(Node):
         return self.in_port.mother.parentItem().ready_to_run()
 
     def reconfigure(self):
+        super().reconfigure()
         if self.out_port.has_children():
             for child in self.out_port.children:
                 child.parentItem().reconfigure()
+
+    def run_parent(self):
+        if self.in_port.mother.parentItem().state != Node.SUCCESS:
+            self.in_port.mother.parentItem().run()
+            QApplication.processEvents()
+        return self.in_port.mother.parentItem().state == Node.SUCCESS
 
 
 class ConfigureDialog(QDialog):
@@ -241,9 +276,13 @@ class ConfigureDialog(QDialog):
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
 
+        self.message_field = QPlainTextEdit()
+        self.message_field.setFixedHeight(50)
+
         layout = QVBoxLayout()
         layout.addWidget(panel)
         layout.addStretch()
+        layout.addWidget(self.message_field)
         layout.addWidget(buttons)
         self.setLayout(layout)
 

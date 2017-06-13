@@ -376,14 +376,17 @@ def get_US_equation(friction_law):
     return NIKURADSE_EQUATION
 
 
-def add_US(available_vars):
+def add_US(available_vars, known_vars):
     """!
     @brief Add US, TAU and DMAX Variable objects to the list
     @param available_vars <[Variable]>: the target list
+    @param known_vars <[str]>: known variables IDs
     """
     available_vars.append(US)
     available_vars.append(TAU)
     available_vars.append(DMAX)
+    if 'MU' in known_vars:
+        available_vars.append(FROTP)
 
 
 def do_calculations_in_frame(equations, us_equation, input_serafin, time_index, selected_output_IDs, output_float_type):

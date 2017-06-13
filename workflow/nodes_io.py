@@ -1,10 +1,12 @@
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
-
 import numpy as np
-from workflow.Node import Node, ConfigureDialog, SingleOutputNode, SingleInputNode
+from copy import deepcopy
+
+from workflow.Node import Node, SingleOutputNode, SingleInputNode
 from slf import Serafin
+from slf.variables import do_calculations_in_frame
 
 
 class LoadSerafinNode(SingleOutputNode):
@@ -42,24 +44,21 @@ class LoadSerafinNode(SingleOutputNode):
             self.name_box.setText(filename)
 
     def configure(self):
-        configure_dialog = ConfigureDialog(self.get_option_panel(), self.label)
-        if configure_dialog.exec_() == QDialog.Accepted:
-            self.state = Node.READY
-        self.name_box = None
-        self.reconfigure()
+        if super().configure():
+            self.name_box = None
 
     def run(self):
-        with Serafin.Read(self.filename, 'fr') as resin:
-            resin.read_header()
-
-            if not resin.header.is_2d:
-                self.state = Node.FAIL
-                self.update()
-                return
-            resin.get_time()
-            self.data = (self.filename, resin.header.copy(), resin.time[:])
-
-        self.state = Node.SUCCESS
+        if self.state == Node.SUCCESS:
+            return
+        data = SerafinData(self.filename, self.scene().language)
+        if not data.read():
+            self.data = None
+            self.message = 'Failed: Input file is not Telemac 2D.'
+            self.state = Node.FAIL
+        else:
+            self.data = data
+            self.message = 'Successful.'
+            self.state = Node.SUCCESS
         self.update()
 
 
@@ -100,31 +99,89 @@ class WriteSerafinNode(SingleInputNode):
             self.name_box.setText(filename)
 
     def configure(self):
-        configure_dialog = ConfigureDialog(self.get_option_panel(), self.label)
-        if configure_dialog.exec_() == QDialog.Accepted:
-            self.state = Node.READY
-        self.name_box = None
-        self.reconfigure()
+        if super().configure():
+            self.name_box = None
 
     def run(self):
-        if self.in_port.mother.parentItem().data is None:
-            self.in_port.mother.parentItem().run()
-        input_filename, input_header, input_time = self.in_port.mother.parentItem().data
-        if input_filename == self.filename:
+        success = super().run_parent()
+        if not success:
             self.state = Node.FAIL
             self.update()
+            self.message = 'Failed: input failed.'
             return
-        with Serafin.Read(input_filename, self.scene().language) as resin:
-            resin.header = input_header
-            resin.time = input_time
-            with Serafin.Write(self.filename, self.scene().language, self.scene().overwrite) as resout:
-                resout.write_header(input_header)
-                for time_index, time_value in enumerate(input_time):
-                    values = np.empty((input_header.nb_var, input_header.nb_nodes))
-                    for i, var_ID in enumerate(input_header.var_IDs):
-                        values[i, :] = resin.read_var_in_frame(time_index, var_ID)
-                    resout.write_entire_frame(input_header, time_value, values)
-        self.state = Node.SUCCESS
-        self.update()
 
+        input_data = self.in_port.mother.parentItem().data
+        if input_data.filename == self.filename:
+            self.state = Node.FAIL
+            self.message = 'Failed: cannot overwrite to the input file.'
+            self.update()
+            return
+        self.progress_bar.setVisible(True)
+        with Serafin.Read(input_data.filename, self.scene().language) as resin:
+            resin.header = input_data.header
+            resin.time = input_data.time
+            with Serafin.Write(self.filename, self.scene().language, self.scene().overwrite) as resout:
+                resout.write_header(input_data.output_header)
+                for i, time_index in enumerate(input_data.selected_time_indices):
+                    values = do_calculations_in_frame(input_data.equations, input_data.us_equation,
+                                                      resin, time_index, input_data.selected_vars,
+                                                      input_data.header.float_type)
+                    resout.write_entire_frame(input_data.output_header, input_data.time[time_index], values)
+
+                    self.progress_bar.setValue(100 * (i+1)/len(input_data.selected_time_indices))
+                    QApplication.processEvents()
+
+        self.state = Node.SUCCESS
+        self.message = 'Successful.'
+        self.update()
+        self.progress_bar.setVisible(False)
+
+
+class SerafinData:
+    def __init__(self, filename, language):
+        self.language = language
+        self.filename = filename
+        self.has_mesh = False
+        self.mesh = None
+        self.header = None
+        self.time = []
+
+        self.selected_vars = []
+        self.selected_vars_names = {}
+        self.output_header = None
+        self.selected_time_indices = []
+        self.equations = []
+        self.us_equation = None
+
+    def read(self):
+        with Serafin.Read(self.filename, self.language) as resin:
+            resin.read_header()
+
+            if not resin.header.is_2d:
+                return False
+            resin.get_time()
+
+            self.header = resin.header.copy()
+            self.time = resin.time[:]
+
+        self.selected_vars = self.header.var_IDs[:]
+        self.selected_vars_names = {var_id: (var_name, var_unit) for (var_id, var_name, var_unit)
+                                    in zip(self.header.var_IDs, self.header.var_names, self.header.var_units)}
+        self.output_header = self.header.copy()
+        self.selected_time_indices = list(range(len(self.time)))
+        return True
+
+    def copy(self):
+        copy_data = SerafinData(self.filename, self.language)
+        copy_data.has_mesh = self.has_mesh
+        copy_data.mesh = self.mesh
+        copy_data.header = self.header
+        copy_data.time = self.time
+        copy_data.selected_vars = self.selected_vars[:]
+        copy_data.selected_vars_names = deepcopy(self.selected_vars_names)
+        copy_data.output_header = self.output_header.copy()
+        copy_data.selected_time_indices = self.selected_time_indices[:]
+        copy_data.equations = self.equations[:]
+        copy_data.us_equation = self.us_equation
+        return copy_data
 
