@@ -3,6 +3,7 @@ from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 import numpy as np
 from copy import deepcopy
+import datetime
 
 from workflow.Node import Node, SingleOutputNode, SingleInputNode
 from slf import Serafin
@@ -103,7 +104,7 @@ class WriteSerafinNode(SingleInputNode):
             self.name_box = None
 
     def run(self):
-        success = super().run_parent()
+        success = super().run_upward()
         if not success:
             self.state = Node.FAIL
             self.update()
@@ -117,16 +118,25 @@ class WriteSerafinNode(SingleInputNode):
             self.update()
             return
         self.progress_bar.setVisible(True)
+        output_header = input_data.header.copy()
+        output_header.nb_var = len(input_data.selected_vars)
+        output_header.var_IDs, output_header.var_names, \
+                             output_header.var_units = [], [], []
+        for var_ID, (var_name, var_unit) in input_data.selected_vars_names.items():
+            output_header.var_IDs.append(var_ID)
+            output_header.var_names.append(var_name)
+            output_header.var_units.append(var_unit)
+
         with Serafin.Read(input_data.filename, self.scene().language) as resin:
             resin.header = input_data.header
             resin.time = input_data.time
             with Serafin.Write(self.filename, self.scene().language, self.scene().overwrite) as resout:
-                resout.write_header(input_data.output_header)
+                resout.write_header(output_header)
                 for i, time_index in enumerate(input_data.selected_time_indices):
                     values = do_calculations_in_frame(input_data.equations, input_data.us_equation,
                                                       resin, time_index, input_data.selected_vars,
-                                                      input_data.header.float_type)
-                    resout.write_entire_frame(input_data.output_header, input_data.time[time_index], values)
+                                                      output_header.float_type)
+                    resout.write_entire_frame(output_header, input_data.time[time_index], values)
 
                     self.progress_bar.setValue(100 * (i+1)/len(input_data.selected_time_indices))
                     QApplication.processEvents()
@@ -145,10 +155,11 @@ class SerafinData:
         self.mesh = None
         self.header = None
         self.time = []
+        self.time_second = []
+        self.start_time = None
 
         self.selected_vars = []
         self.selected_vars_names = {}
-        self.output_header = None
         self.selected_time_indices = []
         self.equations = []
         self.us_equation = None
@@ -164,10 +175,15 @@ class SerafinData:
             self.header = resin.header.copy()
             self.time = resin.time[:]
 
+        if self.header.date is not None:
+            year, month, day, hour, minute, second = self.header.date
+            self.start_time = datetime.datetime(year, month, day, hour, minute, second)
+        else:
+            self.start_time = datetime.datetime(1900, 1, 1, 0, 0, 0)
+        self.time_second = list(map(lambda x: datetime.timedelta(seconds=x), self.time))
         self.selected_vars = self.header.var_IDs[:]
         self.selected_vars_names = {var_id: (var_name, var_unit) for (var_id, var_name, var_unit)
                                     in zip(self.header.var_IDs, self.header.var_names, self.header.var_units)}
-        self.output_header = self.header.copy()
         self.selected_time_indices = list(range(len(self.time)))
         return True
 
@@ -177,9 +193,11 @@ class SerafinData:
         copy_data.mesh = self.mesh
         copy_data.header = self.header
         copy_data.time = self.time
+        copy_data.start_time = self.start_time
+        copy_data.time_second = self.time_second
+
         copy_data.selected_vars = self.selected_vars[:]
         copy_data.selected_vars_names = deepcopy(self.selected_vars_names)
-        copy_data.output_header = self.output_header.copy()
         copy_data.selected_time_indices = self.selected_time_indices[:]
         copy_data.equations = self.equations[:]
         copy_data.us_equation = self.us_equation

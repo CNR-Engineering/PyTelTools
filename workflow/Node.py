@@ -218,10 +218,9 @@ class SingleInputNode(Node):
     def reconfigure(self):
         super().reconfigure()
 
-    def run_parent(self):
+    def run_upward(self):
         if self.in_port.mother.parentItem().state != Node.SUCCESS:
             self.in_port.mother.parentItem().run()
-            QApplication.processEvents()
         return self.in_port.mother.parentItem().state == Node.SUCCESS
 
 
@@ -257,15 +256,14 @@ class OneInOneOutNode(Node):
         return self.in_port.mother.parentItem().ready_to_run()
 
     def reconfigure(self):
-        super().reconfigure()
         if self.out_port.has_children():
             for child in self.out_port.children:
                 child.parentItem().reconfigure()
+        super().reconfigure()
 
-    def run_parent(self):
+    def run_upward(self):
         if self.in_port.mother.parentItem().state != Node.SUCCESS:
             self.in_port.mother.parentItem().run()
-            QApplication.processEvents()
         return self.in_port.mother.parentItem().state == Node.SUCCESS
 
 

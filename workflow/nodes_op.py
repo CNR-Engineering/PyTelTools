@@ -256,19 +256,14 @@ class SelectVariablesNode(OneInOneOutNode):
             QApplication.processEvents()
 
     def run(self):
+        self.run_upward()
         self.data = self.in_data.copy()
         self.data.us_equation = self.us_equation
         self.data.equations = get_necessary_equations(self.in_data.header.var_IDs, self.selected_vars,
                                                       self.us_equation)
-        self.data.output_header.nb_var = len(self.selected_vars)
-        self.data.output_header.var_IDs, self.data.output_header.var_names, \
-                                         self.data.output_header.var_units = [], [], []
         self.data.selected_vars = self.selected_vars
         self.data.selected_vars_names = {}
         for var_ID, (var_name, var_unit) in self.selected_vars_names.items():
-            self.data.output_header.var_IDs.append(var_ID)
-            self.data.output_header.var_names.append(var_name)
-            self.data.output_header.var_units.append(var_unit)
             self.data.selected_vars_names[var_ID] = (var_name, var_unit)
 
         self.state = Node.SUCCESS
@@ -303,10 +298,10 @@ class AddRouseNode(OneInOneOutNode):
             if parent_node.ready_to_run():
                 parent_node.run()
                 if parent_node.state == Node.SUCCESS:
-                    if 'US' in parent_node.selected_vars:
-                        self.data = None
+                    if 'US' in parent_node.data.selected_vars:
                         return
-
+        self.fall_velocities = []
+        self.table = []
         self.in_data = None
         self.state = Node.NOT_CONFIGURED
         self.update()
@@ -319,40 +314,47 @@ class AddRouseNode(OneInOneOutNode):
 
         parent_node = self.in_port.mother.parentItem()
         if parent_node.state != Node.SUCCESS:
-            if not self.fall_velocities:
-                if parent_node.ready_to_run():
-                    parent_node.run()
-                else:
-                    QMessageBox.critical(None, 'Error', 'Configure and run the input before configure this node!',
-                                         QMessageBox.Ok)
-                    return
-                if parent_node.state == Node.SUCCESS:
-                    self.in_data = parent_node.data
-                    if 'US' not in self.in_data.selected_vars:
-                        QMessageBox.critical(None, 'Error', 'US not found.',
-                                             QMessageBox.Ok)
-                        return
-                else:
-                    QMessageBox.critical(None, 'Error', 'Configure and run the input before configure this node!',
-                                         QMessageBox.Ok)
-                    return
+            if parent_node.ready_to_run():
+                parent_node.run()
             else:
+                QMessageBox.critical(None, 'Error', 'Configure and run the input before configure this node!',
+                                     QMessageBox.Ok)
+                return
+            if parent_node.state == Node.SUCCESS:
                 self.in_data = parent_node.data
                 if 'US' not in self.in_data.selected_vars:
                     QMessageBox.critical(None, 'Error', 'US not found.',
                                          QMessageBox.Ok)
                     return
+            else:
+                QMessageBox.critical(None, 'Error', 'Configure and run the input before configure this node!',
+                                         QMessageBox.Ok)
+                return
+            if self.fall_velocities:
                 old_rouse = [self.table[i][0] for i in range(len(self.table))]
                 for rouse in old_rouse:
                     if rouse in self.in_data.selected_vars:
                         QMessageBox.critical(self, 'Error', 'Duplicated values found.',
                                              QMessageBox.Ok)
                         return
+        else:
+            self.in_data = parent_node.data
+            if 'US' not in self.in_data.selected_vars:
+                QMessageBox.critical(None, 'Error', 'US not found.',
+                                     QMessageBox.Ok)
+                return
+            old_rouse = [self.table[i][0] for i in range(len(self.table))]
+            for rouse in old_rouse:
+                if rouse in self.in_data.selected_vars:
+                    QMessageBox.critical(self, 'Error', 'Duplicated values found.',
+                                         QMessageBox.Ok)
+                    return
 
         if self._configure():
             self.state = Node.READY
 
     def run(self):
+        self.run_upward()
         self.data = self.in_data.copy()
         self.data.selected_vars.extend([self.table[i][0] for i in range(len(self.table))])
         for i in range(len(self.table)):
@@ -360,13 +362,6 @@ class AddRouseNode(OneInOneOutNode):
                                                                bytes(self.table[i][2], 'utf-8').ljust(16))
         self.data.equations = get_necessary_equations(self.in_data.header.var_IDs, self.data.selected_vars,
                                                       self.data.us_equation)
-        self.data.output_header.nb_var = len(self.in_data.selected_vars)
-        self.data.output_header.var_IDs, self.data.output_header.var_names, \
-                                         self.data.output_header.var_units = [], [], []
-        for var_ID, (var_name, var_unit) in self.data.selected_vars_names.items():
-            self.data.output_header.var_IDs.append(var_ID)
-            self.data.output_header.var_names.append(var_name)
-            self.data.output_header.var_units.append(var_unit)
         self.state = Node.SUCCESS
         self.update()
         self.message = 'Successful.'
@@ -381,7 +376,6 @@ class SelectTimeNode(OneInOneOutNode):
         self.data = None
         self.selection = None
 
-        self.selected_indices = []
         self.start_index, self.end_index = -1, -1
         self.sampling_frequency = 1
 
@@ -394,18 +388,10 @@ class SelectTimeNode(OneInOneOutNode):
         self.selection.startValue.setReadOnly(True)
         self.selection.endValue.setReadOnly(True)
 
-        if self.in_data.header.date is not None:
-            year, month, day, hour, minute, second = self.in_data.header.date
-            start_time = datetime.datetime(year, month, day, hour, minute, second)
-        else:
-            start_time = datetime.datetime(1900, 1, 1, 0, 0, 0)
-
-        time_frames = list(map(lambda x: datetime.timedelta(seconds=x),
-                               [self.in_data.time[index] for index in self.selected_indices]))
         self.selection.clearText()
-        slider.reinit(start_time, time_frames, self.selection)
+        slider.reinit(self.in_data.start_time, self.in_data.time_second, self.selection)
 
-        if len(time_frames) == 1:
+        if len(self.in_data.time) == 1:
             slider.setEnabled(False)
             self.selection.startIndex.setEnabled(False)
             self.selection.endIndex.setEnabled(False)
@@ -435,7 +421,7 @@ class SelectTimeNode(OneInOneOutNode):
     def _check(self):
         try:
             sampling_frequency = int(self.selection.timeSamplig.text())
-            if sampling_frequency < 1 or sampling_frequency > len(self.in_data.selected_time_indices):
+            if sampling_frequency < 1:
                 self.selection.timeSamplig.setText(str(self.sampling_frequency))
         except ValueError:
             self.selection.timeSamplig.setText(str(self.sampling_frequency))
@@ -447,8 +433,8 @@ class SelectTimeNode(OneInOneOutNode):
 
     def _reset(self):
         self.in_data = self.in_port.mother.parentItem().data
-        self.selected_indices = self.in_data.selected_time_indices[:]
-        self.start_index, self.end_index = self.selected_indices[0], self.selected_indices[-1]
+        if self.end_index > len(self.in_data.time):
+            self.end_index = len(self.in_data.time)
 
     def reconfigure(self):
         super().reconfigure()
@@ -457,12 +443,8 @@ class SelectTimeNode(OneInOneOutNode):
             if parent_node.ready_to_run():
                 parent_node.run()
                 if parent_node.state == Node.SUCCESS:
-                    self.in_data = parent_node.data
-                    self.selected_indices = self.in_data.selected_time_indices[:]
-                    self.start_index, self.end_index = self.selected_indices[0], self.selected_indices[-1]
-                    self.data = None
+                    self._reset()
                     return
-
         self.in_data = None
         self.state = Node.NOT_CONFIGURED
         self.update()
@@ -481,17 +463,15 @@ class SelectTimeNode(OneInOneOutNode):
                 QMessageBox.critical(None, 'Error', 'Configure and run the input before configure this node!',
                                      QMessageBox.Ok)
                 return
-            if parent_node.state == Node.SUCCESS:
-                self._reset()
-            else:
+            if parent_node.state != Node.SUCCESS:
                 QMessageBox.critical(None, 'Error', 'Configure and run the input before configure this node!',
                                      QMessageBox.Ok)
                 return
-        else:
-            self.in_data = parent_node.data
+        self._reset()
         super().configure()
 
     def run(self):
+        self.run_upward()
         self.data = self.in_data.copy()
         self.data.selected_time_indices = list(range(self.start_index, self.end_index+1, self.sampling_frequency))
         self.state = Node.SUCCESS
