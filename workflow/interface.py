@@ -111,18 +111,22 @@ class TreePanel(QWidget):
 
     def run_all(self):
         self.view.scene().run_all()
+        self.view.scene().update()
 
     def configure_node(self):
         self.view.current_node.configure()
         if self.view.current_node.ready_to_run():
             self.run_act.setEnabled(True)
+        self.view.scene().update()
 
     def delete_node(self):
         self.view.scene().handle_remove_node(self.view.current_node)
         self.view.deselect_node()
+        self.view.scene().update()
 
     def run_node(self):
         self.view.current_node.run()
+        self.view.scene().update()
 
     def enable_toolbar(self):
         self.node_label.setText(self.view.current_node.label)

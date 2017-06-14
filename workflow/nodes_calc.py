@@ -18,8 +18,8 @@ class ComputeVolumeNode(TwoInOneOutNode):
         self.second_in_port.data_type = 'polygon'
         self.in_data = None
 
-        self.first_var = ''
-        self.second_var = ''
+        self.first_var = None
+        self.second_var = None
         self.sup_volume = False
 
         self.first_var_box = None
@@ -107,6 +107,8 @@ class ComputeVolumeNode(TwoInOneOutNode):
                     self._reset()
                     return
         self.in_data = None
+        self.first_var = None
+        self.second_var = None
         self.state = Node.NOT_CONFIGURED
         self.update()
 
