@@ -197,7 +197,7 @@ class ComputeVolumeNode(TwoInOneOutNode):
             resin.header = self.in_data.header
             resin.time = self.in_data.time
 
-            calculator = VolumeCalculator(VolumeCalculator.NET_STRICT, self.first_var, self.second_var, resin,
+            calculator = VolumeCalculator(volume_type, self.first_var, self.second_var, resin,
                                           polygon_names, polygons, 1)
             calculator.time_indices = self.in_data.selected_time_indices
             calculator.mesh = mesh
