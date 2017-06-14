@@ -40,7 +40,6 @@ class VolumeCalculatorThread(OutputThread):
         init_values = None
         if self.calculator.second_var_ID == VolumeCalculator.INIT_VALUE:
             init_values = self.calculator.input_stream.read_var_in_frame(0, self.calculator.var_ID)
-
         for i, time_index in enumerate(self.calculator.time_indices):
             if self.canceled:
                 return []

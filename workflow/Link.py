@@ -25,6 +25,10 @@ class Link(QGraphicsLineItem):
         self.dashed_pen = QPen(Qt.black, 1, Qt.DashLine)
         self.brush = QBrush(Qt.black)
 
+    def save(self):
+        return '|'.join(map(str, [self.from_port.parentItem().index(), self.from_port.index(),
+                                  self.to_port.parentItem().index(), self.to_port.index()]))
+
     def update_polygon(self):
         angle = self.line().angle() * math.pi / 180
         dx = self.selection_offset * math.sin(angle)

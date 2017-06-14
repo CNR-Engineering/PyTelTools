@@ -90,7 +90,7 @@ class Node(QGraphicsItem):
     COLOR = {NOT_CONFIGURED: QColor(220, 255, 255, 255), READY: QColor(250, 220, 165, 255),
              SUCCESS: QColor(180, 250, 165, 255), FAIL: QColor(255, 160, 160, 255)}
 
-    def __init__(self, index, label):
+    def __init__(self, index):
         super().__init__()
         self._index = index
         self.box = Box(self)
@@ -111,7 +111,9 @@ class Node(QGraphicsItem):
         self.setCursor(Qt.ArrowCursor)
         self.dashed_pen = QPen(Qt.black, 1, Qt.DashLine)
 
-        self.label = label
+        self.label = ''
+        self.category = ''
+
         self.state = Node.NOT_CONFIGURED
         self.message = ''
 
@@ -130,6 +132,8 @@ class Node(QGraphicsItem):
 
     def add_link(self, link):
         self.links.add(link)
+        if self.state != Node.NOT_CONFIGURED:
+            self.state = Node.READY
 
     def remove_link(self, link):
         self.links.remove(link)
@@ -201,10 +205,32 @@ class Node(QGraphicsItem):
         if self.state != Node.NOT_CONFIGURED:
             self.state = Node.READY
 
+    def run_upward(self):
+        return True
+
+    def run_downward(self):
+        if self.ready_to_run() and self.state != Node.SUCCESS:
+            self.run()
+        if self.state != Node.SUCCESS:
+            return False
+        return True
+
+    def run(self):
+        pass
+
+    def name(self):
+        return ' '.join(self.label.split())
+
+    def save(self):
+        return ''
+
+    def load(self, options):
+        pass
+
 
 class SingleInputNode(Node):
-    def __init__(self, index, label):
-        super().__init__(index, label)
+    def __init__(self, index):
+        super().__init__(index)
         self.in_port = InputPort(0, -Port.WIDTH, Box.HEIGHT/2-Port.WIDTH/2)
         self.add_port(self.in_port)
 
@@ -225,8 +251,8 @@ class SingleInputNode(Node):
 
 
 class SingleOutputNode(Node):
-    def __init__(self, index, label):
-        super().__init__(index, label)
+    def __init__(self, index):
+        super().__init__(index)
         self.out_port = OutputPort(0, Box.WIDTH/2-Port.WIDTH/2, Box.HEIGHT)
         self.add_port(self.out_port)
 
@@ -239,10 +265,18 @@ class SingleOutputNode(Node):
             for child in self.out_port.children:
                 child.parentItem().reconfigure()
 
+    def run_downward(self):
+        if not super().run_downward():
+            return False
+        if self.out_port.has_children():
+            for child in self.out_port.children:
+                child.parentItem().run_downward()
+        return True
+
 
 class OneInOneOutNode(Node):
-    def __init__(self, index, label):
-        super().__init__(index, label)
+    def __init__(self, index):
+        super().__init__(index)
         self.in_port = InputPort(0, -Port.WIDTH, Box.HEIGHT/2-Port.WIDTH/2)
         self.out_port = OutputPort(1, Box.WIDTH/2-Port.WIDTH/2, Box.HEIGHT)
         self.add_port(self.in_port)
@@ -261,10 +295,68 @@ class OneInOneOutNode(Node):
                 child.parentItem().reconfigure()
         super().reconfigure()
 
+    def run_downward(self):
+        if not super().run_downward():
+            return False
+        if self.out_port.has_children():
+            for child in self.out_port.children:
+                child.parentItem().run_downward()
+        return True
+
     def run_upward(self):
+        success = self.in_port.mother.parentItem().run_upward()
+        if not success:
+            return False
         if self.in_port.mother.parentItem().state != Node.SUCCESS:
             self.in_port.mother.parentItem().run()
         return self.in_port.mother.parentItem().state == Node.SUCCESS
+
+
+class TwoInOneOutNode(Node):
+    def __init__(self, index):
+        super().__init__(index)
+        self.first_in_port = InputPort(0, -Port.WIDTH, Box.HEIGHT/4-Port.WIDTH/2)
+        self.second_in_port = InputPort(1, -Port.WIDTH, 3*Box.HEIGHT/4-Port.WIDTH/2)
+        self.out_port = OutputPort(2, Box.WIDTH/2-Port.WIDTH/2, Box.HEIGHT)
+        self.add_port(self.first_in_port)
+        self.add_port(self.second_in_port)
+        self.add_port(self.out_port)
+
+    def ready_to_run(self):
+        if self.state == Node.NOT_CONFIGURED:
+            return False
+        if not self.first_in_port.has_mother():
+            return False
+        if not self.second_in_port.has_mother():
+            return False
+        return self.first_in_port.mother.parentItem().ready_to_run() and\
+               self.second_in_port.mother.parentItem().ready_to_run()
+
+    def reconfigure(self):
+        if self.out_port.has_children():
+            for child in self.out_port.children:
+                child.parentItem().reconfigure()
+        super().reconfigure()
+
+    def run_downward(self):
+        if not super().run_downward():
+            return False
+        if self.out_port.has_children():
+            for child in self.out_port.children:
+                child.parentItem().run_downward()
+        return True
+
+    def run_upward(self):
+        success = self.first_in_port.mother.parentItem().run_upward() and \
+                  self.second_in_port.mother.parentItem().run_upward()
+        if not success:
+            return False
+        if self.first_in_port.mother.parentItem().state != Node.SUCCESS:
+            self.first_in_port.mother.parentItem().run()
+        if self.second_in_port.mother.parentItem().state != Node.SUCCESS:
+            self.second_in_port.mother.parentItem().run()
+        return self.first_in_port.mother.parentItem().state == Node.SUCCESS and\
+               self.second_in_port.mother.parentItem().state == Node.SUCCESS
 
 
 class ConfigureDialog(QDialog):

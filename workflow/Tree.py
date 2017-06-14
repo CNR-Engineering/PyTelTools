@@ -1,10 +1,15 @@
-from PyQt5.QtWidgets import *
-from PyQt5.QtCore import *
-from PyQt5.QtGui import *
-
-from workflow.Node import Port, Box, Node
-from workflow.nodes_io import LoadSerafinNode
+from workflow.Node import Port, Box
 from workflow.Link import Link
+from workflow.nodes_io import *
+from workflow.nodes_op import *
+from workflow.nodes_calc import *
+
+
+NODES = {'Input/Output': {'Load Serafin': LoadSerafinNode, 'Write Serafin': WriteSerafinNode,
+                          'Load Polygon': LoadPolygonNode, 'Write CSV': WriteCSVNode},
+         'Basic operations': {'Select Variables': SelectVariablesNode, 'Select Time': SelectTimeNode,
+                              'Add Rouse': AddRouseNode},
+         'Calculations': {'Compute Volume': ComputeVolumeNode}}
 
 
 def add_link(from_port, to_port):
@@ -22,8 +27,10 @@ def add_link(from_port, to_port):
 class TreeScene(QGraphicsScene):
     def __init__(self):
         super().__init__()
+
         self.language = 'fr'
         self.overwrite = True
+        self.csv_separator = ';'
 
         self.setSceneRect(QRectF(0, 0, 800, 600))
         self.transform = QTransform()
@@ -94,6 +101,38 @@ class TreeScene(QGraphicsScene):
         self.nodes[node.index()] = node
         self.nb_nodes += 1
         node.moveBy(pos.x(), pos.y())
+
+    def run_all(self):
+        roots = []
+        visited = {node: False for node in self.nodes}
+
+        def forward(node):
+            for port in node.ports:
+                if port.type == Port.OUTPUT:
+                    if port.has_children():
+                        for child in port.children:
+                            child_node = child.parentItem()
+                            if not visited[child_node.index()]:
+                                visited[child_node.index()] = False
+                                forward(child_node)
+
+        def backward(node_index):
+            if not visited[node_index]:
+                visited[node_index] = True
+                node = self.nodes[node_index]
+                if node.ports[0].type == Port.INPUT:
+                    backward(node.ports[0].parentItem().index())
+                    if len(node.ports) > 1 and node.ports[1].type == Port.INPUT:
+                        backward(node.ports[1].parentItem().index())
+                else:
+                    roots.append(node_index)
+                    forward(node)
+
+        for node in self.nodes:
+            backward(node)
+
+        for root in roots:
+            self.nodes[root].run_downward()
 
     def _handle_add_link(self, target_item):
         port_index = target_item.index()
@@ -168,3 +207,63 @@ class TreeScene(QGraphicsScene):
         elif p1.type == Port.INPUT and p2.type == Port.OUTPUT:
             return second_node, first_node, p2, p1
         return None, None, None, None
+
+    def save(self, filename):
+        links = []
+        for item in self.items():
+            if isinstance(item, Link):
+                links.append(item.save())
+
+        with open(filename, 'w') as f:
+            f.write('%d %d\n' % (self.nb_nodes, len(links)))
+            for node in self.nodes.values():
+                f.write(node.save())
+                f.write('\n')
+            for link in links:
+                f.write(link)
+                f.write('\n')
+
+    def load(self, filename):
+        self.clear()
+
+        self.current_line = QGraphicsLineItem()
+        self.addItem(self.current_line)
+        self.current_line.setVisible(False)
+        pen = QPen(QColor(0, 0, 0))
+        pen.setWidth(2)
+        self.current_line.setPen(pen)
+        self.current_port = None
+
+        self.nb_nodes = 0
+        self.nodes = {}
+        try:
+            with open(filename, 'r') as f:
+                nb_nodes, nb_links = map(int, f.readline().split())
+                for i in range(nb_nodes):
+                    line = f.readline().rstrip().split('|')
+                    category, name, index, x, y = line[:5]
+                    node = NODES[category][name](int(index))
+                    node.load(line[5:])
+                    self.nodes[int(index)] = node
+                    self.addItem(node)
+                    node.moveBy(float(x), float(y))
+                    self.nb_nodes += 1
+                for i in range(nb_links):
+                    from_node_index, from_port_index, to_node_index, to_port_index = map(int,
+                                                                                         f.readline().rstrip().split('|'))
+                    from_node = self.nodes[from_node_index]
+                    to_node = self.nodes[to_node_index]
+                    from_port = from_node.ports[from_port_index]
+                    to_port = to_node.ports[to_port_index]
+                    _, _ = add_link(from_port, to_port)
+                    link = Link(from_port, to_port)
+                    from_node.add_link(link)
+                    to_node.add_link(link)
+                    self.addItem(link)
+                    link.setZValue(-1)
+        except (IndexError, ValueError):
+             QMessageBox.critical(None, 'Error',
+                                  'The workspace file is not valid.',
+                                  QMessageBox.Ok)
+        self.update()
+

@@ -11,7 +11,9 @@ from slf.variables import get_available_variables, get_necessary_equations, add_
 
 class SelectVariablesNode(OneInOneOutNode):
     def __init__(self, index):
-        super().__init__(index, 'Select\nVariables')
+        super().__init__(index)
+        self.category = 'Basic operations'
+        self.label = 'Select\nVariables'
         self.out_port.data_type = 'slf'
         self.in_port.data_type = 'slf'
         self.in_data = None
@@ -193,15 +195,34 @@ class SelectVariablesNode(OneInOneOutNode):
 
     def _reset(self):
         self.in_data = self.in_port.mother.parentItem().data
-        new_vars = self.in_data.selected_vars
-        intersection = [var for var in self.selected_vars if var in new_vars]
-        if intersection:
-            self.selected_vars = intersection
-            self.selected_vars_names = {var_id: self.in_data.selected_vars_names[var_id]
-                                        for var_id in intersection}
+        if self.selected_vars:
+            new_vars = self.in_data.selected_vars[:]
+            new_vars.extend(list(map(lambda x: x.ID(), get_available_variables(new_vars))))
+            intersection = [var for var in self.selected_vars if var in new_vars]
+            if intersection:
+                self.selected_vars = intersection
+                self.selected_vars_names = {var_id: self.selected_vars_names[var_id]
+                                            for var_id in intersection}
+            else:
+                self.selected_vars = self.in_data.selected_vars[:]
+                self.selected_vars_names = deepcopy(self.in_data.selected_vars_names)
         else:
             self.selected_vars = self.in_data.selected_vars[:]
             self.selected_vars_names = deepcopy(self.in_data.selected_vars_names)
+
+    def add_link(self, link):
+        super().add_link(link)
+        if not self.in_port.has_mother():
+            return
+        self.state = Node.READY
+        self.update()
+        parent_node = self.in_port.mother.parentItem()
+        if parent_node.state != Node.SUCCESS:
+            if parent_node.ready_to_run():
+                parent_node.run()
+            if parent_node.state != Node.SUCCESS:
+                return
+        self._reset()
 
     def reconfigure(self):
         super().reconfigure()
@@ -238,14 +259,11 @@ class SelectVariablesNode(OneInOneOutNode):
                 QMessageBox.critical(None, 'Error', 'Configure and run the input before configure this node!',
                                      QMessageBox.Ok)
                 return
-            if parent_node.state == Node.SUCCESS:
-                self._reset()
-            else:
+            if parent_node.state != Node.SUCCESS:
                 QMessageBox.critical(None, 'Error', 'Configure and run the input before configure this node!',
                                      QMessageBox.Ok)
                 return
-        else:
-            self.in_data = parent_node.data
+        self._reset()
 
         if super().configure():
             if not self.selected_vars:
@@ -255,8 +273,31 @@ class SelectVariablesNode(OneInOneOutNode):
             self.update()
             QApplication.processEvents()
 
+    def save(self):
+        vars = ','.join(self.selected_vars)
+        names, units = [], []
+        for var in self.selected_vars:
+            name, unit = self.selected_vars_names[var]
+            names.append(name.decode('utf-8').strip())
+            units.append(unit.decode('utf-8').strip())
+        return '|'.join([self.category, self.name(), str(self.index()),
+                         str(self.pos().x()), str(self.pos().y()),
+                         vars, ','.join(names), ','.join(units)])
+
+    def load(self, options):
+        vars, names, units = options
+        if vars:
+            for var, name, unit in zip(vars.split(','), names.split(','), units.split(',')):
+                self.selected_vars.append(var)
+                self.selected_vars_names[var] = (bytes(name, 'utf-8').ljust(16), bytes(unit, 'utf-8').ljust(16))
+
     def run(self):
-        self.run_upward()
+        success = super().run_upward()
+        if not success:
+            self.state = Node.FAIL
+            self.update()
+            self.message = 'Failed: input failed.'
+            return
         self.data = self.in_data.copy()
         self.data.us_equation = self.us_equation
         self.data.equations = get_necessary_equations(self.in_data.header.var_IDs, self.selected_vars,
@@ -273,7 +314,9 @@ class SelectVariablesNode(OneInOneOutNode):
 
 class AddRouseNode(OneInOneOutNode):
     def __init__(self, index):
-        super().__init__(index, 'Add Rouse')
+        super().__init__(index)
+        self.category = 'Basic operations'
+        self.label = 'Add Rouse'
         self.out_port.data_type = 'slf'
         self.in_port.data_type = 'slf'
         self.in_data = None
@@ -290,6 +333,25 @@ class AddRouseNode(OneInOneOutNode):
         for i in range(len(self.table)):
             self.fall_velocities.append(float(self.table[i][0][6:]))
         return True
+
+    def add_link(self, link):
+        super().add_link(link)
+        if not self.in_port.has_mother():
+            return
+
+        parent_node = self.in_port.mother.parentItem()
+        if parent_node.state != Node.SUCCESS:
+            if parent_node.ready_to_run():
+                parent_node.run()
+            if parent_node.state != Node.SUCCESS:
+                return
+        if 'US' not in parent_node.data.selected_vars:
+            self.state = Node.NOT_CONFIGURED
+            self.update()
+            return
+        if self.fall_velocities:
+            self.state = Node.READY
+        self.update()
 
     def reconfigure(self):
         super().reconfigure()
@@ -353,7 +415,30 @@ class AddRouseNode(OneInOneOutNode):
         if self._configure():
             self.state = Node.READY
 
+    def save(self):
+        table = []
+        for line in self.table:
+            for j in range(3):
+                table.append(line[j])
+        return '|'.join([self.category, self.name(), str(self.index()),
+                         str(self.pos().x()), str(self.pos().y()),
+                         ','.join(map(str, self.fall_velocities)), ','.join(table)])
+
+    def load(self, options):
+        values, table = options
+        table = table.split(',')
+        if values:
+            self.fall_velocities = list(map(float, values.split(',')))
+            for i in range(0, len(table), 3):
+                self.table.append([table[i], table[i+1], table[i+2]])
+
     def run(self):
+        success = super().run_upward()
+        if not success:
+            self.state = Node.FAIL
+            self.update()
+            self.message = 'Failed: input failed.'
+            return
         self.run_upward()
         self.data = self.in_data.copy()
         self.data.selected_vars.extend([self.table[i][0] for i in range(len(self.table))])
@@ -369,12 +454,15 @@ class AddRouseNode(OneInOneOutNode):
 
 class SelectTimeNode(OneInOneOutNode):
     def __init__(self, index):
-        super().__init__(index, 'Select\nTime')
+        super().__init__(index)
+        self.category = 'Basic operations'
+        self.label = 'Select\nTime'
         self.out_port.data_type = 'slf'
         self.in_port.data_type = 'slf'
         self.in_data = None
         self.data = None
         self.selection = None
+        self.state = Node.READY
 
         self.start_index, self.end_index = -1, -1
         self.sampling_frequency = 1
@@ -436,6 +524,20 @@ class SelectTimeNode(OneInOneOutNode):
         if self.end_index > len(self.in_data.time):
             self.end_index = len(self.in_data.time)
 
+    def add_link(self, link):
+        super().add_link(link)
+        if not self.in_port.has_mother():
+            return
+        self.state = Node.READY
+        self.update()
+        parent_node = self.in_port.mother.parentItem()
+        if parent_node.state != Node.SUCCESS:
+            if parent_node.ready_to_run():
+                parent_node.run()
+            if parent_node.state != Node.SUCCESS:
+                return
+        self._reset()
+
     def reconfigure(self):
         super().reconfigure()
         if self.in_port.has_mother():
@@ -470,9 +572,24 @@ class SelectTimeNode(OneInOneOutNode):
         self._reset()
         super().configure()
 
+    def save(self):
+        return '|'.join([self.category, self.name(), str(self.index()),
+                         str(self.pos().x()), str(self.pos().y()),
+                         str(self.start_index), str(self.end_index), str(self.sampling_frequency)])
+
+    def load(self, options):
+        self.start_index = int(options[0])
+        self.end_index = int(options[1])
+        self.sampling_frequency = int(options[2])
+
     def run(self):
-        self.run_upward()
-        self.data = self.in_data.copy()
+        success = super().run_upward()
+        if not success:
+            self.state = Node.FAIL
+            self.update()
+            self.message = 'Failed: input failed.'
+            return
+        self.data = self.in_port.mother.parentItem().data.copy()
         self.data.selected_time_indices = list(range(self.start_index, self.end_index+1, self.sampling_frequency))
         self.state = Node.SUCCESS
         self.update()

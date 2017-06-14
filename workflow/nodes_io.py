@@ -8,11 +8,14 @@ import datetime
 from workflow.Node import Node, SingleOutputNode, SingleInputNode
 from slf import Serafin
 from slf.variables import do_calculations_in_frame
+from geom import BlueKenue, Shapefile
 
 
 class LoadSerafinNode(SingleOutputNode):
     def __init__(self, index):
-        super().__init__(index, 'Load Serafin')
+        super().__init__(index)
+        self.category = 'Input/Output'
+        self.label = 'Load Serafin'
         self.out_port.data_type = 'slf'
         self.name_box = None
         self.filename = ''
@@ -44,9 +47,22 @@ class LoadSerafinNode(SingleOutputNode):
             self.filename = filename
             self.name_box.setText(filename)
 
-    def configure(self):
-        if super().configure():
-            self.name_box = None
+    def save(self):
+        return '|'.join([self.category, self.name(), str(self.index()),
+                         str(self.pos().x()), str(self.pos().y()), self.filename])
+
+    def load(self, options):
+        self.filename = options[0]
+        if not self.filename:
+            return
+        try:
+            with open(self.filename) as f:
+                pass
+        except FileNotFoundError:
+            self.state = Node.NOT_CONFIGURED
+            self.filename = ''
+            return
+        self.state = Node.READY
 
     def run(self):
         if self.state == Node.SUCCESS:
@@ -65,9 +81,10 @@ class LoadSerafinNode(SingleOutputNode):
 
 class WriteSerafinNode(SingleInputNode):
     def __init__(self, index):
-        super().__init__(index, 'Write Serafin')
+        super().__init__(index)
         self.in_port.data_type = 'slf'
-
+        self.category = 'Input/Output'
+        self.label = 'Write Serafin'
         self.name_box = None
         self.filename = ''
 
@@ -99,9 +116,14 @@ class WriteSerafinNode(SingleInputNode):
             self.filename = filename
             self.name_box.setText(filename)
 
-    def configure(self):
-        if super().configure():
-            self.name_box = None
+    def save(self):
+        return '|'.join([self.category, self.name(), str(self.index()),
+                         str(self.pos().x()), str(self.pos().y()), self.filename])
+
+    def load(self, options):
+        self.filename = options[0]
+        if self.filename:
+            self.state = Node.READY
 
     def run(self):
         success = super().run_upward()
@@ -151,8 +173,9 @@ class SerafinData:
     def __init__(self, filename, language):
         self.language = language
         self.filename = filename
-        self.has_mesh = False
-        self.mesh = None
+        self.has_index = False
+        self.index = None
+        self.triangles = {}
         self.header = None
         self.time = []
         self.time_second = []
@@ -189,8 +212,9 @@ class SerafinData:
 
     def copy(self):
         copy_data = SerafinData(self.filename, self.language)
-        copy_data.has_mesh = self.has_mesh
-        copy_data.mesh = self.mesh
+        copy_data.has_index = self.has_index
+        copy_data.index = self.index
+        copy_data.triangles = self.triangles
         copy_data.header = self.header
         copy_data.time = self.time
         copy_data.start_time = self.start_time
@@ -202,4 +226,149 @@ class SerafinData:
         copy_data.equations = self.equations[:]
         copy_data.us_equation = self.us_equation
         return copy_data
+
+
+class LoadPolygonNode(SingleOutputNode):
+    def __init__(self, index):
+        super().__init__(index)
+        self.category = 'Input/Output'
+        self.label = 'Load Polygon'
+        self.out_port.data_type = 'polygon'
+        self.name_box = None
+        self.filename = ''
+        self.data = None
+
+    def get_option_panel(self):
+        open_button = QPushButton(QWidget().style().standardIcon(QStyle.SP_DialogOpenButton),
+                                  'Load Polygon')
+        open_button.setToolTip('<b>Open</b> a .shp or .i2s file')
+        open_button.setFixedHeight(30)
+
+        option_panel = QWidget()
+        layout = QHBoxLayout()
+        layout.addWidget(open_button)
+        self.name_box = QLineEdit(self.filename)
+        self.name_box.setReadOnly(True)
+        self.name_box.setFixedHeight(30)
+        layout.addWidget(self.name_box)
+        option_panel.setLayout(layout)
+
+        open_button.clicked.connect(self._open)
+        return option_panel
+
+    def _open(self):
+        filename, _ = QFileDialog.getOpenFileName(None, 'Open a polygon file', '',
+                                                  'Line sets (*.i2s);;Shapefile (*.shp);;All Files (*)',
+                                                  QDir.currentPath(),
+                                                  options=QFileDialog.Options() | QFileDialog.DontUseNativeDialog)
+        if filename:
+            is_i2s = filename[-4:] == '.i2s'
+            is_shp = filename[-4:] == '.shp'
+
+            if not is_i2s and not is_shp:
+                QMessageBox.critical(None, 'Error', 'Only .i2s and .shp file formats are currently supported.',
+                                     QMessageBox.Ok)
+                return
+            self.filename = filename
+            self.name_box.setText(filename)
+
+    def save(self):
+        return '|'.join([self.category, self.name(), str(self.index()),
+                         str(self.pos().x()), str(self.pos().y()), self.filename])
+
+    def load(self, options):
+        self.filename = options[0]
+        if self.filename:
+            self.state = Node.READY
+
+    def run(self):
+        if self.state == Node.SUCCESS:
+            return
+
+        self.data = []
+        is_i2s = self.filename[-4:] == '.i2s'
+        if is_i2s:
+            with BlueKenue.Read(self.filename) as f:
+                f.read_header()
+                for poly in f.get_polygons():
+                    self.data.append(poly)
+        else:
+            for polygon in Shapefile.get_polygons(self.filename):
+                self.data.append(polygon)
+        if not self.data:
+            self.state = Node.FAIL
+            self.message = 'Failed: The file does not contain any polygon.'
+            self.update()
+            return
+
+        self.message = 'Successful. The file contains {} polygon{}.'.format(len(self.data),
+                                                                            's' if len(self.data) > 1 else '')
+
+        self.state = Node.SUCCESS
+        self.update()
+
+
+class WriteCSVNode(SingleInputNode):
+    def __init__(self, index):
+        super().__init__(index)
+        self.category = 'Input/Output'
+        self.label = 'Write CSV'
+        self.in_port.data_type = 'csv'
+
+        self.name_box = None
+        self.filename = ''
+
+    def get_option_panel(self):
+        open_button = QPushButton(QWidget().style().standardIcon(QStyle.SP_DialogSaveButton),
+                                  'Write CSV')
+        open_button.setToolTip('<b>Write</b> a .csv file')
+        open_button.setFixedHeight(30)
+
+        option_panel = QWidget()
+        layout = QHBoxLayout()
+        layout.addWidget(open_button)
+        self.name_box = QLineEdit(self.filename)
+        self.name_box.setReadOnly(True)
+        self.name_box.setFixedHeight(30)
+        layout.addWidget(self.name_box)
+        option_panel.setLayout(layout)
+
+        open_button.clicked.connect(self._open)
+        return option_panel
+
+    def _open(self):
+        filename, _ = QFileDialog.getSaveFileName(None, 'Choose the output file name', '',
+                                                  'CSV Files (*.csv)',
+                                                  options=QFileDialog.Options() | QFileDialog.DontUseNativeDialog)
+        if filename:
+            if len(filename) < 5 or filename[-4:] != '.csv':
+                filename += '.csv'
+            self.filename = filename
+            self.name_box.setText(filename)
+
+    def save(self):
+        return '|'.join([self.category, self.name(), str(self.index()),
+                         str(self.pos().x()), str(self.pos().y()), self.filename])
+
+    def load(self, options):
+        self.filename = options[0]
+        if self.filename:
+            self.state = Node.READY
+
+    def run(self):
+        success = super().run_upward()
+        if not success:
+            self.state = Node.FAIL
+            self.update()
+            self.message = 'Failed: input failed.'
+            return
+
+        table = self.in_port.mother.parentItem().data
+        with open(self.filename, 'w') as output_stream:
+            for line in table:
+                output_stream.write(self.scene().csv_separator.join(line))
+                output_stream.write('\n')
+        self.state = Node.SUCCESS
+        self.message = 'Successful.'
+        self.update()
 

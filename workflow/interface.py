@@ -3,15 +3,7 @@ from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 
-from workflow.Tree import TreeScene
-from workflow.nodes_io import *
-from workflow.nodes_op import *
-from workflow.nodes_calc import *
-
-_NODES = {'Load Serafin': LoadSerafinNode, 'Write Serafin': WriteSerafinNode,
-          'Select Variables': SelectVariablesNode, 'Select Time': SelectTimeNode,
-          'Add Rouse': AddRouseNode,
-          'Compute Volume': ComputeVolumeNode}
+from workflow.Tree import TreeScene, NODES
 
 
 class TreeView(QGraphicsView):
@@ -28,8 +20,8 @@ class TreeView(QGraphicsView):
     def dropEvent(self, event):
         if event.mimeData().hasText():
             event.acceptProposedAction()
-            label = event.mimeData().text()
-            node = _NODES[label](self.scene().nb_nodes)
+            category, label = event.mimeData().text().split('|')
+            node = NODES[category][label](self.scene().nb_nodes)
             pos = self.mapToScene(event.pos())
             self.scene().add_node(node, pos)
             event.accept()
@@ -58,9 +50,14 @@ class TreePanel(QWidget):
 
         self.toolbar = QToolBar()
         self.node_label = QLineEdit()
-        self.configure_act = QAction('Configure', self, triggered=self.configure_node, enabled=False)
-        self.delete_act = QAction('Delete', self, triggered=self.delete_node, enabled=False)
-        self.run_act = QAction('Run', self, triggered=self.run_node, enabled=False)
+        self.save_act = QAction('Save workspace\n(Ctrl+S)', self, triggered=self.save, shortcut='Ctrl+S')
+        self.load_act = QAction('Load workspace\n(Ctrl+O)', self, triggered=self.load, shortcut='Ctrl+O')
+
+        self.run_all_act = QAction('Run all\n(F5)', self, triggered=self.run_all, shortcut='F5')
+        self.configure_act = QAction('Configure\n(Ctrl+C)', self, triggered=self.configure_node,
+                                     enabled=False, shortcut='Ctrl+C')
+        self.delete_act = QAction('Delete\n(Del)', self, triggered=self.delete_node, enabled=False, shortcut='Del')
+        self.run_act = QAction('Run\n(Ctrl+R)', self, triggered=self.run_node, enabled=False, shortcut='Ctrl+R')
         self.init_toolbar()
 
         layout = QVBoxLayout()
@@ -70,7 +67,16 @@ class TreePanel(QWidget):
         self.setLayout(layout)
 
     def init_toolbar(self):
-        self.toolbar.addWidget(QLabel('Selected node  '))
+        for act in [self.save_act, self.load_act, self.run_all_act]:
+            button = QToolButton(self)
+            button.setFixedWidth(100)
+            button.setMinimumHeight(30)
+            button.setDefaultAction(act)
+            button.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Expanding)
+            self.toolbar.addWidget(button)
+            self.toolbar.addSeparator()
+
+        self.toolbar.addWidget(QLabel('   Selected node  '))
         self.toolbar.addWidget(self.node_label)
         self.node_label.setFixedWidth(150)
         self.node_label.setReadOnly(True)
@@ -82,6 +88,29 @@ class TreePanel(QWidget):
             button.setDefaultAction(act)
             button.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Expanding)
             self.toolbar.addWidget(button)
+
+    def save(self):
+        filename, _ = QFileDialog.getSaveFileName(None, 'Choose the file name', '', 'All files (*)',
+                                                  options=QFileDialog.Options() | QFileDialog.DontUseNativeDialog)
+        if not filename:
+            return
+        self.view.scene().save(filename)
+
+    def load(self):
+        msg = QMessageBox.warning(None, 'Confirm load',
+                                  'Do you want to load workspace file?\n(Your current workspace will be erased)',
+                                  QMessageBox.Ok | QMessageBox.Cancel,
+                                  QMessageBox.Ok)
+        if msg == QMessageBox.Cancel:
+            return
+        filename, _ = QFileDialog.getOpenFileName(None, 'Choose the file name', '', 'All files (*)',
+                                                  options=QFileDialog.Options() | QFileDialog.DontUseNativeDialog)
+        if not filename:
+            return
+        self.view.scene().load(filename)
+
+    def run_all(self):
+        self.view.scene().run_all()
 
     def configure_node(self):
         self.view.current_node.configure()
@@ -110,27 +139,13 @@ class TreePanel(QWidget):
             act.setEnabled(False)
 
 
-class NodeItem(QTreeWidgetItem):
-    def __init__(self, label):
-        super().__init__([label], QTreeWidgetItem.Type)
-        self.label = label
-
-
 class NodeTree(QTreeWidget):
     def __init__(self):
         super().__init__()
-        nodes_io = QTreeWidgetItem(self, ['Input/Output'])
-        for text in ['Load Serafin', 'Write Serafin']:
-            item = NodeItem(text)
-            nodes_io.addChild(item)
-
-        nodes_op = QTreeWidgetItem(self, ['Basic operations'])
-        for text in ['Select Variables', 'Select Time', 'Add Rouse']:
-            item = NodeItem(text)
-            nodes_op.addChild(item)
-
-        nodes_calc = QTreeWidgetItem(self, ['Calculations'])
-        nodes_calc.addChild(NodeItem('Compute Volume'))
+        for category in NODES:
+            node = QTreeWidgetItem(self, [category])
+            for node_text in NODES[category]:
+                node.addChild(QTreeWidgetItem([node_text]))
 
         self.setDragEnabled(True)
         self.setMaximumWidth(200)
@@ -144,7 +159,7 @@ class NodeTree(QTreeWidget):
         if current_item.parent() is not None:
             drag = QDrag(self)
             mime_data = QMimeData()
-            mime_data.setText(self.currentItem().text(0))
+            mime_data.setText('|'.join([self.currentItem().parent().text(0), self.currentItem().text(0)]))
             drag.setMimeData(mime_data)
             drag.exec(Qt.MoveAction | Qt.CopyAction)
 
