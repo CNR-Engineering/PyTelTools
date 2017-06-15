@@ -69,12 +69,14 @@ class ScalarMaxMinMeanCalculator:
             if var not in computed_values:
                 computed_values[var] = self.input_stream.read_var_in_frame(time_index, var)
             values[i, :] = computed_values[var]
-        if self.maxmin == MAX:
-            self.current_values = np.minimum(self.current_values, values)
-        elif self.maxmin == MIN:
-            self.current_values = np.maximum(self.current_values, values)
-        else:
-            self.current_values += values
+
+        with np.errstate(invalid='ignore'):
+            if self.maxmin == MAX:
+                self.current_values = np.minimum(self.current_values, values)
+            elif self.maxmin == MIN:
+                self.current_values = np.maximum(self.current_values, values)
+            else:
+                self.current_values += values
 
     def finishing_up(self):
         if self.maxmin == MEAN:
@@ -167,21 +169,21 @@ class VectorMaxMinMeanCalculator:
 
 class ArrivalDurationCalculator:
     """!
-    Compute arrival/duration of conditions (defined by an expression, a comparator and a threshold) from a .slf input stream
+    Compute arrival/duration of conditions from a .slf input stream
     """
-    def __init__(self, input_stream, time_indices, expression, comparator, threshold):
+    def __init__(self, input_stream, time_indices, condition):
         self.input_stream = input_stream
         self.time_indices = time_indices
-        self.expression = expression
+        self.expression = condition.expression
 
-        if comparator == '>':
-            self.test_condition = lambda value: value > threshold
-        elif comparator == '<':
-            self.test_condition = lambda value: value < threshold
-        elif comparator == '>=':
-            self.test_condition = lambda value: value >= threshold
+        if condition.comparator == '>':
+            self.test_condition = lambda value: value > condition.threshold
+        elif condition.comparator == '<':
+            self.test_condition = lambda value: value < condition.threshold
+        elif condition.comparator == '>=':
+            self.test_condition = lambda value: value >= condition.threshold
         else:
-            self.test_condition = lambda value: value <= threshold
+            self.test_condition = lambda value: value <= condition.threshold
 
         # first
         self.previous_time = self.input_stream.time[self.time_indices[0]]
@@ -223,6 +225,20 @@ class ArrivalDurationCalculator:
         for index in self.time_indices[1:]:
             self.arrival_duration_in_frame(index)
         return self.arrival, self.duration
+
+
+class Condition:
+    def __init__(self, expression, literal_expression, comparator, threshold):
+        self.expression = expression
+        self.literal_expression = literal_expression
+        self.comparator = comparator
+        self.threshold = threshold
+
+    def __repr__(self):
+        return ' '.join(self.expression) + ' %s %s' % (self.comparator, str(self.threshold))
+
+    def __str__(self):
+        return '%s %s %.4f' % (''.join(self.literal_expression), self.comparator, self.threshold)
 
 
 def scalars_vectors(known_vars, selected_vars, us_equation=None):

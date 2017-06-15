@@ -11,7 +11,10 @@ def get_lines(input_filename, closed):
     for record in sf.shapeRecords():
         if record.shape.shapeType in [3, 5, 13, 15]:
             attributes = record.record
-            poly = Polyline(record.shape.points, attributes)
+            if record.shape.shapeType > 10:
+                poly = Polyline(record.shape.points, attributes, record.shape.z)
+            else:
+                poly = Polyline(record.shape.points, attributes)
             if poly.is_closed() == closed:
                 yield poly
 

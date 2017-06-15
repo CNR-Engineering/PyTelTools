@@ -27,6 +27,7 @@ from slf.volume import TruncatedTriangularPrisms
 from slf.flux import TriangularVectorField
 from slf.comparison import ReferenceMesh
 from slf.interpolation import MeshInterpolator
+import slf.misc as operations
 
 
 class TimeSlider(QSlider):
@@ -876,6 +877,129 @@ class FallVelocityMessage(QDialog):
         self.table.setItem(nb_row, 0, id_item)
         self.table.setItem(nb_row, 1, name_item)
         self.table.setItem(nb_row, 2, unit_item)
+
+
+class ConditionDialog(QDialog):
+    def __init__(self, var_IDs, var_names):
+        super().__init__()
+        self.var_IDs = var_IDs
+
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel,
+                                   Qt.Horizontal, self)
+        buttons.accepted.connect(self.checkCondition)
+        buttons.rejected.connect(self.reject)
+
+        self.expressionBox = QTextEdit()
+        self.expressionBox.setFixedSize(150, 30)
+        self.old_format = self.expressionBox.currentCharFormat()
+        self.expressionBox.cursorPositionChanged.connect(lambda:
+                                                         self.expressionBox.setCurrentCharFormat(self.old_format))
+
+        self.addButton = QPushButton('Add')
+        self.addButton.setFixedSize(50, 30)
+        self.addButton.clicked.connect(self.addButtonEvent)
+
+        self.clearButton = QPushButton('Clear')
+        self.clearButton.setFixedSize(50, 30)
+        self.clearButton.clicked.connect(self.expressionBox.clear)
+
+        self.varBox = QComboBox()
+        self.varBox.setFixedSize(150, 30)
+
+        for var_ID, var_name in zip(var_IDs, var_names):
+            var_name = var_name.decode('utf-8').strip()
+            self.varBox.addItem('%s (%s)' % (var_ID, var_name))
+
+        self.comparatorBox = QComboBox()
+        for comparator in ['>', '<', '>=', '<=']:
+            self.comparatorBox.addItem(comparator)
+        self.comparatorBox.setFixedSize(50, 30)
+
+        self.threashold = QLineEdit()
+        self.threashold.setFixedSize(150, 30)
+
+        self.condition = ([], '', '', 0.0)
+
+        mainLayout = QVBoxLayout()
+        mainLayout.addItem(QSpacerItem(50, 10))
+        mainLayout.addWidget(QLabel('<p style="font-size:10pt">'
+                                    '<b>Help</b>: use <b>Add</b> button to add variables to the expression.<br>'
+                                    'You can also enter operators, parentheses and numbers.<br>'
+                                    'Supported operators: <tt>+ - * / ^ sqrt</tt>.'))
+
+        mainLayout.addItem(QSpacerItem(50, 15))
+        hlayout = QHBoxLayout()
+        hlayout.addWidget(QLabel('Edit expression'))
+        hlayout.addWidget(self.clearButton)
+        hlayout.addWidget(self.addButton)
+        hlayout.addWidget(self.varBox)
+        hlayout.setSpacing(10)
+        hlayout.setAlignment(Qt.AlignLeft)
+        mainLayout.addLayout(hlayout)
+        mainLayout.setAlignment(hlayout, Qt.AlignHCenter)
+        mainLayout.addItem(QSpacerItem(50, 20))
+        glayout = QGridLayout()
+        glayout.addWidget(QLabel('Expression'), 1, 1, Qt.AlignHCenter)
+        glayout.addWidget(QLabel('Comparator'), 1, 2, Qt.AlignHCenter)
+        glayout.addWidget(QLabel('Threshold'), 1, 3, Qt.AlignHCenter)
+        glayout.addWidget(self.expressionBox, 2, 1)
+        glayout.addWidget(self.comparatorBox, 2, 2)
+        glayout.addWidget(self.threashold, 2, 3)
+        glayout.setVerticalSpacing(12)
+        glayout.setRowStretch(0, 1)
+        mainLayout.addLayout(glayout)
+        mainLayout.addItem(QSpacerItem(50, 20))
+        mainLayout.addWidget(buttons)
+
+        self.setLayout(mainLayout)
+        self.setWindowTitle('Add new condition')
+        self.resize(self.sizeHint())
+
+    def _processExpression(self, expression):
+        infix = operations.to_infix(expression)
+        return operations.infix_to_postfix(infix)
+
+    def _validateExpression(self, expression):
+        for item in expression:
+            if item[0] == '[':  # variable ID
+                if item[1:-1] not in self.var_IDs:
+                    return False
+            elif item in operations.OPERATORS:
+                continue
+            else:  # is number
+                try:
+                    _ = float(item)
+                except ValueError:
+                    return False
+        return operations.is_valid_postfix(expression)
+
+    def addButtonEvent(self):
+        var_ID = self.varBox.currentText().split(' (')[0]
+        self.expressionBox.insertHtml("<span style=\" font-size:8pt; "
+                                      "font-weight:600; color:#554DF7;\" "
+                                      ">[%s]</span>" % var_ID)
+        self.expressionBox.setCurrentCharFormat(self.old_format)
+
+    def checkCondition(self):
+        literal_expression = self.expressionBox.toPlainText()
+        comparator = self.comparatorBox.currentText()
+        threshold = self.threashold.text()
+        self.condition = ([], '', '', 0.0)
+
+        try:
+            threshold = float(threshold)
+        except ValueError:
+            QMessageBox.critical(self, 'Error', 'The threshold is not a number!',
+                                 QMessageBox.Ok)
+            return
+        expression = self._processExpression(literal_expression)
+
+        if not self._validateExpression(expression):
+            QMessageBox.critical(self, 'Error', 'Invalid expression.',
+                                 QMessageBox.Ok)
+            return
+        self.condition = operations.Condition(expression, literal_expression, comparator, threshold)
+        self.accept()
 
 
 class PlotColumnsSelector(QDialog):

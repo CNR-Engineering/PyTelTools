@@ -1,10 +1,12 @@
 from PyQt5.QtWidgets import *
+from PyQt5.QtCore import *
 
 from workflow.Node import Node, OneInOneOutNode, TwoInOneOutNode
 from slf import Serafin
 from slf.volume import TruncatedTriangularPrisms, VolumeCalculator
 from slf.flux import TriangularVectorField, FluxCalculator
 import slf.misc as operations
+from gui.util import ConditionDialog
 
 
 class ComputeMaxNode(OneInOneOutNode):
@@ -164,6 +166,283 @@ class ComputeMeanNode(OneInOneOutNode):
         self.state = Node.SUCCESS
         self.update()
         self.message = 'Successful.'
+
+
+class ArrivalDurationNode(OneInOneOutNode):
+    def __init__(self, index):
+        super().__init__(index)
+        self.category = 'Calculations'
+        self.label = 'Compute\nArrival\nDuration'
+        self.out_port.data_type = 'csv'
+        self.in_port.data_type = 'slf'
+        self.in_data = None
+        self.data = None
+
+        self.conditions = []
+        self.table = []
+        self.time_unit = 'second'
+        self.new_conditions = []
+        self.new_options = tuple()
+
+        self.units = ['second', 'minute', 'hour', 'day', 'percentage']
+        self.condition_table = None
+        self.unit_box = None
+
+    def get_option_panel(self):
+        add_button = QPushButton('Add new condition')
+        add_button.setFixedSize(135, 50)
+
+        self.condition_table = QTableWidget()
+        self.condition_table.setColumnCount(3)
+        self.condition_table .setHorizontalHeaderLabels(['Condition', 'Arrival', 'Duration'])
+        vh = self.condition_table .verticalHeader()
+        vh.setSectionResizeMode(QHeaderView.Fixed)
+        vh.setDefaultSectionSize(20)
+        hh = self.condition_table .horizontalHeader()
+        hh.setDefaultSectionSize(150)
+        self.condition_table.setMaximumHeight(500)
+        self.condition_table.cellChanged.connect(self._check_name)
+
+        self.unit_box = QComboBox()
+        for unit in self.units:
+            self.unit_box.addItem(unit)
+        self.unit_box.setCurrentIndex(self.units.index(self.time_unit))
+        self.unit_box.setFixedHeight(30)
+        self.unit_box.setMaximumWidth(150)
+
+        self.new_conditions = self.conditions[:]
+        if self.conditions:
+            for line in self.table:
+                row = self.condition_table.rowCount()
+                self.condition_table.insertRow(row)
+                condition_item = QTableWidgetItem(line[0])
+                condition_item.setFlags(Qt.ItemIsEditable)
+                self.condition_table.setItem(row, 0, condition_item)
+                self.condition_table.setItem(row, 1, QTableWidgetItem(line[1]))
+                self.condition_table.setItem(row, 2, QTableWidgetItem(line[2]))
+
+        option_panel = QWidget()
+        layout = QVBoxLayout()
+        hlayout = QHBoxLayout()
+
+        hlayout.addItem(QSpacerItem(50, 10))
+        hlayout.addWidget(add_button)
+        hlayout.setAlignment(add_button, Qt.AlignLeft)
+        hlayout.addStretch()
+        lb = QLabel('Double click on the cells to edit Arrival / Duration variable names')
+        hlayout.addWidget(lb)
+        hlayout.setAlignment(lb, Qt.AlignBottom | Qt.AlignRight)
+        layout.addLayout(hlayout)
+        layout.addItem(QSpacerItem(1, 5))
+        layout.addWidget(self.condition_table)
+        layout.addItem(QSpacerItem(1, 10))
+        hlayout = QHBoxLayout()
+        hlayout.addItem(QSpacerItem(50, 10))
+        hlayout.addWidget(QLabel('Time unit'))
+        hlayout.addWidget(self.unit_box, Qt.AlignLeft)
+        hlayout.addStretch()
+        hlayout.setAlignment(Qt.AlignLeft)
+        layout.addLayout(hlayout)
+        option_panel.setLayout(layout)
+        add_button.clicked.connect(self._add)
+        option_panel.destroyed.connect(self._select)
+        return option_panel
+
+    def _current_names(self, ignore_row, ignore_column):
+        names = []
+        for row in range(self.condition_table.rowCount()):
+            for column in range(1, 3):
+                if row == ignore_row and column == ignore_column:
+                    continue
+                item = self.condition_table.item(row, column)
+                if item is not None:
+                    names.append(item.text())
+        return names
+
+    def _current_conditions(self):
+        conditions = []
+        for row in range(self.condition_table.rowCount()):
+            conditions.append(self.condition_table.item(row, 0).text())
+        return conditions
+
+    def _check_name(self, row, column):
+        if column == 1 or column == 2:
+            name = self.condition_table.item(row, column).text()
+            if len(name) < 2 or len(name) > 16:
+                QMessageBox.critical(None, 'Error', 'The variable names should be between 2 and 16 characters!',
+                                     QMessageBox.Ok)
+            elif ',' in name or '|' in name:
+                QMessageBox.critical(None, 'Error', 'The variable names should not contain comma or vertical bar.',
+                                     QMessageBox.Ok)
+            elif name in self._current_names(row, column):
+                QMessageBox.critical(None, 'Error', 'Duplicated name.',
+                                     QMessageBox.Ok)
+            else:
+                return
+            # back to default
+            condition = self.condition_table.item(row, 0).text()
+            condition_tight = operations.tighten_expression(condition)
+            if column == 1:
+                self.condition_table.setItem(row, column, QTableWidgetItem(('A ' + condition_tight)[:16]))
+            else:
+                self.condition_table.setItem(row, column, QTableWidgetItem(('D ' + condition_tight)[:16]))
+
+    def _add(self):
+        parent_node = self.in_port.mother.parentItem()
+        available_vars = [var for var in parent_node.data.header.var_IDs if var in parent_node.data.selected_vars]
+        available_var_names = [parent_node.data.selected_vars_names[var][0] for var in available_vars]
+
+        dlg = ConditionDialog(available_vars, available_var_names)
+        value = dlg.exec_()
+        if value == QDialog.Rejected:
+            return
+        condition = str(dlg.condition)
+        if condition in self._current_conditions():
+            QMessageBox.critical(None, 'Error', 'This condition is already added!',
+                                 QMessageBox.Ok)
+            return
+        condition_tight = operations.tighten_expression(condition)
+        self.new_conditions.append(dlg.condition)
+
+        row = self.condition_table.rowCount()
+        self.condition_table.insertRow(row)
+        condition_item = QTableWidgetItem(condition)
+        condition_item.setFlags(Qt.ItemIsEditable)
+        self.condition_table.setItem(row, 0, condition_item)
+        self.condition_table.setItem(row, 1, QTableWidgetItem(('A ' + condition_tight)[:16]))
+        self.condition_table.setItem(row, 2, QTableWidgetItem(('D ' + condition_tight)[:16]))
+
+    def _select(self):
+        table = []
+        for row in range(self.condition_table.rowCount()):
+            row_condition = []
+            for j in range(3):
+                row_condition.append(self.condition_table.item(row, j).text())
+            table.append(row_condition)
+        time_unit = self.unit_box.currentText()
+        self.new_options = (self.new_conditions, table, time_unit)
+
+    def _current_needed_vars(self):
+        vars = set()
+        for condition in self.conditions:
+            expression = condition.expression
+            for item in expression:
+                if item[0] == '[':
+                    vars.add(item[1:-1])
+        return vars
+
+    def _reset(self):
+        self.in_data = self.in_port.mother.parentItem().data
+        if not self.conditions:
+            self.state = Node.NOT_CONFIGURED
+            self.reconfigure_downward()
+            self.update()
+            return
+        available_vars = [var for var in self.in_data.selected_vars if var in self.in_data.header.var_IDs]
+        current_vars = self._current_needed_vars()
+        if all([var in available_vars for var in current_vars]):
+            self.state = Node.READY
+        else:
+            self.state = Node.NOT_CONFIGURED
+            self.conditions = []
+            self.table = []
+        self.reconfigure_downward()
+        self.update()
+
+    def add_link(self, link):
+        self.links.add(link)
+
+        if not self.in_port.has_mother():
+            return
+        parent_node = self.in_port.mother.parentItem()
+        if parent_node.state != Node.SUCCESS:
+            if parent_node.ready_to_run():
+                parent_node.run()
+            if parent_node.state != Node.SUCCESS:
+                return
+        self._reset()
+
+    def reconfigure(self):
+        super().reconfigure()
+        if self.in_port.has_mother():
+            parent_node = self.in_port.mother.parentItem()
+            if parent_node.ready_to_run():
+                parent_node.run()
+                if parent_node.state == Node.SUCCESS:
+                    self._reset()
+                    return
+        self.in_data = None
+        self.state = Node.NOT_CONFIGURED
+        self.reconfigure_downward()
+        self.update()
+
+    def configure(self):
+        if not self.in_port.has_mother():
+            QMessageBox.critical(None, 'Error', 'Connect and run the input before configure this node!',
+                                 QMessageBox.Ok)
+            return
+
+        parent_node = self.in_port.mother.parentItem()
+        if parent_node.state != Node.SUCCESS:
+            if parent_node.ready_to_run():
+                parent_node.run()
+            else:
+                QMessageBox.critical(None, 'Error', 'Configure and run the input before configure this node!',
+                                     QMessageBox.Ok)
+                return
+            if parent_node.state != Node.SUCCESS:
+                QMessageBox.critical(None, 'Error', 'Configure and run the input before configure this node!',
+                                     QMessageBox.Ok)
+                return
+        self._reset()
+        if super().configure():
+            self.conditions, self.table, self.time_unit = self.new_options
+        self.reconfigure_downward()
+
+    def save(self):
+        table = []
+        for line in self.table:
+            for j in range(3):
+                table.append(line[j])
+        return '|'.join([self.category, self.name(), str(self.index()),
+                         str(self.pos().x()), str(self.pos().y()),
+                         ','.join(map(repr, self.conditions)), ','.join(table), self.time_unit])
+
+    def load(self, options):
+        conditions, table, time_unit = options
+        table = table.split(',')
+        for i in range(int(len(table)/3)):
+            line = []
+            for j in range(3):
+                line.append(table[3*i+j])
+            self.table.append(line)
+        conditions = conditions.split(',')
+        for i, condition in zip(range(len(self.table)), conditions):
+            literal = self.table[i][0]
+            condition = condition.split()
+            expression = condition[:-2]
+            comparator = condition[-2]
+            threshold = float(condition[-1])
+            self.conditions.append(operations.Condition(expression, literal, comparator, threshold))
+        self.time_unit = time_unit
+
+    def run(self):
+        #TODO TODO
+        success = super().run_upward()
+        if not success:
+            self.state = Node.FAIL
+            self.update()
+            self.message = 'Failed: input failed.'
+            return
+        self.state = Node.FAIL
+        self.update()
+        self.message = 'Failed: not implemented yet.'
+
+        # self.in_data = self.in_port.mother.parentItem().data
+        #
+        # self.state = Node.SUCCESS
+        # self.update()
+        # self.message = 'Successful.'
 
 
 class ComputeVolumeNode(TwoInOneOutNode):

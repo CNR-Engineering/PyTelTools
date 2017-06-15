@@ -10,15 +10,23 @@ class Polyline:
     """!
     @brief Custom (open or closed) polyline class
     """
-    def __init__(self, coordinates, attributes=None):
+    def __init__(self, coordinates, attributes=None, z=None):
         self._nb_points = len(coordinates)
         self._is_2d = len(coordinates[0]) == 2
+        if z is not None:
+            self._is_2d = False
+
+        self._is_closed = False
         if coordinates[0] == coordinates[-1]:
-            self._polyline = ClosedPolyline(coordinates)
             self._is_closed = True
+        if z is None:
+            coord = coordinates
         else:
-            self._polyline = OpenPolyline(coordinates)
-            self._is_closed = False
+            coord = [(x, y, z) for (x, y), z in zip(coordinates, z)]
+        if self._is_closed:
+            self._polyline = ClosedPolyline(coord)
+        else:
+            self._polyline = OpenPolyline(coord)
         if attributes is None:
             self._attributes = []
         else:
@@ -122,7 +130,6 @@ class Polyline:
 
     def apply_transformations(self, transformations):
         new_coords = np.array(list(self.coords()))
-        is_2d = False
         if self.is_2d():
             new_coords = np.hstack((new_coords, np.zeros((new_coords.shape[0], 1))))
 

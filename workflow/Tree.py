@@ -11,6 +11,7 @@ NODES = {'Input/Output': {'Load Serafin': LoadSerafinNode, 'Write Serafin': Writ
          'Basic operations': {'Select Variables': SelectVariablesNode, 'Select Time': SelectTimeNode,
                               'Add Rouse': AddRouseNode, 'Convert to Single Precision': ConvertToSinglePrecisionNode},
          'Calculations': {'Compute Max': ComputeMaxNode, 'Compute Min': ComputeMinNode, 'Compute Mean': ComputeMeanNode,
+                          'Compute Arrival Duration': ArrivalDurationNode,
                           'Compute Volume': ComputeVolumeNode, 'Compute Flux': ComputeFluxNode}}
 
 

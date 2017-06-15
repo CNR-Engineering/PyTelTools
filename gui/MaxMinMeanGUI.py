@@ -9,7 +9,7 @@ import logging
 from slf import Serafin
 import slf.misc as operations
 from gui.util import TableWidgetDragRows, QPlainTextEditLogger, handleOverwrite, \
-    OutputProgressDialog, TimeRangeSlider, TelToolWidget, testOpen, OutputThread
+    OutputProgressDialog, TimeRangeSlider, TelToolWidget, testOpen, OutputThread, ConditionDialog
 
 
 class MaxMinMeanThread(OutputThread):
@@ -60,9 +60,9 @@ class ArrivalDurationThread(OutputThread):
         self.nb_frames = len(time_indices)
         self.calculators = []
 
-        for i, (expression, _, comparator, threshold) in enumerate(self.conditions):
+        for i, condition in enumerate(self.conditions):
             self.calculators.append(operations.ArrivalDurationCalculator(self.input_stream, self.time_indices,
-                                                                         expression, comparator, threshold))
+                                                                         condition))
 
     def run(self):
 
@@ -149,129 +149,6 @@ class TimeSelection(QWidget):
         self.endIndex.setEnabled(False)
         self.startValue.setEnabled(False)
         self.endValue.setEnabled(False)
-
-
-class ConditionDialog(QDialog):
-    def __init__(self, input_header):
-        super().__init__()
-        self.var_IDs = input_header.var_IDs
-
-        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel,
-                                   Qt.Horizontal, self)
-        buttons.accepted.connect(self.checkCondition)
-        buttons.rejected.connect(self.reject)
-
-        self.expressionBox = QTextEdit()
-        self.expressionBox.setFixedSize(150, 30)
-        self.old_format = self.expressionBox.currentCharFormat()
-        self.expressionBox.cursorPositionChanged.connect(lambda:
-                                                         self.expressionBox.setCurrentCharFormat(self.old_format))
-
-        self.addButton = QPushButton('Add')
-        self.addButton.setFixedSize(50, 30)
-        self.addButton.clicked.connect(self.addButtonEvent)
-
-        self.clearButton = QPushButton('Clear')
-        self.clearButton.setFixedSize(50, 30)
-        self.clearButton.clicked.connect(self.expressionBox.clear)
-
-        self.varBox = QComboBox()
-        self.varBox.setFixedSize(150, 30)
-
-        for var_ID, var_name in zip(input_header.var_IDs, input_header.var_names):
-            var_name = var_name.decode('utf-8').strip()
-            self.varBox.addItem('%s (%s)' % (var_ID, var_name))
-
-        self.comparatorBox = QComboBox()
-        for comparator in ['>', '<', '>=', '<=']:
-            self.comparatorBox.addItem(comparator)
-        self.comparatorBox.setFixedSize(50, 30)
-
-        self.threashold = QLineEdit()
-        self.threashold.setFixedSize(150, 30)
-
-        self.condition = ([], '', '', 0.0)
-
-        mainLayout = QVBoxLayout()
-        mainLayout.addItem(QSpacerItem(50, 10))
-        mainLayout.addWidget(QLabel('<p style="font-size:10pt">'
-                                    '<b>Help</b>: use <b>Add</b> button to add variables to the expression.<br>'
-                                    'You can also enter operators, parentheses and numbers.<br>'
-                                    'Supported operators: <tt>+ - * / ^ sqrt</tt>.'))
-
-        mainLayout.addItem(QSpacerItem(50, 15))
-        hlayout = QHBoxLayout()
-        hlayout.addWidget(QLabel('Edit expression'))
-        hlayout.addWidget(self.clearButton)
-        hlayout.addWidget(self.addButton)
-        hlayout.addWidget(self.varBox)
-        hlayout.setSpacing(10)
-        hlayout.setAlignment(Qt.AlignLeft)
-        mainLayout.addLayout(hlayout)
-        mainLayout.setAlignment(hlayout, Qt.AlignHCenter)
-        mainLayout.addItem(QSpacerItem(50, 20))
-        glayout = QGridLayout()
-        glayout.addWidget(QLabel('Expression'), 1, 1, Qt.AlignHCenter)
-        glayout.addWidget(QLabel('Comparator'), 1, 2, Qt.AlignHCenter)
-        glayout.addWidget(QLabel('Threshold'), 1, 3, Qt.AlignHCenter)
-        glayout.addWidget(self.expressionBox, 2, 1)
-        glayout.addWidget(self.comparatorBox, 2, 2)
-        glayout.addWidget(self.threashold, 2, 3)
-        glayout.setVerticalSpacing(12)
-        glayout.setRowStretch(0, 1)
-        mainLayout.addLayout(glayout)
-        mainLayout.addItem(QSpacerItem(50, 20))
-        mainLayout.addWidget(buttons)
-
-        self.setLayout(mainLayout)
-        self.setWindowTitle('Add new condition')
-        self.resize(self.sizeHint())
-
-    def _processExpression(self, expression):
-        infix = operations.to_infix(expression)
-        return operations.infix_to_postfix(infix)
-
-    def _validateExpression(self, expression):
-        for item in expression:
-            if item[0] == '[':  # variable ID
-                if item[1:-1] not in self.var_IDs:
-                    return False
-            elif item in operations.OPERATORS:
-                continue
-            else:  # is number
-                try:
-                    _ = float(item)
-                except ValueError:
-                    return False
-        return operations.is_valid_postfix(expression)
-
-    def addButtonEvent(self):
-        var_ID = self.varBox.currentText().split(' (')[0]
-        self.expressionBox.insertHtml("<span style=\" font-size:8pt; "
-                                      "font-weight:600; color:#554DF7;\" "
-                                      ">[%s]</span>" % var_ID)
-        self.expressionBox.setCurrentCharFormat(self.old_format)
-
-    def checkCondition(self):
-        literal_expression = self.expressionBox.toPlainText()
-        comparator = self.comparatorBox.currentText()
-        threshold = self.threashold.text()
-        self.condition = ([], '', '', 0.0)
-
-        try:
-            threshold = float(threshold)
-        except ValueError:
-            QMessageBox.critical(self, 'Error', 'The threshold is not a number!',
-                                 QMessageBox.Ok)
-            return
-        expression = self._processExpression(literal_expression)
-
-        if not self._validateExpression(expression):
-            QMessageBox.critical(self, 'Error', 'Invalid expression.',
-                                 QMessageBox.Ok)
-            return
-        self.condition = (expression, literal_expression, comparator, threshold)
-        self.accept()
 
 
 class InputTab(QWidget):
@@ -774,19 +651,41 @@ class ArrivalDurationTab(QWidget):
         self.timeSelection.startValue.editingFinished.connect(self.timeSlider.enterValueEvent)
         self.timeSelection.endValue.editingFinished.connect(self.timeSlider.enterValueEvent)
 
+    def _current_names(self, ignore_row, ignore_column):
+        names = []
+        for row in range(self.condition_table.rowCount()):
+            for column in range(1, 3):
+                if row == ignore_row and column == ignore_column:
+                    continue
+                item = self.condition_table.item(row, column)
+                if item is not None:
+                    names.append(item.text())
+        return names
+
+    def _current_conditions(self):
+        conditions = []
+        for row in range(self.condition_table.rowCount()):
+            conditions.append(self.conditionTable.item(row, 0).text())
+        return conditions
+
     def _checkName(self, row, column):
         if column == 1 or column == 2:
             name = self.conditionTable.item(row, column).text()
             if len(name) < 2 or len(name) > 16:
                 QMessageBox.critical(self, 'Error', 'The variable names should be between 2 and 16 characters!',
                                      QMessageBox.Ok)
-                # back to default
-                condition = self.conditionTable.item(row, 0).text()
-                condition_tight = operations.tighten_expression(condition)
-                if column == 1:
-                    self.conditionTable.setItem(row, column, QTableWidgetItem(('A ' + condition_tight)[:16]))
-                else:
-                    self.conditionTable.setItem(row, column, QTableWidgetItem(('D ' + condition_tight)[:16]))
+            elif name in self._current_names(row, column):
+                QMessageBox.critical(self, 'Error', 'Duplicated name.',
+                                     QMessageBox.Ok)
+            else:
+                return
+            # back to default
+            condition = self.conditionTable.item(row, 0).text()
+            condition_tight = operations.tighten_expression(condition)
+            if column == 1:
+                self.conditionTable.setItem(row, column, QTableWidgetItem(('A ' + condition_tight)[:16]))
+            else:
+                self.conditionTable.setItem(row, column, QTableWidgetItem(('D ' + condition_tight)[:16]))
 
     def _convertTimeUnit(self, time_indices, values):
         time_unit = self.unitBox.currentText()
@@ -844,11 +743,15 @@ class ArrivalDurationTab(QWidget):
         return output_header
 
     def btnAddEvent(self):
-        dlg = ConditionDialog(self.input.header)
+        dlg = ConditionDialog(self.input.header.var_IDs, self.input.header.var_names)
         value = dlg.exec_()
         if value == QDialog.Rejected:
             return
-        condition = '%s %s %.4f' % (''.join(dlg.condition[1]), dlg.condition[2], dlg.condition[3])
+        condition = str(dlg.condition)
+        if condition in self._current_conditions():
+            QMessageBox.critical(self, 'Error', 'This condition is already added!',
+                                 QMessageBox.Ok)
+            return
         condition_tight = operations.tighten_expression(condition)  # used to define variable names
         self.conditions.append(dlg.condition)
 
