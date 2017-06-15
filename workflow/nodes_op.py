@@ -249,10 +249,12 @@ class SelectVariablesNode(OneInOneOutNode):
                         self.state = Node.NOT_CONFIGURED
                         self.update()
                     self.update()
+                    self.reconfigure_downward()
                     return
 
         self.in_data = None
         self.state = Node.NOT_CONFIGURED
+        self.reconfigure_downward()
         self.update()
 
     def configure(self):
@@ -390,6 +392,7 @@ class AddRouseNode(OneInOneOutNode):
                     return
         self.in_data = None
         self.state = Node.NOT_CONFIGURED
+        self.reconfigure_downward()
         self.update()
 
     def configure(self):
@@ -597,6 +600,7 @@ class SelectTimeNode(OneInOneOutNode):
                     return
         self.in_data = None
         self.state = Node.NOT_CONFIGURED
+        self.reconfigure_downward()
         self.update()
 
     def configure(self):
@@ -659,10 +663,22 @@ class ConvertToSinglePrecisionNode(OneInOneOutNode):
         self.state = Node.READY
         self.data = None
 
+    def reconfigure(self):
+        super().reconfigure()
+        self.state = Node.READY
+        self.reconfigure_downward()
+
     def configure(self):
         super().configure()
         self.state = Node.READY
         self.reconfigure_downward()
+
+    def save(self):
+        return '|'.join([self.category, self.name(), str(self.index()),
+                         str(self.pos().x()), str(self.pos().y()), ''])
+
+    def load(self, options):
+        self.state = Node.READY
 
     def run(self):
         success = super().run_upward()
@@ -680,7 +696,7 @@ class ConvertToSinglePrecisionNode(OneInOneOutNode):
         if input_data.to_single:
             self.state = Node.FAIL
             self.update()
-            self.message = 'Failed: the input file is already converted to single-precision format.'
+            self.message = 'Failed: the input data is already converted to single-precision format.'
             return
 
         self.data = input_data.copy()

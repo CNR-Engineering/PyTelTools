@@ -1,9 +1,169 @@
 from PyQt5.QtWidgets import *
 
-from workflow.Node import Node, TwoInOneOutNode
+from workflow.Node import Node, OneInOneOutNode, TwoInOneOutNode
 from slf import Serafin
 from slf.volume import TruncatedTriangularPrisms, VolumeCalculator
 from slf.flux import TriangularVectorField, FluxCalculator
+import slf.misc as operations
+
+
+class ComputeMaxNode(OneInOneOutNode):
+    def __init__(self, index):
+        super().__init__(index)
+        self.category = 'Calculations'
+        self.label = 'Compute\nMax'
+        self.out_port.data_type = 'slf'
+        self.in_port.data_type = 'slf'
+        self.state = Node.READY
+        self.data = None
+
+    def reconfigure(self):
+        super().reconfigure()
+        self.state = Node.READY
+        self.reconfigure_downward()
+
+    def configure(self):
+        super().configure()
+        self.state = Node.READY
+        self.reconfigure_downward()
+
+    def save(self):
+        return '|'.join([self.category, self.name(), str(self.index()),
+                         str(self.pos().x()), str(self.pos().y()), ''])
+
+    def load(self, options):
+        self.state = Node.READY
+
+    def run(self):
+        success = super().run_upward()
+        if not success:
+            self.state = Node.FAIL
+            self.update()
+            self.message = 'Failed: input failed.'
+            return
+        input_data = self.in_port.mother.parentItem().data
+
+        if input_data.operator is not None:
+            self.state = Node.FAIL
+            self.update()
+            if input_data.operator == operations.MAX:
+                self.message = 'Failed: the input data is already the result of Compute Max.'
+                return
+            else:
+                self.message = 'Failed: the input data is already the result of another computation.'
+                return
+
+        self.data = input_data.copy()
+        self.data.operator = operations.MAX
+        self.state = Node.SUCCESS
+        self.update()
+        self.message = 'Successful.'
+
+
+class ComputeMinNode(OneInOneOutNode):
+    def __init__(self, index):
+        super().__init__(index)
+        self.category = 'Calculations'
+        self.label = 'Compute\nMin'
+        self.out_port.data_type = 'slf'
+        self.in_port.data_type = 'slf'
+        self.state = Node.READY
+        self.data = None
+
+    def reconfigure(self):
+        super().reconfigure()
+        self.state = Node.READY
+        self.reconfigure_downward()
+
+    def configure(self):
+        super().configure()
+        self.state = Node.READY
+        self.reconfigure_downward()
+
+    def save(self):
+        return '|'.join([self.category, self.name(), str(self.index()),
+                         str(self.pos().x()), str(self.pos().y()), ''])
+
+    def load(self, options):
+        self.state = Node.READY
+
+    def run(self):
+        success = super().run_upward()
+        if not success:
+            self.state = Node.FAIL
+            self.update()
+            self.message = 'Failed: input failed.'
+            return
+        input_data = self.in_port.mother.parentItem().data
+
+        if input_data.operator is not None:
+            self.state = Node.FAIL
+            self.update()
+            if input_data.operator == operations.MIN:
+                self.message = 'Failed: the input data is already the result of Compute Min.'
+                return
+            else:
+                self.message = 'Failed: the input data is already the result of another computation.'
+                return
+
+        self.data = input_data.copy()
+        self.data.operator = operations.MIN
+        self.state = Node.SUCCESS
+        self.update()
+        self.message = 'Successful.'
+
+
+class ComputeMeanNode(OneInOneOutNode):
+    def __init__(self, index):
+        super().__init__(index)
+        self.category = 'Calculations'
+        self.label = 'Compute\nMean'
+        self.out_port.data_type = 'slf'
+        self.in_port.data_type = 'slf'
+        self.state = Node.READY
+        self.data = None
+
+    def reconfigure(self):
+        super().reconfigure()
+        self.state = Node.READY
+        self.reconfigure_downward()
+
+    def configure(self):
+        super().configure()
+        self.state = Node.READY
+        self.reconfigure_downward()
+
+    def save(self):
+        return '|'.join([self.category, self.name(), str(self.index()),
+                         str(self.pos().x()), str(self.pos().y()), ''])
+
+    def load(self, options):
+        self.state = Node.READY
+
+    def run(self):
+        success = super().run_upward()
+        if not success:
+            self.state = Node.FAIL
+            self.update()
+            self.message = 'Failed: input failed.'
+            return
+        input_data = self.in_port.mother.parentItem().data
+
+        if input_data.operator is not None:
+            self.state = Node.FAIL
+            self.update()
+            if input_data.operator == operations.MEAN:
+                self.message = 'Failed: the input data is already the result of Compute Mean.'
+                return
+            else:
+                self.message = 'Failed: the input data is already the result of another computation.'
+                return
+
+        self.data = input_data.copy()
+        self.data.operator = operations.MEAN
+        self.state = Node.SUCCESS
+        self.update()
+        self.message = 'Successful.'
 
 
 class ComputeVolumeNode(TwoInOneOutNode):
@@ -116,6 +276,7 @@ class ComputeVolumeNode(TwoInOneOutNode):
                     return
         self.in_data = None
         self.state = Node.NOT_CONFIGURED
+        self.reconfigure_downward()
         self.update()
 
     def configure(self):
@@ -340,6 +501,7 @@ class ComputeFluxNode(TwoInOneOutNode):
                         return
         self.in_data = None
         self.state = Node.NOT_CONFIGURED
+        self.reconfigure_downward()
         self.update()
 
     def configure(self):

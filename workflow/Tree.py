@@ -10,7 +10,8 @@ NODES = {'Input/Output': {'Load Serafin': LoadSerafinNode, 'Write Serafin': Writ
                           'Write CSV': WriteCSVNode},
          'Basic operations': {'Select Variables': SelectVariablesNode, 'Select Time': SelectTimeNode,
                               'Add Rouse': AddRouseNode, 'Convert to Single Precision': ConvertToSinglePrecisionNode},
-         'Calculations': {'Compute Volume': ComputeVolumeNode, 'Compute Flux': ComputeFluxNode}}
+         'Calculations': {'Compute Max': ComputeMaxNode, 'Compute Min': ComputeMinNode, 'Compute Mean': ComputeMeanNode,
+                          'Compute Volume': ComputeVolumeNode, 'Compute Flux': ComputeFluxNode}}
 
 
 def add_link(from_port, to_port):
