@@ -37,14 +37,11 @@ class VolumeCalculatorThread(OutputThread):
         logging.info('Finished processing the mesh')
 
         result = []
-        init_values = None
-        if self.calculator.second_var_ID == VolumeCalculator.INIT_VALUE:
-            init_values = self.calculator.input_stream.read_var_in_frame(0, self.calculator.var_ID)
         for i, time_index in enumerate(self.calculator.time_indices):
             if self.canceled:
                 return []
             i_result = [str(self.calculator.input_stream.time[time_index])]
-            values = self.calculator.read_values_in_frame(time_index, init_values)
+            values = self.calculator.read_values_in_frame(time_index)
 
             for j in range(len(self.calculator.polygons)):
                 if self.canceled:

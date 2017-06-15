@@ -1,7 +1,5 @@
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
-from PyQt5.QtGui import *
-import numpy as np
 from copy import deepcopy
 import datetime
 
@@ -15,7 +13,7 @@ class LoadSerafinNode(SingleOutputNode):
     def __init__(self, index):
         super().__init__(index)
         self.category = 'Input/Output'
-        self.label = 'Load Serafin'
+        self.label = 'Load\nSerafin'
         self.out_port.data_type = 'slf'
         self.name_box = None
         self.filename = ''
@@ -84,7 +82,7 @@ class WriteSerafinNode(SingleInputNode):
         super().__init__(index)
         self.in_port.data_type = 'slf'
         self.category = 'Input/Output'
-        self.label = 'Write Serafin'
+        self.label = 'Write\nSerafin'
         self.name_box = None
         self.filename = ''
 
@@ -232,7 +230,7 @@ class LoadPolygonNode(SingleOutputNode):
     def __init__(self, index):
         super().__init__(index)
         self.category = 'Input/Output'
-        self.label = 'Load Polygon'
+        self.label = 'Load\nPolygon'
         self.out_port.data_type = 'polygon'
         self.name_box = None
         self.filename = ''
@@ -312,7 +310,7 @@ class WriteCSVNode(SingleInputNode):
     def __init__(self, index):
         super().__init__(index)
         self.category = 'Input/Output'
-        self.label = 'Write CSV'
+        self.label = 'Write\nCSV'
         self.in_port.data_type = 'csv'
 
         self.name_box = None

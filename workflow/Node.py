@@ -197,6 +197,7 @@ class Node(QGraphicsItem):
                 if port.type == Port.OUTPUT:
                     for child in port.children:
                         child.parentItem().reconfigure()
+            self.update()
             return True
         return False
 
@@ -321,6 +322,7 @@ class TwoInOneOutNode(Node):
         self.add_port(self.first_in_port)
         self.add_port(self.second_in_port)
         self.add_port(self.out_port)
+        self.proxy.setZValue(10)
 
     def ready_to_run(self):
         if self.state == Node.NOT_CONFIGURED:

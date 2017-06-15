@@ -218,6 +218,10 @@ class VolumeCalculator:
         self.mesh = None
         self.weights = []
 
+        self.init_values = None
+        if self.second_var_ID == VolumeCalculator.INIT_VALUE:
+            self.init_values = input_stream.read_var_in_frame(0, self.var_ID)
+
     def construct_triangles(self):
         self.mesh = TruncatedTriangularPrisms(self.input_stream.header, True)
 
@@ -267,14 +271,14 @@ class VolumeCalculator:
                                                                                                    values[[a, b, c]])
             return volume_net, volume_positive, volume_net - volume_positive
 
-    def read_values_in_frame(self, time_index, init_values):
+    def read_values_in_frame(self, time_index):
         """!
         Read variable values in a single frame, depending on the first/second variable choice
         """
         values = self.input_stream.read_var_in_frame(time_index, self.var_ID)
         if self.second_var_ID is not None:
             if self.second_var_ID == VolumeCalculator.INIT_VALUE:
-                values -= init_values
+                values -= self.init_values
             else:
                 second_values = self.input_stream.read_var_in_frame(time_index, self.second_var_ID)
                 values -= second_values
@@ -288,14 +292,10 @@ class VolumeCalculator:
         self.construct_weights()
         result = []
 
-        init_values = None
-        if self.second_var_ID == VolumeCalculator.INIT_VALUE:
-            init_values = self.input_stream.read_var_in_frame(0, self.var_ID)
-
         for time_index in self.time_indices:
             i_result = [str(self.input_stream.time[time_index])]
 
-            values = self.read_values_in_frame(time_index, init_values)
+            values = self.read_values_in_frame(time_index)
             for j in range(len(self.polygons)):
                 weight = self.weights[j]
                 volume = self.volume_in_frame_in_polygon(weight, values, self.polygons[j])
@@ -307,17 +307,20 @@ class VolumeCalculator:
             result.append(i_result)
         return result
 
-    def write_csv(self, result, output_stream):
-        output_stream.write('time')
-        for name in self.polynames:
-            output_stream.write(';')
-            output_stream.write(name)
-            if self.volume_type == VolumeCalculator.POSITIVE:
-                output_stream.write(';')
-                output_stream.write(name + ' POSITIVE')
-                output_stream.write(';')
-                output_stream.write(name + ' NEGATIVE')
+    def get_csv_header(self):
+        header = ['time']
+        if self.volume_type == VolumeCalculator.POSITIVE:
+            for name in self.polynames:
+                header.append(name)
+                header.append(name + ' POSITIVE')
+                header.append(name + ' NEGATIVE')
+        else:
+            for name in self.polynames:
+                header.append(name)
+        return header
 
+    def write_csv(self, result, output_stream):
+        output_stream.write(';'.join(self.get_csv_header()))
         output_stream.write('\n')
 
         for line in result:

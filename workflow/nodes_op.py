@@ -20,6 +20,7 @@ class SelectVariablesNode(OneInOneOutNode):
         self.data = None
         self.selected_vars = []
         self.selected_vars_names = {}
+        self.new_options = tuple()
         self.us_equation = None
         self.us_button = None
         self.ws_button = None
@@ -159,13 +160,14 @@ class SelectVariablesNode(OneInOneOutNode):
         return option_panel
 
     def _select(self):
-        self.selected_vars = []
-        self.selected_vars_names = {}
+        selected_vars = []
+        selected_vars_names = {}
         for i in range(self.second_table.rowCount()):
             var_id, var_name, var_unit = [self.second_table.item(i, j).text() for j in range(3)]
-            self.selected_vars.append(var_id)
-            self.selected_vars_names[var_id] = (bytes(var_name, 'utf-8').ljust(16),
-                                                bytes(var_unit, 'utf-8').ljust(16))
+            selected_vars.append(var_id)
+            selected_vars_names[var_id] = (bytes(var_name, 'utf-8').ljust(16),
+                                           bytes(var_unit, 'utf-8').ljust(16))
+        self.new_options = (selected_vars, selected_vars_names)
 
     def _add_us(self):
         msg = FrictionLawMessage()
@@ -203,6 +205,9 @@ class SelectVariablesNode(OneInOneOutNode):
                 self.selected_vars = intersection
                 self.selected_vars_names = {var_id: self.selected_vars_names[var_id]
                                             for var_id in intersection}
+                self.state = Node.READY
+                self.update()
+                return
             else:
                 self.selected_vars = self.in_data.selected_vars[:]
                 self.selected_vars_names = deepcopy(self.in_data.selected_vars_names)
@@ -214,8 +219,6 @@ class SelectVariablesNode(OneInOneOutNode):
         super().add_link(link)
         if not self.in_port.has_mother():
             return
-        self.state = Node.READY
-        self.update()
         parent_node = self.in_port.mother.parentItem()
         if parent_node.state != Node.SUCCESS:
             if parent_node.ready_to_run():
@@ -233,14 +236,19 @@ class SelectVariablesNode(OneInOneOutNode):
                 if parent_node.state == Node.SUCCESS:
                     new_vars = parent_node.data.selected_vars
                     intersection = [var for var in self.selected_vars if var in new_vars]
+                    self.in_data = parent_node.data
                     if intersection:
-                        self.in_data = parent_node.data
                         self.selected_vars = intersection
                         self.selected_vars_names = {var_id: self.in_data.selected_vars_names[var_id]
                                                     for var_id in intersection}
-                        self.data = None
                         self.state = Node.READY
-                        return
+                    else:
+                        self.selected_vars = self.in_data.selected_vars[:]
+                        self.selected_vars_names = deepcopy(self.in_data.selected_vars_names)
+                        self.state = Node.NOT_CONFIGURED
+                        self.update()
+                    self.update()
+                    return
 
         self.in_data = None
         self.state = Node.NOT_CONFIGURED
@@ -266,12 +274,12 @@ class SelectVariablesNode(OneInOneOutNode):
         self._reset()
 
         if super().configure():
+            self.selected_vars, self.selected_vars_names = self.new_options
             if not self.selected_vars:
                 self.state = Node.NOT_CONFIGURED
-            else:
-                self.state = Node.READY
-            self.update()
-            QApplication.processEvents()
+        else:
+            self.us_equation = None
+        self.update()
 
     def save(self):
         vars = ','.join(self.selected_vars)
@@ -316,7 +324,7 @@ class AddRouseNode(OneInOneOutNode):
     def __init__(self, index):
         super().__init__(index)
         self.category = 'Basic operations'
-        self.label = 'Add Rouse'
+        self.label = 'Add\nRouse'
         self.out_port.data_type = 'slf'
         self.in_port.data_type = 'slf'
         self.in_data = None
@@ -330,28 +338,44 @@ class AddRouseNode(OneInOneOutNode):
         if value != QDialog.Accepted:
             return False
         self.table = msg.get_table()
+        new_rouse = [self.table[i][0] for i in range(len(self.table))]
+        for rouse in new_rouse:
+            if rouse in self.in_data.selected_vars:
+                QMessageBox.critical(None, 'Error', 'Duplicated values found.',
+                                     QMessageBox.Ok)
+                self.table = []
+                return False
         for i in range(len(self.table)):
             self.fall_velocities.append(float(self.table[i][0][6:]))
         return True
+
+    def _reset(self):
+        self.in_data = self.in_port.mother.parentItem().data
+        if 'US' not in self.in_data.selected_vars:
+            self.state = Node.NOT_CONFIGURED
+            self.in_data = None
+        elif self.fall_velocities:
+            old_rouse = [self.table[i][0] for i in range(len(self.table))]
+            for rouse in old_rouse:
+                if rouse in self.in_data.selected_vars:
+                    self.state = Node.NOT_CONFIGURED
+                    self.in_data = None
+                    self.update()
+                    return
+            self.state = Node.READY
+        self.update()
 
     def add_link(self, link):
         super().add_link(link)
         if not self.in_port.has_mother():
             return
-
         parent_node = self.in_port.mother.parentItem()
         if parent_node.state != Node.SUCCESS:
             if parent_node.ready_to_run():
                 parent_node.run()
             if parent_node.state != Node.SUCCESS:
                 return
-        if 'US' not in parent_node.data.selected_vars:
-            self.state = Node.NOT_CONFIGURED
-            self.update()
-            return
-        if self.fall_velocities:
-            self.state = Node.READY
-        self.update()
+        self._reset()
 
     def reconfigure(self):
         super().reconfigure()
@@ -360,10 +384,8 @@ class AddRouseNode(OneInOneOutNode):
             if parent_node.ready_to_run():
                 parent_node.run()
                 if parent_node.state == Node.SUCCESS:
-                    if 'US' in parent_node.data.selected_vars:
-                        return
-        self.fall_velocities = []
-        self.table = []
+                    self._reset()
+                    return
         self.in_data = None
         self.state = Node.NOT_CONFIGURED
         self.update()
@@ -396,7 +418,7 @@ class AddRouseNode(OneInOneOutNode):
                 old_rouse = [self.table[i][0] for i in range(len(self.table))]
                 for rouse in old_rouse:
                     if rouse in self.in_data.selected_vars:
-                        QMessageBox.critical(self, 'Error', 'Duplicated values found.',
+                        QMessageBox.critical(None, 'Error', 'Duplicated values found.',
                                              QMessageBox.Ok)
                         return
         else:
@@ -408,12 +430,15 @@ class AddRouseNode(OneInOneOutNode):
             old_rouse = [self.table[i][0] for i in range(len(self.table))]
             for rouse in old_rouse:
                 if rouse in self.in_data.selected_vars:
-                    QMessageBox.critical(self, 'Error', 'Duplicated values found.',
+                    QMessageBox.critical(None, 'Error', 'Duplicated values found.',
                                          QMessageBox.Ok)
                     return
 
         if self._configure():
             self.state = Node.READY
+        else:
+            self.state = Node.NOT_CONFIGURED
+        self.update()
 
     def save(self):
         table = []
@@ -439,7 +464,6 @@ class AddRouseNode(OneInOneOutNode):
             self.update()
             self.message = 'Failed: input failed.'
             return
-        self.run_upward()
         self.data = self.in_data.copy()
         self.data.selected_vars.extend([self.table[i][0] for i in range(len(self.table))])
         for i in range(len(self.table)):
@@ -462,8 +486,8 @@ class SelectTimeNode(OneInOneOutNode):
         self.in_data = None
         self.data = None
         self.selection = None
-        self.state = Node.READY
 
+        self.new_options = tuple()
         self.start_index, self.end_index = -1, -1
         self.sampling_frequency = 1
 
@@ -515,21 +539,41 @@ class SelectTimeNode(OneInOneOutNode):
             self.selection.timeSamplig.setText(str(self.sampling_frequency))
 
     def _select(self):
-        self.start_index = int(self.selection.startIndex.text())-1
-        self.end_index = int(self.selection.endIndex.text())-1
-        self.sampling_frequency = int(self.selection.timeSamplig.text())
+        start_index = int(self.selection.startIndex.text())-1
+        end_index = int(self.selection.endIndex.text())-1
+        sampling_frequency = int(self.selection.timeSamplig.text())
+        self.new_options = (start_index, end_index, sampling_frequency)
 
     def _reset(self):
+        if self.start_index > -1:
+            has_old = True
+            old_start, old_end = self.in_data.start_time + self.in_data.time_second[self.start_index], \
+                                 self.in_data.start_time + self.in_data.time_second[self.end_index]
+        else:
+            has_old = False
+            old_start, old_end = None, None
         self.in_data = self.in_port.mother.parentItem().data
-        if self.end_index > len(self.in_data.time):
-            self.end_index = len(self.in_data.time)
+        if has_old:
+            new_time = list(map(lambda x: x + self.in_data.start_time, self.in_data.time_second))
+            if old_start in new_time:
+                self.start_index = new_time.index(old_start)
+                self.state = Node.READY
+            else:
+                self.start_index = -1
+                self.state = Node.NOT_CONFIGURED
+            if old_end in new_time:
+                self.end_index = new_time.index(old_end)
+                self.state = Node.READY
+            else:
+                self.end_index = -1
+                self.state = Node.NOT_CONFIGURED
+        self.update()
 
     def add_link(self, link):
         super().add_link(link)
         if not self.in_port.has_mother():
             return
-        self.state = Node.READY
-        self.update()
+
         parent_node = self.in_port.mother.parentItem()
         if parent_node.state != Node.SUCCESS:
             if parent_node.ready_to_run():
@@ -546,6 +590,9 @@ class SelectTimeNode(OneInOneOutNode):
                 parent_node.run()
                 if parent_node.state == Node.SUCCESS:
                     self._reset()
+                    if self.start_index > -1:
+                        self.state = Node.READY
+                        self.update()
                     return
         self.in_data = None
         self.state = Node.NOT_CONFIGURED
@@ -569,8 +616,10 @@ class SelectTimeNode(OneInOneOutNode):
                 QMessageBox.critical(None, 'Error', 'Configure and run the input before configure this node!',
                                      QMessageBox.Ok)
                 return
+        self.in_data = parent_node.data
         self._reset()
-        super().configure()
+        if super().configure():
+            self.start_index, self.end_index, self.sampling_frequency = self.new_options
 
     def save(self):
         return '|'.join([self.category, self.name(), str(self.index()),
@@ -593,4 +642,4 @@ class SelectTimeNode(OneInOneOutNode):
         self.data.selected_time_indices = list(range(self.start_index, self.end_index+1, self.sampling_frequency))
         self.state = Node.SUCCESS
         self.update()
-        self.message = 'Successful.'
+        self.message = 'Successful. You selected %d frames.' % len(self.data.selected_time_indices)

@@ -17,10 +17,12 @@ class ComputeVolumeNode(TwoInOneOutNode):
         self.first_in_port.data_type = 'slf'
         self.second_in_port.data_type = 'polygon'
         self.in_data = None
+        self.data = None
 
         self.first_var = None
         self.second_var = None
         self.sup_volume = False
+        self.new_options = tuple()
 
         self.first_var_box = None
         self.second_var_box = None
@@ -36,7 +38,7 @@ class ComputeVolumeNode(TwoInOneOutNode):
         self.second_var_box.addItem('0')
         self.second_var_box.addItem('Initial values of the first variable')
 
-        available_vars = [var for var in self.in_data.selected_vars if var in self.in_data.header.var_IDs]
+        available_vars = [var for var in self.in_data.header.var_IDs if var in self.in_data.selected_vars]
         for var_ID, var_name in zip(self.in_data.header.var_IDs, self.in_data.header.var_names):
             if var_ID not in available_vars:
                 continue
@@ -64,27 +66,36 @@ class ComputeVolumeNode(TwoInOneOutNode):
         return option_panel
 
     def _select(self):
-        self.first_var = self.first_var_box.currentText().split('(')[0][:-1]
-        self.second_var = self.second_var_box.currentText()
-        if self.second_var == '0':
-            self.second_var = None
-        elif '(' in self.second_var:
-            self.second_var = self.second_var.split('(')[0][:-1]
+        first_var = self.first_var_box.currentText().split('(')[0][:-1]
+        second_var = self.second_var_box.currentText()
+        if second_var == '0':
+            second_var = None
+        elif '(' in second_var:
+            second_var = second_var.split('(')[0][:-1]
         else:
-            self.second_var = VolumeCalculator.INIT_VALUE
-        self.sup_volume = self.sup_volume_box.isChecked()
+            second_var = VolumeCalculator.INIT_VALUE
+        sup_volume = self.sup_volume_box.isChecked()
+        self.new_options = (first_var, second_var, sup_volume)
 
     def _reset(self):
         self.in_data = self.first_in_port.mother.parentItem().data
+        if self.first_var is None:
+            return
         available_vars = [var for var in self.in_data.selected_vars if var in self.in_data.header.var_IDs]
         if self.first_var not in available_vars:
             self.first_var = None
+            self.state = Node.NOT_CONFIGURED
+        elif self.state == Node.NOT_CONFIGURED:
+            self.state = Node.READY
         if self.second_var is not None and self.second_var != VolumeCalculator.INIT_VALUE:
             if self.second_var not in available_vars:
                 self.second_var = None
+                self.state = Node.NOT_CONFIGURED
+        self.update()
 
     def add_link(self, link):
-        super().add_link(link)
+        self.links.add(link)
+
         if not self.first_in_port.has_mother():
             return
         parent_node = self.first_in_port.mother.parentItem()
@@ -94,8 +105,6 @@ class ComputeVolumeNode(TwoInOneOutNode):
             if parent_node.state != Node.SUCCESS:
                 return
         self._reset()
-        self.state = Node.READY
-        self.update()
 
     def reconfigure(self):
         super().reconfigure()
@@ -107,8 +116,6 @@ class ComputeVolumeNode(TwoInOneOutNode):
                     self._reset()
                     return
         self.in_data = None
-        self.first_var = None
-        self.second_var = None
         self.state = Node.NOT_CONFIGURED
         self.update()
 
@@ -131,7 +138,8 @@ class ComputeVolumeNode(TwoInOneOutNode):
                                      QMessageBox.Ok)
                 return
         self._reset()
-        super().configure()
+        if super().configure():
+            self.first_var, self.second_var, self.sup_volume = self.new_options
 
     def save(self):
         first = '' if self.first_var is None else self.first_var
@@ -203,23 +211,11 @@ class ComputeVolumeNode(TwoInOneOutNode):
             calculator.mesh = mesh
             calculator.construct_weights()
 
-            self.data = [['time']]
-            if volume_type == VolumeCalculator.POSITIVE:
-                for name in polygon_names:
-                    self.data[0].append(name)
-                    self.data[0].append(name + ' POSITIVE')
-                    self.data[0].append(name + ' NEGATIVE')
-            else:
-                for name in polygon_names:
-                    self.data[0].append(name)
-
-            init_values = None
-            if calculator.second_var_ID == VolumeCalculator.INIT_VALUE:
-                init_values = calculator.input_stream.read_var_in_frame(0, calculator.var_ID)
+            self.data = [calculator.get_csv_header()]
 
             for i, time_index in enumerate(calculator.time_indices):
                 i_result = [str(calculator.input_stream.time[time_index])]
-                values = calculator.read_values_in_frame(time_index, init_values)
+                values = calculator.read_values_in_frame(time_index)
 
                 for j in range(len(calculator.polygons)):
                     weight = calculator.weights[j]
