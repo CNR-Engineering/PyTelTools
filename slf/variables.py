@@ -14,11 +14,12 @@ class Variable():
     """!
     @brief Data type for a single variable with ID (short name), Name (fr or en) and Unit
     """
-    def __init__(self, ID, name_fr, name_en, unit):
+    def __init__(self, ID, name_fr, name_en, unit, order):
         self._ID = ID
         self.name_fr = name_fr
         self.name_en = name_en
         self._unit = unit
+        self.order = order
 
     def __repr__(self):
         return ', '.join([self.ID(), self.name_fr,
@@ -50,26 +51,23 @@ def build_variables():
     """!
     @brief Initialize the BASIC_VARIABLES constant
     """
-    spec = """U,VITESSE U,VELOCITY U,M/S
-V,VITESSE V,VELOCITY V,M/S
-H,HAUTEUR D'EAU,WATER DEPTH,M
-S,SURFACE LIBRE,FREE SURFACE,M
+    spec = """S,SURFACE LIBRE,FREE SURFACE,M
 B,FOND,BOTTOM,M
+H,HAUTEUR D'EAU,WATER DEPTH,M
+M,VITESSE SCALAIRE,SCALAR VELOCITY,M/S
 C,CELERITE,CELERITY,M/S
 F,FROUDE,FROUDE NUMBER,
-Q,DEBIT SCALAIRE,SCALAR FLOWRATE,M2/S
 I,DEBIT SUIVANT X,FLOWRATE ALONG X,M2/S
 J,DEBIT SUIVANT Y,FLOWRATE ALONG Y,M2/S
-M,VITESSE SCALAIRE,SCALAR VELOCITY,M/S
+Q,DEBIT SCALAIRE,SCALAR FLOWRATE,M2/S
 US,VITESSE DE FROT.,FRICTION VEL.,M/S
 TAU,CONTRAINTE,BED SHEAR STRESS,PASCAL
 DMAX,DIAMETRE,DIAMETER,MM
 W,FROTTEMENT,BOTTOM FRICTION,
 ROUSE,NOMBRE DE ROUSE,ROUSE NUMBER,
-HD,EPAISSEUR DU LIT,BED THICKNESS,M
-RB,FOND RIGIDE,RIGID BED,M
-QS,DEBIT SOLIDE,SOLID DISCH,M2/S            
-QSX,DEBIT SOLIDE X,SOLID DISCH X,M2/S            
+FROTP,FROT. PEAU,FROT. PEAU,PASCAL
+QS,DEBIT SOLIDE,SOLID DISCH,M2/S
+QSX,DEBIT SOLIDE X,SOLID DISCH X,M2/S
 QSY,DEBIT SOLIDE Y,SOLID DISCH Y,M2/S
 QSBL,QS CHARRIAGE,QS BEDLOAD,M2/S
 QSBLX,QS CHARRIAGE X,QS BEDLOAD X,M2/S
@@ -77,14 +75,17 @@ QSBLY,QS CHARRIAGE Y,QS BEDLOAD Y,M2/S
 QSSUSP,QS SUSPENSION,QS SUSPENSION,M2/S
 QSSUSPX,QS SUSPENSION X,QS SUSPENSION X,M2/S
 QSSUSPY,QS SUSPENSION Y,QS SUSPENSION Y,M2/S
+U,VITESSE U,VELOCITY U,M/S
+V,VITESSE V,VELOCITY V,M/S
+HD,EPAISSEUR DU LIT,BED THICKNESS,M
+RB,FOND RIGIDE,RIGID BED,M
 EF,FLUX D'EROSION,EROSION FLUX,KG/M2/S
 DF,FLUX DE DEPOT,DEPOSITION FLUX,KG/M2/S
-MU,CORR FROTT PEAU,FROT. PEAU MU,
-FROTP,FROT. PEAU,FROT. PEAU,PASCAL"""
+MU,CORR FROTT PEAU,FROT. PEAU MU,"""
 
     for i, row in enumerate(spec.split('\n')):
         ID, name_fr, name_en, unit = row.split(',')
-        VARIABLES[ID] = Variable(ID, name_fr, name_en, unit)
+        VARIABLES[ID] = Variable(ID, name_fr, name_en, unit, i)
 
 
 # all variable entities involved in computations are stored as constants in a dictionary with ordered keys

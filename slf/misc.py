@@ -27,7 +27,7 @@ class ScalarMaxMinMeanCalculator:
     Compute max/min/mean of scalar variables from a .slf input stream
     """
 
-    def __init__(self, max_min_type, input_stream, selected_scalars, time_indices):
+    def __init__(self, max_min_type, input_stream, selected_scalars, time_indices, additional_equations=None):
         self.maxmin = max_min_type
         self.input_stream = input_stream
         self.selected_scalars = selected_scalars
@@ -35,6 +35,7 @@ class ScalarMaxMinMeanCalculator:
 
         self.nb_var = len(selected_scalars)
         self.nb_nodes = input_stream.header.nb_nodes
+        self.additional_equations = additional_equations
 
         if self.maxmin == MAX:
             self.current_values = np.ones((self.nb_var, self.nb_nodes)) * (-float('Inf'))
@@ -43,10 +44,31 @@ class ScalarMaxMinMeanCalculator:
         else:
             self.current_values = np.zeros((self.nb_var, self.nb_nodes))
 
+    def additional_computation_in_frame(self, time_index):
+        computed_values = {}
+        for equation in self.additional_equations:
+            input_var_IDs = list(map(lambda x: x.ID(), equation.input))
+
+            # read (if needed) input variables values
+            for input_var_ID in input_var_IDs:
+                if input_var_ID not in computed_values:
+                    computed_values[input_var_ID] = self.input_stream.read_var_in_frame(time_index, input_var_ID)
+            # compute additional variables
+            output_values = do_calculation(equation, [computed_values[var_ID] for var_ID in input_var_IDs])
+            computed_values[equation.output.ID()] = output_values
+        return computed_values
+
     def max_min_mean_in_frame(self, time_index):
+        if self.additional_equations is not None:
+            computed_values = self.additional_computation_in_frame(time_index)
+        else:
+            computed_values = {}
+
         values = np.empty((self.nb_var, self.nb_nodes))
         for i, (var, name, unit) in enumerate(self.selected_scalars):
-            values[i, :] = self.input_stream.read_var_in_frame(time_index, var)
+            if var not in computed_values:
+                computed_values[var] = self.input_stream.read_var_in_frame(time_index, var)
+            values[i, :] = computed_values[var]
         if self.maxmin == MAX:
             self.current_values = np.minimum(self.current_values, values)
         elif self.maxmin == MIN:
@@ -106,12 +128,13 @@ class VectorMaxMinMeanCalculator:
         return computed_values
 
     def max_min_mean_in_frame(self, time_index):
+        computed_values = self.additional_computation_in_frame(time_index)
+
         if self.maxmin == MEAN:
             for var, _, _ in self.selected_vectors:
-                self.current_values[var] += self.input_stream.read_var_in_frame(time_index, var)
+                self.current_values[var] += computed_values[var]
             return
 
-        computed_values = self.additional_computation_in_frame(time_index)
         for var, _, _ in self.selected_vectors:
             mother = _VECTORS[var][1]
 
@@ -202,7 +225,7 @@ class ArrivalDurationCalculator:
         return self.arrival, self.duration
 
 
-def scalars_vectors(known_vars, selected_vars):
+def scalars_vectors(known_vars, selected_vars, us_equation=None):
     """!
     @brief Separate the scalars from vectors, allowing different max/min computations
     @param <list> known_vars: the list of variable IDs with known values
@@ -211,7 +234,8 @@ def scalars_vectors(known_vars, selected_vars):
     """
     scalars = []
     vectors = []
-    additional_equations = {}
+    computable_variables = list(map(lambda x: x.ID(), get_available_variables(known_vars)))
+    additional_equations = get_necessary_equations(known_vars, list(map(lambda x: x[0], selected_vars)), us_equation)
     for var, name, unit in selected_vars:
         if var in _VECTORS:
             brother, mother = _VECTORS[var]
@@ -219,21 +243,20 @@ def scalars_vectors(known_vars, selected_vars):
                 vectors.append((var, name, unit))
             elif brother in known_vars:  # if the magnitude is unknown but the orthogonal field is known
                 vectors.append((var, name, unit))
-                additional_equations[mother] = get_necessary_equations(known_vars, [mother], None)
+                additional_equations.extend(get_necessary_equations(known_vars, [mother], us_equation))
             else:
-                # handle the special case for I and J (the magnitude may be computed from U, V, H, S, B, RB, HD)
-                if var == 'I' or var == 'J':
-                    computable_variables = get_available_variables(known_vars)
-                    if 'Q' in map(lambda x: x.ID(), computable_variables):
-                        vectors.append((var, name, unit))
-                        additional_equations['Q'] = get_necessary_equations(known_vars, ['Q'], None)
-                        continue
+                if mother in computable_variables:
+                    vectors.append((var, name, unit))
+                    additional_equations.extend(get_necessary_equations(known_vars, [mother], us_equation))
+                    continue
                 # if the magnitude is not computable, use scalar operation instead
                 module_logger.warn('The variable %s will be considered to be scalar instead of vector.' % var)
                 scalars.append((var, name, unit))
         else:
             scalars.append((var, name, unit))
-    return scalars, vectors, list(sum(additional_equations.values(), []))
+    additional_equations = list(set(additional_equations))
+    additional_equations.sort(key=lambda x: x.output.order)
+    return scalars, vectors, additional_equations
 
 
 def tighten_expression(expression):
