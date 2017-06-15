@@ -68,11 +68,11 @@ class LoadSerafinNode(SingleOutputNode):
         data = SerafinData(self.filename, self.scene().language)
         if not data.read():
             self.data = None
-            self.message = 'Failed: Input file is not Telemac 2D.'
+            self.message = 'Failed: Input file is not 2D.'
             self.state = Node.FAIL
         else:
             self.data = data
-            self.message = 'Successful.'
+            self.message = 'Successful. ' + self.data.header.summary()
             self.state = Node.SUCCESS
         self.update()
 
@@ -141,11 +141,13 @@ class WriteSerafinNode(SingleInputNode):
         output_header = input_data.header.copy()
         output_header.nb_var = len(input_data.selected_vars)
         output_header.var_IDs, output_header.var_names, \
-                             output_header.var_units = [], [], []
+                               output_header.var_units = [], [], []
         for var_ID, (var_name, var_unit) in input_data.selected_vars_names.items():
             output_header.var_IDs.append(var_ID)
             output_header.var_names.append(var_name)
             output_header.var_units.append(var_unit)
+        if input_data.to_single:
+            output_header.to_single_precision()
 
         with Serafin.Read(input_data.filename, self.scene().language) as resin:
             resin.header = input_data.header
@@ -155,7 +157,7 @@ class WriteSerafinNode(SingleInputNode):
                 for i, time_index in enumerate(input_data.selected_time_indices):
                     values = do_calculations_in_frame(input_data.equations, input_data.us_equation,
                                                       resin, time_index, input_data.selected_vars,
-                                                      output_header.float_type)
+                                                      output_header.np_float_type)
                     resout.write_entire_frame(output_header, input_data.time[time_index], values)
 
                     self.progress_bar.setValue(100 * (i+1)/len(input_data.selected_time_indices))
@@ -184,6 +186,7 @@ class SerafinData:
         self.selected_time_indices = []
         self.equations = []
         self.us_equation = None
+        self.to_single = False
 
     def read(self):
         with Serafin.Read(self.filename, self.language) as resin:
@@ -223,6 +226,7 @@ class SerafinData:
         copy_data.selected_time_indices = self.selected_time_indices[:]
         copy_data.equations = self.equations[:]
         copy_data.us_equation = self.us_equation
+        copy_data.to_single = self.to_single
         return copy_data
 
 
@@ -295,12 +299,92 @@ class LoadPolygonNode(SingleOutputNode):
                 self.data.append(polygon)
         if not self.data:
             self.state = Node.FAIL
-            self.message = 'Failed: The file does not contain any polygon.'
+            self.message = 'Failed: the file does not contain any polygon.'
             self.update()
             return
 
         self.message = 'Successful. The file contains {} polygon{}.'.format(len(self.data),
                                                                             's' if len(self.data) > 1 else '')
+
+        self.state = Node.SUCCESS
+        self.update()
+
+
+class LoadOpenPolyline2DNode(SingleOutputNode):
+    def __init__(self, index):
+        super().__init__(index)
+        self.category = 'Input/Output'
+        self.label = 'Load 2D\nOpen\nPolyline'
+        self.out_port.data_type = 'polyline 2d'
+        self.name_box = None
+        self.filename = ''
+        self.data = None
+
+    def get_option_panel(self):
+        open_button = QPushButton(QWidget().style().standardIcon(QStyle.SP_DialogOpenButton),
+                                  'Load 2D open polyline')
+        open_button.setToolTip('<b>Open</b> a .shp or .i2s file')
+        open_button.setFixedHeight(30)
+
+        option_panel = QWidget()
+        layout = QHBoxLayout()
+        layout.addWidget(open_button)
+        self.name_box = QLineEdit(self.filename)
+        self.name_box.setReadOnly(True)
+        self.name_box.setFixedHeight(30)
+        layout.addWidget(self.name_box)
+        option_panel.setLayout(layout)
+
+        open_button.clicked.connect(self._open)
+        return option_panel
+
+    def _open(self):
+        filename, _ = QFileDialog.getOpenFileName(None, 'Open a 2D open polyline file', '',
+                                                  'Line sets (*.i2s);;Shapefile (*.shp);;All Files (*)',
+                                                  QDir.currentPath(),
+                                                  options=QFileDialog.Options() | QFileDialog.DontUseNativeDialog)
+        if filename:
+            is_i2s = filename[-4:] == '.i2s'
+            is_shp = filename[-4:] == '.shp'
+
+            if not is_i2s and not is_shp:
+                QMessageBox.critical(None, 'Error', 'Only .i2s and .shp file formats are currently supported.',
+                                     QMessageBox.Ok)
+                return
+            self.filename = filename
+            self.name_box.setText(filename)
+
+    def save(self):
+        return '|'.join([self.category, self.name(), str(self.index()),
+                         str(self.pos().x()), str(self.pos().y()), self.filename])
+
+    def load(self, options):
+        self.filename = options[0]
+        if self.filename:
+            self.state = Node.READY
+
+    def run(self):
+        if self.state == Node.SUCCESS:
+            return
+
+        self.data = []
+        is_i2s = self.filename[-4:] == '.i2s'
+        if is_i2s:
+            with BlueKenue.Read(self.filename) as f:
+                f.read_header()
+                for poly in f.get_open_polylines():
+                    self.data.append(poly)
+        else:
+            for poly in Shapefile.get_open_polylines(self.filename):
+                self.data.append(poly)
+        if not self.data:
+            self.state = Node.FAIL
+            self.message = 'Failed: the file does not contain any 2D open polyline.'
+            self.update()
+            return
+
+        self.message = 'Successful. The file contains {} open line{}.'.format(len(self.data),
+                                                                              's' if len(self.data) > 1 else '')
 
         self.state = Node.SUCCESS
         self.update()

@@ -6,10 +6,11 @@ from workflow.nodes_calc import *
 
 
 NODES = {'Input/Output': {'Load Serafin': LoadSerafinNode, 'Write Serafin': WriteSerafinNode,
-                          'Load Polygon': LoadPolygonNode, 'Write CSV': WriteCSVNode},
+                          'Load Polygon': LoadPolygonNode, 'Load 2D Open Polyline': LoadOpenPolyline2DNode,
+                          'Write CSV': WriteCSVNode},
          'Basic operations': {'Select Variables': SelectVariablesNode, 'Select Time': SelectTimeNode,
-                              'Add Rouse': AddRouseNode},
-         'Calculations': {'Compute Volume': ComputeVolumeNode}}
+                              'Add Rouse': AddRouseNode, 'Convert to Single Precision': ConvertToSinglePrecisionNode},
+         'Calculations': {'Compute Volume': ComputeVolumeNode, 'Compute Flux': ComputeFluxNode}}
 
 
 def add_link(from_port, to_port):
@@ -154,6 +155,7 @@ class TreeScene(QGraphicsScene):
             to_node.add_link(link)
             self.addItem(link)
             link.setZValue(-1)
+            self.update()
         else:
             if cause == 'already':
                 QMessageBox.critical(None, 'Error', 'These two ports are already connected.',

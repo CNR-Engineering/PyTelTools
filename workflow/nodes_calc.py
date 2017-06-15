@@ -1,11 +1,9 @@
 from PyQt5.QtWidgets import *
-from PyQt5.QtCore import *
-from PyQt5.QtGui import *
-import shapely
 
 from workflow.Node import Node, TwoInOneOutNode
 from slf import Serafin
 from slf.volume import TruncatedTriangularPrisms, VolumeCalculator
+from slf.flux import TriangularVectorField, FluxCalculator
 
 
 class ComputeVolumeNode(TwoInOneOutNode):
@@ -91,6 +89,7 @@ class ComputeVolumeNode(TwoInOneOutNode):
             if self.second_var not in available_vars:
                 self.second_var = None
                 self.state = Node.NOT_CONFIGURED
+        self.reconfigure_downward()
         self.update()
 
     def add_link(self, link):
@@ -140,6 +139,7 @@ class ComputeVolumeNode(TwoInOneOutNode):
         self._reset()
         if super().configure():
             self.first_var, self.second_var, self.sup_volume = self.new_options
+        self.reconfigure_downward()
 
     def save(self):
         first = '' if self.first_var is None else self.first_var
@@ -179,24 +179,7 @@ class ComputeVolumeNode(TwoInOneOutNode):
             mesh.index = self.in_data.index
             mesh.triangles = self.in_data.triangles
         else:
-            five_percent = 0.05 * mesh.nb_triangles
-            nb_processed = 0
-            current_percent = 0
-
-            for i, j, k in mesh.ikle:
-                t = shapely.geometry.Polygon([mesh.points[i], mesh.points[j], mesh.points[k]])
-                mesh.triangles[i, j, k] = t
-                mesh.index.insert(i, t.bounds, obj=(i, j, k))
-
-                nb_processed += 1
-                if nb_processed > five_percent:
-                    nb_processed = 0
-                    current_percent += 5
-                    self.progress_bar.setValue(current_percent)
-                    QApplication.processEvents()
-
-            self.progress_bar.setValue(0)
-            QApplication.processEvents()
+            self.construct_mesh(mesh)
             self.in_data.has_index = True
             self.in_data.index = mesh.index
             self.in_data.triangles = mesh.triangles
@@ -225,6 +208,238 @@ class ComputeVolumeNode(TwoInOneOutNode):
                             i_result.append('%.6f' % v)
                     else:
                         i_result.append('%.6f' % volume)
+                self.data.append(i_result)
+
+                self.progress_bar.setValue(100 * (i+1) / len(calculator.time_indices))
+                QApplication.processEvents()
+
+        self.state = Node.SUCCESS
+        self.update()
+        self.message = 'Successful.'
+        self.progress_bar.setVisible(False)
+
+
+class ComputeFluxNode(TwoInOneOutNode):
+    def __init__(self, index):
+        super().__init__(index)
+        self.category = 'Calculations'
+        self.label = 'Compute\nFlux'
+        self.out_port.data_type = 'csv'
+        self.first_in_port.data_type = 'slf'
+        self.second_in_port.data_type = 'polyline 2d'
+        self.in_data = None
+        self.data = None
+
+        self.flux_options = ''
+        self.new_options = ''
+
+        self.flux_type_box = None
+
+    def get_option_panel(self):
+        option_panel = QWidget()
+        layout = QHBoxLayout()
+        layout.addWidget(QLabel('     Select the flux to compute'))
+        layout.addWidget(self.flux_type_box)
+        option_panel.setLayout(layout)
+        option_panel.destroyed.connect(self._select)
+        return option_panel
+
+    def _select(self):
+        self.new_options = self.flux_type_box.currentText()
+
+    def _prepare_flux_options(self, available_vars, available_var_names):
+        self.flux_type_box = QComboBox()
+        self.flux_type_box.setFixedSize(400, 30)
+        if 'U' in available_vars and 'V' in available_vars:
+            if 'H' in available_vars:
+                self.flux_type_box.addItem('Liquid flux (m3/s): (U, V, H)')
+                for name in available_var_names:
+                    str_name = name.decode('utf-8').strip()
+                    if 'TRACEUR' in str_name or 'TRACER' in str_name:
+                        self.flux_type_box.addItem('Solid flux (kg/s): (U, V, H, %s)' % str_name)
+        if 'I' in available_vars and 'J' in available_vars:
+            self.flux_type_box.addItem('Liquid flux (m3/s): (I, J)')
+        if 'H' in available_vars and 'M' in available_vars:
+            self.flux_type_box.addItem('Liquid flux (m3/s): (M, H)')
+        if 'Q' in available_vars:
+            self.flux_type_box.addItem('Liquid flux (m3/s): (Q)')
+
+        if 'QSX' in available_vars and 'QSY' in available_vars:
+            self.flux_type_box.addItem('Solid flux TOTAL (m3/s): (QSX, QSY)')
+        if 'QS' in available_vars:
+            self.flux_type_box.addItem('Solid flux TOTAL (m3/s): (QS)')
+        if 'QSBLX' in available_vars and 'QSBLY' in available_vars:
+            self.flux_type_box.addItem('Solid flux BEDLOAD (m3/s): (QSBLX, QSBLY)')
+        if 'QSBL' in available_vars:
+            self.flux_type_box.addItem('Solid flux BEDLOAD (m3/s): (QSBL)')
+        if 'QSSUSPX' in available_vars and 'QSSUSPY' in available_vars:
+            self.flux_type_box.addItem('Solid flux SUSPENSION (m3/s): (QSSUSPX, QSSUSPY)')
+        if 'QSSUSP' in available_vars:
+            self.flux_type_box.addItem('Solid flux SUSPENSION (m3/s): (QSSUSP)')
+
+        for name in available_var_names:
+            str_name = name.decode('utf-8').strip()
+            if 'QS CLASS' in str_name:
+                self.flux_type_box.addItem('Solid flux TOTAL (m3/s): (%s)' % str_name)
+            if 'QS BEDLOAD CL' in str_name:
+                self.flux_type_box.addItem('Solid flux BEDLOAD (m3/s): (%s)' % str_name)
+            if 'QS SUSP. CL' in str_name:
+                self.flux_type_box.addItem('Solid flux SUSPENSION (m3/s): (%s)' % str_name)
+
+        return self.flux_type_box.count() > 0
+
+    def _reset(self):
+        self.in_data = self.first_in_port.mother.parentItem().data
+        if self.flux_options:
+            for i in range(self.flux_type_box.count()):
+                text = self.flux_type_box.itemText(i)
+                if text == self.flux_options:
+                    self.flux_type_box.setCurrentIndex(i)
+                    self.state = Node.READY
+                    self.update()
+                    return
+            self.state = Node.NOT_CONFIGURED
+        else:
+            self.state = Node.READY
+        self.reconfigure_downward()
+        self.update()
+
+    def add_link(self, link):
+        self.links.add(link)
+
+        if not self.first_in_port.has_mother():
+            return
+        parent_node = self.first_in_port.mother.parentItem()
+        if parent_node.state != Node.SUCCESS:
+            if parent_node.ready_to_run():
+                parent_node.run()
+            if parent_node.state != Node.SUCCESS:
+                return
+        available_vars = [var for var in parent_node.data.header.var_IDs if var in parent_node.data.selected_vars]
+        available_var_names = [parent_node.data.selected_vars_names[var][0] for var in available_vars]
+        has_options = self._prepare_flux_options(available_vars, available_var_names)
+        if has_options:
+            self._reset()
+        else:
+            self.state = Node.NOT_CONFIGURED
+            self.update()
+
+    def reconfigure(self):
+        super().reconfigure()
+        if self.first_in_port.has_mother():
+            parent_node = self.first_in_port.mother.parentItem()
+            if parent_node.ready_to_run():
+                parent_node.run()
+                if parent_node.state == Node.SUCCESS:
+                    available_vars = [var for var in parent_node.data.header.var_IDs
+                                      if var in parent_node.data.selected_vars]
+                    available_var_names = [parent_node.data.selected_vars_names[var][0] for var in available_vars]
+                    has_options = self._prepare_flux_options(available_vars, available_var_names)
+                    if has_options:
+                        self._reset()
+                        return
+        self.in_data = None
+        self.state = Node.NOT_CONFIGURED
+        self.update()
+
+    def configure(self):
+        if not self.first_in_port.has_mother():
+            QMessageBox.critical(None, 'Error', 'Connect and run the input before configure this node!',
+                                 QMessageBox.Ok)
+            return
+
+        parent_node = self.first_in_port.mother.parentItem()
+        if parent_node.state != Node.SUCCESS:
+            if parent_node.ready_to_run():
+                parent_node.run()
+            else:
+                QMessageBox.critical(None, 'Error', 'Configure and run the input before configure this node!',
+                                     QMessageBox.Ok)
+                return
+            if parent_node.state != Node.SUCCESS:
+                QMessageBox.critical(None, 'Error', 'Configure and run the input before configure this node!',
+                                     QMessageBox.Ok)
+                return
+        available_vars = [var for var in parent_node.data.header.var_IDs if var in parent_node.data.selected_vars]
+        available_var_names = [parent_node.data.selected_vars_names[var][0] for var in available_vars]
+        has_options = self._prepare_flux_options(available_vars, available_var_names)
+        if not has_options:
+            QMessageBox.critical(None, 'Error', 'No flux is computable from the input file.',
+                                 QMessageBox.Ok)
+            return
+        self._reset()
+        if super().configure():
+            self.flux_options = self.new_options
+        self.reconfigure_downward()
+
+    def save(self):
+        return '|'.join([self.category, self.name(), str(self.index()),
+                         str(self.pos().x()), str(self.pos().y()),
+                         self.flux_options])
+
+    def load(self, options):
+        self.flux_options = options[0]
+
+    def run(self):
+        success = super().run_upward()
+        if not success:
+            self.state = Node.FAIL
+            self.update()
+            self.message = 'Failed: input failed.'
+            return
+
+        self.progress_bar.setVisible(True)
+        self.in_data = self.first_in_port.mother.parentItem().data
+        sections = self.second_in_port.mother.parentItem().data
+        section_names = ['Section %d' % (i+1) for i in range(len(sections))]
+
+        var_IDs = list(self.flux_options.split(':')[1].split('(')[1][:-1].split(', '))
+        nb_vars = len(var_IDs)
+        if nb_vars == 1:
+            flux_type = FluxCalculator.LINE_INTEGRAL
+        elif nb_vars == 2:
+            if var_IDs[0] == 'M':
+                flux_type = FluxCalculator.DOUBLE_LINE_INTEGRAL
+            else:
+                flux_type = FluxCalculator.LINE_FLUX
+        elif nb_vars == 3:
+            flux_type = FluxCalculator.AREA_FLUX
+        else:
+            flux_type = FluxCalculator.MASS_FLUX
+        pass
+        mesh = TriangularVectorField(self.in_data.header, False)
+
+        if self.in_data.has_index:
+            mesh.index = self.in_data.index
+            mesh.triangles = self.in_data.triangles
+        else:
+            self.construct_mesh(mesh)
+            self.in_data.has_index = True
+            self.in_data.index = mesh.index
+            self.in_data.triangles = mesh.triangles
+
+        with Serafin.Read(self.in_data.filename, self.in_data.language) as resin:
+            resin.header = self.in_data.header
+            resin.time = self.in_data.time
+
+            calculator = FluxCalculator(flux_type, var_IDs,
+                                        resin, section_names, sections, 1)
+            calculator.time_indices = self.in_data.selected_time_indices
+            calculator.mesh = mesh
+            calculator.construct_intersections()
+
+            self.data = [['time'] + section_names]
+
+            for i, time_index in enumerate(calculator.time_indices):
+                i_result = [str(calculator.input_stream.time[time_index])]
+                values = []
+                for var_ID in calculator.var_IDs:
+                    values.append(calculator.input_stream.read_var_in_frame(time_index, var_ID))
+
+                for j in range(len(calculator.sections)):
+                    intersections = calculator.intersections[j]
+                    flux = calculator.flux_in_frame(intersections, values)
+                    i_result.append('%.6f' % flux)
                 self.data.append(i_result)
 
                 self.progress_bar.setValue(100 * (i+1) / len(calculator.time_indices))

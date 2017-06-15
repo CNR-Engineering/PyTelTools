@@ -6,7 +6,7 @@ Handle variables and their relationships in .slf files for additional variable c
 import numpy as np
 
 KARMAN = 0.4
-RHO_EAU = 1000.
+RHO_WATER = 1000.
 GRAVITY = 9.80665
 
 
@@ -137,7 +137,7 @@ OPERATIONS = {PLUS: lambda a, b: a+b,
               MINUS: lambda a, b: a-b,
               TIMES: lambda a, b: a*b,
               NORM2: lambda a, b: np.sqrt(np.square(a) + np.square(b)),
-              COMPUTE_TAU: lambda x: RHO_EAU * np.square(x),
+              COMPUTE_TAU: lambda x: RHO_WATER * np.square(x),
               COMPUTE_DMAX: compute_DMAX,
               COMPUTE_CHEZY: lambda w, h, m: np.sqrt(np.power(m, 2) * GRAVITY / np.square(w)),
               COMPUTE_STRICKLER: lambda w, h, m: np.sqrt(np.power(m, 2) * GRAVITY / np.square(w) / cubic_root(h)),

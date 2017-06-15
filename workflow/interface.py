@@ -148,6 +148,7 @@ class NodeTree(QTreeWidget):
         super().__init__()
         for category in NODES:
             node = QTreeWidgetItem(self, [category])
+            node.setExpanded(True)
             for node_text in NODES[category]:
                 node.addChild(QTreeWidgetItem([node_text]))
 
@@ -155,7 +156,6 @@ class NodeTree(QTreeWidget):
         self.setMaximumWidth(200)
         self.setColumnCount(1)
         self.setHeaderLabel('Add Nodes')
-        self.setContentsMargins(0, 0, 0, 0)
 
     def mousePressEvent(self, event):
         super().mousePressEvent(event)

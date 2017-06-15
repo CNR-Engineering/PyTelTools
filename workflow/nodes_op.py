@@ -2,7 +2,6 @@ from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 from copy import deepcopy
-import datetime
 
 from workflow.Node import Node, OneInOneOutNode
 from gui.util import TableWidgetDragRows, TimeRangeSlider, DoubleSliderBox, FrictionLawMessage, FallVelocityMessage
@@ -206,6 +205,7 @@ class SelectVariablesNode(OneInOneOutNode):
                 self.selected_vars_names = {var_id: self.selected_vars_names[var_id]
                                             for var_id in intersection}
                 self.state = Node.READY
+                self.reconfigure_downward()
                 self.update()
                 return
             else:
@@ -242,6 +242,7 @@ class SelectVariablesNode(OneInOneOutNode):
                         self.selected_vars_names = {var_id: self.in_data.selected_vars_names[var_id]
                                                     for var_id in intersection}
                         self.state = Node.READY
+                        self.reconfigure_downward()
                     else:
                         self.selected_vars = self.in_data.selected_vars[:]
                         self.selected_vars_names = deepcopy(self.in_data.selected_vars_names)
@@ -279,6 +280,7 @@ class SelectVariablesNode(OneInOneOutNode):
                 self.state = Node.NOT_CONFIGURED
         else:
             self.us_equation = None
+        self.reconfigure_downward()
         self.update()
 
     def save(self):
@@ -314,7 +316,6 @@ class SelectVariablesNode(OneInOneOutNode):
         self.data.selected_vars_names = {}
         for var_ID, (var_name, var_unit) in self.selected_vars_names.items():
             self.data.selected_vars_names[var_ID] = (var_name, var_unit)
-
         self.state = Node.SUCCESS
         self.update()
         self.message = 'Successful.'
@@ -363,6 +364,7 @@ class AddRouseNode(OneInOneOutNode):
                     self.update()
                     return
             self.state = Node.READY
+            self.reconfigure_downward()
         self.update()
 
     def add_link(self, link):
@@ -436,6 +438,7 @@ class AddRouseNode(OneInOneOutNode):
 
         if self._configure():
             self.state = Node.READY
+            self.reconfigure_downward()
         else:
             self.state = Node.NOT_CONFIGURED
         self.update()
@@ -489,6 +492,7 @@ class SelectTimeNode(OneInOneOutNode):
 
         self.new_options = tuple()
         self.start_index, self.end_index = -1, -1
+        self.start_date, self.end_date = None, None
         self.sampling_frequency = 1
 
     def get_option_panel(self):
@@ -545,28 +549,28 @@ class SelectTimeNode(OneInOneOutNode):
         self.new_options = (start_index, end_index, sampling_frequency)
 
     def _reset(self):
-        if self.start_index > -1:
+        if self.start_date is not None:
             has_old = True
-            old_start, old_end = self.in_data.start_time + self.in_data.time_second[self.start_index], \
-                                 self.in_data.start_time + self.in_data.time_second[self.end_index]
         else:
             has_old = False
-            old_start, old_end = None, None
         self.in_data = self.in_port.mother.parentItem().data
         if has_old:
             new_time = list(map(lambda x: x + self.in_data.start_time, self.in_data.time_second))
-            if old_start in new_time:
-                self.start_index = new_time.index(old_start)
+            if self.start_date in new_time:
+                self.start_index = new_time.index(self.start_date)
                 self.state = Node.READY
             else:
                 self.start_index = -1
+                self.start_date = None
                 self.state = Node.NOT_CONFIGURED
-            if old_end in new_time:
-                self.end_index = new_time.index(old_end)
+            if self.end_date in new_time:
+                self.end_index = new_time.index(self.end_date)
                 self.state = Node.READY
             else:
                 self.end_index = -1
+                self.end_date = None
                 self.state = Node.NOT_CONFIGURED
+        self.reconfigure_downward()
         self.update()
 
     def add_link(self, link):
@@ -590,9 +594,6 @@ class SelectTimeNode(OneInOneOutNode):
                 parent_node.run()
                 if parent_node.state == Node.SUCCESS:
                     self._reset()
-                    if self.start_index > -1:
-                        self.state = Node.READY
-                        self.update()
                     return
         self.in_data = None
         self.state = Node.NOT_CONFIGURED
@@ -620,6 +621,9 @@ class SelectTimeNode(OneInOneOutNode):
         self._reset()
         if super().configure():
             self.start_index, self.end_index, self.sampling_frequency = self.new_options
+            self.start_date, self.end_date = self.in_data.start_time + self.in_data.time_second[self.start_index], \
+                                             self.in_data.start_time + self.in_data.time_second[self.end_index]
+        self.reconfigure_downward()
 
     def save(self):
         return '|'.join([self.category, self.name(), str(self.index()),
@@ -643,3 +647,44 @@ class SelectTimeNode(OneInOneOutNode):
         self.state = Node.SUCCESS
         self.update()
         self.message = 'Successful. You selected %d frames.' % len(self.data.selected_time_indices)
+
+
+class ConvertToSinglePrecisionNode(OneInOneOutNode):
+    def __init__(self, index):
+        super().__init__(index)
+        self.category = 'Basic operations'
+        self.label = 'Convert to\nSingle\nPrecision'
+        self.out_port.data_type = 'slf'
+        self.in_port.data_type = 'slf'
+        self.state = Node.READY
+        self.data = None
+
+    def configure(self):
+        super().configure()
+        self.state = Node.READY
+        self.reconfigure_downward()
+
+    def run(self):
+        success = super().run_upward()
+        if not success:
+            self.state = Node.FAIL
+            self.update()
+            self.message = 'Failed: input failed.'
+            return
+        input_data = self.in_port.mother.parentItem().data
+        if input_data.header.float_type != 'd':
+            self.state = Node.FAIL
+            self.update()
+            self.message = 'Failed: the input file is not of double-precision format.'
+            return
+        if input_data.to_single:
+            self.state = Node.FAIL
+            self.update()
+            self.message = 'Failed: the input file is already converted to single-precision format.'
+            return
+
+        self.data = input_data.copy()
+        self.data.to_single = True
+        self.state = Node.SUCCESS
+        self.update()
+        self.message = 'Successful.'

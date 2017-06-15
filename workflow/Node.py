@@ -1,6 +1,7 @@
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
+import shapely
 
 
 class Port(QGraphicsRectItem):
@@ -182,21 +183,17 @@ class Node(QGraphicsItem):
         return result
 
     def get_option_panel(self):
-        return None
+        return QWidget()
 
     def ready_to_run(self):
         pass
 
     def configure(self):
-        configure_dialog = ConfigureDialog(self.get_option_panel(), self.label)
+        configure_dialog = ConfigureDialog(self.get_option_panel(), self.name())
         configure_dialog.message_field.appendPlainText(self.message)
         if configure_dialog.exec_() == QDialog.Accepted:
             self.state = Node.READY
             self.message = ''
-            for port in self.ports:
-                if port.type == Port.OUTPUT:
-                    for child in port.children:
-                        child.parentItem().reconfigure()
             self.update()
             return True
         return False
@@ -205,6 +202,12 @@ class Node(QGraphicsItem):
         self.message = ''
         if self.state != Node.NOT_CONFIGURED:
             self.state = Node.READY
+
+    def reconfigure_downward(self):
+        for port in self.ports:
+            if port.type == Port.OUTPUT:
+                for child in port.children:
+                    child.parentItem().reconfigure()
 
     def run_upward(self):
         return True
@@ -242,9 +245,6 @@ class SingleInputNode(Node):
             return False
         return self.in_port.mother.parentItem().ready_to_run()
 
-    def reconfigure(self):
-        super().reconfigure()
-
     def run_upward(self):
         if self.in_port.mother.parentItem().state != Node.SUCCESS:
             self.in_port.mother.parentItem().run()
@@ -260,12 +260,6 @@ class SingleOutputNode(Node):
     def ready_to_run(self):
         return self.state != Node.NOT_CONFIGURED
 
-    def reconfigure(self):
-        super().reconfigure()
-        if self.out_port.has_children():
-            for child in self.out_port.children:
-                child.parentItem().reconfigure()
-
     def run_downward(self):
         if not super().run_downward():
             return False
@@ -273,6 +267,14 @@ class SingleOutputNode(Node):
             for child in self.out_port.children:
                 child.parentItem().run_downward()
         return True
+
+    def reconfigure(self):
+        super().reconfigure()
+        self.reconfigure_downward()
+
+    def configure(self):
+        if super().configure():
+            self.reconfigure_downward()
 
 
 class OneInOneOutNode(Node):
@@ -289,12 +291,6 @@ class OneInOneOutNode(Node):
         if not self.in_port.has_mother():
             return False
         return self.in_port.mother.parentItem().ready_to_run()
-
-    def reconfigure(self):
-        if self.out_port.has_children():
-            for child in self.out_port.children:
-                child.parentItem().reconfigure()
-        super().reconfigure()
 
     def run_downward(self):
         if not super().run_downward():
@@ -334,12 +330,6 @@ class TwoInOneOutNode(Node):
         return self.first_in_port.mother.parentItem().ready_to_run() and\
                self.second_in_port.mother.parentItem().ready_to_run()
 
-    def reconfigure(self):
-        if self.out_port.has_children():
-            for child in self.out_port.children:
-                child.parentItem().reconfigure()
-        super().reconfigure()
-
     def run_downward(self):
         if not super().run_downward():
             return False
@@ -359,6 +349,26 @@ class TwoInOneOutNode(Node):
             self.second_in_port.mother.parentItem().run()
         return self.first_in_port.mother.parentItem().state == Node.SUCCESS and\
                self.second_in_port.mother.parentItem().state == Node.SUCCESS
+
+    def construct_mesh(self, mesh):
+        five_percent = 0.05 * mesh.nb_triangles
+        nb_processed = 0
+        current_percent = 0
+
+        for i, j, k in mesh.ikle:
+            t = shapely.geometry.Polygon([mesh.points[i], mesh.points[j], mesh.points[k]])
+            mesh.triangles[i, j, k] = t
+            mesh.index.insert(i, t.bounds, obj=(i, j, k))
+
+            nb_processed += 1
+            if nb_processed > five_percent:
+                nb_processed = 0
+                current_percent += 5
+                self.progress_bar.setValue(current_percent)
+                QApplication.processEvents()
+
+        self.progress_bar.setValue(0)
+        QApplication.processEvents()
 
 
 class ConfigureDialog(QDialog):
