@@ -38,7 +38,7 @@ class Read(BlueKenue):
                 return False
         return True
 
-    def get_lines(self, closed):
+    def get_lines(self):
         while True:
             line = self.file.readline()
             if not line:  # EOF
@@ -56,16 +56,17 @@ class Read(BlueKenue):
                 coordinates.append(tuple(map(float, line.rstrip().split())))
             poly = Polyline(coordinates)
             poly.add_attribute(float(line_header[1]))
-            if poly.is_closed() == closed:
-                yield poly
+            yield poly
 
     def get_polygons(self):
-        for poly in self.get_lines(True):
-            yield poly
+        for poly in self.get_lines():
+            if poly.is_closed():
+                yield poly
 
     def get_open_polylines(self):
-        for poly in self.get_lines(False):
-            yield poly
+        for poly in self.get_lines():
+            if not poly.is_closed():
+                yield poly
 
     def get_points(self):
         for line in self.file.readlines():

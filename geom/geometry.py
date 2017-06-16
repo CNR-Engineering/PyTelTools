@@ -19,6 +19,8 @@ class Polyline:
         self._is_closed = False
         if coordinates[0] == coordinates[-1]:
             self._is_closed = True
+            if z is not None:
+                self._is_closed = z[-1] == z[0]
         if z is None:
             coord = coordinates
         else:
@@ -31,6 +33,9 @@ class Polyline:
             self._attributes = []
         else:
             self._attributes = attributes
+
+    def copy(self):
+        return Polyline(self.coords(), self.attributes()[:])
 
     def is_2d(self):
         return self._is_2d

@@ -431,19 +431,13 @@ class InputTab(QWidget):
         options = QFileDialog.Options()
         options |= QFileDialog.DontUseNativeDialog
         filename, _ = QFileDialog.getOpenFileName(self, 'Open a .i2s or .shp file', '',
-                                                  'Line sets (*.i2s);;Shapefile (*.shp);;All Files (*)', options=options)
+                                                  'Line sets (*.i2s *.shp)', options=options)
         if not filename:
             return
         if not testOpen(filename):
             return
 
         is_i2s = filename[-4:] == '.i2s'
-        is_shp = filename[-4:] == '.shp'
-
-        if not is_i2s and not is_shp:
-            QMessageBox.critical(self, 'Error', 'Only .i2s and .shp file formats are currently supported.',
-                                 QMessageBox.Ok)
-            return
 
         self.polygons = []
         if is_i2s:
@@ -452,6 +446,11 @@ class InputTab(QWidget):
                 for poly in f.get_polygons():
                     self.polygons.append(poly)
         else:
+            shape_type = Shapefile.get_shape_type(filename)
+            if shape_type != 5:
+                QMessageBox.critical(self, 'Error', 'This shape format is not supported.',
+                                     QMessageBox.Ok)
+                return
             for polygon in Shapefile.get_polygons(filename):
                 self.polygons.append(polygon)
         if not self.polygons:

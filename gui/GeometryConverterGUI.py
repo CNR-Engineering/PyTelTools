@@ -1,548 +1,21 @@
 import sys
-import datetime
 from PyQt5.QtWidgets import *
-from PyQt5.QtGui import *
 from PyQt5.QtCore import *
 
-import numpy as np
 import logging
 import geom.Shapefile as shp
-from geom.transformation import IDENTITY, load_transformation_map
+from geom.transformation import load_transformation_map
 import geom.conversion as convert
-from slf import Serafin
-from gui.util import handleOverwrite, QPlainTextEditLogger, TelToolWidget, OutputProgressDialog, OutputThread, testOpen
+from gui.util import QPlainTextEditLogger, TelToolWidget
 
 
-class MeshTransformThread(OutputThread):
-    def __init__(self, input_stream, output_stream, transformations):
-        super().__init__()
-        self.input_stream = input_stream
-        self.output_stream = output_stream
-        self.transformations = transformations
-
-        self.nb_var = self.input_stream.header.nb_var
-        self.nb_nodes = self.input_stream.header.nb_nodes
-        self.var_IDs = self.input_stream.header.var_IDs
-        self.nb_frames = len(self.input_stream.time)
-
-    def run(self):
-        self.tick.emit(1)
-        QApplication.processEvents()
-
-        # apply transformations
-        from_x = self.input_stream.header.x
-        from_y = self.input_stream.header.y
-        points = [np.array([x, y, 0]) for x, y in zip(from_x, from_y)]
-        for t in self.transformations:
-            if self.canceled:
-                return
-            points = [t(p) for p in points]
-        output_header = self.input_stream.header.copy()
-        output_header.x = np.array([p[0] for p in points])
-        output_header.y = np.array([p[1] for p in points])
-
-        self.tick.emit(10)
-        QApplication.processEvents()
-
-        # write header
-        self.output_stream.write_header(output_header)
-        self.tick.emit(20)
-        QApplication.processEvents()
-
-        # copy values
-        for time_index, time_value in enumerate(self.input_stream.time):
-            if self.canceled:
-                return
-            values = np.empty((self.nb_var, self.nb_nodes))
-            for i, var_ID in enumerate(self.var_IDs):
-                values[i, :] = self.input_stream.read_var_in_frame(time_index, var_ID)
-            self.output_stream.write_entire_frame(output_header, time_value, values)
-
-            self.tick.emit(20 + 80 * (time_index+1) / self.nb_frames)
-            QApplication.processEvents()
-
-
-class PointConverterTab(QWidget):
-    def __init__(self):
-        super().__init__()
-        self.transformation = None
-        self.converter = None
-
-        self._initWidgets()
-        self._setLayout()
-        self._bindEvents()
-
-    def _initWidgets(self):
-        """!
-        @brief (Used in __init__) Create widgets
-        """
-
-        # create the group box for coordinate transformation
-        self.confBox = QGroupBox('Apply coordinate transformation (optional)')
-        self.confBox.setStyleSheet('QGroupBox {font-size: 12px;font-weight: bold;}')
-        self.btnConfig = QPushButton('Load\nTransformation', self)
-        self.btnConfig.setToolTip('<b>Open</b> a transformation config file')
-        self.btnConfig.setFixedSize(105, 50)
-        self.confNameBox = QLineEdit()
-        self.confNameBox.setReadOnly(True)
-        self.confNameBox.setFixedHeight(30)
-        self.fromBox = QComboBox()
-        self.fromBox.setFixedWidth(150)
-        self.toBox = QComboBox()
-
-        # create the open button
-        self.btnOpen = QPushButton('Load\npoints', self, icon=self.style().standardIcon(QStyle.SP_DialogOpenButton))
-        self.btnOpen.setToolTip('<b>Open</b> a .xyz or .shp file')
-        self.btnOpen.setFixedSize(105, 50)
-
-        # create some text fields displaying the IO files info
-        self.inNameBox = QLineEdit()
-        self.inNameBox.setReadOnly(True)
-        self.inNameBox.setFixedHeight(30)
-        self.outNameBox = QLineEdit()
-        self.outNameBox.setReadOnly(True)
-        self.outNameBox.setFixedHeight(30)
-
-        # create the option boxes
-        self.toBox.setFixedWidth(150)
-        self.outFileType = QComboBox()
-        self.outFileType.addItem('.xyz')
-        self.outFileType.addItem('.shp')
-        self.outFileType.setFixedHeight(30)
-        self.zfield = QComboBox()
-        self.zfield.setFixedHeight(30)
-        self.znameBox = QLineEdit()
-        self.znameBox.setFixedHeight(30)
-        self.zfield.setEnabled(False)
-        self.znameBox.setEnabled(False)
-
-        # create the submit button
-        self.btnSubmit = QPushButton('Submit', self, icon=self.style().standardIcon(QStyle.SP_DialogSaveButton))
-        self.btnSubmit.setToolTip('<b>Submit</b> to .xyz or .shp')
-        self.btnSubmit.setFixedSize(105, 50)
-        self.btnSubmit.setEnabled(False)
-
-        # create the widget displaying message logs
-        self.logTextBox = QPlainTextEditLogger(self)
-        self.logTextBox.setFormatter(logging.Formatter('%(asctime)s - [%(levelname)s] - \n%(message)s'))
-        logging.getLogger().addHandler(self.logTextBox)
-        logging.getLogger().setLevel(logging.INFO)
-
-    def _setLayout(self):
-        mainLayout = QVBoxLayout()
-        mainLayout.addItem(QSpacerItem(10, 10))
-        mainLayout.setSpacing(15)
-
-        vlayout = QVBoxLayout()
-        hlayout = QHBoxLayout()
-        hlayout.addWidget(self.btnConfig)
-        hlayout.addWidget(self.confNameBox)
-        vlayout.addLayout(hlayout)
-
-        hlayout = QHBoxLayout()
-        hlayout.addWidget(QLabel('    Transform from'))
-        hlayout.addWidget(self.fromBox)
-        hlayout.addWidget(QLabel('to'))
-        hlayout.addWidget(self.toBox)
-        hlayout.setAlignment(Qt.AlignLeft)
-        vlayout.addLayout(hlayout)
-        vlayout.setSpacing(15)
-        self.confBox.setLayout(vlayout)
-        mainLayout.addWidget(self.confBox)
-
-        mainLayout.addItem(QSpacerItem(10, 15))
-        hlayout = QHBoxLayout()
-        hlayout.addWidget(self.btnOpen)
-        hlayout.addWidget(self.inNameBox)
-        mainLayout.addLayout(hlayout)
-
-        mainLayout.addItem(QSpacerItem(10, 10))
-        hlayout = QHBoxLayout()
-        hlayout.addWidget(QLabel('    Input Z column name'))
-        hlayout.addWidget(self.zfield)
-        mainLayout.addLayout(hlayout)
-        hlayout.setAlignment(Qt.AlignLeft)
-        hlayout = QHBoxLayout()
-        hlayout.addWidget(QLabel('    Output format'))
-        hlayout.addWidget(self.outFileType)
-        hlayout.addWidget(QLabel('Output Z column name'))
-        hlayout.addWidget(self.znameBox)
-        hlayout.setAlignment(Qt.AlignLeft)
-        mainLayout.addLayout(hlayout)
-
-        hlayout = QHBoxLayout()
-        hlayout.addWidget(self.btnSubmit)
-        hlayout.addWidget(self.outNameBox)
-        mainLayout.addLayout(hlayout)
-
-        mainLayout.addItem(QSpacerItem(10, 15))
-        mainLayout.addWidget(QLabel('   Message logs'))
-        mainLayout.addWidget(self.logTextBox.widget)
-        self.setLayout(mainLayout)
-
-    def _bindEvents(self):
-        self.btnOpen.clicked.connect(self.btnOpenEvent)
-        self.btnSubmit.clicked.connect(self.btnSubmitEvent)
-        self.btnConfig.clicked.connect(self.btnConfigEvent)
-        self.outFileType.currentIndexChanged.connect(self.enableZ)
-
-    def btnConfigEvent(self):
-        filename, _ = QFileDialog.getOpenFileName(self, 'Choose the file name', '', 'All files (*)',
-                                                  options=QFileDialog.Options() | QFileDialog.DontUseNativeDialog)
-        if not filename:
-            return
-        self.fromBox.clear()
-        self.toBox.clear()
-        self.confNameBox.clear()
-        self.transformation = None
-
-        success, self.transformation = load_transformation_map(filename)
-        if not success:
-            QMessageBox.critical(self, 'Error', 'The configuration is not valid.',
-                                 QMessageBox.Ok)
-            return
-        self.confNameBox.setText(filename)
-        for label in self.transformation.labels:
-            self.fromBox.addItem(label)
-            self.toBox.addItem(label)
-
-    def enableZ(self, index):
-        if index == 1:
-            self.znameBox.setEnabled(True)
-            self.znameBox.setText('Z')
-        else:
-            self.znameBox.clear()
-            self.znameBox.setEnabled(False)
-
-    def btnOpenEvent(self):
-        options = QFileDialog.Options()
-        options |= QFileDialog.DontUseNativeDialog
-        filename, _ = QFileDialog.getOpenFileName(self, 'Open a point set file', '',
-                                                  '.xyz Files (*.xyz);;.shp Files (*.shp)', options=options)
-        if not filename:
-            return
-        if not testOpen(filename):
-            return
-
-        self.zfield.clear()
-        self.zfield.setEnabled(False)
-        self.inNameBox.setText(filename)
-
-        self.converter = convert.PointSetConverter(filename)
-        success, message = self.converter.read()
-        if success:
-            if not self.converter.from_xyz:
-                if message == 'native':
-                    self.zfield.addItem('Z coord')
-                for index, field in shp.get_numeric_attribute_names(filename):
-                    self.zfield.addItem('Attribute %d - %s' % (index, field))
-                if self.zfield.count() == 0:
-                    QMessageBox.critical(self, 'Error',
-                                         'The input file has neither Z coordinates nor numeric attributes.',
-                                         QMessageBox.Ok)
-                    return
-                self.zfield.setEnabled(True)
-            self.btnSubmit.setEnabled(True)
-        else:
-            QMessageBox.critical(self, 'Error',
-                                 "The input file doesn't contain any point.", QMessageBox.Ok)
-            return
-
-    def btnSubmitEvent(self):
-        output_type = self.outFileType.currentText()
-        options = QFileDialog.Options()
-        options |= QFileDialog.DontUseNativeDialog
-        filename, _ = QFileDialog.getSaveFileName(self, 'Choose the output file name', '',
-                                                  '%s Files (*%s);;All Files (*)' % (output_type, output_type),
-                                                  options=options)
-        if not filename:
-            return
-        if len(filename) < 5 or filename[-4:] != output_type:
-            filename += output_type
-        if filename == self.inNameBox.text():
-            QMessageBox.critical(self, 'Error', 'Cannot overwrite to the input file.',
-                                 QMessageBox.Ok)
-            return
-        overwrite = handleOverwrite(filename)
-        if overwrite is None:
-            return
-
-        # getting the converter options right
-        if self.transformation is not None:
-            from_index, to_index = self.fromBox.currentIndex(), self.toBox.currentIndex()
-            trans = self.transformation.get_transformation(from_index, to_index)
-            self.converter.set_transformations(trans)
-        if '-' in self.zfield.currentText():
-            index = int(self.zfield.currentText().split(' - ')[0].split()[1])
-            self.converter.set_z_index(index)
-
-        self.outNameBox.setText(filename)
-        from_file = self.inNameBox.text()
-        to_file = filename
-
-        logging.info('Start conversion from %s\nto %s' % (from_file, to_file))
-        self.converter.convert(to_file, self.znameBox.text())
-        logging.info('Done.')
-
-
-class LineConverterTab(QWidget):
-    def __init__(self):
-        super().__init__()
-        self.transformation = None
-        self.converter = None
-
-        self._initWidgets()
-        self._setLayout()
-        self._bindEvents()
-
-    def _initWidgets(self):
-        """!
-        @brief (Used in __init__) Create widgets
-        """
-
-        # create the group box for coordinate transformation
-        self.confBox = QGroupBox('Apply coordinate transformation (optional)')
-        self.confBox.setStyleSheet('QGroupBox {font-size: 12px;font-weight: bold;}')
-        self.btnConfig = QPushButton('Load\nTransformation', self)
-        self.btnConfig.setToolTip('<b>Open</b> a transformation config file')
-        self.btnConfig.setFixedSize(105, 50)
-
-        self.confNameBox = QLineEdit()
-        self.confNameBox.setReadOnly(True)
-        self.confNameBox.setFixedHeight(30)
-        self.fromBox = QComboBox()
-        self.fromBox.setFixedWidth(150)
-        self.toBox = QComboBox()
-
-        # create the open button
-        self.btnOpen = QPushButton('Load\nlines', self, icon=self.style().standardIcon(QStyle.SP_DialogOpenButton))
-        self.btnOpen.setToolTip('<b>Open</b> a .i2s, .i3s or .shp file')
-        self.btnOpen.setFixedSize(105, 50)
-
-        # create some text fields displaying the IO files info
-        self.inNameBox = QLineEdit()
-        self.inNameBox.setReadOnly(True)
-        self.inNameBox.setFixedHeight(30)
-        self.outNameBox = QLineEdit()
-        self.outNameBox.setReadOnly(True)
-        self.outNameBox.setFixedHeight(30)
-
-        # create the option boxes
-        self.toBox.setFixedWidth(150)
-        self.outFileType = QComboBox()
-        self.outFileType.addItem('.i2s/.i3s')
-        self.outFileType.addItem('.shp')
-        self.outFileType.setFixedHeight(30)
-        self.outFileType.setEnabled(False)
-
-        self.attributeField = QComboBox()
-        self.attributeField.setFixedHeight(30)
-
-        self.attributeNameBox = QLineEdit()
-        self.attributeNameBox.setFixedHeight(30)
-
-        self.stack = QStackedLayout()
-        self.stack.addWidget(self.attributeField)
-        self.stack.addWidget(self.attributeNameBox)
-
-        self.closedBox = QGroupBox('Line type')
-        hlayout = QHBoxLayout()
-        self.closedButton = QRadioButton('Closed')
-        hlayout.addWidget(self.closedButton)
-        hlayout.addWidget(QRadioButton('Open'))
-        self.closedBox.setLayout(hlayout)
-        self.closedBox.setMaximumHeight(80)
-        self.closedBox.setMaximumWidth(200)
-        self.closedButton.setChecked(True)
-
-        # create the submit button
-        self.btnSubmit = QPushButton('Submit', self, icon=self.style().standardIcon(QStyle.SP_DialogSaveButton))
-        self.btnSubmit.setToolTip('<b>Submit</b> to .i2s, .i3s or .shp')
-        self.btnSubmit.setFixedSize(105, 50)
-        self.btnSubmit.setEnabled(False)
-
-        # create the widget displaying message logs
-        self.logTextBox = QPlainTextEditLogger(self)
-        self.logTextBox.setFormatter(logging.Formatter('%(asctime)s - [%(levelname)s] - \n%(message)s'))
-        logging.getLogger().addHandler(self.logTextBox)
-        logging.getLogger().setLevel(logging.INFO)
-
-    def _setLayout(self):
-        mainLayout = QVBoxLayout()
-        mainLayout.addItem(QSpacerItem(10, 10))
-        mainLayout.setSpacing(15)
-
-        vlayout = QVBoxLayout()
-        hlayout = QHBoxLayout()
-        hlayout.addWidget(self.btnConfig)
-        hlayout.addWidget(self.confNameBox)
-        vlayout.addLayout(hlayout)
-
-        hlayout = QHBoxLayout()
-        hlayout.addWidget(QLabel('    Transform from'))
-        hlayout.addWidget(self.fromBox)
-        hlayout.addWidget(QLabel('to'))
-        hlayout.addWidget(self.toBox)
-        hlayout.setAlignment(Qt.AlignLeft)
-        vlayout.addLayout(hlayout)
-        vlayout.setSpacing(15)
-        self.confBox.setLayout(vlayout)
-        mainLayout.addWidget(self.confBox)
-
-        mainLayout.addItem(QSpacerItem(10, 15))
-        hlayout = QHBoxLayout()
-        hlayout.addItem(QSpacerItem(10, 10))
-        hlayout.addWidget(self.closedBox)
-        mainLayout.addLayout(hlayout)
-        mainLayout.setAlignment(hlayout, Qt.AlignLeft)
-        mainLayout.addItem(QSpacerItem(10, 10))
-
-        hlayout = QHBoxLayout()
-        hlayout.addWidget(self.btnOpen)
-        hlayout.addWidget(self.inNameBox)
-        mainLayout.addLayout(hlayout)
-        mainLayout.addItem(QSpacerItem(10, 10))
-        hlayout = QHBoxLayout()
-        hlayout.addWidget(QLabel('    Output format'))
-        hlayout.addWidget(self.outFileType)
-        hlayout.addWidget(QLabel('Output attribute'))
-        hlayout.addLayout(self.stack)
-        hlayout.setAlignment(Qt.AlignLeft)
-        mainLayout.addLayout(hlayout)
-
-        mainLayout.addItem(QSpacerItem(10, 10))
-        hlayout = QHBoxLayout()
-        hlayout.addWidget(self.btnSubmit)
-        hlayout.addWidget(self.outNameBox)
-        mainLayout.addLayout(hlayout)
-
-        mainLayout.addItem(QSpacerItem(10, 15))
-        mainLayout.addWidget(QLabel('   Message logs'))
-        mainLayout.addWidget(self.logTextBox.widget)
-        self.setLayout(mainLayout)
-
-    def _bindEvents(self):
-        self.btnOpen.clicked.connect(self.btnOpenEvent)
-        self.btnSubmit.clicked.connect(self.btnSubmitEvent)
-        self.btnConfig.clicked.connect(self.btnConfigEvent)
-        self.outFileType.currentIndexChanged.connect(self.outfileTypeChanged)
-
-    def btnConfigEvent(self):
-        filename, _ = QFileDialog.getOpenFileName(self, 'Choose the file name', '', 'All files (*)',
-                                                  options=QFileDialog.Options() | QFileDialog.DontUseNativeDialog)
-        if not filename:
-            return
-        self.confNameBox.clear()
-        self.fromBox.clear()
-        self.toBox.clear()
-        self.transformation = None
-
-        success, self.transformation = load_transformation_map(filename)
-        if not success:
-            QMessageBox.critical(self, 'Error', 'The configuration is not valid.',
-                                 QMessageBox.Ok)
-            return
-        self.confNameBox.setText(filename)
-        for label in self.transformation.labels:
-            self.fromBox.addItem(label)
-            self.toBox.addItem(label)
-
-    def outfileTypeChanged(self, index):
-        self.stack.setCurrentIndex(index)
-        if self.inNameBox.text()[-4:] == '.shp':
-            if index == 1:  # shp to shp
-                self.attributeNameBox.clear()
-                self.attributeNameBox.setEnabled(False)
-            else:  # shp to i2s/i3s
-                pass
-        else:
-            if index == 1:  # i2s/i3s to shp
-                self.attributeNameBox.setEnabled(True)
-                self.attributeNameBox.setText('Value')
-            else:  # i2s/i3s to i2s/i3s
-                self.attributeNameBox.clear()
-
-    def btnOpenEvent(self):
-        options = QFileDialog.Options()
-        options |= QFileDialog.DontUseNativeDialog
-        filename, _ = QFileDialog.getOpenFileName(self, 'Open a line set file', '',
-                                                  '.i2s Files (*.i2s);;.i3s Files (*.i3s);;.shp Files (*.shp)',
-                                                  options=options)
-        if not filename:
-            return
-        if not testOpen(filename):
-            return
-        self.outFileType.setEnabled(False)
-        self.attributeField.clear()
-        self.inNameBox.setText(filename)
-
-        is_closed = self.closedButton.isChecked()
-        self.converter = convert.LineSetsConverter(filename, is_closed)
-        success = self.converter.read()
-        if not success:
-            QMessageBox.critical(self, 'Error',
-                                 "The input file doesn't contain any %s line." % ['open', 'closed'][is_closed],
-                                 QMessageBox.Ok)
-            return
-        if filename[-4:] == '.shp':
-            for index, field in shp.get_numeric_attribute_names(filename):
-                self.attributeField.addItem('Attribute %d - %s' % (index, field))
-        else:
-            self.attributeField.addItem('Attribute value')
-        self.attributeField.addItem('0')
-        self.attributeField.addItem('Iteration')
-
-        self.outFileType.setEnabled(True)
-        self.outfileTypeChanged(self.outFileType.currentIndex())
-        self.btnSubmit.setEnabled(True)
-
-    def btnSubmitEvent(self):
-        output_type = self.outFileType.currentText()
-        if output_type != '.shp':
-            if self.converter.is_2d:
-                output_type = '.i2s'
-            else:
-                output_type = '.i3s'
-
-        options = QFileDialog.Options()
-        options |= QFileDialog.DontUseNativeDialog
-        filename, _ = QFileDialog.getSaveFileName(self, 'Choose the output file name', '',
-                                                  '%s Files (*%s);;All Files (*)' % (output_type, output_type),
-                                                  options=options)
-        if not filename:
-            return
-        if len(filename) < 5 or filename[-4:] != output_type:
-            filename += output_type
-        if filename == self.inNameBox.text():
-            QMessageBox.critical(self, 'Error', 'Cannot overwrite to the input file.',
-                                 QMessageBox.Ok)
-            return
-        overwrite = handleOverwrite(filename)
-        if overwrite is None:
-            return
-
-        if self.transformation is not None:
-            from_index, to_index = self.fromBox.currentIndex(), self.toBox.currentIndex()
-            trans = self.transformation.get_transformation(from_index, to_index)
-            self.converter.set_transformations(trans)
-
-        self.outNameBox.setText(filename)
-        from_file = self.inNameBox.text()
-        to_file = filename
-
-        logging.info('Start conversion from %s\nto %s' % (from_file, to_file))
-        self.converter.convert(to_file, self.attributeNameBox.text(), self.attributeField.currentText())
-        logging.info('Done.')
-
-
-class MeshTransformTab(QWidget):
+class FileConverterInputTab(QWidget):
     def __init__(self, parent):
         super().__init__()
         self.parent = parent
-        self.filename = ''
-        self.header = None
-        self.time = []
         self.transformation = None
+        self.converter = None
+        self.from_type = None
 
         self._initWidgets()
         self._setLayout()
@@ -558,7 +31,6 @@ class MeshTransformTab(QWidget):
         self.btnConfig = QPushButton('Load\nTransformation', self)
         self.btnConfig.setToolTip('<b>Open</b> a transformation config file')
         self.btnConfig.setFixedSize(105, 50)
-
         self.confNameBox = QLineEdit()
         self.confNameBox.setReadOnly(True)
         self.confNameBox.setFixedHeight(30)
@@ -568,26 +40,14 @@ class MeshTransformTab(QWidget):
         self.toBox.setFixedWidth(150)
 
         # create the open button
-        self.btnOpen = QPushButton('Load\nSerafin', self, icon=self.style().standardIcon(QStyle.SP_DialogOpenButton))
-        self.btnOpen.setToolTip('<b>Open</b> a .slf file')
+        self.btnOpen = QPushButton('Open', self, icon=self.style().standardIcon(QStyle.SP_DialogOpenButton))
+        self.btnOpen.setToolTip('<b>Open</b> a geometry file (.shp .xyz .i2s .i3s)')
         self.btnOpen.setFixedSize(105, 50)
 
         # create some text fields displaying the IO files info
         self.inNameBox = QLineEdit()
         self.inNameBox.setReadOnly(True)
         self.inNameBox.setFixedHeight(30)
-        self.summaryTextBox = QPlainTextEdit()
-        self.summaryTextBox.setReadOnly(True)
-        self.summaryTextBox.setFixedHeight(50)
-        self.outNameBox = QLineEdit()
-        self.outNameBox.setReadOnly(True)
-        self.outNameBox.setFixedHeight(30)
-
-        # create the submit button
-        self.btnSubmit = QPushButton('Submit', self, icon=self.style().standardIcon(QStyle.SP_DialogSaveButton))
-        self.btnSubmit.setToolTip('<b>Submit</b> to .i2s, .i3s or .shp')
-        self.btnSubmit.setFixedSize(105, 50)
-        self.btnSubmit.setEnabled(False)
 
         # create the widget displaying message logs
         self.logTextBox = QPlainTextEditLogger(self)
@@ -618,16 +78,12 @@ class MeshTransformTab(QWidget):
         mainLayout.addWidget(self.confBox)
 
         mainLayout.addItem(QSpacerItem(10, 15))
-        glayout = QGridLayout()
-        glayout.addWidget(self.btnOpen, 1, 1)
-        glayout.addWidget(self.inNameBox, 1, 2)
-        glayout.addWidget(self.summaryTextBox, 2, 2)
-        mainLayout.addLayout(glayout)
-
         hlayout = QHBoxLayout()
-        hlayout.addWidget(self.btnSubmit)
-        hlayout.addWidget(self.outNameBox)
+        hlayout.addWidget(self.btnOpen)
+        hlayout.addWidget(self.inNameBox)
         mainLayout.addLayout(hlayout)
+
+        mainLayout.addItem(QSpacerItem(10, 10))
 
         mainLayout.addItem(QSpacerItem(10, 15))
         mainLayout.addWidget(QLabel('   Message logs'))
@@ -636,25 +92,68 @@ class MeshTransformTab(QWidget):
 
     def _bindEvents(self):
         self.btnOpen.clicked.connect(self.btnOpenEvent)
-        self.btnSubmit.clicked.connect(self.btnSubmitEvent)
         self.btnConfig.clicked.connect(self.btnConfigEvent)
 
-    def _reinitInput(self, filename):
-        self.filename = filename
-        self.inNameBox.setText(filename)
-        self.summaryTextBox.clear()
-        self.header = None
-        self.time = []
-        self.btnSubmit.setEnabled(False)
+    def _handleOpenShapefile(self, filename):
+        try:
+            with open(filename, 'r') as f:
+                pass
+        except PermissionError:
+            QMessageBox.critical(None, 'Error', 'Permission denied.', QMessageBox.Ok)
+            self.parent.reset()
+            return False
+
+        shape_type = shp.get_shape_type(filename)
+        if shape_type == 1:
+            self.from_type = 'shp Point'
+        elif shape_type == 11:
+            self.from_type = 'shp PointZ'
+        elif shape_type == 21:
+            self.from_type = 'shp PointM'
+        elif shape_type == 3:
+            self.from_type = 'shp Polyline'
+        elif shape_type == 13:
+            self.from_type = 'shp PolylineZ'
+        elif shape_type == 23:
+            self.from_type = 'shp PolylineM'
+        elif shape_type == 5:
+            self.from_type = 'shp Polygon'
+        elif shape_type == 15:
+            self.from_type = 'shp PolygonZ'
+        elif shape_type == 25:
+            self.from_type = 'shp PolygonM'
+        # elif shape_type == 8:
+        #     self.from_type = 'shp Multipoint'
+        # elif shape_type == 18:
+        #     self.from_type = 'shp MultiPointZ'
+        # elif shape_type == 28:
+        #     self.from_type = 'shp MultiPointM'
+        elif shape_type == 0:
+            QMessageBox.critical(None, 'Error', 'The shape type Null is currently not supported!', QMessageBox.Ok)
+            self.parent.reset()
+            return False
+        elif shape_type == 31:
+            QMessageBox.critical(None, 'Error', 'The shape type MultiPatch is currently not supported!', QMessageBox.Ok)
+            self.parent.reset()
+            return False
+        else:
+            QMessageBox.critical(None, 'Error', 'Not implemented!', QMessageBox.Ok)
+            self.parent.reset()
+            return False
+        if shape_type in [1, 11, 21]:
+            self.converter = convert.ShpPointConverter(filename, shape_type)
+        else:
+            self.converter = convert.ShpLineConverter(filename, shape_type)
+        return True
 
     def btnConfigEvent(self):
         filename, _ = QFileDialog.getOpenFileName(self, 'Choose the file name', '', 'All files (*)',
                                                   options=QFileDialog.Options() | QFileDialog.DontUseNativeDialog)
         if not filename:
             return
-        self.confNameBox.clear()
         self.fromBox.clear()
         self.toBox.clear()
+        self.confNameBox.clear()
         self.transformation = None
 
         success, self.transformation = load_transformation_map(filename)
@@ -670,110 +169,386 @@ class MeshTransformTab(QWidget):
     def btnOpenEvent(self):
         options = QFileDialog.Options()
         options |= QFileDialog.DontUseNativeDialog
-        filename, _ = QFileDialog.getOpenFileName(self, 'Open a .slf file', '',
-                                                  'Serafin Files (*.slf);;All Files (*)', QDir.currentPath(), options=options)
+        filename, _ = QFileDialog.getOpenFileName(self, 'Open a geometry file', '',
+                                                  'Geometry Files (*.shp *.xyz *.i2s *.i3s)', options=options)
         if not filename:
             return
-        if not testOpen(filename):
-            return
 
-        self._reinitInput(filename)
-
-        with Serafin.Read(filename, 'fr') as resin:
-            resin.read_header()
-
-            # check if the file is 2D
-            if not resin.header.is_2d:
-                QMessageBox.critical(self, 'Error', 'The file type (TELEMAC 3D) is currently not supported.',
-                                     QMessageBox.Ok)
+        self.inNameBox.setText(filename)
+        suffix = filename[-4:]
+        if suffix == '.xyz':
+            self.converter = convert.XYZConverter(filename)
+            self.from_type = 'xyz'
+        elif suffix == '.shp':
+            if not self._handleOpenShapefile(filename):
                 return
+        elif suffix == '.i2s' or suffix == '.i3s':
+            self.converter = convert.BKLineConverter(filename)
+            self.from_type = suffix[1:]
 
-            # record the time series
-            resin.get_time()
+        logging.info('Reading the input file...')
+        QApplication.processEvents()
+        try:
+            self.converter.read()
+        except PermissionError:
+            QMessageBox.critical(None, 'Error', 'Permission denied (Is the file opened by another application?).',
+                                 QMessageBox.Ok)
+            self.parent.reset()
+            return
+        except ValueError:
+            QMessageBox.critical(None, 'Error', 'The file is empty!', QMessageBox.Ok)
+            self.parent.reset()
+            return
+        logging.info('Finished reading the input file: %s' % filename)
+        self.parent.getInput()
 
-            # update the file summary
-            self.summaryTextBox.appendPlainText(resin.get_summary())
 
-            # copy to avoid reading the same data in the future
-            self.header = resin.header.copy()
-            self.time = resin.time[:]
+class FileConverterOutputTab(QWidget):
+    def __init__(self, inputTab):
+        super().__init__()
+        self.input = inputTab
 
-        self.btnSubmit.setEnabled(True)
+        self.EMPTY = 0
+        self.BK_SHP = 1
+        self.Z_FROM_SHP = 2
+        self.M_FROM_SHP = 3
+        self.SHP_BK = 4
+        self.Z_AND_BK = 5
+
+        self.convert_type = {'xyz': {'xyz': self.EMPTY, 'shp PointZ': self.BK_SHP, 'csv': self.EMPTY},
+                             'i2s': {'i2s': self.EMPTY, 'shp Polyline': self.BK_SHP,
+                                                        'shp Polygon': self.BK_SHP, 'csv': self.EMPTY},
+                             'i3s': {'i3s': self.EMPTY, 'i2s': self.EMPTY,
+                                     'shp PolylineZ': self.BK_SHP,
+                                     'shp PolygonZ': self.BK_SHP, 'csv': self.EMPTY},
+                             'shp Point': {'shp Point': self.EMPTY, 'shp PointZ': self.Z_FROM_SHP,
+                                           'csv': self.EMPTY},
+                             'shp PointZ': {'shp Point': self.EMPTY, 'shp PointZ': self.Z_FROM_SHP,
+                                            'xyz': self.Z_FROM_SHP, 'csv': self.EMPTY},
+                             'shp PointM': {'shp PointM': self.M_FROM_SHP, 'shp PointZ': self.Z_FROM_SHP,
+                                            'csv': self.EMPTY},
+                             'shp Polyline': {'shp Polyline': self.EMPTY, 'shp PolylineZ': self.Z_FROM_SHP,
+                                              'i2s': self.SHP_BK, 'i3s': self.Z_AND_BK, 'csv': self.EMPTY},
+                             'shp Polygon': {'shp Polygon': self.EMPTY, 'shp PolygonZ': self.Z_FROM_SHP,
+                                             'i2s': self.SHP_BK, 'i3s': self.Z_AND_BK, 'csv': self.EMPTY},
+                             'shp PolylineZ': {'shp PolylineZ': self.Z_FROM_SHP, 'shp Polyline': self.EMPTY,
+                                               'i2s': self.SHP_BK, 'i3s': self.Z_AND_BK, 'csv': self.EMPTY},
+                             'shp PolygonZ': {'shp PolygonZ': self.Z_FROM_SHP, 'shp Polygon': self.EMPTY,
+                                              'i2s': self.SHP_BK, 'i3s': self.Z_AND_BK, 'csv': self.EMPTY},
+                             'shp PolylineM': {'shp PolylineM': self.M_FROM_SHP, 'shp PolylineZ': self.Z_FROM_SHP,
+                                               'i2s': self.SHP_BK, 'i3s': self.Z_AND_BK, 'csv': self.EMPTY},
+                             'shp PolygonM': {'shp PolygonM': self.M_FROM_SHP, 'shp PolygonZ': self.Z_FROM_SHP,
+                                              'i2s': self.SHP_BK, 'i3s': self.Z_AND_BK, 'csv': self.EMPTY}}
+        self._initWidgets()
+        self._setLayout()
+        self._bindEvents()
+
+    def _initWidgets(self):
+        # create a text for input information
+        self.inputBox = QPlainTextEdit()
+        self.inputBox.setFixedHeight(60)
+        self.inputBox.setReadOnly(True)
+
+        # create the widget displaying message logs
+        self.logTextBox = QPlainTextEditLogger(self)
+        self.logTextBox.setFormatter(logging.Formatter('%(asctime)s - [%(levelname)s] - \n%(message)s'))
+        logging.getLogger().addHandler(self.logTextBox)
+        logging.getLogger().setLevel(logging.INFO)
+
+        # create a combo box for output file type
+        self.outTypeBox = QComboBox()
+        self.outTypeBox.setFixedHeight(30)
+
+        # create a text box for output file name
+        self.outNameBox = QLineEdit()
+        self.outNameBox.setReadOnly(True)
+        self.outNameBox.setFixedHeight(30)
+
+        # create the option panel
+        self.stack = QStackedLayout()
+
+        self.empty = QWidget()
+
+        self.bkshp = QWidget()
+        hlayout = QHBoxLayout()
+        hlayout.addWidget(QLabel('Attribute name'))
+        self.bkshpname = QLineEdit('Value')
+        self.bkshpname.setFixedHeight(30)
+        hlayout.addWidget(self.bkshpname)
+        self.bkshp.setLayout(hlayout)
+
+        self.zfield = QWidget()
+        hlayout = QHBoxLayout()
+        hlayout.addWidget(QLabel('Fill Z with'))
+        self.zfieldchoice = QComboBox()
+        self.zfieldchoice.setFixedHeight(30)
+        hlayout.addWidget(self.zfieldchoice, Qt.AlignLeft)
+        self.zfield.setLayout(hlayout)
+
+        self.mfield = QWidget()
+        hlayout = QHBoxLayout()
+        hlayout.addWidget(QLabel('Fill M with'))
+        self.mfieldchoice = QComboBox()
+        self.mfieldchoice.setFixedHeight(30)
+        hlayout.addWidget(self.mfieldchoice, Qt.AlignLeft)
+        self.mfield.setLayout(hlayout)
+
+        self.shpbk = QWidget()
+        hlayout = QHBoxLayout()
+        hlayout.addWidget(QLabel('Fill attribute with'))
+        self.shpbkmethod = QComboBox()
+        self.shpbkmethod.setFixedHeight(30)
+        hlayout.addWidget(self.shpbkmethod, Qt.AlignLeft)
+        self.shpbk.setLayout(hlayout)
+
+        self.shpbkz = QWidget()
+        vlayout = QVBoxLayout()
+        hlayout = QHBoxLayout()
+        hlayout.addWidget(QLabel('Fill Z with'))
+        self.zfieldchoicebis = QComboBox()
+        self.zfieldchoicebis.setFixedHeight(30)
+        hlayout.addWidget(self.zfieldchoicebis, Qt.AlignLeft)
+        vlayout.addLayout(hlayout)
+        hlayout = QHBoxLayout()
+        hlayout.addWidget(QLabel('Fill attribute with'))
+        self.shpbkmethodbis = QComboBox()
+        self.shpbkmethodbis.setFixedHeight(30)
+        hlayout.addWidget(self.shpbkmethodbis, Qt.AlignLeft)
+        self.shpbkz.setLayout(vlayout)
+
+        for panel in [self.empty, self.bkshp, self.zfield, self.mfield, self.shpbk, self.shpbkz]:
+            self.stack.addWidget(panel)
+
+        # create the submit button
+        self.btnSubmit = QPushButton('Submit', self, icon=self.style().standardIcon(QStyle.SP_DialogSaveButton))
+        self.btnSubmit.setToolTip('<b>Submit</b>')
+        self.btnSubmit.setFixedSize(105, 50)
+
+    def _bindEvents(self):
+        self.btnSubmit.clicked.connect(self.btnSubmitEvent)
+        self.outTypeBox.currentIndexChanged.connect(self.changeOutType)
+
+    def _setLayout(self):
+        mainLayout = QVBoxLayout()
+        mainLayout.addItem(QSpacerItem(50, 20))
+        mainLayout.addWidget(self.inputBox)
+        mainLayout.addItem(QSpacerItem(50, 20))
+        hlayout = QHBoxLayout()
+        hlayout.addWidget(QLabel('Output file type'))
+        hlayout.addWidget(self.outTypeBox, Qt.AlignLeft)
+        mainLayout.addLayout(hlayout)
+        mainLayout.addItem(QSpacerItem(50, 10))
+        mainLayout.addLayout(self.stack)
+        mainLayout.addItem(QSpacerItem(50, 10))
+        hlayout = QHBoxLayout()
+        hlayout.addWidget(self.btnSubmit)
+        hlayout.addWidget(self.outNameBox)
+        mainLayout.addLayout(hlayout)
+        mainLayout.addItem(QSpacerItem(30, 15))
+        mainLayout.addWidget(QLabel('   Message logs'))
+        mainLayout.addWidget(self.logTextBox.widget)
+        self.setLayout(mainLayout)
+
+    def reset(self):
+        self.inputBox.clear()
+        self.outTypeBox.clear()
+        self.outNameBox.clear()
+        self.bkshpname.setText('Value')
+        self.zfieldchoice.clear()
+        self.zfieldchoicebis.clear()
+        self.mfieldchoice.clear()
+        self.shpbkmethod.clear()
+        self.shpbkmethod.addItem('0')
+        self.shpbkmethod.addItem('Iteration')
+        self.shpbkmethodbis.clear()
+        self.shpbkmethodbis.addItem('0')
+        self.shpbkmethodbis.addItem('Iteration')
+
+    def changeOutType(self, index):
+        if self.outTypeBox.currentText():
+            self.stack.setCurrentIndex(self.convert_type[self.input.from_type][self.outTypeBox.currentText()])
+
+    def _check_options(self):
+        current_type = self.stack.currentIndex()
+        if current_type == self.BK_SHP:
+            attribute_name = self.bkshpname.text()
+            if not attribute_name:
+                QMessageBox.critical(None, 'Error', 'The attribute name cannot be empty!', QMessageBox.Ok)
+                return False, []
+            return True, [attribute_name]
+        elif current_type == self.Z_FROM_SHP:
+            return True, [self.zfieldchoice.currentText()]
+        elif current_type == self.M_FROM_SHP:
+            return True, [self.mfieldchoice.currentText()]
+        elif current_type == self.SHP_BK:
+            return True, [self.shpbkmethod.currentText()]
+        elif current_type == self.Z_AND_BK:
+            return True, [self.zfieldchoicebis.currentText(), self.shpbkmethodbis.currentText()]
+        return True, []
+
+    def getInput(self):
+        self.reset()
+
+        from_type = self.input.from_type
+        message = 'The input format is of type {}.\n'.format(from_type)
+
+        possible_types = self.convert_type[from_type].keys()
+
+        if from_type == 'i2s' or from_type == 'i3s':
+            nb_closed, nb_open = self.input.converter.nb_closed, self.input.converter.nb_open
+            if nb_closed > 0 and nb_open > 0:
+                possible_types = self.convert_type[from_type].keys()
+            elif nb_closed == 0:
+                if from_type == 'i2s':
+                    possible_types = ['i2s', 'shp Polyline', 'csv']
+                else:
+                    possible_types = ['i3s', 'shp PolylineZ', 'csv']
+            else:
+                if from_type == 'i2s':
+                    possible_types = ['i2s', 'shp Polygon', 'csv']
+                else:
+                    possible_types = ['i3s', 'shp PolygonZ', 'csv']
+            message += 'It has {} polygon{} and {} open polyline{}.\n'.format(nb_closed, 's' if nb_closed > 1 else '',
+                                                                              nb_open, 's' if nb_open > 1 else '')
+        elif from_type == 'shp Point':
+            numeric_fields = self.input.converter.numeric_fields
+            if numeric_fields:
+                for index, name in numeric_fields:
+                    self.zfieldchoice.addItem('%d - %s' % (index, name))
+                    self.mfieldchoice.addItem('%d - %s' % (index, name))
+            else:
+                possible_types = ['shp Point', 'csv']
+
+        elif from_type == 'shp PointM':
+            numeric_fields = self.input.converter.numeric_fields
+            self.mfieldchoice.addItem('M')
+            if numeric_fields:
+                for index, name in numeric_fields:
+                    self.zfieldchoice.addItem('%d - %s' % (index, name))
+                    self.mfieldchoice.addItem('%d - %s' % (index, name))
+            else:
+                possible_types = ['shp PointM', 'csv']
+
+        elif from_type == 'shp PointZ':
+            self.zfieldchoice.addItem('Z')
+            numeric_fields = self.input.converter.numeric_fields
+            if numeric_fields:
+                for index, name in numeric_fields:
+                    self.zfieldchoice.addItem('%d - %s' % (index, name))
+
+        elif from_type == 'shp Polyline' or from_type == 'shp Polygon':
+            numeric_fields = self.input.converter.numeric_fields
+            if numeric_fields:
+                for index, name in numeric_fields:
+                    item = '%d - %s' % (index, name)
+                    self.zfieldchoice.addItem(item)
+                    self.zfieldchoicebis.addItem(item)
+                    self.shpbkmethod.addItem(item)
+                    self.shpbkmethodbis.addItem(item)
+            else:
+                possible_types = [from_type, 'i2s', 'csv']
+
+        elif from_type == 'shp PolylineZ' or from_type == 'shp PolygonZ':
+            self.zfieldchoice.addItem('Z')
+            self.zfieldchoicebis.addItem('Z')
+            numeric_fields = self.input.converter.numeric_fields
+            if numeric_fields:
+                for index, name in numeric_fields:
+                    item = '%d - %s' % (index, name)
+                    self.zfieldchoice.addItem(item)
+                    self.zfieldchoicebis.addItem(item)
+                    self.shpbkmethod.addItem(item)
+                    self.shpbkmethodbis.addItem(item)
+
+        elif from_type == 'shp PolylineM' or from_type == 'shp PolygonM':
+            numeric_fields = self.input.converter.numeric_fields
+            self.mfieldchoice.addItem('M')
+            if numeric_fields:
+                for index, name in numeric_fields:
+                    item = '%d - %s' % (index, name)
+                    self.mfieldchoice.addItem(item)
+                    self.zfieldchoice.addItem(item)
+                    self.zfieldchoicebis.addItem(item)
+                    self.shpbkmethod.addItem(item)
+                    self.shpbkmethodbis.addItem(item)
+            else:
+                possible_types = [from_type, 'i2s', 'csv']
+
+        for to_type in possible_types:
+            self.outTypeBox.addItem(to_type)
+
+        message += 'It can be converted to the following types: {}.'.format(', '.join(list(possible_types)))
+        self.inputBox.appendPlainText(message)
 
     def btnSubmitEvent(self):
-        options = QFileDialog.Options()
-        options |= QFileDialog.DontUseNativeDialog
-        options |= QFileDialog.DontConfirmOverwrite
+        # check the transformations options
+        valid, options = self._check_options()
+        if not valid:
+            return
 
+        # getting the converter options right
+        if self.input.transformation is not None:
+            from_index, to_index = self.input.fromBox.currentIndex(), self.input.toBox.currentIndex()
+            trans = self.input.transformation.get_transformation(from_index, to_index)
+            self.input.converter.set_transformations(trans)
+
+        out_type = self.outTypeBox.currentText()
+        if out_type[:3] == 'shp':
+            out_type = 'shp'
         filename, _ = QFileDialog.getSaveFileName(self, 'Choose the output file name', '',
-                                                  '.slf Files (*.slf)', options=options)
-        # check the file name consistency
+                                                  '%s Files (*.%s)' % (out_type, out_type),
+                                                  options=QFileDialog.Options() | QFileDialog.DontUseNativeDialog)
         if not filename:
             return
-        if len(filename) < 5 or filename[-4:] != '.slf':
-            filename += '.slf'
-
-        # overwrite to the input file is forbidden
-        if filename == self.filename:
+        if len(filename) < 5 or filename[-3:] != out_type:
+            filename += '.' + out_type
+        if filename == self.input.converter.from_file:
             QMessageBox.critical(self, 'Error', 'Cannot overwrite to the input file.',
                                  QMessageBox.Ok)
             return
-
-        # handle overwrite manually
-        overwrite = handleOverwrite(filename)
-        if overwrite is None:
-            return
-
-        if self.transformation is None:
-            trans = [IDENTITY]
-        else:
-            from_index, to_index = self.fromBox.currentIndex(), self.toBox.currentIndex()
-            trans = self.transformation.get_transformation(from_index, to_index)
+        try:
+            with open(filename, 'w') as f:
+                pass
+        except PermissionError:
+            QMessageBox.critical(self, 'Error',
+                                 'Permission denied (Is the file opened by another application?).', QMessageBox.Ok)
+            return None
 
         self.outNameBox.setText(filename)
-        from_file = self.inNameBox.text()
-        to_file = filename
-
-        self.parent.inDialog()
-        logging.info('Start transformation from %s\nto %s' % (from_file, to_file))
-        progressBar = OutputProgressDialog()
-
-        # do some calculations
-        with Serafin.Read(self.filename, 'fr') as resin:
-            resin.header = self.header
-            resin.time = self.time
-
-            with Serafin.Write(filename, 'fr', overwrite) as resout:
-                process = MeshTransformThread(resin, resout, trans)
-                progressBar.connectToThread(process)
-                process.run()
-
-                if not process.canceled:
-                    progressBar.outputFinished()
-        progressBar.exec_()
-        self.parent.outDialog()
+        logging.info('Start conversion from %s\nto %s' % (self.input.converter.from_file, filename))
+        QApplication.processEvents()
+        self.input.converter.write(self.outTypeBox.currentText(), filename, options)
+        logging.info('Done.')
 
 
-class GeometryConverterGUI(TelToolWidget):
+class FileConverterGUI(TelToolWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle('Conversion between file formats and coordinate transformations')
 
-        self.point = PointConverterTab()
-        self.line = LineConverterTab()
-        self.mesh = MeshTransformTab(self)
+        self.input = FileConverterInputTab(self)
+        self.output = FileConverterOutputTab(self.input)
+
+        self.setWindowTitle('Transform and convert geometry files')
 
         self.tab = QTabWidget()
-        self.tab.addTab(self.point, 'Convert point sets')
-        self.tab.addTab(self.line, 'Convert line sets')
-        self.tab.addTab(self.mesh, 'Transform Serafin mesh')
+        self.tab.addTab(self.input, 'Input')
+        self.tab.addTab(self.output, 'Output')
+
+        self.tab.setTabEnabled(1, False)
 
         self.tab.setStyleSheet('QTabBar::tab { height: 40px; min-width: 200px; }')
 
         mainLayout = QVBoxLayout()
         mainLayout.addWidget(self.tab)
         self.setLayout(mainLayout)
-        self.resize(700, 500)
+
+    def reset(self):
+        self.output.reset()
+        self.tab.setTabEnabled(1, False)
+
+    def getInput(self):
+        self.output.getInput()
+        self.tab.setTabEnabled(1, True)
 
 
 def exception_hook(exctype, value, traceback):
@@ -790,8 +565,6 @@ if __name__ == '__main__':
     sys.excepthook = exception_hook
 
     app = QApplication(sys.argv)
-    widget = GeometryConverterGUI()
+    widget = FileConverterGUI()
     widget.show()
     app.exec_()
-
-

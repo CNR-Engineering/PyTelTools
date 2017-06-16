@@ -1695,7 +1695,7 @@ def handleOverwrite(filename):
                 pass
         except PermissionError:
             QMessageBox.critical(None, 'Permission denied',
-                                 'Permission denied. (Is the file opened by another application?).',
+                                 'Permission denied (Is the file opened by another application?).',
                                  QMessageBox.Ok, QMessageBox.Ok)
             return None
         return True
