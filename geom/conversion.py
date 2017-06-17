@@ -3,7 +3,6 @@ File format converter for geometrical objects
 """
 
 import numpy as np
-from copy import deepcopy
 import geom.BlueKenue as bk
 import geom.Shapefile as shp
 from geom.geometry import Polyline
@@ -28,7 +27,15 @@ class PointFileConverter(GeomFileConverter):
     def transform(self):
         if not self.transformations:
             return self.shapes
-        transformed_points = deepcopy(self.shapes)
+        transformed_points = self.shapes[:]
+        for t in self.transformations:
+            transformed_points = [t(p) for p in transformed_points]
+        return transformed_points
+
+    def apply_transform(self, shapes):
+        if not self.transformations:
+            return shapes
+        transformed_points = shapes[:]
         for t in self.transformations:
             transformed_points = [t(p) for p in transformed_points]
         return transformed_points
@@ -41,13 +48,17 @@ class LineFileConverter(GeomFileConverter):
     def transform(self):
         if not self.transformations:
             return self.shapes
-        # keep old shapes
-        old_shapes = []
+        new_shapes = []
         for poly in self.shapes:
-            old_shapes.append(poly.copy())
-            poly.apply_transformations(self.transformations)
-        new_shapes = self.shapes
-        self.shapes = old_shapes
+            new_shapes.append(poly.apply_transformations(self.transformations))
+        return new_shapes
+
+    def apply_transform(self, shapes):
+        if not self.transformations:
+            return shapes
+        new_shapes = []
+        for poly in shapes:
+            new_shapes.append(poly.apply_transformations(self.transformations))
         return new_shapes
 
 
@@ -80,13 +91,13 @@ class XYZConverter(PointFileConverter):
     def to_xyz(self, new_shapes, to_file):
         with bk.Write(to_file) as f:
             f.write_header(self.header)
-            f.write_points(new_shapes, )
+            f.write_points(new_shapes)
 
     def to_csv(self, new_shapes, to_file):
         with open(to_file, 'w') as f:
             f.write(';'.join(['id point', 'x', 'y', 'z']))
             f.write('\n')
-            for i, p in enumerate(new_shapes, ):
+            for i, p in enumerate(new_shapes):
                 x, y, z = p
                 f.write(';'.join(map(str, [i+1, x, y, z])))
                 f.write('\n')
@@ -245,47 +256,48 @@ class ShpPointConverter(PointFileConverter):
         if out_type == 'shp Point':
             new_shapes = self.transform()
             self.to_point(new_shapes, to_file)
-        #TODO  fix the old shape bug
-        # elif out_type == 'shp PointZ':
-        #     zfield = options[0]
-        #     if zfield != 'Z':
-        #         # construct z
-        #         attribute_index = int(zfield.split(' - ')[0])
-        #         new_shapes = []
-        #         for (x, y, _), attribute in zip(self.shapes, self.attributes):
-        #             new_z = attribute[attribute_index]
-        #             new_shapes.append((x, y, new_z))
-        #         self.shapes = new_shapes
-        #     self.transform()
-        #     self.to_pointz(to_file)
-        # elif out_type == 'shp PointM':
-        #     self.transform()
-        #     mfield = options[0]
-        #     if mfield == 'M':  # use original M
-        #         self.to_pointm(to_file)
-        #     else:
-        #         # construct M
-        #         attribute_index = int(mfield.split(' - ')[0])
-        #         self.m = []
-        #         for attribute in self.attributes:
-        #             new_m = attribute[attribute_index]
-        #             self.m.append(new_m)
-        #         self.to_pointm(to_file)
-        # elif out_type == 'xyz':
-        #     zfield = options[0]
-        #     if zfield != 'Z':
-        #         # construct z
-        #         attribute_index = int(zfield.split(' - ')[0])
-        #         new_shapes = []
-        #         for (x, y, _), attribute in zip(self.shapes, self.attributes):
-        #             new_z = attribute[attribute_index]
-        #             new_shapes.append((x, y, new_z))
-        #         self.shapes = new_shapes
-            self.transform()
-            self.to_xyz(to_file)
+        elif out_type == 'shp PointZ':
+            zfield = options[0]
+            if zfield != 'Z':
+                # construct z
+                attribute_index = int(zfield.split(' - ')[0])
+                new_shapes = []
+                for (x, y, _), attribute in zip(self.shapes, self.attributes):
+                    new_z = attribute[attribute_index]
+                    new_shapes.append((x, y, new_z))
+            else:
+                new_shapes = self.shapes
+            transformed_shapes = self.apply_transform(new_shapes)
+            self.to_pointz(transformed_shapes, to_file)
+        elif out_type == 'shp PointM':
+            new_shapes = self.transform()
+            mfield = options[0]
+            if mfield == 'M':  # use original M
+                self.to_pointm(new_shapes, to_file, self.m)
+            else:
+                # construct M
+                attribute_index = int(mfield.split(' - ')[0])
+                new_m = []
+                for attribute in self.attributes:
+                    m = attribute[attribute_index]
+                    new_m.append(m)
+                self.to_pointm(new_shapes, to_file, new_m)
+        elif out_type == 'xyz':
+            zfield = options[0]
+            if zfield != 'Z':
+                # construct z
+                attribute_index = int(zfield.split(' - ')[0])
+                new_shapes = []
+                for (x, y, _), attribute in zip(self.shapes, self.attributes):
+                    new_z = attribute[attribute_index]
+                    new_shapes.append((x, y, new_z))
+            else:
+                new_shapes = self.shapes
+            transformed_shapes = self.apply_transform(new_shapes)
+            self.to_xyz(transformed_shapes, to_file)
         else:
-            self.transform()
-            self.to_csv(to_file)
+            new_shapes = self.transform()
+            self.to_csv(new_shapes, to_file)
 
     def to_xyz(self, new_shapes, to_file):
         with bk.Write(to_file) as f:
@@ -313,13 +325,13 @@ class ShpPointConverter(PointFileConverter):
             w.record(*attribute)
         w.save(to_file)
 
-    def to_pointm(self, new_shapes, to_file):
+    def to_pointm(self, new_shapes, to_file, m_array):
         w = shapefile.Writer(shapefile.POINTM)
 
         for field_name, field_type, field_length, decimal_length in self.fields:
             w.field(field_name, field_type, str(field_length), decimal_length)
 
-        for (x, y, _), m, attribute in zip(new_shapes, self.m, self.attributes):
+        for (x, y, _), m, attribute in zip(new_shapes, m_array, self.attributes):
             w.point(x, y, m=m, shapeType=shapefile.POINTM)
             w.record(*attribute)
         w.save(to_file)

@@ -10,7 +10,7 @@ class Polyline:
     """!
     @brief Custom (open or closed) polyline class
     """
-    def __init__(self, coordinates, attributes=None, z=None):
+    def __init__(self, coordinates, attributes=None, z_array=None):
         self._nb_points = len(coordinates)
         self._is_2d = len(coordinates[0]) == 2
         if z is not None:
@@ -19,12 +19,12 @@ class Polyline:
         self._is_closed = False
         if coordinates[0] == coordinates[-1]:
             self._is_closed = True
-            if z is not None:
+            if z_array is not None:
                 self._is_closed = z[-1] == z[0]
-        if z is None:
+        if z_array is None:
             coord = coordinates
         else:
-            coord = [(x, y, z) for (x, y), z in zip(coordinates, z)]
+            coord = [(x, y, z) for (x, y), z in zip(coordinates, z_array)]
         if self._is_closed:
             self._polyline = ClosedPolyline(coord)
         else:
@@ -34,8 +34,8 @@ class Polyline:
         else:
             self._attributes = attributes
 
-    def copy(self):
-        return Polyline(self.coords(), self.attributes()[:])
+    def to_3d(self, z_array):
+        return Polyline(self.coords(), self.attributes()[:], z_array)
 
     def is_2d(self):
         return self._is_2d
@@ -144,6 +144,6 @@ class Polyline:
             new_coords = new_coords[:, :2]
 
         if self.is_closed():
-            self._polyline = ClosedPolyline(new_coords)
+            return ClosedPolyline(new_coords, self.attributes()[:])
         else:
-            self._polyline = OpenPolyline(new_coords)
+            return OpenPolyline(new_coords, self.attributes()[:])

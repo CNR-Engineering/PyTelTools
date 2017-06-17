@@ -149,8 +149,9 @@ class Node(QGraphicsItem):
 
     def paint(self, painter, options, widget=None):
         painter.fillRect(self.box.rect(), Node.COLOR[self.state])
-        painter.drawText(self.box.rect(), Qt.AlignCenter, self.label)
         painter.drawText(self.box.rect().topLeft()+QPointF(4, -3), self.state)
+        painter.setPen(QPen(QColor(0, 0, 0)))
+        painter.drawText(self.box.rect(), Qt.AlignCenter, self.label)
         if self.isSelected():
             painter.setPen(self.dashed_pen)
             painter.drawRect(self.boundingRect())
