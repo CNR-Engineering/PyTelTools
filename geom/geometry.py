@@ -13,7 +13,7 @@ class Polyline:
     def __init__(self, coordinates, attributes=None, z_array=None):
         self._nb_points = len(coordinates)
         self._is_2d = len(coordinates[0]) == 2
-        if z is not None:
+        if z_array is not None:
             self._is_2d = False
 
         self._is_closed = False
@@ -32,10 +32,15 @@ class Polyline:
         if attributes is None:
             self._attributes = []
         else:
-            self._attributes = attributes
+            self._attributes = attributes[:]
 
     def to_3d(self, z_array):
-        return Polyline(self.coords(), self.attributes()[:], z_array)
+        return Polyline(self.coords(), self.attributes(), z_array)
+
+    def to_2d(self):
+        if self.is_2d():
+            return Polyline(self.coords(), self.attributes())
+        return Polyline(list(map(tuple, np.array(self.coords())[:, :2])), self.attributes())
 
     def is_2d(self):
         return self._is_2d
@@ -136,11 +141,11 @@ class Polyline:
     def apply_transformations(self, transformations):
         new_coords = np.array(list(self.coords()))
         if self.is_2d():
-            new_coords = np.hstack((new_coords, np.zeros((new_coords.shape[0], 1))))
+            new_coords = np.hstack((new_coords, np.zeros((self.nb_points(), 1))))
 
         for t in transformations:
             new_coords = np.apply_along_axis(t, 1, new_coords)
         if self.is_2d():
             new_coords = new_coords[:, :2]
 
-        return Polyline(new_coords, self.attributes()[:])
+        return Polyline(new_coords, self.attributes())

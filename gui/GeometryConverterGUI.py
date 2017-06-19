@@ -3,6 +3,7 @@ from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 
 import logging
+import shapefile
 import geom.Shapefile as shp
 from geom.transformation import load_transformation_map
 import geom.conversion as convert
@@ -102,8 +103,13 @@ class FileConverterInputTab(QWidget):
             QMessageBox.critical(None, 'Error', 'Permission denied.', QMessageBox.Ok)
             self.parent.reset()
             return False
+        try:
+            shape_type = shp.get_shape_type(filename)
+        except shapefile.ShapefileException:
+            QMessageBox.critical(None, 'Error', 'Failed to open shp file (is the .dbf file present?).', QMessageBox.Ok)
+            self.parent.reset()
+            return False
 
-        shape_type = shp.get_shape_type(filename)
         if shape_type == 1:
             self.from_type = 'shp Point'
         elif shape_type == 11:
@@ -122,28 +128,26 @@ class FileConverterInputTab(QWidget):
             self.from_type = 'shp PolygonZ'
         elif shape_type == 25:
             self.from_type = 'shp PolygonM'
-        # elif shape_type == 8:  # TODO
-        #     self.from_type = 'shp Multipoint'
-        # elif shape_type == 18:
-        #     self.from_type = 'shp MultiPointZ'
-        # elif shape_type == 28:
-        #     self.from_type = 'shp MultiPointM'
+        elif shape_type == 8:
+            self.from_type = 'shp Multipoint'
+        elif shape_type == 18:
+            self.from_type = 'shp MultiPointZ'
+        elif shape_type == 28:
+            self.from_type = 'shp MultiPointM'
         elif shape_type == 0:
             QMessageBox.critical(None, 'Error', 'The shape type Null is currently not supported!', QMessageBox.Ok)
             self.parent.reset()
             return False
-        elif shape_type == 31:
+        else:
             QMessageBox.critical(None, 'Error', 'The shape type MultiPatch is currently not supported!', QMessageBox.Ok)
             self.parent.reset()
             return False
-        else:  # TODO
-            QMessageBox.critical(None, 'Error', 'Not implemented!', QMessageBox.Ok)
-            self.parent.reset()
-            return False
-        if shape_type in [1, 11, 21]:
+        if shape_type in (1, 11, 21):
             self.converter = convert.ShpPointConverter(filename, shape_type)
-        else:
+        elif shape_type in (3, 5, 13, 15, 23, 25):
             self.converter = convert.ShpLineConverter(filename, shape_type)
+        else:
+            self.converter = convert.ShpMultiPointConverter(filename, shape_type)
         return True
 
     def btnConfigEvent(self):
@@ -232,20 +236,28 @@ class FileConverterOutputTab(QWidget):
                              'shp PointZ': {'shp Point': self.EMPTY, 'shp PointZ': self.Z_AND_M,
                                             'shp PointM': self.M_FROM_SHP,
                                             'xyz': self.Z_FROM_SHP, 'csv': self.EMPTY},
-                             'shp PointM': {'shp PointM': self.M_FROM_SHP, 'shp PointZ': self.Z_AND_M,
-                                            'xyz': self.Z_FROM_SHP, 'csv': self.EMPTY},
-                             'shp Polyline': {'shp Polyline': self.EMPTY, 'shp PolylineZ': self.Z_FROM_SHP,
+                             'shp PointM': {'shp Point': self.EMPTY, 'shp PointM': self.M_FROM_SHP,
+                                            'shp PointZ': self.Z_AND_M, 'xyz': self.Z_FROM_SHP, 'csv': self.EMPTY},
+                             'shp Polyline': {'shp Polyline': self.EMPTY, 'shp PolylineZ': self.Z_AND_M,
                                               'i2s': self.SHP_BK, 'i3s': self.Z_AND_BK, 'csv': self.EMPTY},
-                             'shp Polygon': {'shp Polygon': self.EMPTY, 'shp PolygonZ': self.Z_FROM_SHP,
+                             'shp Polygon': {'shp Polygon': self.EMPTY, 'shp PolygonZ': self.Z_AND_M,
                                              'i2s': self.SHP_BK, 'i3s': self.Z_AND_BK, 'csv': self.EMPTY},
-                             'shp PolylineZ': {'shp PolylineZ': self.Z_FROM_SHP, 'shp Polyline': self.EMPTY,
+                             'shp PolylineZ': {'shp PolylineZ': self.Z_AND_M, 'shp Polyline': self.EMPTY,
                                                'i2s': self.SHP_BK, 'i3s': self.Z_AND_BK, 'csv': self.EMPTY},
-                             'shp PolygonZ': {'shp PolygonZ': self.Z_FROM_SHP, 'shp Polygon': self.EMPTY,
+                             'shp PolygonZ': {'shp PolygonZ': self.Z_AND_M, 'shp Polygon': self.EMPTY,
                                               'i2s': self.SHP_BK, 'i3s': self.Z_AND_BK, 'csv': self.EMPTY},
-                             'shp PolylineM': {'shp PolylineM': self.M_FROM_SHP, 'shp PolylineZ': self.Z_FROM_SHP,
+                             'shp PolylineM': {'shp Polyline': self.EMPTY,
+                                               'shp PolylineM': self.M_FROM_SHP, 'shp PolylineZ': self.Z_AND_M,
                                                'i2s': self.SHP_BK, 'i3s': self.Z_AND_BK, 'csv': self.EMPTY},
-                             'shp PolygonM': {'shp PolygonM': self.M_FROM_SHP, 'shp PolygonZ': self.Z_FROM_SHP,
-                                              'i2s': self.SHP_BK, 'i3s': self.Z_AND_BK, 'csv': self.EMPTY}}
+                             'shp PolygonM': {'shp Polygon': self.EMPTY, 'shp PolygonM': self.M_FROM_SHP,
+                                              'shp PolygonZ': self.Z_AND_M,
+                                              'i2s': self.SHP_BK, 'i3s': self.Z_AND_BK, 'csv': self.EMPTY},
+                             'shp MultiPoint': {'shp MultiPoint': self.EMPTY, 'shp Point': self.EMPTY,
+                                                'csv': self.EMPTY},
+                             'shp MultiPointZ': {'shp MultiPointZ': self.EMPTY, 'shp PointZ': self.EMPTY,
+                                                 'csv': self.EMPTY},
+                             'shp MultiPointM': {'shp MultiPointM': self.EMPTY, 'shp PointM': self.EMPTY,
+                                                 'csv': self.EMPTY}}
         self._initWidgets()
         self._setLayout()
         self._bindEvents()
@@ -430,12 +442,12 @@ class FileConverterOutputTab(QWidget):
                 if from_type == 'i2s':
                     possible_types = ['i2s', 'shp Polyline', 'csv']
                 else:
-                    possible_types = ['i3s', 'shp PolylineZ', 'csv']
+                    possible_types = ['i3s', 'i2s', 'shp PolylineZ', 'csv']
             else:
                 if from_type == 'i2s':
                     possible_types = ['i2s', 'shp Polygon', 'csv']
                 else:
-                    possible_types = ['i3s', 'shp PolygonZ', 'csv']
+                    possible_types = ['i3s', 'i2s', 'shp PolygonZ', 'csv']
             message += 'It has {} polygon{} and {} open polyline{}.\n'.format(nb_closed, 's' if nb_closed > 1 else '',
                                                                               nb_open, 's' if nb_open > 1 else '')
         elif from_type == 'shp Point':
@@ -462,7 +474,7 @@ class FileConverterOutputTab(QWidget):
                     self.mfieldchoice.addItem(item)
                     self.mfieldchoicebis.addItem(item)
             else:
-                possible_types = ['shp PointM', 'csv']
+                possible_types = ['shp PointM', 'shp Point', 'csv']
 
         elif from_type == 'shp PointZ':
             self.zfieldchoice.addItem('Z')
@@ -481,9 +493,11 @@ class FileConverterOutputTab(QWidget):
         elif from_type == 'shp Polyline' or from_type == 'shp Polygon':
             numeric_fields = self.input.converter.numeric_fields
             if numeric_fields:
+                self.mfieldchoicebis.addItem('0')
                 for index, name in numeric_fields:
                     item = '%d - %s' % (index, name)
-                    self.zfieldchoice.addItem(item)
+                    self.zfieldchoiceter.addItem(item)
+                    self.mfieldchoicebis.addItem(item)
                     self.zfieldchoicebis.addItem(item)
                     self.shpbkmethod.addItem(item)
                     self.shpbkmethodbis.addItem(item)
@@ -491,30 +505,34 @@ class FileConverterOutputTab(QWidget):
                 possible_types = [from_type, 'i2s', 'csv']
 
         elif from_type == 'shp PolylineZ' or from_type == 'shp PolygonZ':
-            self.zfieldchoice.addItem('Z')
+            self.zfieldchoiceter.addItem('Z')
             self.zfieldchoicebis.addItem('Z')
+            self.mfieldchoicebis.addItem('M')
             numeric_fields = self.input.converter.numeric_fields
             if numeric_fields:
                 for index, name in numeric_fields:
                     item = '%d - %s' % (index, name)
-                    self.zfieldchoice.addItem(item)
+                    self.zfieldchoiceter.addItem(item)
                     self.zfieldchoicebis.addItem(item)
+                    self.mfieldchoicebis.addItem(item)
                     self.shpbkmethod.addItem(item)
                     self.shpbkmethodbis.addItem(item)
 
         elif from_type == 'shp PolylineM' or from_type == 'shp PolygonM':
             numeric_fields = self.input.converter.numeric_fields
             self.mfieldchoice.addItem('M')
+            self.mfieldchoicebis.addItem('M')
             if numeric_fields:
                 for index, name in numeric_fields:
                     item = '%d - %s' % (index, name)
                     self.mfieldchoice.addItem(item)
-                    self.zfieldchoice.addItem(item)
+                    self.zfieldchoiceter.addItem(item)
                     self.zfieldchoicebis.addItem(item)
+                    self.mfieldchoicebis.addItem(item)
                     self.shpbkmethod.addItem(item)
                     self.shpbkmethodbis.addItem(item)
             else:
-                possible_types = [from_type, 'i2s', 'csv']
+                possible_types = [from_type, from_type[:-1], 'i2s', 'csv']
 
         for to_type in possible_types:
             self.outTypeBox.addItem(to_type)
