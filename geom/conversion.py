@@ -52,20 +52,20 @@ class LineFileConverter(GeomFileConverter):
     def __init__(self, from_file):
         super().__init__(from_file)
 
-    def transform(self):
-        if not self.transformations:
-            return self.shapes
-        new_shapes = []
-        for poly in self.shapes:
-            new_shapes.append(poly.apply_transformations(self.transformations))
-        return new_shapes
-
     def apply_transform(self, shapes):
         if not self.transformations:
             return shapes
         new_shapes = []
         for poly in shapes:
             new_shapes.append(poly.apply_transformations(self.transformations))
+        return new_shapes
+
+    def resample(self, values):
+        if not values:
+            return self.shapes
+        new_shapes = []
+        for poly, value in zip(self.shapes, values):
+            new_shapes.append(poly.resample(value))
         return new_shapes
 
 
@@ -139,7 +139,23 @@ class BKLineConverter(LineFileConverter):
             raise ValueError
 
     def write(self, out_type, to_file, options):
-        new_shapes = self.transform()
+        resample_option = options[-1]
+        if resample_option:
+            method, val = resample_option.split('|')
+            if method == 'v':
+                val = float(val)
+                values = [val] * len(self.shapes)
+            else:
+                values = []
+                for poly in self.shapes:
+                    values.append(poly.attributes()[0])
+                    if values[-1] <= 0:
+                        raise RuntimeError
+        else:
+            values = []
+        new_shapes = self.resample(values)
+        new_shapes = self.apply_transform(new_shapes)
+
         if out_type == 'i3s':
             self.to_i2s_i3s(new_shapes, to_file)
         elif out_type == 'i2s':
@@ -399,7 +415,14 @@ class ShpLineConverter(LineFileConverter):
         self.i3s_header = [':FileType i3s  ASCII  EnSim 1.0\n', ':EndHeader\n']
         self.fields = []
         self.numeric_fields = []
-        self.m = []
+
+    def apply_resample(self, shapes, values):
+        if not values:
+            return shapes
+        new_shapes = []
+        for poly, value in zip(shapes, values):
+            new_shapes.append(poly.resample(value))
+        return new_shapes
 
     def read(self):
         self.fields = shp.get_all_fields(self.from_file)
@@ -418,7 +441,6 @@ class ShpLineConverter(LineFileConverter):
             if record.shape.shapeType == self.shape_type:
                 attributes = record.record
                 poly = Polyline(record.shape.points, attributes)
-                self.m.append([None] * poly.nb_points())
                 self.shapes.append(poly)
 
     def read_linez(self):
@@ -426,11 +448,11 @@ class ShpLineConverter(LineFileConverter):
         for record in sf.shapeRecords():
             if record.shape.shapeType == self.shape_type:
                 attributes = record.record
-                poly = Polyline(record.shape.points, attributes, z_array=record.shape.z)
                 if hasattr(record.shape, 'm'):
-                    self.m.append(record.shape.m)
+                    m_array = record.shape.m
                 else:
-                    self.m.append([None] * poly.nb_points())
+                    m_array = None
+                poly = Polyline(record.shape.points, attributes, z_array=record.shape.z, m_array=m_array)
                 self.shapes.append(poly)
 
     def read_linem(self):
@@ -438,18 +460,34 @@ class ShpLineConverter(LineFileConverter):
         for record in sf.shapeRecords():
             if record.shape.shapeType == self.shape_type:
                 attributes = record.record
-                poly = Polyline(record.shape.points, attributes)
-                self.m.append(record.shape.m)
+                poly = Polyline(record.shape.points, attributes, m_array=record.shape.m)
                 self.shapes.append(poly)
 
     def write(self, out_type, to_file, options):
+        resample_option = options[-1]
+        if resample_option:
+            method, val = resample_option.split('|')
+            if method == 'v':
+                val = float(val)
+                values = [val] * len(self.shapes)
+            else:
+                index = int(val.split(' - ')[0])
+                values = []
+                for poly in self.shapes:
+                    values.append(poly.attributes()[index])
+                    if values[-1] <= 0:
+                        raise RuntimeError
+        else:
+            values = []
+
         out_type = self.OUT_TYPE[out_type]
         if out_type in (3, 5):
-            new_shapes = self.transform()
+            new_shapes = self.resample(values)
+            new_shapes = self.apply_transform(new_shapes)
             self.to_line(new_shapes, to_file, out_type)
 
         elif out_type in (13, 15):
-            zfield, mfield = options
+            zfield, mfield = options[0], options[1]
             if zfield != 'Z':
                 # construct z
                 attribute_index = int(zfield.split(' - ')[0])
@@ -460,39 +498,42 @@ class ShpLineConverter(LineFileConverter):
                     new_shapes.append(new_poly.to_3d(z_array=[new_z for _ in range(poly.nb_points())]))
             else:
                 new_shapes = self.shapes
+            new_shapes = self.apply_resample(new_shapes, values)
             transformed_shapes = self.apply_transform(new_shapes)
             if mfield == 'M':
-                self.to_linezm(transformed_shapes, to_file, out_type, self.m)
+                self.to_linezm(transformed_shapes, to_file, out_type)
             elif mfield == '0':
-                self.to_linezm(transformed_shapes, to_file, out_type, [[0] * poly.nb_points() for poly in self.shapes])
+                for poly in transformed_shapes:
+                    poly.m = [0] * poly.nb_points()
+                self.to_linezm(transformed_shapes, to_file, out_type)
             else:
                 attribute_index = int(mfield.split(' - ')[0])
-                new_m = []
-                for poly in self.shapes:
+                for poly in new_shapes:
                     m = poly.attributes()[attribute_index]
-                    new_m.append([m for _ in range(poly.nb_points())])
-                self.to_linezm(transformed_shapes, to_file, out_type, new_m)
+                    poly.m = [m] * poly.nb_points()
+                self.to_linezm(transformed_shapes, to_file, out_type)
 
         elif out_type in (23, 25):
-            new_shapes = self.transform()
+            new_shapes = self.resample(values)
+            new_shapes = self.apply_transform(new_shapes)
             mfield = options[0]
             if mfield == 'M':
-                self.to_linezm(new_shapes, to_file, out_type, self.m)
+                self.to_linezm(new_shapes, to_file, out_type)
             else:
                 attribute_index = int(mfield.split(' - ')[0])
-                new_m = []
-                for poly in self.shapes:
+                for poly in new_shapes:
                     m = poly.attributes()[attribute_index]
-                    new_m.append([m for _ in range(poly.nb_points())])
-                self.to_linezm(new_shapes, to_file, out_type, new_m)
+                    poly.m = [m] * poly.nb_points()
+                self.to_linezm(new_shapes, to_file, out_type)
 
         elif out_type == 1:  # i2s
             attribute_method = options[0]
-            new_shapes = self.transform()
+            new_shapes = self.resample(values)
+            new_shapes = self.apply_transform(new_shapes)
             self.to_i2s(new_shapes, to_file, attribute_method)
 
         elif out_type == 2:  # i3s
-            zfield, attribute_method = options
+            zfield, attribute_method = options[0], options[1]
             if zfield != 'Z':
                 # construct z
                 attribute_index = int(zfield.split(' - ')[0])
@@ -503,11 +544,13 @@ class ShpLineConverter(LineFileConverter):
                     new_shapes.append(new_poly.to_3d(z_array=[new_z for _ in range(poly.nb_points())]))
             else:
                 new_shapes = self.shapes
+            new_shapes = self.apply_resample(new_shapes, values)
             transformed_shapes = self.apply_transform(new_shapes)
             self.to_i3s(transformed_shapes, to_file, attribute_method)
 
         else:
-            new_shapes = self.transform()
+            new_shapes = self.resample(values)
+            new_shapes = self.apply_transform(new_shapes)
             self.to_csv(new_shapes, to_file)
 
     def to_line(self, new_shapes, to_file, shape_type):
@@ -522,14 +565,14 @@ class ShpLineConverter(LineFileConverter):
             w.record(*poly.attributes())
         w.save(to_file)
 
-    def to_linezm(self, new_shapes, to_file, shape_type, m_array):
+    def to_linezm(self, new_shapes, to_file, shape_type):
         w = shapefile.Writer(shapeType=shape_type)
 
         for field_name, field_type, field_length, decimal_length in self.fields:
             w.field(field_name, field_type, str(field_length), decimal_length)
 
-        for poly, poly_m in zip(new_shapes, m_array):
-            new_m = [0 if m is None else m for m in poly_m]
+        for poly in new_shapes:
+            new_m = [0 if m is None else m for m in poly.m]
             m_flat = np.array(new_m).reshape((poly.nb_points(), 1))
             coords = np.array(poly.coords())
             if poly.is_2d():
@@ -589,14 +632,14 @@ class ShpLineConverter(LineFileConverter):
         with open(to_file, 'w') as f:
             f.write(';'.join(header))
             f.write('\n')
-            for i, (poly, poly_m) in enumerate(zip(new_shapes, self.m)):
+            for i, poly in enumerate(new_shapes):
                 attributes = []
                 for a in poly.attributes():
                     if type(a) == bytes:
                         a = a.decode('latin-1')
                     attributes.append(str(a))
 
-                for coord, m in zip(poly.coords(), poly_m):
+                for coord, m in zip(poly.coords(), poly.m):
                     x, y = coord[0], coord[1]
                     line = [i+1, x, y]
                     if self.shape_type > 20:

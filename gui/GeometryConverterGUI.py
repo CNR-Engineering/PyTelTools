@@ -204,12 +204,15 @@ class FileConverterInputTab(QWidget):
             self.parent.reset()
             return
         except RuntimeError:
-            QMessageBox.critical(None, 'Error', 'Failed to read the shp file: inconsistent bytes.',
+            QMessageBox.critical(None, 'Error', 'Failed to read the shp file: Inconsistent bytes.',
                                  QMessageBox.Ok)
             self.parent.reset()
             return
         logging.info('Finished reading the input file: %s' % filename)
         self.parent.getInput()
+        QMessageBox.information(self, 'Success',
+                                'Finished reading the input file. The file converter is ready!',
+                                QMessageBox.Ok)
 
 
 class FileConverterOutputTab(QWidget):
@@ -355,6 +358,35 @@ class FileConverterOutputTab(QWidget):
         for panel in [self.empty, self.bkshp, self.zfield, self.mfield, self.shpbk, self.shpbkz, self.shpzm]:
             self.stack.addWidget(panel)
 
+        self.stackbis = QStackedLayout()
+        self.emptybis = QWidget()
+
+        self.resample = QGroupBox('Re-sample lines by Maximum Length')
+        self.resample.setCheckable(True)
+        vlayout = QVBoxLayout()
+        self.valueButton = QRadioButton('Use constant')
+        self.valueBox = QLineEdit('1')
+        self.choiceButton = QRadioButton('Use attribute')
+        self.choiceBox = QComboBox()
+        hlayout = QHBoxLayout()
+        hlayout.addWidget(self.valueButton)
+        hlayout.addWidget(self.valueBox)
+        vlayout.addLayout(hlayout)
+        hlayout = QHBoxLayout()
+        hlayout.addWidget(self.choiceButton)
+        hlayout.addWidget(self.choiceBox, Qt.AlignLeft)
+        vlayout.addLayout(hlayout)
+        self.resample.setLayout(vlayout)
+        self.choiceBox.setVisible(False)
+        self.valueBox.setVisible(False)
+        self.resample.setChecked(False)
+        self.valueButton.toggled.connect(lambda checked: self.valueBox.setVisible(checked))
+        self.choiceButton.toggled.connect(lambda checked: self.choiceBox.setVisible(checked))
+        self.valueButton.setChecked(True)
+
+        self.stackbis.addWidget(self.emptybis)
+        self.stackbis.addWidget(self.resample)
+        self.stackbis.setCurrentIndex(1)
         # create the submit button
         self.btnSubmit = QPushButton('Submit', self, icon=self.style().standardIcon(QStyle.SP_DialogSaveButton))
         self.btnSubmit.setToolTip('<b>Submit</b>')
@@ -375,6 +407,8 @@ class FileConverterOutputTab(QWidget):
         mainLayout.addLayout(hlayout)
         mainLayout.addItem(QSpacerItem(50, 10))
         mainLayout.addLayout(self.stack)
+        mainLayout.addItem(QSpacerItem(50, 10))
+        mainLayout.addLayout(self.stackbis)
         mainLayout.addItem(QSpacerItem(50, 10))
         hlayout = QHBoxLayout()
         hlayout.addWidget(self.btnSubmit)
@@ -401,6 +435,7 @@ class FileConverterOutputTab(QWidget):
         self.shpbkmethodbis.clear()
         self.shpbkmethodbis.addItem('0')
         self.shpbkmethodbis.addItem('Iteration')
+        self.choiceBox.clear()
 
     def changeOutType(self, index):
         if self.outTypeBox.currentText():
@@ -413,28 +448,56 @@ class FileConverterOutputTab(QWidget):
             if not attribute_name:
                 QMessageBox.critical(None, 'Error', 'The attribute name cannot be empty!', QMessageBox.Ok)
                 return False, []
-            return True, [attribute_name]
+            options = [attribute_name]
         elif current_type == self.Z_FROM_SHP:
-            return True, [self.zfieldchoice.currentText()]
+            options = [self.zfieldchoice.currentText()]
         elif current_type == self.M_FROM_SHP:
-            return True, [self.mfieldchoice.currentText()]
+            options = [self.mfieldchoice.currentText()]
         elif current_type == self.SHP_BK:
-            return True, [self.shpbkmethod.currentText()]
+            options = [self.shpbkmethod.currentText()]
         elif current_type == self.Z_AND_BK:
-            return True, [self.zfieldchoicebis.currentText(), self.shpbkmethodbis.currentText()]
+            options = [self.zfieldchoicebis.currentText(), self.shpbkmethodbis.currentText()]
         elif current_type == self.Z_AND_M:
-            return True, [self.zfieldchoiceter.currentText(), self.mfieldchoicebis.currentText()]
-        return True, []
+            options = [self.zfieldchoiceter.currentText(), self.mfieldchoicebis.currentText()]
+        else:
+            options = []
+        if self.stackbis.currentIndex() == 1:
+            if self.resample.isChecked():
+                if self.valueButton.isChecked():
+                    value = self.valueBox.text()
+                    try:
+                        value = float(value)
+                    except ValueError:
+                        QMessageBox.critical(None, 'Error', 'Re-sampling Maximum Length must be a number!',
+                                             QMessageBox.Ok)
+                        return False, []
+                    if value <= 0:
+                        QMessageBox.critical(None, 'Error', 'Re-sampling Maximum Length must be a positive!',
+                                             QMessageBox.Ok)
+                        return False, []
+                    options.append('v|' + str(value))
+                else:
+                    attribute = self.choiceBox.currentText()
+                    if not attribute:
+                        QMessageBox.critical(None, 'Error', 'No numeric attribute available for re-sampling.',
+                                             QMessageBox.Ok)
+                        return False, []
+                    options.append('a|' + attribute)
+            else:
+                options.append('')
+        return True, options
 
     def getInput(self):
         self.reset()
 
         from_type = self.input.from_type
         message = 'The input format is of type {}.\n'.format(from_type)
-
+        is_line = False
         possible_types = self.convert_type[from_type].keys()
 
         if from_type == 'i2s' or from_type == 'i3s':
+            is_line = True
+            self.choiceBox.addItem('Attribute')
             nb_closed, nb_open = self.input.converter.nb_closed, self.input.converter.nb_open
             if nb_closed > 0 and nb_open > 0:
                 possible_types = self.convert_type[from_type].keys()
@@ -491,6 +554,7 @@ class FileConverterOutputTab(QWidget):
                     self.mfieldchoicebis.addItem(item)
 
         elif from_type == 'shp Polyline' or from_type == 'shp Polygon':
+            is_line = True
             numeric_fields = self.input.converter.numeric_fields
             if numeric_fields:
                 self.mfieldchoicebis.addItem('0')
@@ -501,10 +565,12 @@ class FileConverterOutputTab(QWidget):
                     self.zfieldchoicebis.addItem(item)
                     self.shpbkmethod.addItem(item)
                     self.shpbkmethodbis.addItem(item)
+                    self.choiceBox.addItem(item)
             else:
                 possible_types = [from_type, 'i2s', 'csv']
 
         elif from_type == 'shp PolylineZ' or from_type == 'shp PolygonZ':
+            is_line = True
             self.zfieldchoiceter.addItem('Z')
             self.zfieldchoicebis.addItem('Z')
             self.mfieldchoicebis.addItem('M')
@@ -517,8 +583,10 @@ class FileConverterOutputTab(QWidget):
                     self.mfieldchoicebis.addItem(item)
                     self.shpbkmethod.addItem(item)
                     self.shpbkmethodbis.addItem(item)
+                    self.choiceBox.addItem(item)
 
         elif from_type == 'shp PolylineM' or from_type == 'shp PolygonM':
+            is_line = True
             numeric_fields = self.input.converter.numeric_fields
             self.mfieldchoice.addItem('M')
             self.mfieldchoicebis.addItem('M')
@@ -531,11 +599,17 @@ class FileConverterOutputTab(QWidget):
                     self.mfieldchoicebis.addItem(item)
                     self.shpbkmethod.addItem(item)
                     self.shpbkmethodbis.addItem(item)
+                    self.choiceBox.addItem(item)
             else:
                 possible_types = [from_type, from_type[:-1], 'i2s', 'csv']
 
         for to_type in possible_types:
             self.outTypeBox.addItem(to_type)
+
+        if is_line:
+            self.stackbis.setCurrentIndex(1)
+        else:
+            self.stackbis.setCurrentIndex(0)
 
         message += 'It can be converted to the following types: {}.'.format(', '.join(list(possible_types)))
         self.inputBox.appendPlainText(message)
@@ -577,8 +651,16 @@ class FileConverterOutputTab(QWidget):
         self.outNameBox.setText(filename)
         logging.info('Start conversion from %s\nto %s' % (self.input.converter.from_file, filename))
         QApplication.processEvents()
-        self.input.converter.write(self.outTypeBox.currentText(), filename, options)
+        try:
+            self.input.converter.write(self.outTypeBox.currentText(), filename, options)
+        except RuntimeError:
+            QMessageBox.critical(self, 'Error',
+                                 'The attribute used for re-sampling contains non-positive number.', QMessageBox.Ok)
+            logging.info('Failed.')
+            return None
         logging.info('Done.')
+        QMessageBox.information(self, 'Success',
+                                'File conversion finished successfully!', QMessageBox.Ok)
 
 
 class FileConverterGUI(TelToolWidget):

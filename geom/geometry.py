@@ -10,7 +10,7 @@ class Polyline:
     """!
     @brief Custom (open or closed) polyline class
     """
-    def __init__(self, coordinates, attributes=None, z_array=None):
+    def __init__(self, coordinates, attributes=None, z_array=None, m_array=None):
         self._nb_points = len(coordinates)
         self._is_2d = len(coordinates[0]) == 2
         if z_array is not None:
@@ -34,13 +34,21 @@ class Polyline:
         else:
             self._attributes = attributes[:]
 
+        if m_array is None:
+            self.m = [None] * self._nb_points
+        else:
+            if m_array:
+                self.m = m_array[:]
+            else:
+                self.m = [None] * self._nb_points
+
     def to_3d(self, z_array):
         return Polyline(self.coords(), self.attributes(), z_array)
 
     def to_2d(self):
         if self.is_2d():
-            return Polyline(self.coords(), self.attributes())
-        return Polyline(list(map(tuple, np.array(self.coords())[:, :2])), self.attributes())
+            return Polyline(self.coords(), self.attributes(), m_array=self.m)
+        return Polyline(list(map(tuple, np.array(self.coords())[:, :2])), self.attributes(), m_array=self.m)
 
     def is_2d(self):
         return self._is_2d
@@ -148,4 +156,34 @@ class Polyline:
         if self.is_2d():
             new_coords = new_coords[:, :2]
 
-        return Polyline(new_coords, self.attributes())
+        return Polyline(new_coords, self.attributes(), m_array=self.m)
+
+    def resample(self, max_len):
+        new_coords = []
+        new_m = []
+        coords = list(self.coords())
+
+        for i in range(self.nb_points()-1):
+            first_point, second_point = coords[i], coords[i+1]
+            segment = OpenPolyline([first_point, second_point])
+            nb_segments = int(np.ceil(segment.length / max_len))
+            inv_nb_segments = 1/nb_segments
+            first_m, second_m = self.m[i], self.m[i+1]
+            if first_m is None or second_m is None:
+                interpolate_m = False
+            else:
+                interpolate_m = True
+
+            new_coords.append(first_point)
+            new_m.append(first_m)
+            for j in range(1, nb_segments-1):
+                new_point = list(segment.interpolate(j*inv_nb_segments, normalized=True).coords)[0]
+                new_coords.append(new_point)
+                if interpolate_m:
+                    m = ((1-j) * first_m + j * second_m) * inv_nb_segments
+                    new_m.append(m)
+                else:
+                    new_m.append(None)
+            new_coords.append(second_point)
+            new_m.append(second_m)
+        return Polyline(new_coords, self.attributes(), m_array=new_m)
