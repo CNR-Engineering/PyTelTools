@@ -3,6 +3,7 @@ File format converter for geometrical objects
 """
 
 import numpy as np
+import struct
 import geom.BlueKenue as bk
 import geom.Shapefile as shp
 from geom.geometry import Polyline
@@ -211,7 +212,10 @@ class ShpPointConverter(PointFileConverter):
         if self.shape_type == 1:
             self.read_point()
         elif self.shape_type == 11:
-            self.read_pointz()
+            try:
+                self.read_pointz()
+            except RuntimeError:
+                raise RuntimeError
         else:
             self.read_pointm()
         if not self.shapes:
@@ -228,21 +232,24 @@ class ShpPointConverter(PointFileConverter):
 
     def read_pointz(self):
         sf = shapefile.Reader(self.from_file)
-        for record in sf.shapeRecords():
-            if record.shape.shapeType == 11:
-                x, y = record.shape.points[0]
-                z = record.shape.z[0]
-                m = record.shape.m[0]
-                if m is None:
-                    m = 0
-                self.m.append(m)
-                self.shapes.append(np.array([x, y, z]))
-                self.attributes.append(record.record)
+        try:
+            for record in sf.shapeRecords():
+                if record.shape.shapeType == 11:
+                    x, y = record.shape.points[0]
+                    z = record.shape.z[0]
+                    m = record.shape.m[0]
+                    if m is None:
+                        m = 0
+                    self.m.append(m)
+                    self.shapes.append(np.array([x, y, z]))
+                    self.attributes.append(record.record)
+        except struct.error:
+            raise RuntimeError
 
     def read_pointm(self):
         sf = shapefile.Reader(self.from_file)
         for record in sf.shapeRecords():
-            if record.shape.shapeType == 11:
+            if record.shape.shapeType == 21:
                 x, y = record.shape.points[0]
                 m = record.shape.m[0]
                 if m is None:
@@ -252,7 +259,6 @@ class ShpPointConverter(PointFileConverter):
                 self.attributes.append(record.record)
 
     def write(self, out_type, to_file, options):
-
         if out_type == 'shp Point':
             new_shapes = self.transform()
             self.to_point(new_shapes, to_file)
@@ -268,7 +274,19 @@ class ShpPointConverter(PointFileConverter):
             else:
                 new_shapes = self.shapes
             transformed_shapes = self.apply_transform(new_shapes)
-            self.to_pointz(transformed_shapes, to_file)
+            if len(options) > 1:
+                mfield = options[1]
+                if mfield == 'M':
+                    self.to_pointz(transformed_shapes, to_file, self.m)
+                elif mfield == '0':
+                    self.to_pointz(transformed_shapes, to_file, [0 for _ in range(len(self.shapes))])
+                else:
+                    attribute_index = int(mfield.split(' - ')[0])
+                    new_m = []
+                    for attribute in self.attributes:
+                        m = attribute[attribute_index]
+                        new_m.append(m)
+                    self.to_pointz(transformed_shapes, to_file, new_m)
         elif out_type == 'shp PointM':
             new_shapes = self.transform()
             mfield = options[0]
@@ -314,13 +332,13 @@ class ShpPointConverter(PointFileConverter):
             w.record(*attribute)
         w.save(to_file)
 
-    def to_pointz(self, new_shapes, to_file):
+    def to_pointz(self, new_shapes, to_file, m_array):
         w = shapefile.Writer(shapefile.POINTZ)
 
         for field_name, field_type, field_length, decimal_length in self.fields:
             w.field(field_name, field_type, str(field_length), decimal_length)
 
-        for (x, y, z), m, attribute in zip(new_shapes, self.m, self.attributes):
+        for (x, y, z), m, attribute in zip(new_shapes, m_array, self.attributes):
             w.point(x, y, z, m, shapeType=shapefile.POINTZ)
             w.record(*attribute)
         w.save(to_file)

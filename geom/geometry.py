@@ -20,7 +20,7 @@ class Polyline:
         if coordinates[0] == coordinates[-1]:
             self._is_closed = True
             if z_array is not None:
-                self._is_closed = z[-1] == z[0]
+                self._is_closed = z_array[-1] == z_array[0]
         if z_array is None:
             coord = coordinates
         else:
@@ -143,7 +143,4 @@ class Polyline:
         if self.is_2d():
             new_coords = new_coords[:, :2]
 
-        if self.is_closed():
-            return ClosedPolyline(new_coords, self.attributes()[:])
-        else:
-            return OpenPolyline(new_coords, self.attributes()[:])
+        return Polyline(new_coords, self.attributes()[:])

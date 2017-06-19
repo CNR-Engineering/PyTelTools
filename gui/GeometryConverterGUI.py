@@ -122,7 +122,7 @@ class FileConverterInputTab(QWidget):
             self.from_type = 'shp PolygonZ'
         elif shape_type == 25:
             self.from_type = 'shp PolygonM'
-        # elif shape_type == 8:
+        # elif shape_type == 8:  # TODO
         #     self.from_type = 'shp Multipoint'
         # elif shape_type == 18:
         #     self.from_type = 'shp MultiPointZ'
@@ -136,7 +136,7 @@ class FileConverterInputTab(QWidget):
             QMessageBox.critical(None, 'Error', 'The shape type MultiPatch is currently not supported!', QMessageBox.Ok)
             self.parent.reset()
             return False
-        else:
+        else:  # TODO
             QMessageBox.critical(None, 'Error', 'Not implemented!', QMessageBox.Ok)
             self.parent.reset()
             return False
@@ -199,6 +199,11 @@ class FileConverterInputTab(QWidget):
             QMessageBox.critical(None, 'Error', 'The file is empty!', QMessageBox.Ok)
             self.parent.reset()
             return
+        except RuntimeError:
+            QMessageBox.critical(None, 'Error', 'Failed to read the shp file: inconsistent bytes.',
+                                 QMessageBox.Ok)
+            self.parent.reset()
+            return
         logging.info('Finished reading the input file: %s' % filename)
         self.parent.getInput()
 
@@ -214,6 +219,7 @@ class FileConverterOutputTab(QWidget):
         self.M_FROM_SHP = 3
         self.SHP_BK = 4
         self.Z_AND_BK = 5
+        self.Z_AND_M = 6
 
         self.convert_type = {'xyz': {'xyz': self.EMPTY, 'shp PointZ': self.BK_SHP, 'csv': self.EMPTY},
                              'i2s': {'i2s': self.EMPTY, 'shp Polyline': self.BK_SHP,
@@ -221,12 +227,13 @@ class FileConverterOutputTab(QWidget):
                              'i3s': {'i3s': self.EMPTY, 'i2s': self.EMPTY,
                                      'shp PolylineZ': self.BK_SHP,
                                      'shp PolygonZ': self.BK_SHP, 'csv': self.EMPTY},
-                             'shp Point': {'shp Point': self.EMPTY, 'shp PointZ': self.Z_FROM_SHP,
-                                           'csv': self.EMPTY},
-                             'shp PointZ': {'shp Point': self.EMPTY, 'shp PointZ': self.Z_FROM_SHP,
+                             'shp Point': {'shp Point': self.EMPTY, 'shp PointZ': self.Z_AND_M,
+                                           'xyz': self.Z_FROM_SHP, 'csv': self.EMPTY},
+                             'shp PointZ': {'shp Point': self.EMPTY, 'shp PointZ': self.Z_AND_M,
+                                            'shp PointM': self.M_FROM_SHP,
                                             'xyz': self.Z_FROM_SHP, 'csv': self.EMPTY},
-                             'shp PointM': {'shp PointM': self.M_FROM_SHP, 'shp PointZ': self.Z_FROM_SHP,
-                                            'csv': self.EMPTY},
+                             'shp PointM': {'shp PointM': self.M_FROM_SHP, 'shp PointZ': self.Z_AND_M,
+                                            'xyz': self.Z_FROM_SHP, 'csv': self.EMPTY},
                              'shp Polyline': {'shp Polyline': self.EMPTY, 'shp PolylineZ': self.Z_FROM_SHP,
                                               'i2s': self.SHP_BK, 'i3s': self.Z_AND_BK, 'csv': self.EMPTY},
                              'shp Polygon': {'shp Polygon': self.EMPTY, 'shp PolygonZ': self.Z_FROM_SHP,
@@ -314,9 +321,26 @@ class FileConverterOutputTab(QWidget):
         self.shpbkmethodbis = QComboBox()
         self.shpbkmethodbis.setFixedHeight(30)
         hlayout.addWidget(self.shpbkmethodbis, Qt.AlignLeft)
+        vlayout.addLayout(hlayout)
         self.shpbkz.setLayout(vlayout)
 
-        for panel in [self.empty, self.bkshp, self.zfield, self.mfield, self.shpbk, self.shpbkz]:
+        self.shpzm = QWidget()
+        vlayout = QVBoxLayout()
+        hlayout = QHBoxLayout()
+        hlayout.addWidget(QLabel('Fill Z with'))
+        self.zfieldchoiceter = QComboBox()
+        self.zfieldchoiceter.setFixedHeight(30)
+        hlayout.addWidget(self.zfieldchoiceter, Qt.AlignLeft)
+        vlayout.addLayout(hlayout)
+        hlayout = QHBoxLayout()
+        hlayout.addWidget(QLabel('Fill M with'))
+        self.mfieldchoicebis = QComboBox()
+        self.mfieldchoicebis.setFixedHeight(30)
+        hlayout.addWidget(self.mfieldchoicebis, Qt.AlignLeft)
+        vlayout.addLayout(hlayout)
+        self.shpzm.setLayout(vlayout)
+
+        for panel in [self.empty, self.bkshp, self.zfield, self.mfield, self.shpbk, self.shpbkz, self.shpzm]:
             self.stack.addWidget(panel)
 
         # create the submit button
@@ -356,7 +380,9 @@ class FileConverterOutputTab(QWidget):
         self.bkshpname.setText('Value')
         self.zfieldchoice.clear()
         self.zfieldchoicebis.clear()
+        self.zfieldchoiceter.clear()
         self.mfieldchoice.clear()
+        self.mfieldchoicebis.clear()
         self.shpbkmethod.clear()
         self.shpbkmethod.addItem('0')
         self.shpbkmethod.addItem('Iteration')
@@ -384,6 +410,8 @@ class FileConverterOutputTab(QWidget):
             return True, [self.shpbkmethod.currentText()]
         elif current_type == self.Z_AND_BK:
             return True, [self.zfieldchoicebis.currentText(), self.shpbkmethodbis.currentText()]
+        elif current_type == self.Z_AND_M:
+            return True, [self.zfieldchoiceter.currentText(), self.mfieldchoicebis.currentText()]
         return True, []
 
     def getInput(self):
@@ -413,28 +441,42 @@ class FileConverterOutputTab(QWidget):
         elif from_type == 'shp Point':
             numeric_fields = self.input.converter.numeric_fields
             if numeric_fields:
+                self.mfieldchoicebis.addItem('0')
                 for index, name in numeric_fields:
-                    self.zfieldchoice.addItem('%d - %s' % (index, name))
-                    self.mfieldchoice.addItem('%d - %s' % (index, name))
+                    item = '%d - %s' % (index, name)
+                    self.zfieldchoice.addItem(item)
+                    self.zfieldchoiceter.addItem(item)
+                    self.mfieldchoicebis.addItem(item)
             else:
                 possible_types = ['shp Point', 'csv']
 
         elif from_type == 'shp PointM':
             numeric_fields = self.input.converter.numeric_fields
             self.mfieldchoice.addItem('M')
+            self.mfieldchoicebis.addItem('M')
             if numeric_fields:
                 for index, name in numeric_fields:
-                    self.zfieldchoice.addItem('%d - %s' % (index, name))
-                    self.mfieldchoice.addItem('%d - %s' % (index, name))
+                    item = '%d - %s' % (index, name)
+                    self.zfieldchoice.addItem(item)
+                    self.zfieldchoiceter.addItem(item)
+                    self.mfieldchoice.addItem(item)
+                    self.mfieldchoicebis.addItem(item)
             else:
                 possible_types = ['shp PointM', 'csv']
 
         elif from_type == 'shp PointZ':
             self.zfieldchoice.addItem('Z')
+            self.zfieldchoiceter.addItem('Z')
+            self.mfieldchoice.addItem('M')
+            self.mfieldchoicebis.addItem('M')
             numeric_fields = self.input.converter.numeric_fields
             if numeric_fields:
                 for index, name in numeric_fields:
-                    self.zfieldchoice.addItem('%d - %s' % (index, name))
+                    item = '%d - %s' % (index, name)
+                    self.zfieldchoice.addItem(item)
+                    self.zfieldchoiceter.addItem(item)
+                    self.mfieldchoice.addItem(item)
+                    self.mfieldchoicebis.addItem(item)
 
         elif from_type == 'shp Polyline' or from_type == 'shp Polygon':
             numeric_fields = self.input.converter.numeric_fields
