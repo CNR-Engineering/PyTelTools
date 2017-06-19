@@ -176,7 +176,7 @@ class Polyline:
 
             new_coords.append(first_point)
             new_m.append(first_m)
-            for j in range(1, nb_segments-1):
+            for j in range(1, nb_segments):
                 new_point = list(segment.interpolate(j*inv_nb_segments, normalized=True).coords)[0]
                 new_coords.append(new_point)
                 if interpolate_m:
