@@ -65,7 +65,6 @@ class ArrivalDurationThread(OutputThread):
                                                                          condition))
 
     def run(self):
-
         for i, index in enumerate(self.time_indices[1:]):
             if self.canceled:
                 return []

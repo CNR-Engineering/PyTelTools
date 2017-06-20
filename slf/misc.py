@@ -11,7 +11,7 @@ module_logger = logging.getLogger(__name__)
 
 # constants
 OPERATORS = ['+', '-', '*', '/', '^', 'sqrt']
-MAX, MIN, MEAN = 0, 1, 2
+MAX, MIN, MEAN, ARRIVAL_DURATION = 0, 1, 2, 3
 
 _OPERATIONS = {'+': np.add, '-': np.subtract, '*': np.multiply, '/': np.divide, '^': np.power, 'sqrt': np.sqrt}
 _PRECEDENCE = {'(': 1, '-': 2, '+': 2, '*': 3, '/': 3, '^': 4, 'sqrt': 5}

@@ -173,7 +173,7 @@ class ArrivalDurationNode(OneInOneOutNode):
         super().__init__(index)
         self.category = 'Calculations'
         self.label = 'Compute\nArrival\nDuration'
-        self.out_port.data_type = 'csv'
+        self.out_port.data_type = 'slf'
         self.in_port.data_type = 'slf'
         self.in_data = None
         self.data = None
@@ -427,22 +427,29 @@ class ArrivalDurationNode(OneInOneOutNode):
         self.time_unit = time_unit
 
     def run(self):
-        #TODO TODO
         success = super().run_upward()
         if not success:
             self.state = Node.FAIL
             self.update()
             self.message = 'Failed: input failed.'
             return
-        self.state = Node.FAIL
-        self.update()
-        self.message = 'Failed: not implemented yet.'
+        input_data = self.in_port.mother.parentItem().data
+        if input_data.operator is not None:
+            self.state = Node.FAIL
+            self.update()
+            if input_data.operator == operations.ARRIVAL_DURATION:
+                self.message = 'Failed: the input data is already the result of Arrival Duration.'
+                return
+            else:
+                self.message = 'Failed: the input data is already the result of another computation.'
+                return
 
-        # self.in_data = self.in_port.mother.parentItem().data
-        #
-        # self.state = Node.SUCCESS
-        # self.update()
-        # self.message = 'Successful.'
+        self.data = input_data.copy()
+        self.data.operator = operations.ARRIVAL_DURATION
+        self.data.metadata = {'conditions': self.conditions, 'table': self.table, 'time unit': self.time_unit}
+        self.state = Node.SUCCESS
+        self.update()
+        self.message = 'Successful.'
 
 
 class ComputeVolumeNode(TwoInOneOutNode):

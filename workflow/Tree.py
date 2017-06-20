@@ -105,7 +105,7 @@ class TreeScene(QGraphicsScene):
         self.nb_nodes += 1
         node.moveBy(pos.x(), pos.y())
 
-    def run_all(self):
+    def _to_sources(self):
         roots = []
         visited = {node: False for node in self.nodes}
 
@@ -133,6 +133,11 @@ class TreeScene(QGraphicsScene):
 
         for node in self.nodes:
             backward(node)
+
+        return roots
+
+    def run_all(self):
+        roots = self._to_sources()
 
         for root in roots:
             self.nodes[root].run_downward()

@@ -31,6 +31,7 @@ class SerafinData:
         self.to_single = False
 
         self.operator = None
+        self.metadata = {}
 
     def read(self):
         with Serafin.Read(self.filename, self.language) as resin:
@@ -64,6 +65,7 @@ class SerafinData:
         copy_data.time = self.time
         copy_data.start_time = self.start_time
         copy_data.time_second = self.time_second
+        copy_data.metadata = self.metadata
 
         copy_data.selected_vars = self.selected_vars[:]
         copy_data.selected_vars_names = deepcopy(self.selected_vars_names)
@@ -208,7 +210,7 @@ class WriteSerafinNode(SingleInputNode):
         with Serafin.Read(input_data.filename, self.scene().language) as resin:
             resin.header = input_data.header
             resin.time = input_data.time
-            with Serafin.Write(self.filename, self.scene().language, self.scene().overwrite) as resout:
+            with Serafin.Write(self.filename, input_data.language, self.scene().overwrite) as resout:
                 resout.write_header(output_header)
                 for i, time_index in enumerate(input_data.selected_time_indices):
                     values = do_calculations_in_frame(input_data.equations, input_data.us_equation,
@@ -219,7 +221,7 @@ class WriteSerafinNode(SingleInputNode):
                     self.progress_bar.setValue(100 * (i+1) / len(input_data.selected_time_indices))
                     QApplication.processEvents()
 
-    def _run_operation(self, input_data):
+    def _run_max_min_mean(self, input_data):
         selected = [(var, input_data.selected_vars_names[var][0],
                           input_data.selected_vars_names[var][1]) for var in input_data.selected_vars]
         scalars, vectors, additional_equations = operations.scalars_vectors(input_data.header.var_IDs,
@@ -235,7 +237,7 @@ class WriteSerafinNode(SingleInputNode):
         if input_data.to_single:
             output_header.to_single_precision()
 
-        with Serafin.Read(input_data.filename, self.scene().language) as input_stream:
+        with Serafin.Read(input_data.filename, input_data.language) as input_stream:
             input_stream.header = input_data.header
             input_stream.time = input_data.time
             has_scalar, has_vector = False, False
@@ -267,7 +269,58 @@ class WriteSerafinNode(SingleInputNode):
             else:
                 values = np.vstack((scalar_calculator.finishing_up(), vector_calculator.finishing_up()))
 
-            with Serafin.Write(self.filename, self.scene().language, self.scene().overwrite) as resout:
+            with Serafin.Write(self.filename, input_data.language, self.scene().overwrite) as resout:
+                resout.write_header(output_header)
+                resout.write_entire_frame(output_header, input_data.time[0], values)
+
+    def _run_arrival_duration(self, input_data):
+        conditions, table, time_unit = input_data.metadata['conditions'], \
+                                       input_data.metadata['table'], input_data.metadata['time unit']
+
+        output_header = input_data.header.copy()
+        output_header.nb_var = 2 * len(conditions)
+        output_header.var_IDs, output_header.var_names, output_header.var_units = [], [], []
+        for row in range(len(table)):
+            a_name = table[row][1]
+            d_name = table[row][2]
+            for name in [a_name, d_name]:
+                output_header.var_IDs.append('')
+                output_header.var_names.append(bytes(name, 'utf-8').ljust(16))
+                output_header.var_units.append(bytes(time_unit.upper(), 'utf-8').ljust(16))
+        if input_data.to_single:
+            output_header.to_single_precision()
+
+        with Serafin.Read(input_data.filename, input_data.language) as input_stream:
+            input_stream.header = input_data.header
+            input_stream.time = input_data.time
+            calculators = []
+
+            for i, condition in enumerate(conditions):
+                calculators.append(operations.ArrivalDurationCalculator(input_stream, input_data.selected_time_indices,
+                                                                        condition))
+            for i, index in enumerate(input_data.selected_time_indices[1:]):
+                for calculator in calculators:
+                    calculator.arrival_duration_in_frame(index)
+
+                self.progress_bar.setValue(100 * (i+1) / len(input_data.selected_time_indices))
+                QApplication.processEvents()
+
+            values = np.empty((2*len(conditions), input_data.header.nb_nodes))
+            for i, calculator in enumerate(calculators):
+                values[2*i, :] = calculator.arrival
+                values[2*i+1, :] = calculator.duration
+
+            if time_unit == 'minute':
+                values /= 60
+            elif time_unit == 'hour':
+                values /= 3600
+            elif time_unit == 'day':
+                values /= 86400
+            elif time_unit == 'percentage':
+                values *= 100 / (input_data.time[input_data.selected_time_indices[-1]]
+                                 - input_data.time[input_data.selected_time_indices[0]])
+
+            with Serafin.Write(self.filename, input_data.language, self.scene().overwrite) as resout:
                 resout.write_header(output_header)
                 resout.write_entire_frame(output_header, input_data.time[0], values)
 
@@ -290,8 +343,10 @@ class WriteSerafinNode(SingleInputNode):
 
         if input_data.operator is None:
             self._run_simple(input_data)
+        elif input_data.operator in (operations.MAX, operations.MIN, operations.MEAN):
+            self._run_max_min_mean(input_data)
         else:
-            self._run_operation(input_data)
+            self._run_arrival_duration(input_data)
 
         self.state = Node.SUCCESS
         self.message = 'Successful.'

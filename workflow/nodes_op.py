@@ -310,7 +310,13 @@ class SelectVariablesNode(OneInOneOutNode):
             self.update()
             self.message = 'Failed: input failed.'
             return
-        self.data = self.in_data.copy()
+        input_data = self.in_port.mother.parentItem().data
+        if input_data.operator is not None:
+            self.state = Node.FAIL
+            self.update()
+            self.message = 'Failed: cannot select variables after computation.'
+            return
+        self.data = input_data.copy()
         self.data.us_equation = self.us_equation
         self.data.equations = get_necessary_equations(self.in_data.header.var_IDs, self.selected_vars,
                                                       self.us_equation)
@@ -470,7 +476,13 @@ class AddRouseNode(OneInOneOutNode):
             self.update()
             self.message = 'Failed: input failed.'
             return
-        self.data = self.in_data.copy()
+        input_data = self.in_port.mother.parentItem().data
+        if input_data.operator is not None:
+            self.state = Node.FAIL
+            self.update()
+            self.message = 'Failed: cannot add Rouse after computation.'
+            return
+        self.data = input_data.copy()
         self.data.selected_vars.extend([self.table[i][0] for i in range(len(self.table))])
         for i in range(len(self.table)):
             self.data.selected_vars_names[self.table[i][0]] = (bytes(self.table[i][1], 'utf-8').ljust(16),
@@ -646,7 +658,13 @@ class SelectTimeNode(OneInOneOutNode):
             self.update()
             self.message = 'Failed: input failed.'
             return
-        self.data = self.in_port.mother.parentItem().data.copy()
+        input_data = self.in_port.mother.parentItem().data
+        if input_data.operator is not None:
+            self.state = Node.FAIL
+            self.update()
+            self.message = 'Failed: cannot select time after computation.'
+            return
+        self.data = input_data.copy()
         self.data.selected_time_indices = list(range(self.start_index, self.end_index+1, self.sampling_frequency))
         self.state = Node.SUCCESS
         self.update()
