@@ -1,12 +1,9 @@
 import sys
 import logging
 import datetime
-import numpy as np
 
 from PyQt5.QtWidgets import *
-from PyQt5.QtGui import *
 from PyQt5.QtCore import *
-import pandas as pd
 from itertools import islice, cycle
 
 from slf import Serafin
@@ -268,7 +265,7 @@ class InputTab(QWidget):
         options = QFileDialog.Options()
         options |= QFileDialog.DontUseNativeDialog
         filename, _ = QFileDialog.getOpenFileName(self, 'Open a .i2s or .shp file', '',
-                                                  'Line sets (*.i2s);;Shapefile (*.shp);;All Files (*)',
+                                                  'Polyine file (*.i2s *.shp)',
                                                   options=options)
         if not filename:
             return

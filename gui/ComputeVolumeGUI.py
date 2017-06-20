@@ -2,7 +2,6 @@ import sys
 import logging
 import datetime
 from PyQt5.QtWidgets import *
-from PyQt5.QtGui import *
 from PyQt5.QtCore import *
 import pandas as pd
 

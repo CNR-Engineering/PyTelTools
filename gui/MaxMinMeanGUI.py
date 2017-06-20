@@ -246,7 +246,7 @@ class InputTab(QWidget):
         options = QFileDialog.Options()
         options |= QFileDialog.DontUseNativeDialog
         filename, _ = QFileDialog.getOpenFileName(self, 'Open a .slf file', '',
-                                                  'Serafin Files (*.slf);;All Files (*)', options=options)
+                                                  'Serafin Files (*.slf)', options=options)
         if not filename:
             return
         if not testOpen(filename):

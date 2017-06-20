@@ -110,6 +110,8 @@ class Node(QGraphicsItem):
         self.setFlag(QGraphicsItem.ItemSendsGeometryChanges)
         self.setFlag(QGraphicsItem.ItemIsSelectable)
         self.setCursor(Qt.ArrowCursor)
+
+        self.help_action = QAction(QWidget().style().standardIcon(QStyle.SP_MessageBoxQuestion), 'Help', None)
         self.dashed_pen = QPen(Qt.black, 1, Qt.DashLine)
 
         self.label = ''
@@ -183,6 +185,11 @@ class Node(QGraphicsItem):
             self.update_links()
         return result
 
+    def contextMenuEvent(self, event):
+        menu = QMenu()
+        menu.addAction(self.help_action)
+        menu.exec_(event.screenPos())
+
     def get_option_panel(self):
         return QWidget()
 
@@ -249,6 +256,7 @@ class SingleInputNode(Node):
         super().__init__(index)
         self.in_port = InputPort(0, -Port.WIDTH, Box.HEIGHT/2-Port.WIDTH/2)
         self.add_port(self.in_port)
+        self.help_action.triggered.connect(self.help)
 
     def ready_to_run(self):
         if self.state == Node.NOT_CONFIGURED:
@@ -262,12 +270,18 @@ class SingleInputNode(Node):
             self.in_port.mother.parentItem().run()
         return self.in_port.mother.parentItem().state == Node.SUCCESS
 
+    def help(self):
+        QMessageBox.information(None, 'Help',
+                                'Input type: %s' % self.in_port.data_type,
+                                QMessageBox.Ok)
+
 
 class SingleOutputNode(Node):
     def __init__(self, index):
         super().__init__(index)
         self.out_port = OutputPort(0, Box.WIDTH/2-Port.WIDTH/2, Box.HEIGHT)
         self.add_port(self.out_port)
+        self.help_action.triggered.connect(self.help)
 
     def ready_to_run(self):
         return self.state != Node.NOT_CONFIGURED
@@ -288,6 +302,11 @@ class SingleOutputNode(Node):
         if super().configure():
             self.reconfigure_downward()
 
+    def help(self):
+        QMessageBox.information(None, 'Help',
+                                'Output type: %s' % self.out_port.data_type,
+                                QMessageBox.Ok)
+
 
 class OneInOneOutNode(Node):
     def __init__(self, index):
@@ -296,6 +315,7 @@ class OneInOneOutNode(Node):
         self.out_port = OutputPort(1, Box.WIDTH/2-Port.WIDTH/2, Box.HEIGHT)
         self.add_port(self.in_port)
         self.add_port(self.out_port)
+        self.help_action.triggered.connect(self.help)
 
     def ready_to_run(self):
         if self.state == Node.NOT_CONFIGURED:
@@ -320,6 +340,12 @@ class OneInOneOutNode(Node):
             self.in_port.mother.parentItem().run()
         return self.in_port.mother.parentItem().state == Node.SUCCESS
 
+    def help(self):
+        QMessageBox.information(None, 'Help',
+                                'Input type: %s\n'
+                                'Output type: %s' % (self.in_port.data_type, self.out_port.data_type),
+                                QMessageBox.Ok)
+
 
 class TwoInOneOutNode(Node):
     def __init__(self, index):
@@ -331,6 +357,7 @@ class TwoInOneOutNode(Node):
         self.add_port(self.second_in_port)
         self.add_port(self.out_port)
         self.proxy.setZValue(10)
+        self.help_action.triggered.connect(self.help)
 
     def ready_to_run(self):
         if self.state == Node.NOT_CONFIGURED:
@@ -381,6 +408,15 @@ class TwoInOneOutNode(Node):
 
         self.progress_bar.setValue(0)
         QApplication.processEvents()
+
+    def help(self):
+        QMessageBox.information(None, 'Help',
+                                'First input type: %s\n'
+                                'Second input type: %s\n'
+                                'Output type: %s' % (self.first_in_port.data_type,
+                                                     self.second_in_port.data_type,
+                                                     self.out_port.data_type),
+                                QMessageBox.Ok)
 
 
 class ConfigureDialog(QDialog):

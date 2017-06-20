@@ -296,7 +296,7 @@ class InputTab(QWidget):
         options = QFileDialog.Options()
         options |= QFileDialog.DontUseNativeDialog
         filename, _ = QFileDialog.getOpenFileName(self, 'Open a .slf file', '',
-                                                  'Serafin Files (*.slf);;All Files (*)', QDir.currentPath(),
+                                                  'Serafin Files (*.slf)', QDir.currentPath(),
                                                   options=options)
         if not filename:
             return
@@ -342,7 +342,7 @@ class InputTab(QWidget):
         options = QFileDialog.Options()
         options |= QFileDialog.DontUseNativeDialog
         filename, _ = QFileDialog.getOpenFileName(self, 'Open a .slf file', '',
-                                                  'Serafin Files (*.slf);;All Files (*)', QDir.currentPath(),
+                                                  'Serafin Files (*.slf)', QDir.currentPath(),
                                                   options=options)
         if not filename:
             return
@@ -396,7 +396,7 @@ class InputTab(QWidget):
         options = QFileDialog.Options()
         options |= QFileDialog.DontUseNativeDialog
         filename, _ = QFileDialog.getOpenFileName(self, 'Open a .i2s or .shp file', '',
-                                                  'Line sets (*.i2s *.shp)', options=options)
+                                                  'Polygon file (*.i2s *.shp)', options=options)
         if not filename:
             return
         is_i2s = filename[-4:] == '.i2s'

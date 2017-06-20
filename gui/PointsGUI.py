@@ -461,7 +461,7 @@ class InputTab(QWidget):
         options = QFileDialog.Options()
         options |= QFileDialog.DontUseNativeDialog
         filename, _ = QFileDialog.getOpenFileName(self, 'Open a .slf file', '',
-                                                  'Serafin Files (*.slf);;All Files (*)', QDir.currentPath(), options=options)
+                                                  'Serafin Files (*.slf)', QDir.currentPath(), options=options)
         if not filename:
             return
         if not testOpen(filename):
@@ -509,7 +509,7 @@ class InputTab(QWidget):
         options = QFileDialog.Options()
         options |= QFileDialog.DontUseNativeDialog
         filename, _ = QFileDialog.getOpenFileName(self, 'Open a .shp file', '',
-                                                  'Shapefile (*.shp);;All Files (*)', options=options)
+                                                  'Shapefile (*.shp)', options=options)
         if not filename:
             return
         if not testOpen(filename):
