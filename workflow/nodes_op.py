@@ -4,7 +4,8 @@ from PyQt5.QtGui import *
 from copy import deepcopy
 
 from workflow.Node import Node, OneInOneOutNode
-from gui.util import TableWidgetDragRows, TimeRangeSlider, DoubleSliderBox, FrictionLawMessage, FallVelocityMessage
+from gui.util import TableWidgetDragRows, TimeSlider, SimpleTimeDateSelection,\
+    TimeRangeSlider, DoubleSliderBox, FrictionLawMessage, FallVelocityMessage
 from slf.variables import get_available_variables, get_necessary_equations, add_US, get_US_equation
 
 
@@ -648,9 +649,144 @@ class SelectTimeNode(OneInOneOutNode):
         if input_data.operator is not None:
             self.fail('cannot select time after computation.')
             return
+        if len(input_data.selected_time_indices) != len(input_data.time):
+            self.fail('cannot re-select time.')
+            return
+
         self.data = input_data.copy()
         self.data.selected_time_indices = list(range(self.start_index, self.end_index+1, self.sampling_frequency))
         self.success('You selected %d frames.' % len(self.data.selected_time_indices))
+
+
+class SelectSingleFrameNode(OneInOneOutNode):
+    def __init__(self, index):
+        super().__init__(index)
+        self.category = 'Basic operations'
+        self.label = 'Select\nSingle\nFrame'
+        self.out_port.data_type = 'slf'
+        self.in_port.data_type = 'slf'
+        self.in_data = None
+        self.data = None
+
+        self.selection = -1
+        self.date = None
+        self.slider = None
+        self.new_option = -1
+
+    def get_option_panel(self):
+        self.slider = SimpleTimeDateSelection()
+        self.slider.initTime(self.in_data.time, list(map(lambda x: x + self.in_data.start_time,
+                                                         self.in_data.time_second)))
+        if self.selection > -1:
+            self.slider.index.setText(str(self.selection+1))
+            self.slider.slider.enterIndexEvent()
+            self.slider.updateSelection()
+
+        option_panel = QWidget()
+        layout = QVBoxLayout()
+        layout.addSpacerItem(QSpacerItem(10, 10))
+        layout.addWidget(self.slider)
+        option_panel.setLayout(layout)
+        option_panel.destroyed.connect(self._select)
+        return option_panel
+
+    def _select(self):
+        self.new_option = int(self.slider.index.text()) - 1
+
+    def _reset(self):
+        if self.date is not None:
+            has_old = True
+        else:
+            has_old = False
+        self.in_data = self.in_port.mother.parentItem().data
+        if has_old:
+            new_time = list(map(lambda x: x + self.in_data.start_time, self.in_data.time_second))
+            if self.date in new_time:
+                self.selection = new_time.index(self.date)
+                self.state = Node.READY
+            else:
+                self.selection = -1
+                self.date = None
+                self.state = Node.NOT_CONFIGURED
+        self.reconfigure_downward()
+        self.update()
+
+    def add_link(self, link):
+        super().add_link(link)
+        if not self.in_port.has_mother():
+            return
+
+        parent_node = self.in_port.mother.parentItem()
+        if parent_node.state != Node.SUCCESS:
+            if parent_node.ready_to_run():
+                parent_node.run()
+            if parent_node.state != Node.SUCCESS:
+                return
+        self._reset()
+
+    def reconfigure(self):
+        super().reconfigure()
+        if self.in_port.has_mother():
+            parent_node = self.in_port.mother.parentItem()
+            if parent_node.ready_to_run():
+                parent_node.run()
+                if parent_node.state == Node.SUCCESS:
+                    self._reset()
+                    return
+        self.in_data = None
+        self.state = Node.NOT_CONFIGURED
+        self.reconfigure_downward()
+        self.update()
+
+    def configure(self):
+        if not self.in_port.has_mother():
+            QMessageBox.critical(None, 'Error', 'Connect and run the input before configure this node!',
+                                 QMessageBox.Ok)
+            return
+
+        parent_node = self.in_port.mother.parentItem()
+        if parent_node.state != Node.SUCCESS:
+            if parent_node.ready_to_run():
+                parent_node.run()
+            else:
+                QMessageBox.critical(None, 'Error', 'Configure and run the input before configure this node!',
+                                     QMessageBox.Ok)
+                return
+            if parent_node.state != Node.SUCCESS:
+                QMessageBox.critical(None, 'Error', 'Configure and run the input before configure this node!',
+                                     QMessageBox.Ok)
+                return
+        self.in_data = parent_node.data
+        self._reset()
+        if super().configure():
+            self.selection = self.new_option
+            self.date = self.in_data.start_time + self.in_data.time_second[self.selection]
+        self.reconfigure_downward()
+
+    def save(self):
+        return '|'.join([self.category, self.name(), str(self.index()),
+                         str(self.pos().x()), str(self.pos().y()),
+                         str(self.selection)])
+
+    def load(self, options):
+        self.selection = int(options[0])
+
+    def run(self):
+        success = super().run_upward()
+        if not success:
+            self.fail('input failed.')
+            return
+        input_data = self.in_port.mother.parentItem().data
+        if input_data.operator is not None:
+            self.fail('cannot select time after computation.')
+            return
+        if len(input_data.selected_time_indices) != len(input_data.time):
+            self.fail('cannot re-select time.')
+            return
+
+        self.data = input_data.copy()
+        self.data.selected_time_indices = [self.selection]
+        self.success()
 
 
 class ConvertToSinglePrecisionNode(OneInOneOutNode):

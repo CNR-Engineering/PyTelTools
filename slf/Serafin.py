@@ -213,10 +213,11 @@ class SerafinHeader:
         module_logger.debug('Finished reading the header')
 
     def summary(self):
-        template = 'The file is of type {} {}. It has {} variable{},\non {} nodes and {} elements for {} time frames.'
+        template = 'The file is of type {} {}. It has {} variable{},\non {} nodes and {} elements for {} time frame{}.'
         return template.format(self.file_type.decode('utf-8'),
                                {True: '2D', False: '3D'}[self.is_2d], self.nb_var,
-                               ['', 's'][self.nb_var > 1], self.nb_nodes, self.nb_elements, self.nb_frames)
+                               ['', 's'][self.nb_var > 1], self.nb_nodes, self.nb_elements, self.nb_frames,
+                               ['', 's'][self.nb_frames > 1])
 
     def copy(self):
         return copy.deepcopy(self)

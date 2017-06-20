@@ -129,7 +129,8 @@ class TimeSlider(QSlider):
         self.update()
 
     def mouseReleaseEvent(self, event):
-        self.display.setText(str(1 + self.value()))
+        self.display.index.setText(str(1 + self.value()))
+        self.display.updateSelection()
 
     def __pick(self, pt):
         return pt.x()
@@ -152,12 +153,12 @@ class TimeSlider(QSlider):
 
     def enterIndexEvent(self):
         try:
-            value = int(self.display.text())
+            value = int(self.display.index.text())
         except ValueError:
-            self.display.setText(str(self.value()+1))
+            self.display.index.setText(str(self.index.value()+1))
             return
         if value <= 0 or value > self.nb_frames:
-            self.display.setText(str(self.value()+1))
+            self.display.index.setText(str(self.value()+1))
             return
         self.setValue(value-1)
 
@@ -170,12 +171,15 @@ class SimpleTimeDateSelection(QWidget):
         self.dates = []
 
         self.index = QLineEdit('', self)
-        self.slider = TimeSlider(self.index)
+        self.slider = TimeSlider(self)
         self.value = QLineEdit('', self)
         self.date = QLineEdit('', self)
 
+        self.value.setReadOnly(True)
+        self.date.setReadOnly(True)
+
         self.index.setMaximumWidth(30)
-        self.value.setMaximumWidth(50)
+        self.value.setMaximumWidth(80)
         self.date.setMaximumWidth(120)
 
         mainLayout = QVBoxLayout()
@@ -193,7 +197,6 @@ class SimpleTimeDateSelection(QWidget):
         mainLayout.addLayout(hlayout)
         self.setLayout(mainLayout)
         self.index.editingFinished.connect(self.slider.enterIndexEvent)
-        self.index.editingFinished.connect(self.updateSelection)
 
     def updateSelection(self):
         index = int(self.index.text()) - 1
