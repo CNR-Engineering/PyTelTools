@@ -186,4 +186,4 @@ class Polyline:
                     new_m.append(None)
             new_coords.append(second_point)
             new_m.append(second_m)
-        return Polyline(new_coords, self.attributes(), m_array=new_m)
+        return Polyline(list(map(tuple, new_coords)), self.attributes(), m_array=new_m)
