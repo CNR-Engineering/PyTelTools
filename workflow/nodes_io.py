@@ -4,6 +4,7 @@ import numpy as np
 from copy import deepcopy
 import datetime
 import os
+import struct
 from workflow.Node import Node, SingleOutputNode, SingleInputNode
 from slf import Serafin
 from slf.variables import do_calculations_in_frame
@@ -164,16 +165,19 @@ class LoadSerafinNode(SingleOutputNode):
     def run(self):
         if self.state == Node.SUCCESS:
             return
+        try:
+            with open(self.filename) as f:
+                pass
+        except PermissionError:
+            self.fail('Access denied.')
+            return
         data = SerafinData(self.filename, self.scene().language)
         if not data.read():
             self.data = None
-            self.message = 'Failed: Input file is not 2D.'
-            self.state = Node.FAIL
-        else:
-            self.data = data
-            self.message = 'Successful. ' + self.data.header.summary()
-            self.state = Node.SUCCESS
-        self.update()
+            self.fail('the input file is not 2D.')
+            return
+        self.data = data
+        self.success(self.data.header.summary())
 
 
 class WriteSerafinNode(SingleInputNode):
@@ -354,22 +358,25 @@ class WriteSerafinNode(SingleInputNode):
     def run(self):
         success = super().run_upward()
         if not success:
-            self.state = Node.FAIL
-            self.update()
-            self.message = 'Failed: input failed.'
+            self.fail('input failed.')
             return
 
         input_data = self.in_port.mother.parentItem().data
         if input_data.filename == self.filename:
-            self.state = Node.FAIL
-            self.message = 'Failed: cannot overwrite to the input file.'
-            self.update()
+            self.fail('cannot overwrite to the input file.')
             return
 
         if not self.filename:
             name_pattern = self.scene().name_pattern
             head, tail = os.path.splitext(input_data.filename)
             self.filename = ''.join([head, name_pattern, '.slf'])
+
+        try:
+            with open(self.filename, 'w') as f:
+                pass
+        except PermissionError:
+            self.fail('Access denied.')
+            return
 
         self.progress_bar.setVisible(True)
 
@@ -380,18 +387,15 @@ class WriteSerafinNode(SingleInputNode):
         else:
             self._run_arrival_duration(input_data)
 
-        self.state = Node.SUCCESS
-        self.message = 'Successful.'
-        self.update()
-        self.progress_bar.setVisible(False)
+        self.success()
 
 
-class LoadPolygonNode(SingleOutputNode):
+class LoadPolygon2DNode(SingleOutputNode):
     def __init__(self, index):
         super().__init__(index)
         self.category = 'Input/Output'
-        self.label = 'Load\nPolygon'
-        self.out_port.data_type = 'polygon'
+        self.label = 'Load 2D\nPolygons'
+        self.out_port.data_type = 'polygon 2d'
         self.name_box = None
         self.filename = ''
         self.data = None
@@ -416,17 +420,10 @@ class LoadPolygonNode(SingleOutputNode):
 
     def _open(self):
         filename, _ = QFileDialog.getOpenFileName(None, 'Open a polygon file', '',
-                                                  'Line sets (*.i2s);;Shapefile (*.shp);;All Files (*)',
+                                                  'Polygon file (*.i2s *.shp)',
                                                   QDir.currentPath(),
                                                   options=QFileDialog.Options() | QFileDialog.DontUseNativeDialog)
         if filename:
-            is_i2s = filename[-4:] == '.i2s'
-            is_shp = filename[-4:] == '.shp'
-
-            if not is_i2s and not is_shp:
-                QMessageBox.critical(None, 'Error', 'Only .i2s and .shp file formats are currently supported.',
-                                     QMessageBox.Ok)
-                return
             self.filename = filename
             self.name_box.setText(filename)
 
@@ -437,12 +434,24 @@ class LoadPolygonNode(SingleOutputNode):
     def load(self, options):
         self.filename = options[0]
         if self.filename:
+            try:
+                with open(self.filename) as f:
+                    pass
+            except FileNotFoundError:
+                self.state = Node.NOT_CONFIGURED
+                self.filename = ''
+                return
             self.state = Node.READY
 
     def run(self):
         if self.state == Node.SUCCESS:
             return
-
+        try:
+            with open(self.filename) as f:
+                pass
+        except PermissionError:
+            self.fail('Access denied.')
+            return
         self.data = []
         is_i2s = self.filename[-4:] == '.i2s'
         if is_i2s:
@@ -451,26 +460,25 @@ class LoadPolygonNode(SingleOutputNode):
                 for poly in f.get_polygons():
                     self.data.append(poly)
         else:
-            for polygon in Shapefile.get_polygons(self.filename):
-                self.data.append(polygon)
+            try:
+                for polygon in Shapefile.get_polygons(self.filename):
+                    self.data.append(polygon)
+            except struct.error:
+                self.fail('Inconsistent bytes.')
+                return
         if not self.data:
-            self.state = Node.FAIL
-            self.message = 'Failed: the file does not contain any polygon.'
-            self.update()
+            self.fail('the file does not contain any polygon.')
             return
 
-        self.message = 'Successful. The file contains {} polygon{}.'.format(len(self.data),
-                                                                            's' if len(self.data) > 1 else '')
-
-        self.state = Node.SUCCESS
-        self.update()
+        self.success('The file contains {} polygon{}.'.format(len(self.data),
+                                                              's' if len(self.data) > 1 else ''))
 
 
 class LoadOpenPolyline2DNode(SingleOutputNode):
     def __init__(self, index):
         super().__init__(index)
         self.category = 'Input/Output'
-        self.label = 'Load 2D\nOpen\nPolyline'
+        self.label = 'Load 2D\nOpen\nPolylines'
         self.out_port.data_type = 'polyline 2d'
         self.name_box = None
         self.filename = ''
@@ -496,17 +504,10 @@ class LoadOpenPolyline2DNode(SingleOutputNode):
 
     def _open(self):
         filename, _ = QFileDialog.getOpenFileName(None, 'Open a 2D open polyline file', '',
-                                                  'Line sets (*.i2s);;Shapefile (*.shp);;All Files (*)',
+                                                  'Polyline file (*.i2s *.shp)',
                                                   QDir.currentPath(),
                                                   options=QFileDialog.Options() | QFileDialog.DontUseNativeDialog)
         if filename:
-            is_i2s = filename[-4:] == '.i2s'
-            is_shp = filename[-4:] == '.shp'
-
-            if not is_i2s and not is_shp:
-                QMessageBox.critical(None, 'Error', 'Only .i2s and .shp file formats are currently supported.',
-                                     QMessageBox.Ok)
-                return
             self.filename = filename
             self.name_box.setText(filename)
 
@@ -517,12 +518,24 @@ class LoadOpenPolyline2DNode(SingleOutputNode):
     def load(self, options):
         self.filename = options[0]
         if self.filename:
+            try:
+                with open(self.filename) as f:
+                    pass
+            except FileNotFoundError:
+                self.state = Node.NOT_CONFIGURED
+                self.filename = ''
+                return
             self.state = Node.READY
 
     def run(self):
         if self.state == Node.SUCCESS:
             return
-
+        try:
+            with open(self.filename) as f:
+                pass
+        except PermissionError:
+            self.fail('Access denied.')
+            return
         self.data = []
         is_i2s = self.filename[-4:] == '.i2s'
         if is_i2s:
@@ -531,19 +544,18 @@ class LoadOpenPolyline2DNode(SingleOutputNode):
                 for poly in f.get_open_polylines():
                     self.data.append(poly)
         else:
-            for poly in Shapefile.get_open_polylines(self.filename):
-                self.data.append(poly)
+            try:
+                for poly in Shapefile.get_open_polylines(self.filename):
+                    self.data.append(poly)
+            except struct.error:
+                self.fail('Inconsistent bytes.')
+                return
         if not self.data:
-            self.state = Node.FAIL
-            self.message = 'Failed: the file does not contain any 2D open polyline.'
-            self.update()
+            self.fail('the file does not contain any 2D open polyline.')
             return
 
-        self.message = 'Successful. The file contains {} open line{}.'.format(len(self.data),
-                                                                              's' if len(self.data) > 1 else '')
-
-        self.state = Node.SUCCESS
-        self.update()
+        self.success('The file contains {} open line{}.'.format(len(self.data),
+                                                                's' if len(self.data) > 1 else ''))
 
 
 class WriteCSVNode(SingleInputNode):
@@ -606,9 +618,13 @@ class WriteCSVNode(SingleInputNode):
     def run(self):
         success = super().run_upward()
         if not success:
-            self.state = Node.FAIL
-            self.update()
-            self.message = 'Failed: input failed.'
+            self.fail('input failed.')
+            return
+        try:
+            with open(self.filename, 'w') as f:
+                pass
+        except PermissionError:
+            self.fail('Access denied.')
             return
 
         csv = self.in_port.mother.parentItem().data
@@ -620,7 +636,83 @@ class WriteCSVNode(SingleInputNode):
         with open(self.filename, 'w') as output_stream:
             csv.write(output_stream, self.scene().csv_separator)
 
-        self.state = Node.SUCCESS
-        self.message = 'Successful.'
-        self.update()
+        self.success()
+
+
+class LoadPoint2DNode(SingleOutputNode):
+    def __init__(self, index):
+        super().__init__(index)
+        self.category = 'Input/Output'
+        self.label = 'Load 2D\nPoints'
+        self.out_port.data_type = 'point 2d'
+        self.name_box = None
+        self.filename = ''
+        self.data = None
+
+    def get_option_panel(self):
+        open_button = QPushButton(QWidget().style().standardIcon(QStyle.SP_DialogOpenButton),
+                                  'Load 2D points')
+        open_button.setToolTip('<b>Open</b> a .shp file')
+        open_button.setFixedHeight(30)
+
+        option_panel = QWidget()
+        layout = QHBoxLayout()
+        layout.addWidget(open_button)
+        self.name_box = QLineEdit(self.filename)
+        self.name_box.setReadOnly(True)
+        self.name_box.setFixedHeight(30)
+        layout.addWidget(self.name_box)
+        option_panel.setLayout(layout)
+
+        open_button.clicked.connect(self._open)
+        return option_panel
+
+    def _open(self):
+        filename, _ = QFileDialog.getOpenFileName(None, 'Open a point file', '',
+                                                  'Shapefile (*.shp)',
+                                                  QDir.currentPath(),
+                                                  options=QFileDialog.Options() | QFileDialog.DontUseNativeDialog)
+        if filename:
+            self.filename = filename
+            self.name_box.setText(filename)
+
+    def save(self):
+        return '|'.join([self.category, self.name(), str(self.index()),
+                         str(self.pos().x()), str(self.pos().y()), self.filename])
+
+    def load(self, options):
+        self.filename = options[0]
+        if self.filename:
+            try:
+                with open(self.filename) as f:
+                    pass
+            except FileNotFoundError:
+                self.state = Node.NOT_CONFIGURED
+                self.filename = ''
+                return
+            self.state = Node.READY
+
+    def run(self):
+        if self.state == Node.SUCCESS:
+            return
+        try:
+            with open(self.filename) as f:
+                pass
+        except PermissionError:
+            self.fail('Access denied.')
+            return
+        self.data = []
+        try:
+            for point, attribute in Shapefile.get_points(self.filename):
+                self.data.append(point)
+        except struct.error:
+            self.fail('Inconsistent bytes.')
+            return
+        if not self.data:
+            self.fail('the file does not contain any points.')
+            return
+        self.success('The file contains {} point{}.'.format(len(self.data),
+                                                            's' if len(self.data) > 1 else ''))
+
+
 

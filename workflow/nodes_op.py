@@ -306,15 +306,11 @@ class SelectVariablesNode(OneInOneOutNode):
     def run(self):
         success = super().run_upward()
         if not success:
-            self.state = Node.FAIL
-            self.update()
-            self.message = 'Failed: input failed.'
+            self.fail('input failed.')
             return
         input_data = self.in_port.mother.parentItem().data
         if input_data.operator is not None:
-            self.state = Node.FAIL
-            self.update()
-            self.message = 'Failed: cannot select variables after computation.'
+            self.fail('cannot select variables after computation.')
             return
         self.data = input_data.copy()
         self.data.us_equation = self.us_equation
@@ -324,9 +320,7 @@ class SelectVariablesNode(OneInOneOutNode):
         self.data.selected_vars_names = {}
         for var_ID, (var_name, var_unit) in self.selected_vars_names.items():
             self.data.selected_vars_names[var_ID] = (var_name, var_unit)
-        self.state = Node.SUCCESS
-        self.update()
-        self.message = 'Successful.'
+        self.success()
 
 
 class AddRouseNode(OneInOneOutNode):
@@ -472,15 +466,11 @@ class AddRouseNode(OneInOneOutNode):
     def run(self):
         success = super().run_upward()
         if not success:
-            self.state = Node.FAIL
-            self.update()
-            self.message = 'Failed: input failed.'
+            self.fail('input failed.')
             return
         input_data = self.in_port.mother.parentItem().data
         if input_data.operator is not None:
-            self.state = Node.FAIL
-            self.update()
-            self.message = 'Failed: cannot add Rouse after computation.'
+            self.fail('cannot add Rouse after computation.')
             return
         self.data = input_data.copy()
         self.data.selected_vars.extend([self.table[i][0] for i in range(len(self.table))])
@@ -489,9 +479,7 @@ class AddRouseNode(OneInOneOutNode):
                                                                bytes(self.table[i][2], 'utf-8').ljust(16))
         self.data.equations = get_necessary_equations(self.in_data.header.var_IDs, self.data.selected_vars,
                                                       self.data.us_equation)
-        self.state = Node.SUCCESS
-        self.update()
-        self.message = 'Successful.'
+        self.success()
 
 
 class SelectTimeNode(OneInOneOutNode):
@@ -654,21 +642,15 @@ class SelectTimeNode(OneInOneOutNode):
     def run(self):
         success = super().run_upward()
         if not success:
-            self.state = Node.FAIL
-            self.update()
-            self.message = 'Failed: input failed.'
+            self.fail('input failed.')
             return
         input_data = self.in_port.mother.parentItem().data
         if input_data.operator is not None:
-            self.state = Node.FAIL
-            self.update()
-            self.message = 'Failed: cannot select time after computation.'
+            self.fail('cannot select time after computation.')
             return
         self.data = input_data.copy()
         self.data.selected_time_indices = list(range(self.start_index, self.end_index+1, self.sampling_frequency))
-        self.state = Node.SUCCESS
-        self.update()
-        self.message = 'Successful. You selected %d frames.' % len(self.data.selected_time_indices)
+        self.success('You selected %d frames.' % len(self.data.selected_time_indices))
 
 
 class ConvertToSinglePrecisionNode(OneInOneOutNode):
@@ -687,9 +669,9 @@ class ConvertToSinglePrecisionNode(OneInOneOutNode):
         self.reconfigure_downward()
 
     def configure(self):
-        super().configure()
-        self.state = Node.READY
-        self.reconfigure_downward()
+        if super().configure():
+            self.state = Node.READY
+            self.reconfigure_downward()
 
     def save(self):
         return '|'.join([self.category, self.name(), str(self.index()),
@@ -701,24 +683,17 @@ class ConvertToSinglePrecisionNode(OneInOneOutNode):
     def run(self):
         success = super().run_upward()
         if not success:
-            self.state = Node.FAIL
-            self.update()
-            self.message = 'Failed: input failed.'
+            self.fail('input failed.')
             return
         input_data = self.in_port.mother.parentItem().data
         if input_data.header.float_type != 'd':
-            self.state = Node.FAIL
-            self.update()
-            self.message = 'Failed: the input file is not of double-precision format.'
+            self.fail('the input file is not of double-precision format.')
             return
         if input_data.to_single:
-            self.state = Node.FAIL
-            self.update()
-            self.message = 'Failed: the input data is already converted to single-precision format.'
+            self.fail('the input data is already converted to single-precision format.')
             return
 
         self.data = input_data.copy()
         self.data.to_single = True
-        self.state = Node.SUCCESS
-        self.update()
-        self.message = 'Successful.'
+        self.success()
+

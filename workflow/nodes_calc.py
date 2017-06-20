@@ -6,6 +6,7 @@ from workflow.nodes_io import CSVData
 from slf import Serafin
 from slf.volume import TruncatedTriangularPrisms, VolumeCalculator
 from slf.flux import TriangularVectorField, FluxCalculator
+from slf.interpolation import MeshInterpolator
 import slf.misc as operations
 from gui.util import ConditionDialog
 
@@ -19,6 +20,7 @@ class ComputeMaxNode(OneInOneOutNode):
         self.in_port.data_type = 'slf'
         self.state = Node.READY
         self.data = None
+        self.message = 'Nothing to configure.'
 
     def reconfigure(self):
         super().reconfigure()
@@ -26,9 +28,9 @@ class ComputeMaxNode(OneInOneOutNode):
         self.reconfigure_downward()
 
     def configure(self):
-        super().configure()
-        self.state = Node.READY
-        self.reconfigure_downward()
+        if super().configure():
+            self.state = Node.READY
+            self.reconfigure_downward()
 
     def save(self):
         return '|'.join([self.category, self.name(), str(self.index()),
@@ -40,27 +42,21 @@ class ComputeMaxNode(OneInOneOutNode):
     def run(self):
         success = super().run_upward()
         if not success:
-            self.state = Node.FAIL
-            self.update()
-            self.message = 'Failed: input failed.'
+            self.fail('input failed.')
             return
         input_data = self.in_port.mother.parentItem().data
 
         if input_data.operator is not None:
-            self.state = Node.FAIL
-            self.update()
             if input_data.operator == operations.MAX:
-                self.message = 'Failed: the input data is already the result of Compute Max.'
+                self.fail('the input data is already the result of Compute Max.')
                 return
             else:
-                self.message = 'Failed: the input data is already the result of another computation.'
+                self.fail('the input data is already the result of another computation.')
                 return
 
         self.data = input_data.copy()
         self.data.operator = operations.MAX
-        self.state = Node.SUCCESS
-        self.update()
-        self.message = 'Successful.'
+        self.success()
 
 
 class ComputeMinNode(OneInOneOutNode):
@@ -72,6 +68,7 @@ class ComputeMinNode(OneInOneOutNode):
         self.in_port.data_type = 'slf'
         self.state = Node.READY
         self.data = None
+        self.message = 'Nothing to configure.'
 
     def reconfigure(self):
         super().reconfigure()
@@ -79,9 +76,9 @@ class ComputeMinNode(OneInOneOutNode):
         self.reconfigure_downward()
 
     def configure(self):
-        super().configure()
-        self.state = Node.READY
-        self.reconfigure_downward()
+        if super().configure():
+            self.state = Node.READY
+            self.reconfigure_downward()
 
     def save(self):
         return '|'.join([self.category, self.name(), str(self.index()),
@@ -93,27 +90,21 @@ class ComputeMinNode(OneInOneOutNode):
     def run(self):
         success = super().run_upward()
         if not success:
-            self.state = Node.FAIL
-            self.update()
-            self.message = 'Failed: input failed.'
+            self.fail('input failed.')
             return
         input_data = self.in_port.mother.parentItem().data
 
         if input_data.operator is not None:
-            self.state = Node.FAIL
-            self.update()
             if input_data.operator == operations.MIN:
-                self.message = 'Failed: the input data is already the result of Compute Min.'
+                self.fail('the input data is already the result of Compute Min.')
                 return
             else:
-                self.message = 'Failed: the input data is already the result of another computation.'
+                self.fail('the input data is already the result of another computation.')
                 return
 
         self.data = input_data.copy()
         self.data.operator = operations.MIN
-        self.state = Node.SUCCESS
-        self.update()
-        self.message = 'Successful.'
+        self.success()
 
 
 class ComputeMeanNode(OneInOneOutNode):
@@ -125,6 +116,7 @@ class ComputeMeanNode(OneInOneOutNode):
         self.in_port.data_type = 'slf'
         self.state = Node.READY
         self.data = None
+        self.message = 'Nothing to configure.'
 
     def reconfigure(self):
         super().reconfigure()
@@ -132,9 +124,9 @@ class ComputeMeanNode(OneInOneOutNode):
         self.reconfigure_downward()
 
     def configure(self):
-        super().configure()
-        self.state = Node.READY
-        self.reconfigure_downward()
+        if super().configure():
+            self.state = Node.READY
+            self.reconfigure_downward()
 
     def save(self):
         return '|'.join([self.category, self.name(), str(self.index()),
@@ -146,27 +138,21 @@ class ComputeMeanNode(OneInOneOutNode):
     def run(self):
         success = super().run_upward()
         if not success:
-            self.state = Node.FAIL
-            self.update()
-            self.message = 'Failed: input failed.'
+            self.fail('input failed.')
             return
         input_data = self.in_port.mother.parentItem().data
 
         if input_data.operator is not None:
-            self.state = Node.FAIL
-            self.update()
             if input_data.operator == operations.MEAN:
-                self.message = 'Failed: the input data is already the result of Compute Mean.'
+                self.fail('the input data is already the result of Compute Mean.')
                 return
             else:
-                self.message = 'Failed: the input data is already the result of another computation.'
+                self.fail('the input data is already the result of another computation.')
                 return
 
         self.data = input_data.copy()
         self.data.operator = operations.MEAN
-        self.state = Node.SUCCESS
-        self.update()
-        self.message = 'Successful.'
+        self.success()
 
 
 class ArrivalDurationNode(OneInOneOutNode):
@@ -430,27 +416,20 @@ class ArrivalDurationNode(OneInOneOutNode):
     def run(self):
         success = super().run_upward()
         if not success:
-            self.state = Node.FAIL
-            self.update()
-            self.message = 'Failed: input failed.'
+            self.fail('input failed.')
             return
         input_data = self.in_port.mother.parentItem().data
         if input_data.operator is not None:
-            self.state = Node.FAIL
-            self.update()
             if input_data.operator == operations.ARRIVAL_DURATION:
-                self.message = 'Failed: the input data is already the result of Arrival Duration.'
+                self.fail('the input data is already the result of Arrival Duration.')
                 return
             else:
-                self.message = 'Failed: the input data is already the result of another computation.'
+                self.fail('the input data is already the result of another computation.')
                 return
-
         self.data = input_data.copy()
         self.data.operator = operations.ARRIVAL_DURATION
         self.data.metadata = {'conditions': self.conditions, 'table': self.table, 'time unit': self.time_unit}
-        self.state = Node.SUCCESS
-        self.update()
-        self.message = 'Successful.'
+        self.success()
 
 
 class ComputeVolumeNode(TwoInOneOutNode):
@@ -460,7 +439,7 @@ class ComputeVolumeNode(TwoInOneOutNode):
         self.label = 'Compute\nVolume'
         self.out_port.data_type = 'csv'
         self.first_in_port.data_type = 'slf'
-        self.second_in_port.data_type = 'polygon'
+        self.second_in_port.data_type = 'polygon 2d'
         self.in_data = None
         self.data = None
 
@@ -585,6 +564,11 @@ class ComputeVolumeNode(TwoInOneOutNode):
                                      QMessageBox.Ok)
                 return
         self._reset()
+        available_vars = [var for var in self.in_data.header.var_IDs if var in self.in_data.selected_vars]
+        if not available_vars:
+            QMessageBox.critical(None, 'Error', 'No variable available.',
+                                 QMessageBox.Ok)
+            return
         if super().configure():
             self.first_var, self.second_var, self.sup_volume = self.new_options
         self.reconfigure_downward()
@@ -607,9 +591,7 @@ class ComputeVolumeNode(TwoInOneOutNode):
     def run(self):
         success = super().run_upward()
         if not success:
-            self.state = Node.FAIL
-            self.update()
-            self.message = 'Failed: input failed.'
+            self.fail('input failed.')
             return
 
         self.progress_bar.setVisible(True)
@@ -661,10 +643,7 @@ class ComputeVolumeNode(TwoInOneOutNode):
                 self.progress_bar.setValue(100 * (i+1) / len(calculator.time_indices))
                 QApplication.processEvents()
 
-        self.state = Node.SUCCESS
-        self.update()
-        self.message = 'Successful.'
-        self.progress_bar.setVisible(False)
+        self.success()
 
 
 class ComputeFluxNode(TwoInOneOutNode):
@@ -832,9 +811,7 @@ class ComputeFluxNode(TwoInOneOutNode):
     def run(self):
         success = super().run_upward()
         if not success:
-            self.state = Node.FAIL
-            self.update()
-            self.message = 'Failed: input failed.'
+            self.fail('input failed.')
             return
 
         self.progress_bar.setVisible(True)
@@ -894,7 +871,99 @@ class ComputeFluxNode(TwoInOneOutNode):
                 self.progress_bar.setValue(100 * (i+1) / len(calculator.time_indices))
                 QApplication.processEvents()
 
-        self.state = Node.SUCCESS
-        self.update()
-        self.message = 'Successful.'
-        self.progress_bar.setVisible(False)
+        self.success()
+
+
+class InterpolateOnPoints(TwoInOneOutNode):
+    def __init__(self, index):
+        super().__init__(index)
+        self.category = 'Calculations'
+        self.label = 'Interpolate\non\nPoints'
+        self.out_port.data_type = 'csv'
+        self.first_in_port.data_type = 'slf'
+        self.second_in_port.data_type = 'point 2d'
+        self.data = None
+        self.state = Node.READY
+        self.message = 'Nothing to configure.'
+
+    def reconfigure(self):
+        super().reconfigure()
+        self.state = Node.READY
+        self.reconfigure_downward()
+
+    def configure(self):
+        if super().configure():
+            self.state = Node.READY
+            self.reconfigure_downward()
+
+    def save(self):
+        return '|'.join([self.category, self.name(), str(self.index()),
+                         str(self.pos().x()), str(self.pos().y()), ''])
+
+    def load(self, options):
+        self.state = Node.READY
+
+    def run(self):
+        success = super().run_upward()
+        if not success:
+            self.fail('input failed.')
+            return
+
+        self.progress_bar.setVisible(True)
+        input_data = self.first_in_port.mother.parentItem().data
+
+        selected_vars = [var for var in input_data.header.var_IDs if var in input_data.selected_vars]
+        if not selected_vars:
+            self.fail('no variable available.')
+            return
+        points = self.second_in_port.mother.parentItem().data
+
+        mesh = MeshInterpolator(input_data.header, False)
+
+        if input_data.has_index:
+            mesh.index = input_data.index
+            mesh.triangles = input_data.triangles
+        else:
+            self.construct_mesh(mesh)
+            input_data.has_index = True
+            input_data.index = mesh.index
+            input_data.triangles = mesh.triangles
+
+        is_inside, point_interpolators = mesh.get_point_interpolators(points)
+        point_interpolators = [p for i, p in enumerate(point_interpolators) if is_inside[i]]
+        nb_inside = sum(map(int, is_inside))
+        if nb_inside == 0:
+            self.fail('no point inside the mesh.')
+            return
+
+        header = ['time']
+        for x, y in points:
+            for var in selected_vars:
+                header.append('%s (%.4f, %.4f)' % (var, x, y))
+        self.data = CSVData(input_data.filename, header)
+        nb_selected_vars = len(selected_vars)
+        nb_frames = len(input_data.selected_time_indices)
+
+        with Serafin.Read(input_data.filename, input_data.language) as input_stream:
+            input_stream.header = input_data.header
+            input_stream.time = input_data.time
+
+            for index, index_time in enumerate(input_data.selected_time_indices):
+                row = [str(input_data.time[index_time])]
+
+                var_values = []
+                for var in selected_vars:
+                    var_values.append(input_stream.read_var_in_frame(index, var))
+
+                for (i, j, k), interpolator in point_interpolators:
+                    for index_var in range(nb_selected_vars):
+                        row.append('%.6f' % interpolator.dot(var_values[index_var][[i, j, k]]))
+
+                self.data.add_row(row)
+                self.progress_bar.setValue(100 * (index+1) / nb_frames)
+                QApplication.processEvents()
+
+        self.success('{} point{} inside the mesh.'.format(nb_inside, 's are' if nb_inside > 1 else ' is'))
+
+
+

@@ -6,13 +6,15 @@ from workflow.nodes_calc import *
 
 
 NODES = {'Input/Output': {'Load Serafin': LoadSerafinNode,
-                          'Load Polygon': LoadPolygonNode, 'Load 2D Open Polyline': LoadOpenPolyline2DNode,
+                          'Load 2D Polygons': LoadPolygon2DNode, 'Load 2D Open Polylines': LoadOpenPolyline2DNode,
+                          'Load 2D Points': LoadPoint2DNode,
                           'Write CSV': WriteCSVNode, 'Write Serafin': WriteSerafinNode},
          'Basic operations': {'Select Variables': SelectVariablesNode, 'Select Time': SelectTimeNode,
                               'Add Rouse': AddRouseNode, 'Convert to Single Precision': ConvertToSinglePrecisionNode},
          'Calculations': {'Compute Max': ComputeMaxNode, 'Compute Min': ComputeMinNode, 'Compute Mean': ComputeMeanNode,
                           'Compute Arrival Duration': ArrivalDurationNode,
-                          'Compute Volume': ComputeVolumeNode, 'Compute Flux': ComputeFluxNode}}
+                          'Compute Volume': ComputeVolumeNode, 'Compute Flux': ComputeFluxNode,
+                          'Interpolate on Points': InterpolateOnPoints}}
 
 
 def add_link(from_port, to_port):
@@ -150,8 +152,8 @@ class TreeScene(QGraphicsScene):
                     node.moveBy(float(x), float(y))
                     self.nb_nodes += 1
                 for i in range(nb_links):
-                    from_node_index, from_port_index, to_node_index, to_port_index = map(int,
-                                                                                         f.readline().rstrip().split('|'))
+                    from_node_index, from_port_index, \
+                                     to_node_index, to_port_index = map(int,  f.readline().rstrip().split('|'))
                     from_node = self.nodes[from_node_index]
                     to_node = self.nodes[to_node_index]
                     from_port = from_node.ports[from_port_index]
@@ -162,10 +164,10 @@ class TreeScene(QGraphicsScene):
                     to_node.add_link(link)
                     self.addItem(link)
                     link.setZValue(-1)
-        except (IndexError, ValueError):
-             QMessageBox.critical(None, 'Error',
-                                  'The workspace file is not valid.',
-                                  QMessageBox.Ok)
+        except (IndexError, ValueError, KeyError):
+            QMessageBox.critical(None, 'Error',
+                                 'The workspace file is not valid.',
+                                 QMessageBox.Ok)
         self.update()
 
     def run_all(self):

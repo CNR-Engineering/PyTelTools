@@ -858,9 +858,9 @@ class FallVelocityMessage(QDialog):
         try:
             value = float(value)
         except ValueError:
-             QMessageBox.critical(self, 'Error', 'You must enter a number!',
-                                 QMessageBox.Ok)
-             return
+            QMessageBox.critical(self, 'Error', 'You must enter a number!',
+                             QMessageBox.Ok)
+            return
         if value in self.values:
             QMessageBox.critical(self, 'Error', 'The value %.4E is already added!' % value,
                                  QMessageBox.Ok)

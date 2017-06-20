@@ -232,6 +232,17 @@ class Node(QGraphicsItem):
     def load(self, options):
         pass
 
+    def success(self, message=''):
+        self.progress_bar.setVisible(False)
+        self.state = Node.SUCCESS
+        self.update()
+        self.message = 'Successful. ' + message
+
+    def fail(self, message):
+        self.state = Node.FAIL
+        self.update()
+        self.message = 'Failed: ' + message
+
 
 class SingleInputNode(Node):
     def __init__(self, index):
