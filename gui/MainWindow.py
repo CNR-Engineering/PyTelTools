@@ -83,7 +83,6 @@ class MyMainWindow(QWidget):
         self.setWindowFlags(self.windowFlags() | Qt.CustomizeWindowHint)
         self.frameGeom = self.frameGeometry()
         self.move(self.frameGeom.center())
-        self.show()
 
     def autoResize(self, index):
         if not self.isMaximized():
@@ -115,6 +114,7 @@ if __name__ == '__main__':
 
     app = QApplication(sys.argv)
     window = MyMainWindow()
+    window.show()
     app.exec_()
 
 
