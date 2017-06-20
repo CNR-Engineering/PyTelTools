@@ -29,17 +29,17 @@ class WriteCSVProcess(OutputThread):
         output_stream.write('\n')
 
     def write_csv(self, input_stream, selected_vars, output_stream, line_interpolators,
-                        indices_nonemtpy, reference, time_index):
+                        indices_nonempty, reference, time_index):
         self.write_header(output_stream, selected_vars)
 
-        nb_lines = len(indices_nonemtpy)
+        nb_lines = len(indices_nonempty)
         max_distance = reference.length()
 
         var_values = []
         for var in selected_vars:
             var_values.append(input_stream.read_var_in_frame(time_index, var))
 
-        for u, id_line in enumerate(indices_nonemtpy):
+        for u, id_line in enumerate(indices_nonempty):
             line_interpolator, _ = line_interpolators[id_line]
             distances = []
             for x, y, _, __ in line_interpolator:

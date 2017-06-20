@@ -966,4 +966,113 @@ class InterpolateOnPoints(TwoInOneOutNode):
         self.success('{} point{} inside the mesh.'.format(nb_inside, 's are' if nb_inside > 1 else ' is'))
 
 
+class InterpolateAlongLines(TwoInOneOutNode):
+    def __init__(self, index):
+        super().__init__(index)
+        self.category = 'Calculations'
+        self.label = 'Interpolate\nalong\nLines'
+        self.out_port.data_type = 'csv'
+        self.first_in_port.data_type = 'slf'
+        self.second_in_port.data_type = 'polyline 2d'
+        self.data = None
+        self.state = Node.READY
+        self.message = 'Nothing to configure.'
+
+    def reconfigure(self):
+        super().reconfigure()
+        self.state = Node.READY
+        self.reconfigure_downward()
+
+    def configure(self):
+        if super().configure():
+            self.state = Node.READY
+            self.reconfigure_downward()
+
+    def save(self):
+        return '|'.join([self.category, self.name(), str(self.index()),
+                         str(self.pos().x()), str(self.pos().y()), ''])
+
+    def load(self, options):
+        self.state = Node.READY
+
+    def run(self):
+        success = super().run_upward()
+        if not success:
+            self.fail('input failed.')
+            return
+
+        self.progress_bar.setVisible(True)
+        input_data = self.first_in_port.mother.parentItem().data
+
+        selected_vars = [var for var in input_data.header.var_IDs if var in input_data.selected_vars]
+        if not selected_vars:
+            self.fail('no variable available.')
+            return
+        lines = self.second_in_port.mother.parentItem().data
+
+        mesh = MeshInterpolator(input_data.header, False)
+
+        if input_data.has_index:
+            mesh.index = input_data.index
+            mesh.triangles = input_data.triangles
+        else:
+            self.construct_mesh(mesh)
+            input_data.has_index = True
+            input_data.index = mesh.index
+            input_data.triangles = mesh.triangles
+
+        nb_nonempty = 0
+        indices_nonempty = []
+        line_interpolators = []
+
+        for i, line in enumerate(lines):
+            line_interpolator, distance, _, _ = mesh.get_line_interpolators(line)
+
+            if line_interpolator:
+                nb_nonempty += 1
+                indices_nonempty.append(i)
+
+            line_interpolators.append((line_interpolator, distance))
+
+        if nb_nonempty == 0:
+            self.fail('no polyline intersects the mesh continuously.')
+            return
+
+        header = ['line', 'time', 'x', 'y', 'distance'] + selected_vars
+        self.data = CSVData(input_data.filename, header)
+
+        nb_frames = len(input_data.selected_time_indices)
+        inv_steps = 1 / nb_nonempty / nb_frames
+
+        with Serafin.Read(input_data.filename, input_data.language) as input_stream:
+            input_stream.header = input_data.header
+            input_stream.time = input_data.time
+
+            for u, id_line in enumerate(indices_nonempty):
+                line_interpolator, distances = line_interpolators[id_line]
+
+                for v, time_index in enumerate(input_data.selected_time_indices):
+                    time_value = input_data.time[time_index]
+
+                    var_values = []
+                    for var in selected_vars:
+                        var_values.append(input_stream.read_var_in_frame(time_index, var))
+
+                    for (x, y, (i, j, k), interpolator), distance in zip(line_interpolator, distances):
+                        row = [str(id_line+1), str(time_value), '%.6f' % x, '%.6f' % y, '%.6f' % distance]
+
+                        for i_var, var in enumerate(selected_vars):
+                            values = var_values[i_var]
+                            row.append('%.6f' % interpolator.dot(values[[i, j, k]]))
+
+                        self.data.add_row(row)
+
+                    self.progress_bar.setValue(100 * (v+1+u*nb_frames) * inv_steps)
+                    QApplication.processEvents()
+
+        self.success('{} line{} the mesh continuously.'.format(nb_nonempty,
+                                                               's intersect' if nb_nonempty > 1 else ' intersects'))
+
+
+
 

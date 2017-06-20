@@ -25,12 +25,12 @@ class WriteCSVProcess(OutputThread):
         output_stream.write('\n')
 
     def write_csv(self, input_stream, selected_vars, output_stream, line_interpolators,
-                        indices_nonemtpy):
+                        indices_nonempty):
         self.write_header(output_stream, selected_vars)
 
-        nb_lines = len(indices_nonemtpy)
+        nb_lines = len(indices_nonempty)
 
-        for u, id_line in enumerate(indices_nonemtpy):
+        for u, id_line in enumerate(indices_nonempty):
             line_interpolator, distances = line_interpolators[id_line]
 
             for index, time in enumerate(input_stream.time):
@@ -39,7 +39,6 @@ class WriteCSVProcess(OutputThread):
                 var_values = []
                 for var in selected_vars:
                     var_values.append(input_stream.read_var_in_frame(index, var))
-
                 for (x, y, (i, j, k), interpolator), distance in zip(line_interpolator, distances):
                     if self.canceled:
                         return
@@ -56,6 +55,7 @@ class WriteCSVProcess(OutputThread):
 
                     for i_var, var in enumerate(selected_vars):
                         values = var_values[i_var]
+
                         output_stream.write(';')
                         output_stream.write('%.6f' % interpolator.dot(values[[i, j, k]]))
                     output_stream.write('\n')

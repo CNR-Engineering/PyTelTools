@@ -14,7 +14,8 @@ NODES = {'Input/Output': {'Load Serafin': LoadSerafinNode,
          'Calculations': {'Compute Max': ComputeMaxNode, 'Compute Min': ComputeMinNode, 'Compute Mean': ComputeMeanNode,
                           'Compute Arrival Duration': ArrivalDurationNode,
                           'Compute Volume': ComputeVolumeNode, 'Compute Flux': ComputeFluxNode,
-                          'Interpolate on Points': InterpolateOnPoints}}
+                          'Interpolate on Points': InterpolateOnPoints,
+                          'Interpolate along Lines': InterpolateAlongLines}}
 
 
 def add_link(from_port, to_port):
