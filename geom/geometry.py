@@ -156,7 +156,7 @@ class Polyline:
         if self.is_2d():
             new_coords = new_coords[:, :2]
 
-        return Polyline(new_coords, self.attributes(), m_array=self.m)
+        return Polyline(list(map(tuple, new_coords)), self.attributes(), m_array=self.m)
 
     def resample(self, max_len):
         new_coords = []

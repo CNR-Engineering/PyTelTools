@@ -170,7 +170,7 @@ class NodeTree(QTreeWidget):
             drag.exec(Qt.MoveAction | Qt.CopyAction)
 
 
-class MainWindow(QWidget):
+class MyMainWindow(QWidget):
     def __init__(self):
         super().__init__()
         tree = TreePanel()
@@ -215,7 +215,7 @@ if __name__ == '__main__':
     sys.excepthook = exception_hook
 
     app = QApplication(sys.argv)
-    widget = MainWindow()
+    widget = MyMainWindow()
     widget.showMaximized()
     app.exec_()
 
