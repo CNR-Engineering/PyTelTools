@@ -2,6 +2,7 @@ from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 
 from workflow.Node import Node, OneInOneOutNode, TwoInOneOutNode
+from workflow.nodes_io import CSVData
 from slf import Serafin
 from slf.volume import TruncatedTriangularPrisms, VolumeCalculator
 from slf.flux import TriangularVectorField, FluxCalculator
@@ -641,7 +642,7 @@ class ComputeVolumeNode(TwoInOneOutNode):
             calculator.mesh = mesh
             calculator.construct_weights()
 
-            self.data = [calculator.get_csv_header()]
+            self.data = CSVData(self.in_data.filename, calculator.get_csv_header())
 
             for i, time_index in enumerate(calculator.time_indices):
                 i_result = [str(calculator.input_stream.time[time_index])]
@@ -655,7 +656,7 @@ class ComputeVolumeNode(TwoInOneOutNode):
                             i_result.append('%.6f' % v)
                     else:
                         i_result.append('%.6f' % volume)
-                self.data.append(i_result)
+                self.data.add_row(i_result)
 
                 self.progress_bar.setValue(100 * (i+1) / len(calculator.time_indices))
                 QApplication.processEvents()
@@ -876,7 +877,7 @@ class ComputeFluxNode(TwoInOneOutNode):
             calculator.mesh = mesh
             calculator.construct_intersections()
 
-            self.data = [['time'] + section_names]
+            self.data = CSVData(self.in_data.filename, ['time'] + section_names)
 
             for i, time_index in enumerate(calculator.time_indices):
                 i_result = [str(calculator.input_stream.time[time_index])]
@@ -888,7 +889,7 @@ class ComputeFluxNode(TwoInOneOutNode):
                     intersections = calculator.intersections[j]
                     flux = calculator.flux_in_frame(intersections, values)
                     i_result.append('%.6f' % flux)
-                self.data.append(i_result)
+                self.data.add_row(i_result)
 
                 self.progress_bar.setValue(100 * (i+1) / len(calculator.time_indices))
                 QApplication.processEvents()

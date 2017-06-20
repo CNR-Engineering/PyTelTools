@@ -3,7 +3,7 @@ from PyQt5.QtCore import *
 import numpy as np
 from copy import deepcopy
 import datetime
-
+import os
 from workflow.Node import Node, SingleOutputNode, SingleInputNode
 from slf import Serafin
 from slf.variables import do_calculations_in_frame
@@ -22,6 +22,7 @@ class SerafinData:
         self.time = []
         self.time_second = []
         self.start_time = None
+        self.name_pattern = None
 
         self.selected_vars = []
         self.selected_vars_names = {}
@@ -66,6 +67,7 @@ class SerafinData:
         copy_data.start_time = self.start_time
         copy_data.time_second = self.time_second
         copy_data.metadata = self.metadata
+        copy_data.name_pattern = self.name_pattern
 
         copy_data.selected_vars = self.selected_vars[:]
         copy_data.selected_vars_names = deepcopy(self.selected_vars_names)
@@ -89,6 +91,21 @@ class SerafinData:
         if self.to_single:
             output_header.to_single_precision()
         return output_header
+
+
+class CSVData:
+    def __init__(self, filename, header):
+        self.filename = filename
+        self.table = [header]
+        self.name_pattern = None
+
+    def add_row(self, row):
+        self.table.append(row)
+
+    def write(self, output_stream, separator):
+        for line in self.table:
+            output_stream.write(separator.join(line))
+            output_stream.write('\n')
 
 
 class LoadSerafinNode(SingleOutputNode):
@@ -186,6 +203,16 @@ class WriteSerafinNode(SingleInputNode):
         open_button.clicked.connect(self._open)
         return option_panel
 
+    def configure(self):
+        if self.scene().name_pattern is None:
+            super().configure()
+        else:
+            QMessageBox.information(None, 'OK', 'Successfully configured using naming pattern in the global options.',
+                                    QMessageBox.Ok)
+            self.filename = ''
+            self.state = Node.READY
+            self.update()
+
     def _open(self):
         filename, _ = QFileDialog.getSaveFileName(None, 'Choose the output file name', '',
                                                   'Serafin Files (*.slf)',
@@ -210,7 +237,7 @@ class WriteSerafinNode(SingleInputNode):
         with Serafin.Read(input_data.filename, self.scene().language) as resin:
             resin.header = input_data.header
             resin.time = input_data.time
-            with Serafin.Write(self.filename, input_data.language, self.scene().overwrite) as resout:
+            with Serafin.Write(self.filename, input_data.language, True) as resout:
                 resout.write_header(output_header)
                 for i, time_index in enumerate(input_data.selected_time_indices):
                     values = do_calculations_in_frame(input_data.equations, input_data.us_equation,
@@ -269,7 +296,7 @@ class WriteSerafinNode(SingleInputNode):
             else:
                 values = np.vstack((scalar_calculator.finishing_up(), vector_calculator.finishing_up()))
 
-            with Serafin.Write(self.filename, input_data.language, self.scene().overwrite) as resout:
+            with Serafin.Write(self.filename, input_data.language, True) as resout:
                 resout.write_header(output_header)
                 resout.write_entire_frame(output_header, input_data.time[0], values)
 
@@ -320,7 +347,7 @@ class WriteSerafinNode(SingleInputNode):
                 values *= 100 / (input_data.time[input_data.selected_time_indices[-1]]
                                  - input_data.time[input_data.selected_time_indices[0]])
 
-            with Serafin.Write(self.filename, input_data.language, self.scene().overwrite) as resout:
+            with Serafin.Write(self.filename, input_data.language, True) as resout:
                 resout.write_header(output_header)
                 resout.write_entire_frame(output_header, input_data.time[0], values)
 
@@ -338,6 +365,11 @@ class WriteSerafinNode(SingleInputNode):
             self.message = 'Failed: cannot overwrite to the input file.'
             self.update()
             return
+
+        if not self.filename:
+            name_pattern = self.scene().name_pattern
+            head, tail = os.path.splitext(input_data.filename)
+            self.filename = ''.join([head, name_pattern, '.slf'])
 
         self.progress_bar.setVisible(True)
 
@@ -552,6 +584,16 @@ class WriteCSVNode(SingleInputNode):
             self.filename = filename
             self.name_box.setText(filename)
 
+    def configure(self):
+        if self.scene().name_pattern is None:
+            super().configure()
+        else:
+            QMessageBox.information(None, 'OK', 'Successfully configured using naming pattern in the global options.',
+                                    QMessageBox.Ok)
+            self.filename = ''
+            self.state = Node.READY
+            self.update()
+
     def save(self):
         return '|'.join([self.category, self.name(), str(self.index()),
                          str(self.pos().x()), str(self.pos().y()), self.filename])
@@ -569,11 +611,15 @@ class WriteCSVNode(SingleInputNode):
             self.message = 'Failed: input failed.'
             return
 
-        table = self.in_port.mother.parentItem().data
+        csv = self.in_port.mother.parentItem().data
+        if not self.filename:
+            name_pattern = self.scene().name_pattern
+            head, tail = os.path.splitext(csv.filename)
+            self.filename = ''.join([head, name_pattern, '.csv'])
+
         with open(self.filename, 'w') as output_stream:
-            for line in table:
-                output_stream.write(self.scene().csv_separator.join(line))
-                output_stream.write('\n')
+            csv.write(output_stream, self.scene().csv_separator)
+
         self.state = Node.SUCCESS
         self.message = 'Successful.'
         self.update()

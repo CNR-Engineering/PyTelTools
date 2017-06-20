@@ -5,9 +5,9 @@ from workflow.nodes_op import *
 from workflow.nodes_calc import *
 
 
-NODES = {'Input/Output': {'Load Serafin': LoadSerafinNode, 'Write Serafin': WriteSerafinNode,
+NODES = {'Input/Output': {'Load Serafin': LoadSerafinNode,
                           'Load Polygon': LoadPolygonNode, 'Load 2D Open Polyline': LoadOpenPolyline2DNode,
-                          'Write CSV': WriteCSVNode},
+                          'Write CSV': WriteCSVNode, 'Write Serafin': WriteSerafinNode},
          'Basic operations': {'Select Variables': SelectVariablesNode, 'Select Time': SelectTimeNode,
                               'Add Rouse': AddRouseNode, 'Convert to Single Precision': ConvertToSinglePrecisionNode},
          'Calculations': {'Compute Max': ComputeMaxNode, 'Compute Min': ComputeMinNode, 'Compute Mean': ComputeMeanNode,
@@ -18,10 +18,11 @@ NODES = {'Input/Output': {'Load Serafin': LoadSerafinNode, 'Write Serafin': Writ
 def add_link(from_port, to_port):
     if to_port.is_connected_to(from_port) and from_port.is_connected_to(to_port):
         return False, 'already'
-    elif to_port.data_type != from_port.data_type:
-        return False, 'type'
-    elif to_port.has_mother():
+    if to_port.has_mother():
         return False, 'another'
+    if to_port.data_type != 'all' and from_port.data_type != 'all':
+        if to_port.data_type != from_port.data_type:
+            return False, 'type'
     from_port.connect(to_port)
     to_port.connect(from_port)
     return True, ''
@@ -32,8 +33,8 @@ class TreeScene(QGraphicsScene):
         super().__init__()
 
         self.language = 'fr'
-        self.overwrite = True
         self.csv_separator = ';'
+        self.name_pattern = None
 
         self.setSceneRect(QRectF(0, 0, 800, 600))
         self.transform = QTransform()
@@ -105,6 +106,86 @@ class TreeScene(QGraphicsScene):
         self.nb_nodes += 1
         node.moveBy(pos.x(), pos.y())
 
+    def save(self, filename):
+        links = []
+        for item in self.items():
+            if isinstance(item, Link):
+                links.append(item.save())
+
+        with open(filename, 'w') as f:
+            f.write('.'.join([self.language, self.csv_separator, str(self.name_pattern)]) + '\n')
+            f.write('%d %d\n' % (self.nb_nodes, len(links)))
+            for node in self.nodes.values():
+                f.write(node.save())
+                f.write('\n')
+            for link in links:
+                f.write(link)
+                f.write('\n')
+
+    def load(self, filename):
+        self.clear()
+        self.current_line = QGraphicsLineItem()
+        self.addItem(self.current_line)
+        self.current_line.setVisible(False)
+        pen = QPen(QColor(0, 0, 0))
+        pen.setWidth(2)
+        self.current_line.setPen(pen)
+        self.current_port = None
+
+        self.nb_nodes = 0
+        self.nodes = {}
+        try:
+            with open(filename, 'r') as f:
+                self.language, self.csv_separator, self.name_pattern = f.readline().rstrip().split('.')
+                if self.name_pattern == 'None':
+                    self.name_pattern = None
+                nb_nodes, nb_links = map(int, f.readline().split())
+                for i in range(nb_nodes):
+                    line = f.readline().rstrip().split('|')
+                    category, name, index, x, y = line[:5]
+                    node = NODES[category][name](int(index))
+                    node.load(line[5:])
+                    self.nodes[int(index)] = node
+                    self.addItem(node)
+                    node.moveBy(float(x), float(y))
+                    self.nb_nodes += 1
+                for i in range(nb_links):
+                    from_node_index, from_port_index, to_node_index, to_port_index = map(int,
+                                                                                         f.readline().rstrip().split('|'))
+                    from_node = self.nodes[from_node_index]
+                    to_node = self.nodes[to_node_index]
+                    from_port = from_node.ports[from_port_index]
+                    to_port = to_node.ports[to_port_index]
+                    _, _ = add_link(from_port, to_port)
+                    link = Link(from_port, to_port)
+                    from_node.add_link(link)
+                    to_node.add_link(link)
+                    self.addItem(link)
+                    link.setZValue(-1)
+        except (IndexError, ValueError):
+             QMessageBox.critical(None, 'Error',
+                                  'The workspace file is not valid.',
+                                  QMessageBox.Ok)
+        self.update()
+
+    def run_all(self):
+        roots = self._to_sources()
+
+        for root in roots:
+            self.nodes[root].run_downward()
+
+    def global_config(self):
+        old_name_pattern = self.name_pattern
+        dlg = GlobalConfigDialog(self.language, self.csv_separator, self.name_pattern)
+        value = dlg.exec_()
+        if value == QDialog.Accepted:
+            self.language, self.csv_separator, self.name_pattern = dlg.new_options
+            if self.name_pattern != old_name_pattern:
+                for node in self.nodes.values():
+                    if isinstance(node, SingleInputNode):
+                        node.state = Node.NOT_CONFIGURED
+                self.update()
+
     def _to_sources(self):
         roots = []
         visited = {node: False for node in self.nodes}
@@ -136,12 +217,6 @@ class TreeScene(QGraphicsScene):
 
         return roots
 
-    def run_all(self):
-        roots = self._to_sources()
-
-        for root in roots:
-            self.nodes[root].run_downward()
-
     def _handle_add_link(self, target_item):
         port_index = target_item.index()
         node_index = target_item.parentItem().index()
@@ -168,7 +243,7 @@ class TreeScene(QGraphicsScene):
                 QMessageBox.critical(None, 'Error', 'These two ports are already connected.',
                                      QMessageBox.Ok)
             elif cause == 'type':
-                QMessageBox.critical(None, 'Error', 'These two ports cannot be connected: different data types.',
+                QMessageBox.critical(None, 'Error', 'These two ports cannot be connected: incompatible data types.',
                                      QMessageBox.Ok)
             else:
                 QMessageBox.critical(None, 'Error',
@@ -217,62 +292,113 @@ class TreeScene(QGraphicsScene):
             return second_node, first_node, p2, p1
         return None, None, None, None
 
-    def save(self, filename):
-        links = []
-        for item in self.items():
-            if isinstance(item, Link):
-                links.append(item.save())
 
-        with open(filename, 'w') as f:
-            f.write('%d %d\n' % (self.nb_nodes, len(links)))
-            for node in self.nodes.values():
-                f.write(node.save())
-                f.write('\n')
-            for link in links:
-                f.write(link)
-                f.write('\n')
+class GlobalConfigDialog(QDialog):
+    def __init__(self, language, csv_separator, name_pattern):
+        super().__init__()
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel,
+                                   Qt.Horizontal, self)
+        buttons.accepted.connect(self._select)
+        buttons.rejected.connect(self.reject)
+        self.new_options = tuple()
 
-    def load(self, filename):
-        self.clear()
+        self.lang_box = QGroupBox('Input Serafin language')
+        hlayout = QHBoxLayout()
+        self.french_button = QRadioButton('French')
+        english_button = QRadioButton('English')
+        hlayout.addWidget(self.french_button)
+        hlayout.addWidget(english_button)
+        self.lang_box.setLayout(hlayout)
+        self.lang_box.setMaximumHeight(80)
+        if language == 'fr':
+            self.french_button.setChecked(True)
+        else:
+            english_button.setChecked(True)
 
-        self.current_line = QGraphicsLineItem()
-        self.addItem(self.current_line)
-        self.current_line.setVisible(False)
-        pen = QPen(QColor(0, 0, 0))
-        pen.setWidth(2)
-        self.current_line.setPen(pen)
-        self.current_port = None
+        self.csv_box = QComboBox()
+        self.csv_box.setFixedHeight(30)
+        for sep in ['Semicolon ;', 'Comma ,', 'Tab']:
+            self.csv_box.addItem(sep)
+        if csv_separator == ';':
+            self.csv_box.setCurrentIndex(0)
+        elif csv_separator == ',':
+            self.csv_box.setCurrentIndex(1)
+        else:
+            self.csv_box.setCurrentIndex(2)
 
-        self.nb_nodes = 0
-        self.nodes = {}
-        try:
-            with open(filename, 'r') as f:
-                nb_nodes, nb_links = map(int, f.readline().split())
-                for i in range(nb_nodes):
-                    line = f.readline().rstrip().split('|')
-                    category, name, index, x, y = line[:5]
-                    node = NODES[category][name](int(index))
-                    node.load(line[5:])
-                    self.nodes[int(index)] = node
-                    self.addItem(node)
-                    node.moveBy(float(x), float(y))
-                    self.nb_nodes += 1
-                for i in range(nb_links):
-                    from_node_index, from_port_index, to_node_index, to_port_index = map(int,
-                                                                                         f.readline().rstrip().split('|'))
-                    from_node = self.nodes[from_node_index]
-                    to_node = self.nodes[to_node_index]
-                    from_port = from_node.ports[from_port_index]
-                    to_port = to_node.ports[to_port_index]
-                    _, _ = add_link(from_port, to_port)
-                    link = Link(from_port, to_port)
-                    from_node.add_link(link)
-                    to_node.add_link(link)
-                    self.addItem(link)
-                    link.setZValue(-1)
-        except (IndexError, ValueError):
-             QMessageBox.critical(None, 'Error',
-                                  'The workspace file is not valid.',
-                                  QMessageBox.Ok)
-        self.update()
+        self.name_box = QGroupBox('Use naming pattern for output files')
+        self.name_box.setCheckable(True)
+        self.pattern = QLineEdit()
+        self.pattern.setFixedHeight(30)
+        if name_pattern is not None:
+            self.pattern.setText(name_pattern)
+        self.name_box.toggled.connect(self._toggle_name_pattern)
+
+        if name_pattern is not None:
+            self.name_box.setChecked(True)
+        else:
+            self.name_box.setChecked(False)
+
+        hlayout = QHBoxLayout()
+        hlayout.addWidget(QLabel('Append to input name'))
+        hlayout.addWidget(self.pattern)
+        self.name_box.setLayout(hlayout)
+
+        layout = QVBoxLayout()
+        layout.addWidget(self.lang_box)
+        hlayout = QHBoxLayout()
+        hlayout.addWidget(QLabel('CSV separator'))
+        hlayout.addWidget(self.csv_box, Qt.AlignLeft)
+        layout.addLayout(hlayout)
+        layout.addWidget(self.name_box)
+        layout.setSpacing(20)
+        layout.addStretch()
+        layout.addWidget(buttons)
+        self.setLayout(layout)
+
+        self.setWindowTitle('Workspace global configuration')
+        self.resize(self.sizeHint())
+
+    def _toggle_name_pattern(self, checked):
+        self.pattern.setEnabled(checked)
+        if not checked:
+            self.pattern.clear()
+        elif not self.pattern.text():
+            self.pattern.setText('_result')
+
+    def _select(self):
+        if self.name_box.isChecked():
+            pattern = self.pattern.text()
+            if not pattern:
+                QMessageBox.critical(None, 'Error',
+                                     'The naming pattern cannot be empty!',
+                                     QMessageBox.Ok)
+                return
+            elif len(pattern.split()) > 1:
+                QMessageBox.critical(None, 'Error',
+                                     'The naming pattern should not contain spaces!',
+                                     QMessageBox.Ok)
+                return
+            elif '.' in pattern:
+                QMessageBox.critical(None, 'Error',
+                                     'The naming pattern should not contain spaces!',
+                                     QMessageBox.Ok)
+                return
+            else:
+                splitted = pattern.split('_')
+                for part in splitted:
+                    if not part:
+                        continue
+                    if not part.isalnum():
+                        QMessageBox.critical(None, 'Error',
+                                             'The naming pattern should only contain letters, numbers and underscores.',
+                                             QMessageBox.Ok)
+                        return
+        else:
+            pattern = None
+
+        separator = {0: ';', 1: ',', 2: '\t'}[self.csv_box.currentIndex()]
+        language = ['en', 'fr'][self.french_button.isChecked()]
+        self.new_options = (language, separator, pattern)
+        self.accept()
 

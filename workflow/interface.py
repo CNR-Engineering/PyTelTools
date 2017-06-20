@@ -153,13 +153,15 @@ class NodeTree(QTreeWidget):
                 node.addChild(QTreeWidgetItem([node_text]))
 
         self.setDragEnabled(True)
-        self.setMaximumWidth(200)
+        self.setMaximumWidth(230)
         self.setColumnCount(1)
         self.setHeaderLabel('Add Nodes')
 
     def mousePressEvent(self, event):
         super().mousePressEvent(event)
         current_item = self.currentItem()
+        if current_item is None:
+            return
         if current_item.parent() is not None:
             drag = QDrag(self)
             mime_data = QMimeData()
@@ -171,19 +173,32 @@ class NodeTree(QTreeWidget):
 class MainWindow(QWidget):
     def __init__(self):
         super().__init__()
-        self.tree = TreePanel()
-
+        tree = TreePanel()
         node_list = NodeTree()
+
+        left_panel = QWidget()
+        config_button = QPushButton('Global\nConfiguration')
+        config_button.setMinimumHeight(40)
+        config_button.setMaximumWidth(230)
+        config_button.clicked.connect(tree.view.scene().global_config)
+
+        vlayout = QVBoxLayout()
+        vlayout.addWidget(config_button)
+        vlayout.addWidget(node_list)
+        vlayout.setContentsMargins(0, 0, 0, 0)
+        left_panel.setLayout(vlayout)
+
         splitter = QSplitter()
-        splitter.addWidget(node_list)
-        splitter.addWidget(self.tree)
+        splitter.addWidget(left_panel)
+        splitter.addWidget(tree)
         splitter.setHandleWidth(10)
         splitter.setCollapsible(0, False)
+        splitter.setCollapsible(1, False)
+        splitter.setStretchFactor(1, 1)
 
         mainLayout = QHBoxLayout()
         mainLayout.addWidget(splitter)
         self.setLayout(mainLayout)
-        self.resize(self.sizeHint())
 
 
 def exception_hook(exctype, value, traceback):
@@ -200,8 +215,8 @@ if __name__ == '__main__':
     sys.excepthook = exception_hook
 
     app = QApplication(sys.argv)
-    view = MainWindow()
-    view.show()
+    widget = MainWindow()
+    widget.showMaximized()
     app.exec_()
 
 
