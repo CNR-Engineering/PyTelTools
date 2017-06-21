@@ -169,7 +169,7 @@ MANNING_EQUATION = Equation((W, H, M), US, COMPUTE_MANNING)
 NIKURADSE_EQUATION = Equation((W, H, M), US, COMPUTE_NIKURADSE)
 
 # a very special equation
-rouse_equation = lambda ws_id, ws: Equation((Variable(ws_id, None, None, None), US), ROUSE, compute_ROUSE(ws))
+rouse_equation = lambda ws_id, ws: Equation((Variable(ws_id, None, None, None, -1), US), ROUSE, compute_ROUSE(ws))
 
 
 def is_basic_variable(var_ID):

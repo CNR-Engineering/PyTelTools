@@ -137,6 +137,7 @@ class Node(QGraphicsItem):
         self.links.add(link)
         if self.state != Node.NOT_CONFIGURED:
             self.state = Node.READY
+            self.message = ''
 
     def remove_link(self, link):
         self.links.remove(link)

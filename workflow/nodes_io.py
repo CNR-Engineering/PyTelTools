@@ -5,7 +5,7 @@ from copy import deepcopy
 import datetime
 import os
 import struct
-from workflow.Node import Node, SingleOutputNode, SingleInputNode
+from workflow.Node import Node, SingleOutputNode, SingleInputNode, OneInOneOutNode
 from slf import Serafin
 from slf.variables import do_calculations_in_frame
 import slf.misc as operations
@@ -180,14 +180,16 @@ class LoadSerafinNode(SingleOutputNode):
         self.success(self.data.header.summary())
 
 
-class WriteSerafinNode(SingleInputNode):
+class WriteSerafinNode(OneInOneOutNode):
     def __init__(self, index):
         super().__init__(index)
         self.in_port.data_type = 'slf'
+        self.out_port.data_type = 'slf'
         self.category = 'Input/Output'
         self.label = 'Write\nSerafin'
         self.name_box = None
         self.filename = ''
+        self.data = None
 
     def get_option_panel(self):
         open_button = QPushButton(QWidget().style().standardIcon(QStyle.SP_DialogSaveButton),
@@ -230,6 +232,9 @@ class WriteSerafinNode(SingleInputNode):
     def save(self):
         return '|'.join([self.category, self.name(), str(self.index()),
                          str(self.pos().x()), str(self.pos().y()), self.filename])
+
+    def add_link(self, link):
+        self.links.add(link)
 
     def load(self, options):
         self.filename = options[0]
@@ -388,6 +393,8 @@ class WriteSerafinNode(SingleInputNode):
             self._run_arrival_duration(input_data)
 
         self.success()
+        self.data = SerafinData(self.filename, input_data.language)
+        self.data.read()
 
 
 class LoadPolygon2DNode(SingleOutputNode):
