@@ -109,6 +109,46 @@ class CSVData:
             output_stream.write('\n')
 
 
+class PolylineData:
+    def __init__(self):
+        self.lines = []
+        self.fields = []
+
+    def __len__(self):
+        return len(self.lines)
+
+    def add_line(self, line):
+        self.lines.append(line)
+
+    def set_fields(self, fields):
+        self.fields = fields[:]
+
+    def is_empty(self):
+        return len(self.lines) == 0
+
+
+class PointData:
+    def __init__(self):
+        self.points = []
+        self.attributes = []
+        self.fields = []
+
+    def __len__(self):
+        return len(self.points)
+
+    def add_point(self, point):
+        self.points.append(point)
+
+    def add_attribute(self, attribute):
+        self.points.append(attribute)
+
+    def set_fields(self, fields):
+        self.fields = fields[:]
+
+    def is_empty(self):
+        return len(self.points) == 0
+
+
 class LoadSerafinNode(SingleOutputNode):
     def __init__(self, index):
         super().__init__(index)
@@ -459,21 +499,24 @@ class LoadPolygon2DNode(SingleOutputNode):
         except PermissionError:
             self.fail('Access denied.')
             return
-        self.data = []
+        self.data = PolylineData()
         is_i2s = self.filename[-4:] == '.i2s'
         if is_i2s:
             with BlueKenue.Read(self.filename) as f:
                 f.read_header()
                 for poly in f.get_polygons():
-                    self.data.append(poly)
+                    self.data.add_line(poly)
+            self.data.set_fields(['Value'])
         else:
             try:
                 for polygon in Shapefile.get_polygons(self.filename):
-                    self.data.append(polygon)
+                    self.data.add_line(polygon)
             except struct.error:
                 self.fail('Inconsistent bytes.')
                 return
-        if not self.data:
+            self.data.set_fields(Shapefile.get_all_fields(self.filename))
+
+        if self.data.is_empty():
             self.fail('the file does not contain any polygon.')
             return
 
@@ -543,21 +586,24 @@ class LoadOpenPolyline2DNode(SingleOutputNode):
         except PermissionError:
             self.fail('Access denied.')
             return
-        self.data = []
+        self.data = PolylineData()
         is_i2s = self.filename[-4:] == '.i2s'
         if is_i2s:
             with BlueKenue.Read(self.filename) as f:
                 f.read_header()
                 for poly in f.get_open_polylines():
-                    self.data.append(poly)
+                    self.data.add_line(poly)
+            self.data.set_fields(['Value'])
         else:
             try:
                 for poly in Shapefile.get_open_polylines(self.filename):
-                    self.data.append(poly)
+                    self.data.add_line(poly)
             except struct.error:
                 self.fail('Inconsistent bytes.')
                 return
-        if not self.data:
+            self.data.set_fields(Shapefile.get_all_fields(self.filename))
+
+        if self.data.is_empty():
             self.fail('the file does not contain any 2D open polyline.')
             return
 
@@ -708,14 +754,16 @@ class LoadPoint2DNode(SingleOutputNode):
         except PermissionError:
             self.fail('Access denied.')
             return
-        self.data = []
+        self.data = PointData()
         try:
             for point, attribute in Shapefile.get_points(self.filename):
-                self.data.append(point)
+                self.data.add_point(point)
+                self.data.add_attribute(attribute)
         except struct.error:
             self.fail('Inconsistent bytes.')
             return
-        if not self.data:
+        self.data.set_fields(Shapefile.get_all_fields(self.filename))
+        if self.data.is_empty():
             self.fail('the file does not contain any points.')
             return
         self.success('The file contains {} point{}.'.format(len(self.data),

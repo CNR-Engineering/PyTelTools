@@ -9,6 +9,11 @@ from .geometry import Polyline
 from struct import pack, error
 
 
+def get_shape_type(input_filename):
+    sf = shapefile.Reader(input_filename)
+    return sf.shapeType
+
+
 def get_lines(input_filename, shape_type):
     sf = shapefile.Reader(input_filename)
     for record in sf.shapeRecords():
@@ -22,18 +27,17 @@ def get_lines(input_filename, shape_type):
 
 
 def get_open_polylines(input_filename):
-    for poly in get_lines(input_filename, 3):
-        yield poly
+    shape_type = get_shape_type(input_filename)
+    if shape_type in (3, 13):
+        for poly in get_lines(input_filename, shape_type):
+            yield poly
 
 
 def get_polygons(input_filename):
-    for poly in get_lines(input_filename, 5):
-        yield poly
-
-
-def get_shape_type(input_filename):
-    sf = shapefile.Reader(input_filename)
-    return sf.shapeType
+    shape_type = get_shape_type(input_filename)
+    if shape_type in (5, 15):
+        for poly in get_lines(input_filename, shape_type):
+            yield poly
 
 
 def get_all_fields(input_filename):

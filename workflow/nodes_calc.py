@@ -596,7 +596,7 @@ class ComputeVolumeNode(TwoInOneOutNode):
 
         self.progress_bar.setVisible(True)
         self.in_data = self.first_in_port.mother.parentItem().data
-        polygons = self.second_in_port.mother.parentItem().data
+        polygons = self.second_in_port.mother.parentItem().data.lines
         polygon_names = ['Polygon %d' % (i+1) for i in range(len(polygons))]
         if self.sup_volume:
             volume_type = VolumeCalculator.POSITIVE
@@ -816,7 +816,7 @@ class ComputeFluxNode(TwoInOneOutNode):
 
         self.progress_bar.setVisible(True)
         self.in_data = self.first_in_port.mother.parentItem().data
-        sections = self.second_in_port.mother.parentItem().data
+        sections = self.second_in_port.mother.parentItem().data.lines
         section_names = ['Section %d' % (i+1) for i in range(len(sections))]
 
         var_IDs = list(self.flux_options.split(':')[1].split('(')[1][:-1].split(', '))
@@ -916,7 +916,7 @@ class InterpolateOnPointsNode(TwoInOneOutNode):
         if not selected_vars:
             self.fail('no variable available.')
             return
-        points = self.second_in_port.mother.parentItem().data
+        points = self.second_in_port.mother.parentItem().data.points
 
         mesh = MeshInterpolator(input_data.header, False)
 
@@ -1008,7 +1008,7 @@ class InterpolateAlongLinesNode(TwoInOneOutNode):
         if not selected_vars:
             self.fail('no variable available.')
             return
-        lines = self.second_in_port.mother.parentItem().data
+        lines = self.second_in_port.mother.parentItem().data.lines
 
         mesh = MeshInterpolator(input_data.header, False)
 
@@ -1179,7 +1179,7 @@ class ProjectLinesNode(TwoInOneOutNode):
 
         self.progress_bar.setVisible(True)
 
-        lines = self.second_in_port.mother.parentItem().data
+        lines = self.second_in_port.mother.parentItem().data.lines
 
         mesh = MeshInterpolator(input_data.header, False)
 
