@@ -43,7 +43,7 @@ class WriteCSVProcess(OutputThread):
             line_interpolator, _ = line_interpolators[id_line]
             distances = []
             for x, y, _, __ in line_interpolator:
-                distances.append(reference.project(Point(x, y)))
+                distances.append(reference.project(x, y))
 
             for (x, y, (i, j, k), interpolator), distance in zip(line_interpolator, distances):
                 if self.canceled:
@@ -821,7 +821,7 @@ class ImageTab(QWidget):
                     values[line_id][var] = []
 
                 for x, y, (i, j, k), interpolator in line_interpolators[line_id]:
-                    d = reference.project(Point(x, y))
+                    d = reference.project(x, y)
                     if d <= 0 or d >= max_distance:
                         continue
                     distances[line_id].append(d)

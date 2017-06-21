@@ -3,7 +3,7 @@ Geometrical objects
 """
 
 import numpy as np
-from shapely.geometry import LineString as OpenPolyline, Polygon as ClosedPolyline, MultiPolygon
+from shapely.geometry import Point, MultiPolygon, LineString as OpenPolyline, Polygon as ClosedPolyline
 
 
 class Polyline:
@@ -73,8 +73,8 @@ class Polyline:
     def polyline(self):
         return self._polyline
 
-    def project(self, point):
-        return self._polyline.project(point)
+    def project(self, x, y):
+        return self._polyline.project(Point(x, y))
 
     def segments(self):
         prev_x, prev_y = None, None

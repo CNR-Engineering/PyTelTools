@@ -674,7 +674,7 @@ class ComputeFluxNode(TwoInOneOutNode):
     def _select(self):
         self.new_options = self.flux_type_box.currentText()
 
-    def _prepare_flux_options(self, available_vars, available_var_names):
+    def _prepare_options(self, available_vars, available_var_names):
         self.flux_type_box = QComboBox()
         self.flux_type_box.setFixedSize(400, 30)
         if 'U' in available_vars and 'V' in available_vars:
@@ -744,7 +744,7 @@ class ComputeFluxNode(TwoInOneOutNode):
                 return
         available_vars = [var for var in parent_node.data.header.var_IDs if var in parent_node.data.selected_vars]
         available_var_names = [parent_node.data.selected_vars_names[var][0] for var in available_vars]
-        has_options = self._prepare_flux_options(available_vars, available_var_names)
+        has_options = self._prepare_options(available_vars, available_var_names)
         if has_options:
             self._reset()
         else:
@@ -790,7 +790,7 @@ class ComputeFluxNode(TwoInOneOutNode):
                 return
         available_vars = [var for var in parent_node.data.header.var_IDs if var in parent_node.data.selected_vars]
         available_var_names = [parent_node.data.selected_vars_names[var][0] for var in available_vars]
-        has_options = self._prepare_flux_options(available_vars, available_var_names)
+        has_options = self._prepare_options(available_vars, available_var_names)
         if not has_options:
             QMessageBox.critical(None, 'Error', 'No flux is computable from the input file.',
                                  QMessageBox.Ok)
@@ -874,7 +874,7 @@ class ComputeFluxNode(TwoInOneOutNode):
         self.success()
 
 
-class InterpolateOnPoints(TwoInOneOutNode):
+class InterpolateOnPointsNode(TwoInOneOutNode):
     def __init__(self, index):
         super().__init__(index)
         self.category = 'Calculations'
@@ -966,7 +966,7 @@ class InterpolateOnPoints(TwoInOneOutNode):
         self.success('{} point{} inside the mesh.'.format(nb_inside, 's are' if nb_inside > 1 else ' is'))
 
 
-class InterpolateAlongLines(TwoInOneOutNode):
+class InterpolateAlongLinesNode(TwoInOneOutNode):
     def __init__(self, index):
         super().__init__(index)
         self.category = 'Calculations'
@@ -1074,5 +1074,180 @@ class InterpolateAlongLines(TwoInOneOutNode):
                                                                's intersect' if nb_nonempty > 1 else ' intersects'))
 
 
+class ProjectLinesNode(TwoInOneOutNode):
+    def __init__(self, index):
+        super().__init__(index)
+        self.category = 'Calculations'
+        self.label = 'Project\nLines'
+        self.out_port.data_type = 'csv'
+        self.first_in_port.data_type = 'slf'
+        self.second_in_port.data_type = 'polyline 2d'
+        self.data = None
+
+        self.reference_index = -1
+        self.reference_box = None
+        self.new_option = -1
+
+    def get_option_panel(self):
+        option_panel = QWidget()
+        layout = QHBoxLayout()
+        layout.addWidget(QLabel('     Select the reference line'))
+        layout.addWidget(self.reference_box)
+        option_panel.setLayout(layout)
+        option_panel.destroyed.connect(self._select)
+        return option_panel
+
+    def _select(self):
+        self.new_option = int(self.reference_box.currentText().split()[1]) - 1
+
+    def _prepare_options(self, nb_lines):
+        self.reference_box = QComboBox()
+        self.reference_box.setFixedSize(400, 30)
+        for i in range(1, nb_lines+1):
+            self.reference_box.addItem('Line %d' % i)
+
+    def add_link(self, link):
+        self.links.add(link)
+
+    def configure(self):
+        if not self.first_in_port.has_mother() or not self.second_in_port.has_mother():
+            QMessageBox.critical(None, 'Error', 'Connect and run the input before configure this node!',
+                                 QMessageBox.Ok)
+            return
+
+        parent_node = self.first_in_port.mother.parentItem()
+        if parent_node.state != Node.SUCCESS:
+            if parent_node.ready_to_run():
+                parent_node.run()
+            else:
+                QMessageBox.critical(None, 'Error', 'Configure and run the input before configure this node!',
+                                     QMessageBox.Ok)
+                return
+            if parent_node.state != Node.SUCCESS:
+                QMessageBox.critical(None, 'Error', 'Configure and run the input before configure this node!',
+                                     QMessageBox.Ok)
+                return
+        if len(parent_node.data.selected_time_indices) != 1:
+            QMessageBox.critical(None, 'Error', 'Choose one single time frame first!',
+                                 QMessageBox.Ok)
+            return
+
+        available_vars = [var for var in parent_node.data.header.var_IDs if var in parent_node.data.selected_vars]
+        if not available_vars:
+            QMessageBox.critical(None, 'Error', 'No variable available.',
+                                 QMessageBox.Ok)
+            return
+
+        line_node = self.second_in_port.mother.parentItem()
+        if line_node.state != Node.SUCCESS:
+            if line_node.ready_to_run():
+                line_node.run()
+            else:
+                QMessageBox.critical(None, 'Error', 'Configure and run the input before configure this node!',
+                                     QMessageBox.Ok)
+                return
+            if line_node.state != Node.SUCCESS:
+                QMessageBox.critical(None, 'Error', 'Configure and run the input before configure this node!',
+                                     QMessageBox.Ok)
+                return
+        self._prepare_options(len(line_node.data))
+
+        if super().configure():
+            self.reference_index = self.new_option
+        self.reconfigure_downward()
+
+    def reconfigure(self):
+        super().reconfigure()
+        self.state = Node.NOT_CONFIGURED
+        self.reconfigure_downward()
+
+    def save(self):
+        return '|'.join([self.category, self.name(), str(self.index()),
+                         str(self.pos().x()), str(self.pos().y()), ''])
+
+    def load(self, options):
+        pass
+
+    def run(self):
+        success = super().run_upward()
+        if not success:
+            self.fail('input failed.')
+            return
+        input_data = self.first_in_port.mother.parentItem().data
+        time_index = input_data.selected_time_indices[0]
+        selected_vars = [var for var in input_data.header.var_IDs if var in input_data.selected_vars]
+
+        self.progress_bar.setVisible(True)
+
+        lines = self.second_in_port.mother.parentItem().data
+
+        mesh = MeshInterpolator(input_data.header, False)
+
+        if input_data.has_index:
+            mesh.index = input_data.index
+            mesh.triangles = input_data.triangles
+        else:
+            self.construct_mesh(mesh)
+            input_data.has_index = True
+            input_data.index = mesh.index
+            input_data.triangles = mesh.triangles
+
+        nb_nonempty = 0
+        indices_nonempty = []
+        line_interpolators = []
+
+        for i, line in enumerate(lines):
+            line_interpolator, distance, _, _ = mesh.get_line_interpolators(line)
+
+            if line_interpolator:
+                nb_nonempty += 1
+                indices_nonempty.append(i)
+
+            line_interpolators.append((line_interpolator, distance))
+
+        if nb_nonempty == 0:
+            self.fail('no polyline intersects the mesh continuously.')
+            return
+        elif self.reference_index not in indices_nonempty:
+            self.fail('the reference line does not intersect the mesh continuously.')
+            return
+
+        reference = lines[self.reference_index]
+
+        header = ['line', 'x', 'y', 'distance'] + selected_vars
+        self.data = CSVData(input_data.filename, header)
+
+        nb_lines = len(indices_nonempty)
+        max_distance = reference.length()
+        with Serafin.Read(input_data.filename, input_data.language) as input_stream:
+            input_stream.header = input_data.header
+            input_stream.time = input_data.time
+
+            var_values = []
+            for var in selected_vars:
+                var_values.append(input_stream.read_var_in_frame(time_index, var))
+
+            for u, id_line in enumerate(indices_nonempty):
+                line_interpolator, _ = line_interpolators[id_line]
+                distances = []
+                for x, y, _, __ in line_interpolator:
+                    distances.append(reference.project(x, y))
+
+                for (x, y, (i, j, k), interpolator), distance in zip(line_interpolator, distances):
+                    if distance <= 0 or distance >= max_distance:
+                        continue
+                    row = [str(id_line+1), '%.6f' % x, '%.6f' % y, '%.6f' % distance]
+
+                    for i_var, var in enumerate(selected_vars):
+                        values = var_values[i_var]
+                        row.append('%.6f' % interpolator.dot(values[[i, j, k]]))
+
+                    self.data.add_row(row)
+
+                self.progress_bar.setValue(100 * (u+1) / nb_lines)
+                QApplication.processEvents()
+
+        self.success('{} line{} the mesh continuously.'.format(nb_nonempty,
+                                                               's intersect' if nb_nonempty > 1 else ' intersects'))
 
 
