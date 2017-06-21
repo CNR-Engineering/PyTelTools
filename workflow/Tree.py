@@ -3,6 +3,7 @@ from workflow.Link import Link
 from workflow.nodes_io import *
 from workflow.nodes_op import *
 from workflow.nodes_calc import *
+from workflow.nodes_vis import *
 
 
 NODES = {'Input/Output': {'Load Serafin': LoadSerafinNode,
@@ -17,7 +18,9 @@ NODES = {'Input/Output': {'Load Serafin': LoadSerafinNode,
                           'Compute Volume': ComputeVolumeNode, 'Compute Flux': ComputeFluxNode,
                           'Interpolate on Points': InterpolateOnPointsNode,
                           'Interpolate along Lines': InterpolateAlongLinesNode,
-                          'Project Lines': ProjectLinesNode}}
+                          'Project Lines': ProjectLinesNode},
+         'Visualization': {'Show Mesh': ShowMeshNode,
+                           'Locate Open Lines': LocateOpenLinesNode, 'Locate Polygons': LocatePolygonsNode}}
 
 
 def add_link(from_port, to_port):

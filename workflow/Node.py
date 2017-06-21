@@ -419,6 +419,46 @@ class TwoInOneOutNode(Node):
                                 QMessageBox.Ok)
 
 
+class DoubleInputNode(Node):
+    def __init__(self, index):
+        super().__init__(index)
+        self.first_in_port = InputPort(0, -Port.WIDTH, Box.HEIGHT/4-Port.WIDTH/2)
+        self.second_in_port = InputPort(1, -Port.WIDTH, 3*Box.HEIGHT/4-Port.WIDTH/2)
+        self.add_port(self.first_in_port)
+        self.add_port(self.second_in_port)
+        self.proxy.setZValue(10)
+        self.help_action.triggered.connect(self.help)
+
+    def ready_to_run(self):
+        if self.state == Node.NOT_CONFIGURED:
+            return False
+        if not self.first_in_port.has_mother():
+            return False
+        if not self.second_in_port.has_mother():
+            return False
+        return self.first_in_port.mother.parentItem().ready_to_run() and\
+               self.second_in_port.mother.parentItem().ready_to_run()
+
+    def run_upward(self):
+        success = self.first_in_port.mother.parentItem().run_upward() and \
+                  self.second_in_port.mother.parentItem().run_upward()
+        if not success:
+            return False
+        if self.first_in_port.mother.parentItem().state != Node.SUCCESS:
+            self.first_in_port.mother.parentItem().run()
+        if self.second_in_port.mother.parentItem().state != Node.SUCCESS:
+            self.second_in_port.mother.parentItem().run()
+        return self.first_in_port.mother.parentItem().state == Node.SUCCESS and\
+               self.second_in_port.mother.parentItem().state == Node.SUCCESS
+
+    def help(self):
+        QMessageBox.information(None, 'Help',
+                                'First input type: %s\n'
+                                'Second input type: %s' % (self.first_in_port.data_type,
+                                                           self.second_in_port.data_type),
+                                QMessageBox.Ok)
+
+
 class ConfigureDialog(QDialog):
     def __init__(self, panel, label):
         super().__init__()
