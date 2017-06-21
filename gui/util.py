@@ -157,6 +157,7 @@ class TimeSlider(QSlider):
             self.display.index.setText(str(self.value()+1))
             return
         self.setValue(value-1)
+        self.display.updateSelection()
 
 
 class TimeSliderIndexOnly(TimeSlider):
