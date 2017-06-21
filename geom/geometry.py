@@ -163,6 +163,9 @@ class Polyline:
         new_m = []
         coords = list(self.coords())
 
+        new_coords.append(coords[0])
+        new_m.append(self.m[0])
+
         for i in range(self.nb_points()-1):
             first_point, second_point = coords[i], coords[i+1]
             segment = OpenPolyline([first_point, second_point])
@@ -174,8 +177,6 @@ class Polyline:
             else:
                 interpolate_m = True
 
-            new_coords.append(first_point)
-            new_m.append(first_m)
             for j in range(1, nb_segments):
                 new_point = list(segment.interpolate(j*inv_nb_segments, normalized=True).coords)[0]
                 new_coords.append(new_point)
@@ -186,4 +187,4 @@ class Polyline:
                     new_m.append(None)
             new_coords.append(second_point)
             new_m.append(second_m)
-        return Polyline(list(map(tuple, new_coords)), self.attributes(), m_array=new_m)
+        return Polyline(new_coords, self.attributes(), m_array=new_m)
