@@ -247,6 +247,7 @@ class Node(QGraphicsItem):
         self.message = 'Successful. ' + message
 
     def fail(self, message):
+        self.progress_bar.setVisible(False)
         self.state = Node.FAIL
         self.update()
         self.message = 'Failed: ' + message
