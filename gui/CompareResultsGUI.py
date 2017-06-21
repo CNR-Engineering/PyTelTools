@@ -5,7 +5,8 @@ from PyQt5.QtCore import *
 
 import numpy as np
 
-from gui.util import PlotViewer, MapViewer, PolygonMapCanvas, ColorMapCanvas, LoadMeshDialog, TimeSlider, TelToolWidget, testOpen
+from gui.util import PlotViewer, MapViewer, PolygonMapCanvas, ColorMapCanvas, LoadMeshDialog, \
+    TimeSliderIndexOnly as TimeSlider, TelToolWidget, testOpen
 from slf import Serafin
 from geom import BlueKenue, Shapefile
 

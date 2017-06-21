@@ -119,12 +119,8 @@ class TimeSlider(QSlider):
         self.click_offset = new_pos
 
         # update the tip
-        style = QApplication.style()
-        rectHandle = style.subControlRect(style.CC_Slider, opt, style.SC_SliderHandle)
-        pos = rectHandle.topLeft()
-        pos.setX(pos.x())
-        pos = self.mapToGlobal(pos)
-        QToolTip.showText(pos, str(self.value()+1), self)
+        pos = self.mapToGlobal(event.pos())
+        QToolTip.showText(pos, str(self.display.dates[self.value()]), self)
 
         self.update()
 
@@ -155,7 +151,63 @@ class TimeSlider(QSlider):
         try:
             value = int(self.display.index.text())
         except ValueError:
-            self.display.index.setText(str(self.index.value()+1))
+            self.display.index.setText(str(self.value()+1))
+            return
+        if value <= 0 or value > self.nb_frames:
+            self.display.index.setText(str(self.value()+1))
+            return
+        self.setValue(value-1)
+
+
+class TimeSliderIndexOnly(TimeSlider):
+    def __init__(self, display):
+        super().__init__(display)
+
+    def __pick(self, pt):
+        return pt.x()
+
+    def __pixelPosToRangeValue(self, pos):
+        opt = QStyleOptionSlider()
+        self.initStyleOption(opt)
+        style = QApplication.style()
+
+        gr = style.subControlRect(style.CC_Slider, opt, style.SC_SliderGroove, self)
+        sr = style.subControlRect(style.CC_Slider, opt, style.SC_SliderHandle, self)
+
+        slider_length = sr.width()
+        slider_min = gr.x()
+        slider_max = gr.right() - slider_length + 1
+
+        return style.sliderValueFromPosition(self.minimum(), self.maximum(),
+                                             pos-slider_min, slider_max-slider_min,
+                                             opt.upsideDown)
+
+    def mouseMoveEvent(self, event):
+        if self.pressed_control != QStyle.SC_SliderHandle:
+            event.ignore()
+            return
+
+        event.accept()
+        new_pos = self.__pixelPosToRangeValue(self.__pick(event.pos()))
+        opt = QStyleOptionSlider()
+        self.initStyleOption(opt)
+        self._value = new_pos
+        self.click_offset = new_pos
+
+        # update the tip
+        pos = self.mapToGlobal(event.pos())
+        QToolTip.showText(pos, str(1 + self.value()), self)
+
+        self.update()
+
+    def mouseReleaseEvent(self, event):
+        self.display.setText(str(1 + self.value()))
+
+    def enterIndexEvent(self):
+        try:
+            value = int(self.display.text())
+        except ValueError:
+            self.display.index.setText(str(self.value()+1))
             return
         if value <= 0 or value > self.nb_frames:
             self.display.index.setText(str(self.value()+1))
@@ -375,19 +427,12 @@ class TimeRangeSlider(QSlider):
         self.click_offset = new_pos
 
          # update the tip
-        style = QApplication.style()
-
-        rectHandle = style.subControlRect(style.CC_Slider, opt, style.SC_SliderHandle)
-
         if self.active_slider == 0:
-            pos_low = rectHandle.topLeft()
-            pos_low.setX(pos_low.x() + self._low)
-            pos_low = self.mapToGlobal(pos_low)
+            pos_low = self.mapToGlobal(event.pos())
             QToolTip.showText(pos_low, str(self.low()), self)
         elif self.active_slider == 1:
-            pos_high = rectHandle.topLeft()
-            pos_high.setX(pos_high.x() + self._high)
-            pos_high = self.mapToGlobal(pos_high)
+            pos_high = self.mapToGlobal(event.pos())
+
             QToolTip.showText(pos_high, str(self.high()), self)
 
         self.update()
