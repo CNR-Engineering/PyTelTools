@@ -358,7 +358,7 @@ class InputTab(QWidget):
         options = QFileDialog.Options()
         options |= QFileDialog.DontUseNativeDialog
         filename, _ = QFileDialog.getOpenFileName(self, 'Open a .i2s or .shp file', '',
-                                                  'Polyline file (*.i2s *.shp);', options=options)
+                                                  'Polyline file (*.i2s *.shp)', options=options)
         if not filename:
             return
         if not testOpen(filename):
