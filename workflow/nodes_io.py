@@ -7,6 +7,7 @@ import os
 import struct
 from workflow.Node import Node, SingleOutputNode, SingleInputNode, OneInOneOutNode
 from slf import Serafin
+from slf.interpolation import MeshInterpolator
 from slf.variables import do_calculations_in_frame
 import slf.misc as operations
 from geom import BlueKenue, Shapefile
@@ -293,6 +294,8 @@ class WriteSerafinNode(OneInOneOutNode):
 
                     self.progress_bar.setValue(100 * (i+1) / len(input_data.selected_time_indices))
                     QApplication.processEvents()
+        self.success()
+        return True
 
     def _run_max_min_mean(self, input_data):
         selected = [(var, input_data.selected_vars_names[var][0],
@@ -345,6 +348,8 @@ class WriteSerafinNode(OneInOneOutNode):
             with Serafin.Write(self.filename, input_data.language, True) as resout:
                 resout.write_header(output_header)
                 resout.write_entire_frame(output_header, input_data.time[0], values)
+        self.success()
+        return True
 
     def _run_arrival_duration(self, input_data):
         conditions, table, time_unit = input_data.metadata['conditions'], \
@@ -396,6 +401,97 @@ class WriteSerafinNode(OneInOneOutNode):
             with Serafin.Write(self.filename, input_data.language, True) as resout:
                 resout.write_header(output_header)
                 resout.write_entire_frame(output_header, input_data.time[0], values)
+        self.success()
+        return True
+
+    def _run_project_mesh(self, first_input):
+        operation_type = first_input.operator
+        second_input = first_input.metadata['operand']
+
+        if second_input.filename == self.filename:
+            self.fail('cannot overwrite to the input file.')
+            return
+
+        # common vars
+        first_vars = [var for var in first_input.header.var_IDs if var in first_input.selected_vars]
+        second_vars = [var for var in second_input.header.var_IDs if var in second_input.selected_vars]
+        common_vars = []
+        for var in first_vars:
+            if var in second_vars:
+                common_vars.append(var)
+        if not common_vars:
+            self.fail('the two input files do not share common variables.')
+            return False
+
+        # common frames
+        first_frames = [first_input.start_time + first_input.time_second[i]
+                        for i in first_input.selected_time_indices]
+        second_frames = [second_input.start_time + second_input.time_second[i]
+                         for i in second_input.selected_time_indices]
+        common_frames = []
+        for first_index, first_frame in zip(first_input.selected_time_indices, first_frames):
+            for second_index, second_frame in zip(second_input.selected_time_indices, second_frames):
+                if first_frame == second_frame:
+                    common_frames.append((first_index, second_index))
+        if not common_frames:
+            self.fail('the two input files do not share common time frames.')
+            return False
+
+        # construct output header
+        output_header = first_input.header.copy()
+        output_header.nb_var = len(common_vars)
+        output_header.var_IDs, output_header.var_names, output_header.var_units = [], [], []
+        for var in common_vars:
+            name, unit = first_input.selected_vars_names[var]
+            output_header.var_IDs.append(var)
+            output_header.var_names.append(name)
+            output_header.var_units.append(unit)
+        if first_input.to_single:
+            output_header.to_single_precision()
+
+        # map points of A onto mesh B
+        mesh = MeshInterpolator(second_input.header, False)
+
+        if second_input.has_index:
+            mesh.index = second_input.index
+            mesh.triangles = second_input.triangles
+        else:
+            self.construct_mesh(mesh)
+            second_input.has_index = True
+            second_input.index = mesh.index
+            second_input.triangles = mesh.triangles
+
+        is_inside, point_interpolators = mesh.get_point_interpolators(list(zip(first_input.header.x,
+                                                                               first_input.header.y)))
+
+        # run the calculator
+        with Serafin.Read(first_input.filename, first_input.language) as first_in:
+            first_in.header = first_input.header
+            first_in.time = first_input.time
+
+            with Serafin.Read(second_input.filename, second_input.language) as second_in:
+                second_in.header = second_input.header
+                second_in.time = second_input.time
+
+                calculator = operations.ProjectMeshCalculator(first_in, second_in, common_vars, is_inside,
+                                                              point_interpolators, common_frames, operation_type)
+
+                with Serafin.Write(self.filename, first_input.language, True) as out_stream:
+                    out_stream.write_header(output_header)
+
+                    for i, (first_time_index, second_time_index) in enumerate(calculator.time_indices):
+                        values = calculator.operation_in_frame(first_time_index, second_time_index)
+                        out_stream.write_entire_frame(output_header,
+                                                      calculator.first_in.time[first_time_index], values)
+
+                        self.progress_bar.setValue(100 * (i+1) / len(common_frames))
+                        QApplication.processEvents()
+
+        self.success('The two files has {} common variables and {} common frames.\n'
+                     'The mesh A has {} / {} nodes inside the mesh B.'.format(len(common_vars), len(common_frames),
+                                                                              sum(is_inside),
+                                                                              first_input.header.nb_nodes))
+        return True
 
     def run(self):
         success = super().run_upward()
@@ -408,7 +504,7 @@ class WriteSerafinNode(OneInOneOutNode):
             self.fail('cannot overwrite to the input file.')
             return
 
-        if not self.filename:
+        if not self.filename:  # is configure using naming pattern
             name_pattern = self.scene().name_pattern
             head, tail = os.path.splitext(input_data.filename)
             self.filename = ''.join([head, name_pattern, '.slf'])
@@ -422,19 +518,20 @@ class WriteSerafinNode(OneInOneOutNode):
 
         self.progress_bar.setVisible(True)
 
+        # do the actual calculation
         if input_data.operator is None:
-            self._run_simple(input_data)
+            success = self._run_simple(input_data)
         elif input_data.operator in (operations.MAX, operations.MIN, operations.MEAN):
-            self._run_max_min_mean(input_data)
-        elif input_data.operator == operations.DIFF:
-            self.fail('not implemented')
-            return
+            success = self._run_max_min_mean(input_data)
+        elif input_data.operator in (operations.PROJECT, operations.DIFF, operations.REV_DIFF,
+                                     operations.MAX_BETWEEN, operations.MIN_BETWEEN):
+            success = self._run_project_mesh(input_data)
         else:
-            self._run_arrival_duration(input_data)
+            success = self._run_arrival_duration(input_data)
 
-        self.success()
-        self.data = SerafinData(self.filename, input_data.language)
-        self.data.read()
+        if success:  # reload the output file
+            self.data = SerafinData(self.filename, input_data.language)
+            self.data.read()
 
 
 class LoadPolygon2DNode(SingleOutputNode):

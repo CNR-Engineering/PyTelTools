@@ -11,7 +11,7 @@ module_logger = logging.getLogger(__name__)
 
 # constants
 OPERATORS = ['+', '-', '*', '/', '^', 'sqrt']
-MAX, MIN, MEAN, ARRIVAL_DURATION, DIFF = 0, 1, 2, 3, 4
+MAX, MIN, MEAN, ARRIVAL_DURATION, PROJECT, DIFF, REV_DIFF, MAX_BETWEEN, MIN_BETWEEN = 0, 1, 2, 3, 4, 5, 6, 7, 8
 
 _OPERATIONS = {'+': np.add, '-': np.subtract, '*': np.multiply, '/': np.divide, '^': np.power, 'sqrt': np.sqrt}
 _PRECEDENCE = {'(': 1, '-': 2, '+': 2, '*': 3, '/': 3, '^': 4, 'sqrt': 5}
@@ -239,6 +239,67 @@ class Condition:
 
     def __str__(self):
         return '%s %s %.4f' % (''.join(self.literal_expression), self.comparator, self.threshold)
+
+
+class ProjectMeshCalculator:
+    def __init__(self, first_in, second_in, selected_vars, is_inside, point_interpolators,
+                 time_indices, operation_type):
+        self.first_in = first_in
+        self.second_in = second_in
+        self.is_inside = is_inside
+        self.point_interpolators = point_interpolators
+        self.time_indices = time_indices
+        self.operation_type = operation_type
+
+        self.selected_vars = selected_vars
+        self.nb_var = len(self.selected_vars)
+        self.nb_nodes = self.first_in.header.nb_nodes
+
+    def read_values_in_frame(self, time_index, read_second):
+        values = []
+        for i, var_ID in enumerate(self.selected_vars):
+            if read_second:
+                values.append(self.second_in.read_var_in_frame(time_index, var_ID))
+            else:
+                values.append(self.first_in.read_var_in_frame(time_index, var_ID))
+        return values
+
+    def interpolate(self, values):
+        interpolated_values = []
+        for index_node in range(self.nb_nodes):
+            if not self.is_inside[index_node]:
+                interpolated_values.append(np.nan)
+            else:
+                (i, j, k), interpolator = self.point_interpolators[index_node]
+                interpolated_values.append(interpolator.dot(values[[i, j, k]]))
+        return interpolated_values
+
+    def operation_in_frame(self, first_time_index, second_time_index):
+        if self.operation_type == PROJECT:  # projection
+            second_values = self.read_values_in_frame(second_time_index, True)
+            return np.array([self.interpolate(second_values[i]) for i in range(self.nb_var)])
+
+        first_values = np.array(self.read_values_in_frame(first_time_index, False))
+        second_values = self.read_values_in_frame(second_time_index, True)
+
+        if self.operation_type == DIFF:
+            return np.array([first_values[i] - np.array(self.interpolate(second_values[i]))
+                             for i in range(self.nb_var)])
+        elif self.operation_type == REV_DIFF:
+            return np.array([np.array(self.interpolate(second_values[i])) - first_values[i]
+                             for i in range(self.nb_var)])
+        elif self.operation_type == MAX_BETWEEN:
+            return np.array([np.maximum(self.interpolate(second_values[i]), first_values[i])
+                             for i in range(self.nb_var)])
+        else:
+            return np.array([np.minimum(self.interpolate(second_values[i]), first_values[i])
+                             for i in range(self.nb_var)])
+
+    def run(self, out_stream, out_header):
+        for i, (first_time_index, second_time_index) in enumerate(self.time_indices):
+            values = self.operation_in_frame(first_time_index, second_time_index)
+            out_stream.write_entire_frame(out_header,
+                                          self.first_in.time[first_time_index], values)
 
 
 def scalars_vectors(known_vars, selected_vars, us_equation=None):

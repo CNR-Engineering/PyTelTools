@@ -5,7 +5,7 @@ import datetime
 from PyQt5.QtWidgets import *
 from PyQt5.QtGui import *
 from PyQt5.QtCore import *
-
+import slf.misc as operations
 import numpy as np
 
 from gui.util import LoadMeshDialog, OutputProgressDialog, OutputThread, \
@@ -18,66 +18,20 @@ class ProjectMeshThread(OutputThread):
                  time_indices, operation_type):
         super().__init__()
 
-        self.first_in = first_in
-        self.second_in = second_in
+        self.calculator = operations.ProjectMeshCalculator(first_in, second_in, out_header.var_IDs,
+                                                           is_inside, point_interpolators,
+                                                           time_indices, operation_type)
         self.out_stream = out_stream
         self.out_header = out_header
-        self.is_inside = is_inside
-        self.point_interpolators = point_interpolators
-        self.time_indices = time_indices
-        self.operation_type = operation_type
-
         self.nb_frames = len(time_indices)
-        self.nb_var = self.out_header.nb_var
-        self.nb_nodes = self.out_header.nb_nodes
-
-    def read_values_in_frame(self, time_index, read_second):
-        values = []
-        for i, var_ID in enumerate(self.out_header.var_IDs):
-            if read_second:
-                values.append(self.second_in.read_var_in_frame(time_index, var_ID))
-            else:
-                values.append(self.first_in.read_var_in_frame(time_index, var_ID))
-        return values
-
-    def interpolate(self, values):
-        interpolated_values = []
-        for index_node in range(self.nb_nodes):
-            if not self.is_inside[index_node]:
-                interpolated_values.append(np.nan)
-            else:
-                (i, j, k), interpolator = self.point_interpolators[index_node]
-                interpolated_values.append(interpolator.dot(values[[i, j, k]]))
-        return interpolated_values
-
-    def operation_in_frame(self, first_time_index, second_time_index):
-        if self.operation_type == 0:  # projection
-            second_values = self.read_values_in_frame(second_time_index, True)
-            return np.array([self.interpolate(second_values[i]) for i in range(self.nb_var)])
-
-        first_values = np.array(self.read_values_in_frame(first_time_index, False))
-        second_values = self.read_values_in_frame(second_time_index, True)
-
-        if self.operation_type == 1:  # A - B
-            return np.array([first_values[i] - np.array(self.interpolate(second_values[i]))
-                             for i in range(self.nb_var)])
-        elif self.operation_type == 2:  # B - A
-            return np.array([np.array(self.interpolate(second_values[i])) - first_values[i]
-                             for i in range(self.nb_var)])
-        elif self.operation_type == 3:  # max
-            return np.array([np.maximum(self.interpolate(second_values[i]), first_values[i])
-                             for i in range(self.nb_var)])
-        else:  # min
-            return np.array([np.minimum(self.interpolate(second_values[i]), first_values[i])
-                             for i in range(self.nb_var)])
 
     def run(self):
-        for i, (first_time_index, second_time_index) in enumerate(self.time_indices):
+        for i, (first_time_index, second_time_index) in enumerate(self.calculator.time_indices):
             if self.canceled:
                 return
-            values = self.operation_in_frame(first_time_index, second_time_index)
+            values = self.calculator.operation_in_frame(first_time_index, second_time_index)
             self.out_stream.write_entire_frame(self.out_header,
-                                               self.first_in.time[first_time_index], values)
+                                               self.calculator.first_in.time[first_time_index], values)
 
             self.tick.emit(5 + 95 * (i+1) / self.nb_frames)
             QApplication.processEvents()
@@ -562,9 +516,11 @@ class SubmitTab(QWidget):
         if overwrite is None:
             return
 
-        # deduce header from selected variable IDs and write header
+        # deduce header from selected variable IDs
         output_header = self._getOutputHeader()
         time_indices = self.input.common_frames
+        operation_type = {0: operations.PROJECT, 1: operations.DIFF, 2: operations.REV_DIFF,
+                          3: operations.MAX_BETWEEN, 4: operations.MIN_BETWEEN}[self.operationBox.currentIndex()]
         self.parent.inDialog()
         progressBar = OutputProgressDialog()
 
@@ -585,7 +541,7 @@ class SubmitTab(QWidget):
                     out_stream.write_header(output_header)
                     process = ProjectMeshThread(first_in, second_in, out_stream, output_header, self.input.is_inside,
                                                 self.input.point_interpolators, time_indices,
-                                                self.operationBox.currentIndex())
+                                                operation_type)
                     progressBar.connectToThread(process)
                     process.run()
 

@@ -188,6 +188,9 @@ class Node(QGraphicsItem):
         menu.addAction(self.help_action)
         menu.exec_(event.screenPos())
 
+    def name(self):
+        return ' '.join(self.label.split())
+
     def get_option_panel(self):
         return QWidget()
 
@@ -228,8 +231,25 @@ class Node(QGraphicsItem):
     def run(self):
         pass
 
-    def name(self):
-        return ' '.join(self.label.split())
+    def construct_mesh(self, mesh):
+        five_percent = 0.05 * mesh.nb_triangles
+        nb_processed = 0
+        current_percent = 0
+
+        for i, j, k in mesh.ikle:
+            t = shapely.geometry.Polygon([mesh.points[i], mesh.points[j], mesh.points[k]])
+            mesh.triangles[i, j, k] = t
+            mesh.index.insert(i, t.bounds, obj=(i, j, k))
+
+            nb_processed += 1
+            if nb_processed > five_percent:
+                nb_processed = 0
+                current_percent += 5
+                self.progress_bar.setValue(current_percent)
+                QApplication.processEvents()
+
+        self.progress_bar.setValue(0)
+        QApplication.processEvents()
 
     def save(self):
         return ''
@@ -387,26 +407,6 @@ class TwoInOneOutNode(Node):
             self.second_in_port.mother.parentItem().run()
         return self.first_in_port.mother.parentItem().state == Node.SUCCESS and\
                self.second_in_port.mother.parentItem().state == Node.SUCCESS
-
-    def construct_mesh(self, mesh):
-        five_percent = 0.05 * mesh.nb_triangles
-        nb_processed = 0
-        current_percent = 0
-
-        for i, j, k in mesh.ikle:
-            t = shapely.geometry.Polygon([mesh.points[i], mesh.points[j], mesh.points[k]])
-            mesh.triangles[i, j, k] = t
-            mesh.index.insert(i, t.bounds, obj=(i, j, k))
-
-            nb_processed += 1
-            if nb_processed > five_percent:
-                nb_processed = 0
-                current_percent += 5
-                self.progress_bar.setValue(current_percent)
-                QApplication.processEvents()
-
-        self.progress_bar.setValue(0)
-        QApplication.processEvents()
 
     def help(self):
         QMessageBox.information(None, 'Help',

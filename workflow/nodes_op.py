@@ -873,6 +873,9 @@ class BinaryOperatorNode(TwoInOneOutNode):
             else:
                 self.fail('the input data is already the result of another computation.')
                 return
+        if input_data.filename == self.second_in_port.mother.parentItem().data.filename:
+            self.fail('the two input cannot be from the same file.')
+            return
 
         self.data = input_data.copy()
         self.data.operator = self.operator
@@ -942,3 +945,42 @@ class MinusNode(BinaryOperatorNode):
         self.first_in_port.data_type = 'slf'
         self.second_in_port.data_type = 'slf'
 
+
+class ReverseMinusNode(BinaryOperatorNode):
+    def __init__(self, index):
+        super().__init__(index, operations.REV_DIFF)
+        self.category = 'Operators'
+        self.label = 'B Minus A'
+        self.out_port.data_type = 'slf'
+        self.first_in_port.data_type = 'slf'
+        self.second_in_port.data_type = 'slf'
+
+
+class ProjectMeshNode(BinaryOperatorNode):
+    def __init__(self, index):
+        super().__init__(index, operations.PROJECT)
+        self.category = 'Operators'
+        self.label = 'Project B\non A'
+        self.out_port.data_type = 'slf'
+        self.first_in_port.data_type = 'slf'
+        self.second_in_port.data_type = 'slf'
+
+
+class MaxBetweenNode(BinaryOperatorNode):
+    def __init__(self, index):
+        super().__init__(index, operations.MAX_BETWEEN)
+        self.category = 'Operators'
+        self.label = 'Max(A,B)'
+        self.out_port.data_type = 'slf'
+        self.first_in_port.data_type = 'slf'
+        self.second_in_port.data_type = 'slf'
+
+
+class MinBetweenNode(BinaryOperatorNode):
+    def __init__(self, index):
+        super().__init__(index, operations.MIN_BETWEEN)
+        self.category = 'Operators'
+        self.label = 'Min(A,B)'
+        self.out_port.data_type = 'slf'
+        self.first_in_port.data_type = 'slf'
+        self.second_in_port.data_type = 'slf'
