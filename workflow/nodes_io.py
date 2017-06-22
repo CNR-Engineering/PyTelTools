@@ -179,7 +179,7 @@ class LoadSerafinNode(SingleOutputNode):
 
     def _open(self):
         filename, _ = QFileDialog.getOpenFileName(None, 'Open a .slf file', '',
-                                                  'Serafin Files (*.slf);;All Files (*)', QDir.currentPath(),
+                                                  'Serafin Files (*.slf)', QDir.currentPath(),
                                                   options=QFileDialog.Options() | QFileDialog.DontUseNativeDialog)
         if filename:
             self.filename = filename
@@ -272,9 +272,6 @@ class WriteSerafinNode(OneInOneOutNode):
     def save(self):
         return '|'.join([self.category, self.name(), str(self.index()),
                          str(self.pos().x()), str(self.pos().y()), self.filename])
-
-    def add_link(self, link):
-        self.links.add(link)
 
     def load(self, options):
         self.filename = options[0]
@@ -429,6 +426,9 @@ class WriteSerafinNode(OneInOneOutNode):
             self._run_simple(input_data)
         elif input_data.operator in (operations.MAX, operations.MIN, operations.MEAN):
             self._run_max_min_mean(input_data)
+        elif input_data.operator == operations.DIFF:
+            self.fail('not implemented')
+            return
         else:
             self._run_arrival_duration(input_data)
 

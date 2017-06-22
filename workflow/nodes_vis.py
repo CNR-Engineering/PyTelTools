@@ -55,12 +55,22 @@ class ShowMeshNode(SingleInputNode):
             self.map.canvas.initFigure(mesh)
 
             self.has_map = True
-            self.success()
             self.map.canvas.draw()
             self.map.show()
+            self.success()
 
     def run(self):
-        self.configure()
+        success = super().run_upward()
+        if not success:
+            self.fail('input failed.')
+            return
+        if not self.has_map:
+            mesh = Mesh2D(self.in_port.mother.parentItem().data.header)
+            self.map.canvas.initFigure(mesh)
+
+            self.has_map = True
+            self.map.canvas.draw()
+        self.success()
 
 
 class LocateOpenLinesNode(DoubleInputNode):
@@ -134,7 +144,21 @@ class LocateOpenLinesNode(DoubleInputNode):
             self.map.show()
 
     def run(self):
-        self.configure()
+        success = super().run_upward()
+        if not success:
+            self.fail('input failed.')
+            return
+        if not self.has_map:
+            line_node = self.second_in_port.mother.parentItem()
+            mesh = Mesh2D(self.first_in_port.mother.parentItem().data.header)
+            self.map.canvas.reinitFigure(mesh, line_node.data.lines,
+                                         ['Line %d' % (i+1) for i in range(len(line_node.data))],
+                                         list(islice(cycle(['b', 'r', 'g', 'y', 'k', 'c', '#F28AD6', 'm']),
+                                              len(line_node.data))))
+
+            self.has_map = True
+            self.map.canvas.draw()
+        self.success()
 
 
 class LocatePolygonsNode(DoubleInputNode):
@@ -206,6 +230,17 @@ class LocatePolygonsNode(DoubleInputNode):
             self.map.show()
 
     def run(self):
-        self.configure()
+        success = super().run_upward()
+        if not success:
+            self.fail('input failed.')
+            return
+        line_node = self.second_in_port.mother.parentItem()
+        if not self.has_map:
+            mesh = Mesh2D(self.first_in_port.mother.parentItem().data.header)
+            self.map.canvas.reinitFigure(mesh, line_node.data.lines,
+                                         ['Polygon %d' % (i+1) for i in range(len(line_node.data))])
 
+            self.has_map = True
+            self.map.canvas.draw()
+        self.success()
 

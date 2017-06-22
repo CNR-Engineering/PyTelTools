@@ -3,10 +3,11 @@ from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 from copy import deepcopy
 
-from workflow.Node import Node, OneInOneOutNode
-from gui.util import TableWidgetDragRows, TimeSlider, SimpleTimeDateSelection,\
+from workflow.Node import Node, OneInOneOutNode, TwoInOneOutNode
+from gui.util import TableWidgetDragRows, SimpleTimeDateSelection,\
     TimeRangeSlider, DoubleSliderBox, FrictionLawMessage, FallVelocityMessage
 from slf.variables import get_available_variables, get_necessary_equations, add_US, get_US_equation
+import slf.misc as operations
 
 
 class SelectVariablesNode(OneInOneOutNode):
@@ -581,7 +582,6 @@ class SelectTimeNode(OneInOneOutNode):
         super().add_link(link)
         if not self.in_port.has_mother():
             return
-
         parent_node = self.in_port.mother.parentItem()
         if parent_node.state != Node.SUCCESS:
             if parent_node.ready_to_run():
@@ -789,15 +789,13 @@ class SelectSingleFrameNode(OneInOneOutNode):
         self.success()
 
 
-class ConvertToSinglePrecisionNode(OneInOneOutNode):
-    def __init__(self, index):
+class UnaryOperatorNode(OneInOneOutNode):
+    def __init__(self, index, operator):
         super().__init__(index)
-        self.category = 'Basic operations'
-        self.label = 'Convert to\nSingle\nPrecision'
-        self.out_port.data_type = 'slf'
-        self.in_port.data_type = 'slf'
+        self.operator = operator
         self.state = Node.READY
         self.data = None
+        self.message = 'Nothing to configure.'
 
     def reconfigure(self):
         super().reconfigure()
@@ -822,6 +820,80 @@ class ConvertToSinglePrecisionNode(OneInOneOutNode):
             self.fail('input failed.')
             return
         input_data = self.in_port.mother.parentItem().data
+
+        if input_data.operator is not None:
+            if input_data.operator == self.operator:
+                self.fail('the input data is already the result of %s.' % self.name())
+                return
+            else:
+                self.fail('the input data is already the result of another computation.')
+                return
+
+        self.data = input_data.copy()
+        self.data.operator = self.operator
+        self.success()
+
+
+class BinaryOperatorNode(TwoInOneOutNode):
+    def __init__(self, index, operator=None):
+        super().__init__(index)
+        self.operator = operator
+        self.state = Node.READY
+        self.data = None
+        self.message = 'Nothing to configure.'
+
+    def reconfigure(self):
+        super().reconfigure()
+        self.state = Node.READY
+        self.reconfigure_downward()
+
+    def configure(self):
+        if super().configure():
+            self.state = Node.READY
+            self.reconfigure_downward()
+
+    def save(self):
+        return '|'.join([self.category, self.name(), str(self.index()),
+                         str(self.pos().x()), str(self.pos().y()), ''])
+
+    def load(self, options):
+        self.state = Node.READY
+
+    def run(self):
+        success = super().run_upward()
+        if not success:
+            self.fail('input failed.')
+            return
+        input_data = self.first_in_port.mother.parentItem().data
+
+        if input_data.operator is not None:
+            if input_data.operator == self.operator:
+                self.fail('the input data is already the result of %s.' % self.name())
+                return
+            else:
+                self.fail('the input data is already the result of another computation.')
+                return
+
+        self.data = input_data.copy()
+        self.data.operator = self.operator
+        self.data.metadata = {'operand': self.second_in_port.mother.parentItem().data.copy()}
+        self.success()
+
+
+class ConvertToSinglePrecisionNode(UnaryOperatorNode):
+    def __init__(self, index):
+        super().__init__(index, None)
+        self.category = 'Basic operations'
+        self.label = 'Convert to\nSingle\nPrecision'
+        self.out_port.data_type = 'slf'
+        self.in_port.data_type = 'slf'
+
+    def run(self):
+        success = super().run_upward()
+        if not success:
+            self.fail('input failed.')
+            return
+        input_data = self.in_port.mother.parentItem().data
         if input_data.header.float_type != 'd':
             self.fail('the input file is not of double-precision format.')
             return
@@ -832,4 +904,41 @@ class ConvertToSinglePrecisionNode(OneInOneOutNode):
         self.data = input_data.copy()
         self.data.to_single = True
         self.success()
+
+
+class ComputeMaxNode(UnaryOperatorNode):
+    def __init__(self, index):
+        super().__init__(index, operations.MAX)
+        self.category = 'Operators'
+        self.label = 'Max'
+        self.out_port.data_type = 'slf'
+        self.in_port.data_type = 'slf'
+
+
+class ComputeMinNode(UnaryOperatorNode):
+    def __init__(self, index):
+        super().__init__(index, operations.MIN)
+        self.category = 'Operators'
+        self.label = 'Min'
+        self.out_port.data_type = 'slf'
+        self.in_port.data_type = 'slf'
+
+
+class ComputeMeanNode(UnaryOperatorNode):
+    def __init__(self, index):
+        super().__init__(index, operations.MEAN)
+        self.category = 'Operators'
+        self.label = 'Mean'
+        self.out_port.data_type = 'slf'
+        self.in_port.data_type = 'slf'
+
+
+class MinusNode(BinaryOperatorNode):
+    def __init__(self, index):
+        super().__init__(index, operations.DIFF)
+        self.category = 'Operators'
+        self.label = 'A Minus B'
+        self.out_port.data_type = 'slf'
+        self.first_in_port.data_type = 'slf'
+        self.second_in_port.data_type = 'slf'
 
