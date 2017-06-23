@@ -5,6 +5,8 @@ Simple computation/evaluation of variable values in .slf
 import numpy as np
 import logging
 import re
+import shapefile
+from slf import Serafin
 from slf.variables import get_available_variables, get_necessary_equations, do_calculation
 
 module_logger = logging.getLogger(__name__)
@@ -20,6 +22,10 @@ _VECTORS = {'U': ('V', 'M'), 'V': ('U', 'M'), 'QSX': ('QSY', 'QS'), 'QSY': ('QSX
             'QSBLX': ('QSBLY', 'QSBL'), 'QSBLY': ('QSBLX', 'QSBL'),
             'QSSUSPX': ('QSSUSPY', 'QSSUSP'), 'QSSUSPY': ('QSSUSPX', 'QSSUSP'),
             'I': ('J', 'Q'), 'J': ('I', 'Q')}
+
+_VECTOR_COUPLES = {'U': 'V', 'I': 'J', 'X': 'Y', 'QSX': 'QSY', 'QSBLX': 'QSBLY', 'QSSUSPX': 'QSSUSPY'}
+_VECTORS_MOTHER = {('U', 'V'): 'M', ('I', 'J'): 'Q', ('X', 'Y'): '.', ('QSX', 'QSY'): 'QS',
+                   ('QSBLX', 'QSBLY'): 'QSBL', ('QSSUSPX', 'QSSUSPY'): 'QSSUSP'}
 
 
 class ScalarMaxMinMeanCalculator:
@@ -72,9 +78,9 @@ class ScalarMaxMinMeanCalculator:
 
         with np.errstate(invalid='ignore'):
             if self.maxmin == MAX:
-                self.current_values = np.minimum(self.current_values, values)
-            elif self.maxmin == MIN:
                 self.current_values = np.maximum(self.current_values, values)
+            elif self.maxmin == MIN:
+                self.current_values = np.minimum(self.current_values, values)
             else:
                 self.current_values += values
 
@@ -336,6 +342,16 @@ def scalars_vectors(known_vars, selected_vars, us_equation=None):
     return scalars, vectors, additional_equations
 
 
+def available_vectors(known_vars):
+    vectors = []
+    for var in known_vars:
+        if var in _VECTOR_COUPLES:
+            brother = _VECTOR_COUPLES[var]
+            if brother in known_vars:
+                vectors.append((var, brother))
+    return vectors
+
+
 def tighten_expression(expression):
     """!
     Remove the spaces and brackets to get a nice and short expression for display
@@ -430,4 +446,58 @@ def evaluate_expression(input_stream, time_index, expression):
                 stack.append(np.ones((nb_nodes,)) * float(symbol))
 
     return stack.pop()
+
+
+def vectors_to_shp(slf_name, slf_header, shp_name, vector_couple):
+    with Serafin.Read(slf_name, slf_header.language) as slf:
+        slf.header = slf_header
+
+        # fetch vector variable values
+        first_values = slf.read_var_in_frame(0, vector_couple[0])
+        second_values = slf.read_var_in_frame(0, vector_couple[1])
+        mother = _VECTORS_MOTHER[vector_couple]
+        if mother not in slf_header.var_IDs:
+            mother_values = np.sqrt(np.square(first_values) + np.square(second_values))
+        else:
+            mother_values = slf.read_var_in_frame(0, mother)
+        angle_values = np.degrees(second_values, first_values)
+
+    # write shp
+    w = shapefile.Writer(shapefile.POINT)
+    w.field(vector_couple[0], 'N', decimal=4)
+    w.field(vector_couple[1], 'N', decimal=4)
+    w.field(mother, 'N', decimal=4)
+
+    for x, y, u, v, m, angle in zip(slf_header.x, slf_header.y,
+                                    first_values, second_values, mother_values, angle_values):
+        w.point(x, y, shapeType=shapefile.POINT)
+        w.record(u, v, m, angle)
+    w.save(shp_name)
+
+
+def scalar_to_xml(slf_name, slf_header, xml_name, scalar):
+    with Serafin.Read(slf_name, slf_header.language) as slf:
+        slf.header = slf_header
+
+        # fetch vector variable values
+        scalar_values = slf.read_var_in_frame(0, scalar)
+
+    # write shp
+    with open(xml_name, 'w') as xml:
+        xml.write('<?xml version="1.0" ?>\n')
+        xml.write('<LandXML version="1.2" xmlns="http://www.landxml.org/schema/LandXML-1.2" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.landxml.org/schema/LandXML-1.2 http://www.landxml.org/schema/LandXML-1.2/LandXML-1.2.xsd">\n')
+        xml.write('  <Surfaces>\n')
+        xml.write('    <Surface name="My TIN">\n')
+        xml.write('      <Definition surfType="TIN">\n')
+        xml.write('        <Pnts>\n')
+        for i, (x, y, z) in enumerate(zip(slf_header.x, slf_header.y, scalar_values)):
+            xml.write('        <P id="%d">%.4f %.4f %.4f</P>\n' % (i+1, y, x, z))
+        xml.write('        <Faces>\n')
+        for i, (a, b, c) in enumerate(slf_header.ikle_2d):
+            xml.write('        <F id="%d">%d %d %d</F>\n' % (i+1, a, b, c))
+        xml.write('        </Faces>\n')
+        xml.write('      </Definition>\n')
+        xml.write('    </Surface>\n')
+        xml.write('  </Surfaces>\n')
+        xml.write('</LandXML>\n')
 

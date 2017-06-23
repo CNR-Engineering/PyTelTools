@@ -237,6 +237,17 @@ class SerafinHeader:
         self.frame_size = 8 + self.float_size + (self.nb_var * (8 + self.nb_nodes * self.float_size))
         self.file_size = self.header_size + self.nb_frames * self.frame_size
 
+    def apply_transform(self, transformations):
+        if not transformations:
+            return self.copy()
+        points = [np.array([x, y, 0]) for x, y in zip(self.x, self.y)]
+        for t in transformations:
+            points = [t(p) for p in points]
+        new_header = self.copy()
+        new_header.x = np.array([p[0] for p in points])
+        new_header.y = np.array([p[1] for p in points])
+        return new_header
+
 
 class Serafin:
     """!
