@@ -253,12 +253,14 @@ class WriteSerafinNode(OneInOneOutNode):
     def configure(self):
         if self.scene().name_pattern is None:
             super().configure()
-        else:
+        elif self.state != Node.SUCCESS:
             QMessageBox.information(None, 'OK', 'Successfully configured using naming pattern in the global options.',
                                     QMessageBox.Ok)
             self.filename = ''
             self.state = Node.READY
             self.update()
+        else:
+            super().configure()
 
     def _open(self):
         filename, _ = QFileDialog.getSaveFileName(None, 'Choose the output file name', '',

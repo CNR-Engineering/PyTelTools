@@ -276,7 +276,8 @@ class SelectVariablesNode(OneInOneOutNode):
                 QMessageBox.critical(None, 'Error', 'Configure and run the input before configure this node!',
                                      QMessageBox.Ok)
                 return
-        self._reset()
+        if self.state != Node.SUCCESS:
+            self._reset()
 
         if super().configure():
             self.selected_vars, self.selected_vars_names = self.new_options
@@ -284,7 +285,8 @@ class SelectVariablesNode(OneInOneOutNode):
                 self.state = Node.NOT_CONFIGURED
         else:
             self.us_equation = None
-        self.reconfigure_downward()
+        if self.state != Node.SUCCESS:
+            self.reconfigure_downward()
         self.update()
 
     def save(self):
@@ -442,8 +444,9 @@ class AddRouseNode(OneInOneOutNode):
                     return
 
         if self._configure():
-            self.state = Node.READY
-            self.reconfigure_downward()
+            if self.state != Node.SUCCESS:
+                self.state = Node.READY
+                self.reconfigure_downward()
         else:
             self.state = Node.NOT_CONFIGURED
         self.update()
@@ -623,12 +626,14 @@ class SelectTimeNode(OneInOneOutNode):
                                      QMessageBox.Ok)
                 return
         self.in_data = parent_node.data
-        self._reset()
+        if self.state != Node.SUCCESS:
+            self._reset()
         if super().configure():
             self.start_index, self.end_index, self.sampling_frequency = self.new_options
             self.start_date, self.end_date = self.in_data.start_time + self.in_data.time_second[self.start_index], \
                                              self.in_data.start_time + self.in_data.time_second[self.end_index]
-        self.reconfigure_downward()
+        if self.state != Node.SUCCESS:
+            self.reconfigure_downward()
 
     def save(self):
         return '|'.join([self.category, self.name(), str(self.index()),
@@ -757,11 +762,13 @@ class SelectSingleFrameNode(OneInOneOutNode):
                                      QMessageBox.Ok)
                 return
         self.in_data = parent_node.data
-        self._reset()
+        if self.state != Node.SUCCESS:
+            self._reset()
         if super().configure():
             self.selection = self.new_option
             self.date = self.in_data.start_time + self.in_data.time_second[self.selection]
-        self.reconfigure_downward()
+        if self.state != Node.SUCCESS:
+            self.reconfigure_downward()
 
     def save(self):
         return '|'.join([self.category, self.name(), str(self.index()),
@@ -804,8 +811,9 @@ class UnaryOperatorNode(OneInOneOutNode):
 
     def configure(self):
         if super().configure():
-            self.state = Node.READY
-            self.reconfigure_downward()
+            if self.state != Node.SUCCESS:
+                self.state = Node.READY
+                self.reconfigure_downward()
 
     def save(self):
         return '|'.join([self.category, self.name(), str(self.index()),
@@ -849,8 +857,9 @@ class BinaryOperatorNode(TwoInOneOutNode):
 
     def configure(self):
         if super().configure():
-            self.state = Node.READY
-            self.reconfigure_downward()
+            if self.state != Node.SUCCESS:
+                self.state = Node.READY
+                self.reconfigure_downward()
 
     def save(self):
         return '|'.join([self.category, self.name(), str(self.index()),

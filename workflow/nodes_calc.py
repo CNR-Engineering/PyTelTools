@@ -246,7 +246,8 @@ class ArrivalDurationNode(OneInOneOutNode):
                 QMessageBox.critical(None, 'Error', 'The input data is already the result of another computation.',
                                      QMessageBox.Ok)
             return
-        self._reset()
+        if self.state != Node.SUCCESS:
+            self._reset()
         if super().configure():
             self.conditions, self.table, self.time_unit = self.new_options
         self.reconfigure_downward()
@@ -425,12 +426,13 @@ class ComputeVolumeNode(TwoInOneOutNode):
             QMessageBox.critical(None, 'Error', 'The input data is already the result of another computation.',
                                  QMessageBox.Ok)
             return
-        self._reset()
-        available_vars = [var for var in self.in_data.header.var_IDs if var in self.in_data.selected_vars]
-        if not available_vars:
-            QMessageBox.critical(None, 'Error', 'No variable available.',
-                                 QMessageBox.Ok)
-            return
+        if self.state != Node.SUCCESS:
+            self._reset()
+            available_vars = [var for var in self.in_data.header.var_IDs if var in self.in_data.selected_vars]
+            if not available_vars:
+                QMessageBox.critical(None, 'Error', 'No variable available.',
+                                     QMessageBox.Ok)
+                return
         if super().configure():
             self.first_var, self.second_var, self.sup_volume = self.new_options
         self.reconfigure_downward()
@@ -659,14 +661,15 @@ class ComputeFluxNode(TwoInOneOutNode):
             QMessageBox.critical(None, 'Error', 'The input data is already the result of another computation.',
                                  QMessageBox.Ok)
             return
-        available_vars = [var for var in parent_node.data.header.var_IDs if var in parent_node.data.selected_vars]
-        available_var_names = [parent_node.data.selected_vars_names[var][0] for var in available_vars]
-        has_options = self._prepare_options(available_vars, available_var_names)
-        if not has_options:
-            QMessageBox.critical(None, 'Error', 'No flux is computable from the input file.',
-                                 QMessageBox.Ok)
-            return
-        self._reset()
+        if self.state != Node.SUCCESS:
+            available_vars = [var for var in parent_node.data.header.var_IDs if var in parent_node.data.selected_vars]
+            available_var_names = [parent_node.data.selected_vars_names[var][0] for var in available_vars]
+            has_options = self._prepare_options(available_vars, available_var_names)
+            if not has_options:
+                QMessageBox.critical(None, 'Error', 'No flux is computable from the input file.',
+                                     QMessageBox.Ok)
+                return
+            self._reset()
         if super().configure():
             self.flux_options = self.new_options
         self.reconfigure_downward()
