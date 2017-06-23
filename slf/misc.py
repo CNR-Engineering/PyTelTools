@@ -489,10 +489,11 @@ def scalar_to_xml(slf_name, slf_header, xml_name, scalar):
         xml.write('  <Surfaces>\n')
         xml.write('    <Surface name="My TIN">\n')
         xml.write('      <Definition surfType="TIN">\n')
-        xml.write('        <Pnts>\n')
+        xml.write('        <Pnts>')
         for i, (x, y, z) in enumerate(zip(slf_header.x, slf_header.y, scalar_values)):
             xml.write('        <P id="%d">%.4f %.4f %.4f</P>\n' % (i+1, y, x, z))
-        xml.write('        <Faces>\n')
+        xml.write('        </Pnts>\n')
+        xml.write('        <Faces>')
         for i, (a, b, c) in enumerate(slf_header.ikle_2d):
             xml.write('        <F id="%d">%d %d %d</F>\n' % (i+1, a, b, c))
         xml.write('        </Faces>\n')
