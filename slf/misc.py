@@ -467,6 +467,7 @@ def vectors_to_shp(slf_name, slf_header, shp_name, vector_couple):
     w.field(vector_couple[0], 'N', decimal=4)
     w.field(vector_couple[1], 'N', decimal=4)
     w.field(mother, 'N', decimal=4)
+    w.field('Angle', 'N', decimal=4)
 
     for x, y, u, v, m, angle in zip(slf_header.x, slf_header.y,
                                     first_values, second_values, mother_values, angle_values):
