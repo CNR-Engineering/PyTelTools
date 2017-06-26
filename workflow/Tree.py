@@ -9,7 +9,7 @@ from workflow.nodes_vis import *
 NODES = {'Input/Output': {'Load Serafin': LoadSerafinNode,
                           'Load 2D Polygons': LoadPolygon2DNode, 'Load 2D Open Polylines': LoadOpenPolyline2DNode,
                           'Load 2D Points': LoadPoint2DNode,
-                          'Write CSV': WriteCSVNode, 'Write Serafin': WriteSerafinNode},
+                          'Write Serafin': WriteSerafinNode},
          'Basic operations': {'Select Variables': SelectVariablesNode,
                               'Select Time': SelectTimeNode, 'Select Single Frame': SelectSingleFrameNode,
                               'Add Rouse': AddRouseNode, 'Convert to Single Precision': ConvertToSinglePrecisionNode},
@@ -123,7 +123,7 @@ class TreeScene(QGraphicsScene):
                 links.append(item.save())
 
         with open(filename, 'w') as f:
-            f.write('.'.join([self.language, self.csv_separator, str(self.name_pattern)]) + '\n')
+            f.write('.'.join([self.language, self.csv_separator]) + '\n')
             f.write('%d %d\n' % (self.nb_nodes, len(links)))
             for node in self.nodes.values():
                 f.write(node.save())
@@ -146,9 +146,7 @@ class TreeScene(QGraphicsScene):
         self.nodes = {}
         try:
             with open(filename, 'r') as f:
-                self.language, self.csv_separator, self.name_pattern = f.readline().rstrip().split('.')
-                if self.name_pattern == 'None':
-                    self.name_pattern = None
+                self.language, self.csv_separator = f.readline().rstrip().split('.')
                 nb_nodes, nb_links = map(int, f.readline().split())
                 for i in range(nb_nodes):
                     line = f.readline().rstrip().split('|')
@@ -185,16 +183,10 @@ class TreeScene(QGraphicsScene):
             self.nodes[root].run_downward()
 
     def global_config(self):
-        old_name_pattern = self.name_pattern
-        dlg = GlobalConfigDialog(self.language, self.csv_separator, self.name_pattern)
+        dlg = GlobalConfigDialog(self.language, self.csv_separator)
         value = dlg.exec_()
         if value == QDialog.Accepted:
-            self.language, self.csv_separator, self.name_pattern = dlg.new_options
-            if self.name_pattern != old_name_pattern:
-                for node in self.nodes.values():
-                    if isinstance(node, SingleInputNode):
-                        node.state = Node.NOT_CONFIGURED
-                self.update()
+            self.language, self.csv_separator = dlg.new_options
 
     def _to_sources(self):
         roots = []
@@ -304,7 +296,7 @@ class TreeScene(QGraphicsScene):
 
 
 class GlobalConfigDialog(QDialog):
-    def __init__(self, language, csv_separator, name_pattern):
+    def __init__(self, language, csv_separator):
         super().__init__()
         buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel,
                                    Qt.Horizontal, self)
@@ -336,19 +328,6 @@ class GlobalConfigDialog(QDialog):
         else:
             self.csv_box.setCurrentIndex(2)
 
-        self.name_box = QGroupBox('Use naming pattern for output files')
-        self.name_box.setCheckable(True)
-        self.pattern = QLineEdit()
-        self.pattern.setFixedHeight(30)
-        if name_pattern is not None:
-            self.pattern.setText(name_pattern)
-        self.name_box.toggled.connect(self._toggle_name_pattern)
-
-        if name_pattern is not None:
-            self.name_box.setChecked(True)
-        else:
-            self.name_box.setChecked(False)
-
         hlayout = QHBoxLayout()
         hlayout.addWidget(QLabel('Append to input name'))
         hlayout.addWidget(self.pattern)
@@ -360,7 +339,6 @@ class GlobalConfigDialog(QDialog):
         hlayout.addWidget(QLabel('CSV separator'))
         hlayout.addWidget(self.csv_box, Qt.AlignLeft)
         layout.addLayout(hlayout)
-        layout.addWidget(self.name_box)
         layout.setSpacing(20)
         layout.addStretch()
         layout.addWidget(buttons)
@@ -369,46 +347,9 @@ class GlobalConfigDialog(QDialog):
         self.setWindowTitle('Workspace global configuration')
         self.resize(self.sizeHint())
 
-    def _toggle_name_pattern(self, checked):
-        self.pattern.setEnabled(checked)
-        if not checked:
-            self.pattern.clear()
-        elif not self.pattern.text():
-            self.pattern.setText('_result')
-
     def _select(self):
-        if self.name_box.isChecked():
-            pattern = self.pattern.text()
-            if not pattern:
-                QMessageBox.critical(None, 'Error',
-                                     'The naming pattern cannot be empty!',
-                                     QMessageBox.Ok)
-                return
-            elif len(pattern.split()) > 1:
-                QMessageBox.critical(None, 'Error',
-                                     'The naming pattern should not contain spaces!',
-                                     QMessageBox.Ok)
-                return
-            elif '.' in pattern:
-                QMessageBox.critical(None, 'Error',
-                                     'The naming pattern should not contain spaces!',
-                                     QMessageBox.Ok)
-                return
-            else:
-                splitted = pattern.split('_')
-                for part in splitted:
-                    if not part:
-                        continue
-                    if not part.isalnum():
-                        QMessageBox.critical(None, 'Error',
-                                             'The naming pattern should only contain letters, numbers and underscores.',
-                                             QMessageBox.Ok)
-                        return
-        else:
-            pattern = None
-
         separator = {0: ';', 1: ',', 2: '\t'}[self.csv_box.currentIndex()]
         language = ['en', 'fr'][self.french_button.isChecked()]
-        self.new_options = (language, separator, pattern)
+        self.new_options = (language, separator)
         self.accept()
 

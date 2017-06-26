@@ -4,6 +4,7 @@ import numpy as np
 from copy import deepcopy
 import datetime
 import os
+import uuid
 import struct
 from workflow.Node import Node, SingleOutputNode, SingleInputNode, OneInOneOutNode
 from slf import Serafin
@@ -24,7 +25,6 @@ class SerafinData:
         self.time = []
         self.time_second = []
         self.start_time = None
-        self.name_pattern = None
 
         self.selected_vars = []
         self.selected_vars_names = {}
@@ -69,7 +69,6 @@ class SerafinData:
         copy_data.start_time = self.start_time
         copy_data.time_second = self.time_second
         copy_data.metadata = self.metadata
-        copy_data.name_pattern = self.name_pattern
 
         copy_data.selected_vars = self.selected_vars[:]
         copy_data.selected_vars_names = deepcopy(self.selected_vars_names)
@@ -98,16 +97,17 @@ class SerafinData:
 class CSVData:
     def __init__(self, filename, header):
         self.filename = filename
+        self.out_name = ''
         self.table = [header]
-        self.name_pattern = None
 
     def add_row(self, row):
         self.table.append(row)
 
-    def write(self, output_stream, separator):
+    def write(self, filename, output_stream, separator):
         for line in self.table:
             output_stream.write(separator.join(line))
             output_stream.write('\n')
+        self.out_name = filename
 
 
 class PolylineData:
@@ -141,7 +141,7 @@ class PointData:
         self.points.append(point)
 
     def add_attribute(self, attribute):
-        self.points.append(attribute)
+        self.attributes.append(attribute)
 
     def set_fields(self, fields):
         self.fields = fields[:]
@@ -228,39 +228,57 @@ class WriteSerafinNode(OneInOneOutNode):
         self.out_port.data_type = 'slf'
         self.category = 'Input/Output'
         self.label = 'Write\nSerafin'
+        self.auto_box = None
         self.name_box = None
         self.filename = ''
         self.data = None
+        self.auto = True
+        self.state = Node.READY
+        self.new_options = tuple()
+        self.op = {None: '', operations.MAX: '_max_', operations.MIN: '_min_', operations.MEAN: '_mean_',
+                   operations.PROJECT: '_project_', operations.ARRIVAL_DURATION: '_arr_dur_',
+                   operations.DIFF: '_AminusB_', operations.REV_DIFF: '_BminusA_', operations.MAX_BETWEEN: '_maxAB_',
+                   operations.MIN_BETWEEN: '_minAB_'}
 
     def get_option_panel(self):
         open_button = QPushButton(QWidget().style().standardIcon(QStyle.SP_DialogSaveButton),
                                   'Write Serafin')
         open_button.setToolTip('<b>Write</b> a .slf file')
         open_button.setFixedHeight(30)
+        if self.auto:
+            open_button.setEnabled(False)
 
-        option_panel = QWidget()
-        layout = QHBoxLayout()
-        layout.addWidget(open_button)
+        self.auto_box = QCheckBox('Use automatic naming')
+        self.auto_box.setChecked(self.auto)
+        self.auto_box.toggled.connect(lambda checked: open_button.setEnabled(not checked))
         self.name_box = QLineEdit(self.filename)
         self.name_box.setReadOnly(True)
         self.name_box.setFixedHeight(30)
-        layout.addWidget(self.name_box)
+
+        option_panel = QWidget()
+        layout = QVBoxLayout()
+        layout.addWidget(self.auto_box, Qt.AlignLeft)
+        layout.setSpacing(15)
+        hlayout = QHBoxLayout()
+        hlayout.addWidget(open_button)
+
+        hlayout.addWidget(self.name_box)
+        layout.addLayout(hlayout)
         option_panel.setLayout(layout)
 
         open_button.clicked.connect(self._open)
+        option_panel.destroyed.connect(self._select)
         return option_panel
 
+    def _select(self):
+        self.new_options = (self.auto_box.isChecked(), self.name_box.text())
+
     def configure(self):
-        if self.scene().name_pattern is None:
-            super().configure()
-        elif self.state != Node.SUCCESS:
-            QMessageBox.information(None, 'OK', 'Successfully configured using naming pattern in the global options.',
-                                    QMessageBox.Ok)
-            self.filename = ''
-            self.state = Node.READY
-            self.update()
-        else:
-            super().configure()
+        if super().configure():
+            self.auto, self.filename = self.new_options
+            if self.auto:
+                self.filename = ''
+            self.reconfigure_downward()
 
     def _open(self):
         filename, _ = QFileDialog.getSaveFileName(None, 'Choose the output file name', '',
@@ -269,7 +287,6 @@ class WriteSerafinNode(OneInOneOutNode):
         if filename:
             if len(filename) < 5 or filename[-4:] != '.slf':
                 filename += '.slf'
-            self.filename = filename
             self.name_box.setText(filename)
 
     def save(self):
@@ -277,9 +294,15 @@ class WriteSerafinNode(OneInOneOutNode):
                          str(self.pos().x()), str(self.pos().y()), self.filename])
 
     def load(self, options):
-        self.filename = options[0]
-        if self.filename:
+        filename = options[0]
+        if filename:
+            self.auto = False
+            self.filename = filename
             self.state = Node.READY
+        else:
+            self.filename = ''
+            self.auto = True
+            self.state = Node.NOT_CONFIGURED
 
     def _run_simple(self, input_data):
         output_header = input_data.default_output_header()
@@ -296,7 +319,7 @@ class WriteSerafinNode(OneInOneOutNode):
 
                     self.progress_bar.setValue(100 * (i+1) / len(input_data.selected_time_indices))
                     QApplication.processEvents()
-        self.success()
+        self.success('Output saved to {}.'.format(self.filename))
         return True
 
     def _run_max_min_mean(self, input_data):
@@ -350,7 +373,7 @@ class WriteSerafinNode(OneInOneOutNode):
             with Serafin.Write(self.filename, input_data.language, True) as resout:
                 resout.write_header(output_header)
                 resout.write_entire_frame(output_header, input_data.time[0], values)
-        self.success()
+        self.success('Output saved to {}.'.format(self.filename))
         return True
 
     def _run_arrival_duration(self, input_data):
@@ -403,7 +426,7 @@ class WriteSerafinNode(OneInOneOutNode):
             with Serafin.Write(self.filename, input_data.language, True) as resout:
                 resout.write_header(output_header)
                 resout.write_entire_frame(output_header, input_data.time[0], values)
-        self.success()
+        self.success('Output saved to {}.'.format(self.filename))
         return True
 
     def _run_project_mesh(self, first_input):
@@ -489,8 +512,9 @@ class WriteSerafinNode(OneInOneOutNode):
                         self.progress_bar.setValue(100 * (i+1) / len(common_frames))
                         QApplication.processEvents()
 
-        self.success('The two files has {} common variables and {} common frames.\n'
-                     'The mesh A has {} / {} nodes inside the mesh B.'.format(len(common_vars), len(common_frames),
+        self.success('Output saved to {}.\nThe two files has {} common variables and {} common frames.\n'
+                     'The mesh A has {} / {} nodes inside the mesh B.'.format(self.filename,
+                                                                              len(common_vars), len(common_frames),
                                                                               sum(is_inside),
                                                                               first_input.header.nb_nodes))
         return True
@@ -506,10 +530,10 @@ class WriteSerafinNode(OneInOneOutNode):
             self.fail('cannot overwrite to the input file.')
             return
 
-        if not self.filename:  # is configure using naming pattern
-            name_pattern = self.scene().name_pattern
+        if self.auto:  # use automatic naming
+            op_name = self.op[input_data.operator]
             head, tail = os.path.splitext(input_data.filename)
-            self.filename = ''.join([head, name_pattern, '.slf'])
+            self.filename = ''.join([head, op_name, str(uuid.uuid4()), '.slf'])
 
         try:
             with open(self.filename, 'w') as f:
@@ -532,6 +556,7 @@ class WriteSerafinNode(OneInOneOutNode):
             success = self._run_arrival_duration(input_data)
 
         if success:  # reload the output file
+            self.auto = False
             self.data = SerafinData(self.filename, input_data.language)
             self.data.read()
 
@@ -708,87 +733,6 @@ class LoadOpenPolyline2DNode(SingleOutputNode):
 
         self.success('The file contains {} open line{}.'.format(len(self.data),
                                                                 's' if len(self.data) > 1 else ''))
-
-
-class WriteCSVNode(SingleInputNode):
-    def __init__(self, index):
-        super().__init__(index)
-        self.category = 'Input/Output'
-        self.label = 'Write\nCSV'
-        self.in_port.data_type = 'csv'
-
-        self.name_box = None
-        self.filename = ''
-
-    def get_option_panel(self):
-        open_button = QPushButton(QWidget().style().standardIcon(QStyle.SP_DialogSaveButton),
-                                  'Write CSV')
-        open_button.setToolTip('<b>Write</b> a .csv file')
-        open_button.setFixedHeight(30)
-
-        option_panel = QWidget()
-        layout = QHBoxLayout()
-        layout.addWidget(open_button)
-        self.name_box = QLineEdit(self.filename)
-        self.name_box.setReadOnly(True)
-        self.name_box.setFixedHeight(30)
-        layout.addWidget(self.name_box)
-        option_panel.setLayout(layout)
-
-        open_button.clicked.connect(self._open)
-        return option_panel
-
-    def _open(self):
-        filename, _ = QFileDialog.getSaveFileName(None, 'Choose the output file name', '',
-                                                  'CSV Files (*.csv)',
-                                                  options=QFileDialog.Options() | QFileDialog.DontUseNativeDialog)
-        if filename:
-            if len(filename) < 5 or filename[-4:] != '.csv':
-                filename += '.csv'
-            self.filename = filename
-            self.name_box.setText(filename)
-
-    def configure(self):
-        if self.scene().name_pattern is None:
-            super().configure()
-        else:
-            QMessageBox.information(None, 'OK', 'Successfully configured using naming pattern in the global options.',
-                                    QMessageBox.Ok)
-            self.filename = ''
-            self.state = Node.READY
-            self.update()
-
-    def save(self):
-        return '|'.join([self.category, self.name(), str(self.index()),
-                         str(self.pos().x()), str(self.pos().y()), self.filename])
-
-    def load(self, options):
-        self.filename = options[0]
-        if self.filename:
-            self.state = Node.READY
-
-    def run(self):
-        success = super().run_upward()
-        if not success:
-            self.fail('input failed.')
-            return
-        try:
-            with open(self.filename, 'w') as f:
-                pass
-        except PermissionError:
-            self.fail('Access denied.')
-            return
-
-        csv = self.in_port.mother.parentItem().data
-        if not self.filename:
-            name_pattern = self.scene().name_pattern
-            head, tail = os.path.splitext(csv.filename)
-            self.filename = ''.join([head, name_pattern, '.csv'])
-
-        with open(self.filename, 'w') as output_stream:
-            csv.write(output_stream, self.scene().csv_separator)
-
-        self.success()
 
 
 class LoadPoint2DNode(SingleOutputNode):
