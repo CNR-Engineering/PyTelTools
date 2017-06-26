@@ -464,6 +464,7 @@ class FluxPlotViewer(TemporalPlotViewer):
         self.flux_title = ''
         self.var_IDs = []
         self.has_map = False
+        self.language = 'fr'
         self.cumulative = False
 
         self.locateSections = QAction('Locate sections\non map', self, icon=self.style().standardIcon(QStyle.SP_DialogHelpButton),
@@ -549,7 +550,8 @@ class FluxPlotViewer(TemporalPlotViewer):
         # initialize the plot
         self.time = [self.data['time'], self.data['time'], self.data['time'],
                      self.data['time'] / 60, self.data['time'] / 3600, self.data['time'] / 86400]
-        self.current_xlabel = self._defaultXLabel(self.input.language)
+        self.language = self.input.language
+        self.current_xlabel = self._defaultXLabel()
         self.current_ylabel = self.flux_title
         self.current_title = ''
         self.replot()

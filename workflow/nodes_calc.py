@@ -845,6 +845,9 @@ class ComputeFluxNode(TwoInOneOutNode):
             calculator.construct_intersections()
 
             self.data = CSVData(self.in_data.filename, ['time'] + section_names)
+            self.data.metadata = {'flux title': self.flux_options,
+                                  'language': self.in_data.language, 'start time': self.in_data.start_time,
+                                  'var IDs': var_IDs}
 
             for i, time_index in enumerate(calculator.time_indices):
                 i_result = [str(calculator.input_stream.time[time_index])]
@@ -892,7 +895,7 @@ class InterpolateOnPointsNode(TwoInOneOutNode):
         super().__init__(index)
         self.category = 'Calculations'
         self.label = 'Interpolate\non\nPoints'
-        self.out_port.data_type = 'points csv'
+        self.out_port.data_type = 'point csv'
         self.first_in_port.data_type = 'slf'
         self.second_in_port.data_type = 'point 2d'
         self.in_data = None
@@ -937,6 +940,10 @@ class InterpolateOnPointsNode(TwoInOneOutNode):
 
     def _select(self):
         self.new_options = (self.auto_box.isChecked(), self.name_box.text())
+
+    def reconfigure(self):
+        super().reconfigure()
+        self.reconfigure_downward()
 
     def configure(self):
         if super().configure():
@@ -1002,6 +1009,11 @@ class InterpolateOnPointsNode(TwoInOneOutNode):
             for var in selected_vars:
                 header.append('%s (%.4f, %.4f)' % (var, x, y))
         self.data = CSVData(self.in_data.filename, header)
+        self.data.metadata = {'start time': self.in_data.start_time, 'var IDs': selected_vars,
+                              'point indices': [i for i in range(len(points)) if is_inside[i]],
+                              'language': self.in_data.language,
+                              'points': self.second_in_port.mother.parentItem().data}
+
         nb_selected_vars = len(selected_vars)
         nb_frames = len(self.in_data.selected_time_indices)
 

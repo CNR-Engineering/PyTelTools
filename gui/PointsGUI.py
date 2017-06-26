@@ -3,14 +3,14 @@ import logging
 import datetime
 
 from PyQt5.QtWidgets import *
-from PyQt5.QtGui import *
 from PyQt5.QtCore import *
 import pandas as pd
 
 from slf import Serafin
 from geom import Shapefile
 from gui.util import TemporalPlotViewer, MapViewer, MapCanvas, QPlainTextEditLogger, OutputThread,\
-    TableWidgetDragRows, OutputProgressDialog, LoadMeshDialog, handleOverwrite, TelToolWidget, testOpen
+    TableWidgetDragRows, OutputProgressDialog, LoadMeshDialog, handleOverwrite, TelToolWidget, testOpen, \
+    PointAttributeTable, PointLabelEditor
 
 
 class WriteCSVProcess(OutputThread):
@@ -53,148 +53,6 @@ class WriteCSVProcess(OutputThread):
             QApplication.processEvents()
 
 
-class AttributeTable(QTableWidget):
-    def __init__(self):
-        super().__init__()
-        hh = self.horizontalHeader()
-        hh.setDefaultSectionSize(100)
-        self.resize(850, 600)
-        self.setWindowTitle('Attribute table')
-
-    def getData(self, points, is_inside, fields, all_attributes):
-        self.setRowCount(0)
-        true_false = {True: 'Yes', False: 'No'}
-
-        self.setColumnCount(3 + len(fields))
-        self.setHorizontalHeaderLabels(['x', 'y', 'IsInside'] + fields)
-        self.setEditTriggers(QAbstractItemView.NoEditTriggers)
-
-        i = 0
-        for (x, y), inside, attributes in zip(points, is_inside, all_attributes):
-            self.insertRow(i)
-            self.setItem(i, 0, QTableWidgetItem('%.4f' % x))
-            self.setItem(i, 1, QTableWidgetItem('%.4f' % y))
-            self.setItem(i, 2, QTableWidgetItem(true_false[inside]))
-            for j, a in enumerate(attributes):
-                self.setItem(i, j+3, QTableWidgetItem(str(a)))
-            i += 1
-
-
-class AttributeDialog(QDialog):
-    def __init__(self, attribute_table):
-        super().__init__()
-        self.attribute_table = attribute_table
-        self.attribute_table.setSelectionBehavior(QAbstractItemView.SelectColumns)
-
-        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel,
-                                   Qt.Horizontal, self)
-        buttons.accepted.connect(self.checkSelection)
-        buttons.rejected.connect(self.reject)
-        vlayout = QVBoxLayout()
-        vlayout.addWidget(self.attribute_table)
-        vlayout.addWidget(buttons)
-        self.setLayout(vlayout)
-        self.setWindowTitle('Select an attribute as labels')
-        self.resize(850, 500)
-        self.selection = []
-
-    def checkSelection(self):
-        column = self.attribute_table.currentColumn()
-        if column == -1:
-            QMessageBox.critical(self, 'Error', 'Select at least one attribute.',
-                                 QMessageBox.Ok)
-            return
-        self.selection = []
-        for i in range(self.attribute_table.rowCount()):
-            self.selection.append(self.attribute_table.item(i, column).text())
-        self.accept()
-
-
-class PointLabelEditor(QDialog):
-    def __init__(self, column_labels, name, points, is_inside, fields, all_attributes):
-        super().__init__()
-        attribute_table = AttributeTable()
-        attribute_table.getData(points, is_inside, fields, all_attributes)
-        self.attribute_dialog = AttributeDialog(attribute_table)
-
-        self.btnAttribute = QPushButton('Use attributes')
-        self.btnAttribute.setFixedSize(105, 50)
-        self.btnAttribute.clicked.connect(self.btnAttributeEvent)
-
-        self.btnDefault = QPushButton('Default')
-        self.btnDefault.setFixedSize(105, 50)
-        self.btnDefault.clicked.connect(self.btnDefaultEvent)
-
-        self.column_labels = column_labels
-        self.table = QTableWidget()
-        self.table .setColumnCount(2)
-        self.table .setHorizontalHeaderLabels([name, 'Label'])
-        row = 0
-        for column, label in column_labels.items():
-            label = column_labels[column]
-            self.table.insertRow(row)
-            c = QTableWidgetItem(column)
-            l = QTableWidgetItem(label)
-            self.table.setItem(row, 0, c)
-            self.table.setItem(row, 1, l)
-            self.table.item(row, 0).setFlags(Qt.ItemIsEditable)
-            row += 1
-
-        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel,
-                                   Qt.Horizontal, self)
-        buttons.accepted.connect(self.accept)
-        buttons.rejected.connect(self.reject)
-        vlayout = QVBoxLayout()
-        hlayout = QHBoxLayout()
-        hlayout.addWidget(self.btnAttribute)
-        hlayout.addWidget(self.btnDefault)
-        hlayout.setSpacing(10)
-        vlayout.addLayout(hlayout, Qt.AlignHCenter)
-        vlayout.addItem(QSpacerItem(1, 15))
-        vlayout.addWidget(QLabel('Click on the label to modify'))
-        vlayout.addWidget(self.table)
-        vlayout.addWidget(buttons)
-        self.setLayout(vlayout)
-
-        self.setWindowTitle('Change %s labels' % name)
-        self.resize(self.sizeHint())
-        self.setMinimumWidth(300)
-
-    def btnDefaultEvent(self):
-        self.table.setRowCount(0)
-        row = 0
-        for column in self.column_labels.keys():
-            self.table.insertRow(row)
-            c = QTableWidgetItem(column)
-            l = QTableWidgetItem(column)
-            self.table.setItem(row, 0, c)
-            self.table.setItem(row, 1, l)
-            self.table.item(row, 0).setFlags(Qt.ItemIsEditable)
-            row += 1
-
-    def btnAttributeEvent(self):
-        value = self.attribute_dialog.exec_()
-        if value == QDialog.Rejected:
-            return
-        selected_labels = self.attribute_dialog.selection
-        self.table.setRowCount(0)
-        row = 0
-        for column, label in zip(self.column_labels.keys(), selected_labels):
-            self.table.insertRow(row)
-            c = QTableWidgetItem(column)
-            l = QTableWidgetItem(label)
-            self.table.setItem(row, 0, c)
-            self.table.setItem(row, 1, l)
-            self.table.item(row, 0).setFlags(Qt.ItemIsEditable)
-            row += 1
-
-    def getLabels(self, old_labels):
-        for row in range(self.table.rowCount()):
-            column = self.table.item(row, 0).text()
-            label = self.table.item(row, 1).text()
-            old_labels[column] = label
-
-
 class InputTab(QWidget):
     def __init__(self, parent):
         super().__init__()
@@ -215,7 +73,7 @@ class InputTab(QWidget):
         self.point_interpolators = []
         self.fields = []
         self.attributes = []
-        self.attribute_table = AttributeTable()
+        self.attribute_table = PointAttributeTable()
 
         self._initWidgets()  # some instance attributes will be set there
         self._setLayout()
@@ -703,8 +561,8 @@ class ImageTab(TemporalPlotViewer):
         msg.getLabels(self.column_labels)
         self.replot()
 
-    def _defaultYLabel(self, language):
-        word = {'fr': 'de', 'en': 'of'}[language]
+    def _defaultYLabel(self):
+        word = {'fr': 'de', 'en': 'of'}[self.language]
         return 'Values %s %s' % (word, self.current_var)
 
     def selectVariableEvent(self):
@@ -756,8 +614,9 @@ class ImageTab(TemporalPlotViewer):
         # initialize the plot
         self.time = [self.data['time'], self.data['time'], self.data['time'],
                      self.data['time'] / 60, self.data['time'] / 3600, self.data['time'] / 86400]
-        self.current_xlabel = self._defaultXLabel(self.input.language)
-        self.current_ylabel = self._defaultYLabel(self.input.language)
+        self.language = self.input.language
+        self.current_xlabel = self._defaultXLabel()
+        self.current_ylabel = self._defaultYLabel()
         self.current_title = ''
         self.replot()
 

@@ -22,7 +22,10 @@ NODES = {'Input/Output': {'Load Serafin': LoadSerafinNode,
                           'Interpolate along Lines': InterpolateAlongLinesNode,
                           'Project Lines': ProjectLinesNode},
          'Visualization': {'Show Mesh': ShowMeshNode,
-                           'Locate Open Lines': LocateOpenLinesNode, 'Locate Polygons': LocatePolygonsNode}}
+                           'Locate Open Lines': LocateOpenLinesNode, 'Locate Polygons': LocatePolygonsNode,
+                           'Locate Points': LocatePointsNode,
+                           'Volume Plot': VolumePlotNode, 'Flux Plot': FluxPlotNode, 'Point Plot': PointPlotNode,
+                           'Point Attribute Table': PointAttributeTableNode}}
 
 
 def add_link(from_port, to_port):

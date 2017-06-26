@@ -104,8 +104,8 @@ class VolumePlotViewer(TemporalPlotViewer):
         self.menuBar.addMenu(self.mapMenu)
         self.menuBar.addMenu(self.polyMenu)
 
-    def _defaultYLabel(self, language):
-        word = {'fr': 'de', 'en': 'of'}[language]
+    def _defaultYLabel(self):
+        word = {'fr': 'de', 'en': 'of'}[self.language]
         if self.second_var_ID == VolumeCalculator.INIT_VALUE:
             return 'Volume %s (%s - %s$_0$)' % (word, self.var_ID, self.var_ID)
         elif self.second_var_ID is None:
@@ -156,8 +156,9 @@ class VolumePlotViewer(TemporalPlotViewer):
         # initialize the plot
         self.time = [self.data['time'], self.data['time'], self.data['time'],
                      self.data['time'] / 60, self.data['time'] / 3600, self.data['time'] / 86400]
-        self.current_xlabel = self._defaultXLabel(self.input.language)
-        self.current_ylabel = self._defaultYLabel(self.input.language)
+        self.language = self.input.language
+        self.current_xlabel = self._defaultXLabel()
+        self.current_ylabel = self._defaultYLabel()
         self.current_title = ''
         self.replot()
 

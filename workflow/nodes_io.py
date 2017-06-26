@@ -99,7 +99,7 @@ class CSVData:
         self.filename = filename
         self.out_name = ''
         self.table = [header]
-        self.metadata= {}
+        self.metadata = {}
         self.separator = ''
 
     def add_row(self, row):
@@ -110,7 +110,6 @@ class CSVData:
             output_stream.write(separator.join(line))
             output_stream.write('\n')
         self.out_name = filename
-        self.separator = separator
 
 
 class PolylineData:
@@ -136,6 +135,8 @@ class PointData:
         self.points = []
         self.attributes = []
         self.fields = []
+        self.fields_name = []
+        self.attributes_decoded = []
 
     def __len__(self):
         return len(self.points)
@@ -145,9 +146,21 @@ class PointData:
 
     def add_attribute(self, attribute):
         self.attributes.append(attribute)
+        decoded = []
+        for a in attribute:
+            if type(a) == bytes:
+                decoded.append(a.decode('latin-1'))
+            decoded.append(str(a))
+        self.attributes_decoded.append(decoded)
 
     def set_fields(self, fields):
         self.fields = fields[:]
+        for f in fields:
+            name = f[0]
+            if type(name) == bytes:
+                self.fields_name.append(name.decode('latin-1'))
+            else:
+                self.fields_name.append(name)
 
     def is_empty(self):
         return len(self.points) == 0
