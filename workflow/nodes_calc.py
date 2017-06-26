@@ -494,6 +494,13 @@ class ComputeVolumeNode(TwoInOneOutNode):
         if second:
             self.second_var = second
         self.sup_volume = bool(int(sup))
+        try:
+            with open(filename, 'w') as f:
+                pass
+        except (PermissionError, FileNotFoundError):
+            self.filename = ''
+            self.state = Node.NOT_CONFIGURED
+            return
         if filename:
             self.auto = False
             self.filename = filename
@@ -783,6 +790,13 @@ class ComputeFluxNode(TwoInOneOutNode):
 
     def load(self, options):
         self.flux_options, filename = options
+        try:
+            with open(filename, 'w') as f:
+                pass
+        except (PermissionError, FileNotFoundError):
+            self.filename = ''
+            self.state = Node.NOT_CONFIGURED
+            return
         if filename:
             self.filename = filename
             self.auto = False
@@ -950,12 +964,16 @@ class InterpolateOnPointsNode(TwoInOneOutNode):
 
     def load(self, options):
         filename = options[0]
+        try:
+            with open(filename, 'w') as f:
+                pass
+        except (PermissionError, FileNotFoundError):
+            self.filename = ''
+            self.state = Node.NOT_CONFIGURED
+            return
         if filename:
             self.auto = False
             self.filename = filename
-        else:
-            self.filename = ''
-            self.auto = True
 
     def _run_interpolate(self, selected_vars):
         self.progress_bar.setVisible(True)
@@ -1118,12 +1136,16 @@ class InterpolateAlongLinesNode(TwoInOneOutNode):
 
     def load(self, options):
         filename = options[0]
+        try:
+            with open(filename, 'w') as f:
+                pass
+        except (PermissionError, FileNotFoundError):
+            self.filename = ''
+            self.state = Node.NOT_CONFIGURED
+            return
         if filename:
             self.auto = False
             self.filename = filename
-        else:
-            self.filename = ''
-            self.auto = True
 
     def _run_interpolate(self, selected_vars):
         self.progress_bar.setVisible(True)
@@ -1362,12 +1384,16 @@ class ProjectLinesNode(TwoInOneOutNode):
 
     def load(self, options):
         filename = options[0]
+        try:
+            with open(filename, 'w') as f:
+                pass
+        except (PermissionError, FileNotFoundError):
+            self.filename = ''
+            self.state = Node.NOT_CONFIGURED
+            return
         if filename:
             self.auto = False
             self.filename = filename
-        else:
-            self.filename = ''
-            self.auto = True
 
     def run(self):
         success = super().run_upward()
