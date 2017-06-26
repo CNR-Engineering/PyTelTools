@@ -30,7 +30,7 @@ class ExtractVariablesThread(OutputThread):
                 return
             values = do_calculations_in_frame(self.necessary_equations, self.us_equation, self.input_stream, time_index,
                                              self.output_header.var_IDs, self.output_header.np_float_type)
-            self.output_stream.write_entire_frame(self.output_header, self.input_stream.time[i], values)
+            self.output_stream.write_entire_frame(self.output_header, self.input_stream.time[time_index], values)
             self.tick.emit(5 + int(95 * (i+1) / self.nb_frames))
 
 
