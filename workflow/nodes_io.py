@@ -298,14 +298,18 @@ class WriteSerafinNode(OneInOneOutNode):
 
     def load(self, options):
         filename = options[0]
+        try:
+            with open(filename, 'w') as f:
+                pass
+        except (PermissionError, FileNotFoundError):
+            self.filename = ''
+            self.state = Node.NOT_CONFIGURED
+            return
+
         if filename:
             self.auto = False
             self.filename = filename
             self.state = Node.READY
-        else:
-            self.filename = ''
-            self.auto = True
-            self.state = Node.NOT_CONFIGURED
 
     def _run_simple(self, input_data):
         output_header = input_data.default_output_header()
