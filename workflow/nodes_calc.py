@@ -532,6 +532,8 @@ class ComputeVolumeNode(TwoInOneOutNode):
             calculator.construct_weights()
 
             self.data = CSVData(self.in_data.filename, calculator.get_csv_header())
+            self.data.metadata = {'var': self.first_var, 'second var': self.second_var,
+                                  'start time': self.in_data.start_time, 'language': self.in_data.language}
 
             for i, time_index in enumerate(calculator.time_indices):
                 i_result = [str(calculator.input_stream.time[time_index])]

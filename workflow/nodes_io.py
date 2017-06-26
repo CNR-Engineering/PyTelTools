@@ -99,6 +99,8 @@ class CSVData:
         self.filename = filename
         self.out_name = ''
         self.table = [header]
+        self.metadata= {}
+        self.separator = ''
 
     def add_row(self, row):
         self.table.append(row)
@@ -108,6 +110,7 @@ class CSVData:
             output_stream.write(separator.join(line))
             output_stream.write('\n')
         self.out_name = filename
+        self.separator = separator
 
 
 class PolylineData:
