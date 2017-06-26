@@ -47,7 +47,6 @@ class TreeScene(QGraphicsScene):
 
         self.language = 'fr'
         self.csv_separator = ';'
-        self.name_pattern = None
 
         self.setSceneRect(QRectF(0, 0, 800, 600))
         self.transform = QTransform()
@@ -330,11 +329,6 @@ class GlobalConfigDialog(QDialog):
             self.csv_box.setCurrentIndex(1)
         else:
             self.csv_box.setCurrentIndex(2)
-
-        hlayout = QHBoxLayout()
-        hlayout.addWidget(QLabel('Append to input name'))
-        hlayout.addWidget(self.pattern)
-        self.name_box.setLayout(hlayout)
 
         layout = QVBoxLayout()
         layout.addWidget(self.lang_box)
