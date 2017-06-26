@@ -82,6 +82,25 @@ class ArrivalDurationThread(OutputThread):
         return values
 
 
+class SynchMaxThread(OutputThread):
+    def __init__(self, input_stream, selected_vars, time_indices, var):
+        super().__init__()
+        self.time_indices = time_indices
+        self.nb_frames = len(time_indices)
+        self.calculator = operations.SynchMaxCalculator(input_stream, selected_vars, time_indices, var)
+
+    def run(self):
+        for i, time_index in enumerate(self.time_indices[1:]):
+            if self.canceled:
+                return []
+            self.calculator.synch_max_in_frame(time_index)
+
+            self.tick.emit(int(95 * (i+1) / self.nb_frames))
+            QApplication.processEvents()
+
+        return self.calculator.finishing_up()
+
+
 class TimeSelection(QWidget):
     """!
     @brief Text fields for time selection display (with slider)
@@ -833,6 +852,258 @@ class ArrivalDurationTab(QWidget):
         self.parent.outDialog()
 
 
+class SynchMaxTab(QWidget):
+    def __init__(self, input, parent):
+        super().__init__()
+        self.input = input
+        self.parent = parent
+
+        self._initWidgets()
+        self._setLayout()
+        self._bindEvents()
+
+    def _initWidgets(self):
+        # create a combox box for variable selection
+        self.varBox = QComboBox()
+        self.varBox.setFixedSize(200, 30)
+
+        # create a slider for time selection
+        self.timeSlider = TimeRangeSlider()
+        self.timeSlider.setFixedHeight(30)
+        self.timeSlider.setMinimumWidth(600)
+        self.timeSlider.setEnabled(False)
+
+        # create text boxes for displaying the time selection
+        self.timeSelection = TimeSelection(self)
+        self.timeSelection.startIndex.setEnabled(False)
+        self.timeSelection.endIndex.setEnabled(False)
+        self.timeSelection.startValue.setEnabled(False)
+        self.timeSelection.endValue.setEnabled(False)
+
+        # create two 3-column tables for variables selection
+        self.firstTable = TableWidgetDragRows()
+        self.secondTable = TableWidgetDragRows()
+        for tw in [self.firstTable, self.secondTable]:
+            tw.setColumnCount(3)
+            tw.setHorizontalHeaderLabels(['ID', 'Name', 'Unit'])
+            vh = tw.verticalHeader()
+            vh.setSectionResizeMode(QHeaderView.Fixed)
+            vh.setDefaultSectionSize(20)
+            hh = tw.horizontalHeader()
+            hh.setDefaultSectionSize(110)
+            tw.setEditTriggers(QAbstractItemView.NoEditTriggers)
+            tw.setMaximumHeight(800)
+
+        self.secondTable.setMinimumHeight(300)
+
+        # create the widget displaying message logs
+        self.logTextBox = QPlainTextEditLogger(self)
+        self.logTextBox.setFormatter(logging.Formatter('%(asctime)s - [%(levelname)s] - \n%(message)s'))
+        logging.getLogger().addHandler(self.logTextBox)
+        logging.getLogger().setLevel(logging.INFO)
+
+        # create a check box for output file format (simple or double precision)
+        self.singlePrecisionBox = QCheckBox('Convert to SERAFIN \n(single precision)', self)
+        self.singlePrecisionBox.setEnabled(False)
+
+        # create the submit button
+        self.btnSubmit = QPushButton('Submit', self, icon=self.style().standardIcon(QStyle.SP_DialogSaveButton))
+        self.btnSubmit.setToolTip('<b>Submit</b> to write a .slf output')
+        self.btnSubmit.setFixedSize(105, 50)
+        self.btnSubmit.setEnabled(False)
+
+    def _setLayout(self):
+        mainLayout = QVBoxLayout()
+        mainLayout.addItem(QSpacerItem(1, 10))
+        mainLayout.addWidget(self.timeSlider)
+        mainLayout.addWidget(self.timeSelection)
+        mainLayout.addItem(QSpacerItem(1, 10))
+
+        hlayout = QHBoxLayout()
+        hlayout.addWidget(QLabel('  Select the reference variable '))
+        hlayout.addWidget(self.varBox, Qt.AlignLeft)
+        hlayout.addStretch()
+        mainLayout.addLayout(hlayout)
+        mainLayout.addItem(QSpacerItem(1, 10))
+
+        hlayout = QHBoxLayout()
+        hlayout.addItem(QSpacerItem(30, 1))
+        vlayout = QVBoxLayout()
+        vlayout.setAlignment(Qt.AlignHCenter)
+        lb = QLabel('Available variables')
+        vlayout.addWidget(lb)
+        vlayout.setAlignment(lb, Qt.AlignHCenter)
+        vlayout.addWidget(self.firstTable)
+        hlayout.addLayout(vlayout)
+        hlayout.addItem(QSpacerItem(15, 1))
+        vlayout = QVBoxLayout()
+        lb = QLabel('Output variables')
+        vlayout.addWidget(lb)
+        vlayout.setAlignment(lb, Qt.AlignHCenter)
+        vlayout.addWidget(self.secondTable)
+        hlayout.addLayout(vlayout)
+        hlayout.addItem(QSpacerItem(30, 1))
+
+        mainLayout.addLayout(hlayout)
+        mainLayout.addItem(QSpacerItem(50, 20))
+        hlayout = QHBoxLayout()
+        hlayout.addItem(QSpacerItem(50, 10))
+        hlayout.addWidget(self.btnSubmit)
+        hlayout.addItem(QSpacerItem(50, 10))
+        hlayout.addWidget(self.singlePrecisionBox)
+        hlayout.addItem(QSpacerItem(50, 10))
+        mainLayout.addLayout(hlayout)
+        mainLayout.addItem(QSpacerItem(30, 15))
+        mainLayout.addWidget(QLabel('   Message logs'))
+        mainLayout.addWidget(self.logTextBox.widget)
+        self.setLayout(mainLayout)
+
+    def _bindEvents(self):
+        self.btnSubmit.clicked.connect(self.btnSubmitEvent)
+        self.timeSelection.startIndex.editingFinished.connect(self.timeSlider.enterIndexEvent)
+        self.timeSelection.endIndex.editingFinished.connect(self.timeSlider.enterIndexEvent)
+        self.timeSelection.startValue.editingFinished.connect(self.timeSlider.enterValueEvent)
+        self.timeSelection.endValue.editingFinished.connect(self.timeSlider.enterValueEvent)
+
+    def _initVarTables(self):
+        for i, (id, name, unit) in enumerate(zip(self.input.header.var_IDs,
+                                                 self.input.header.var_names, self.input.header.var_units)):
+            self.firstTable.insertRow(self.firstTable.rowCount())
+            id_item = QTableWidgetItem(id.strip())
+            name_item = QTableWidgetItem(name.decode('utf-8').strip())
+            unit_item = QTableWidgetItem(unit.decode('utf-8').strip())
+            self.firstTable.setItem(i, 0, id_item)
+            self.firstTable.setItem(i, 1, name_item)
+            self.firstTable.setItem(i, 2, unit_item)
+        self.secondTable.insertRow(0)
+        self.secondTable.setItem(0, 0, QTableWidgetItem('MAX TIME'))
+        self.secondTable.setItem(0, 1, QTableWidgetItem('MAX TIME'))
+        self.secondTable.setItem(0, 2, QTableWidgetItem('S'))
+        for j in range(3):
+            self.secondTable.item(0, j).setFlags(Qt.NoItemFlags)
+
+    def _getSelectedVariables(self):
+        selected = []
+        for i in range(self.secondTable.rowCount()):
+            selected.append((self.secondTable.item(i, 0).text(),
+                            bytes(self.secondTable.item(i, 1).text(), 'utf-8').ljust(16),
+                            bytes(self.secondTable.item(i, 2).text(), 'utf-8').ljust(16)))
+        return selected
+
+    def reset(self):
+        self.varBox.clear()
+        self.firstTable.setRowCount(0)
+        self.secondTable.setRowCount(0)
+        self.timeSelection.disable()
+        self.btnSubmit.setEnabled(False)
+        self.singlePrecisionBox.setChecked(False)
+        self.singlePrecisionBox.setEnabled(False)
+
+    def getOutputHeader(self, selected_vars):
+        output_header = self.input.header.copy()
+        output_header.nb_var = len(selected_vars)
+        output_header.var_IDs, output_header.var_names, output_header.var_units = [], [], []
+        for var_ID, var_name, var_unit in selected_vars:
+            output_header.var_IDs.append(var_ID)
+            output_header.var_names.append(var_name)
+            output_header.var_units.append(var_unit)
+        if self.singlePrecisionBox.isChecked():
+            output_header.to_single_precision()
+        return output_header
+
+    def getInput(self):
+        self._initVarTables()
+        for var, var_name in zip(self.input.header.var_IDs, self.input.header.var_names):
+            item = '%s (%s)' % (var, var_name.decode('utf-8').strip())
+            self.varBox.addItem(item)
+
+        self.btnSubmit.setEnabled(True)
+
+        # unlock convert to single precision
+        if self.input.header.float_type == 'd':
+            self.singlePrecisionBox.setEnabled(True)
+
+        if self.input.header.date is not None:
+            year, month, day, hour, minute, second = self.input.header.date
+            start_time = datetime.datetime(year, month, day, hour, minute, second)
+        else:
+            start_time = datetime.datetime(1900, 1, 1, 0, 0, 0)
+
+        time_frames = list(map(lambda x: datetime.timedelta(seconds=x), self.input.time))
+        self.timeSlider.reinit(start_time, time_frames, self.timeSelection)
+
+        if self.input.header.nb_frames > 1:
+            self.timeSlider.setEnabled(True)
+            self.timeSelection.enable()
+
+    def btnSubmitEvent(self):
+        # fetch the list of selected variables
+        selected_vars = self._getSelectedVariables()
+        if not selected_vars:
+            QMessageBox.critical(self, 'Error', 'Select at least one variable.',
+                                 QMessageBox.Ok)
+            return
+
+        # create the save file dialog
+        options = QFileDialog.Options()
+        options |= QFileDialog.DontUseNativeDialog
+        options |= QFileDialog.DontConfirmOverwrite
+        filename, _ = QFileDialog.getSaveFileName(self, 'Choose the output file name', '',
+                                                  'Serafin Files (*.slf)', options=options)
+
+        # check the file name consistency
+        if not filename:
+            return
+        if len(filename) < 5 or filename[-4:] != '.slf':
+            filename += '.slf'
+
+        # overwrite to the input file is forbidden
+        if filename == self.input.filename:
+            QMessageBox.critical(self, 'Error', 'Cannot overwrite to the input file.',
+                                 QMessageBox.Ok)
+            return
+
+        # handle overwrite manually
+        overwrite = handleOverwrite(filename)
+        if overwrite is None:
+            return
+
+        # deduce header from selected variable IDs and write header
+        output_header = self.getOutputHeader(selected_vars)
+
+        start_index = int(self.timeSelection.startIndex.text()) - 1
+        end_index = int(self.timeSelection.endIndex.text())
+        time_indices = list(range(start_index, end_index))
+        var = self.varBox.currentText().split(' (')[0]
+
+        output_message = 'Computing SynchMax of variables %s between frame %d and %d.' \
+                          % (str(list(map(lambda x: x[0], selected_vars[1:]))), start_index+1, end_index)
+        self.parent.inDialog()
+        logging.info(output_message)
+        progressBar = OutputProgressDialog()
+
+        # do some calculations
+        with Serafin.Read(self.input.filename, self.input.language) as resin:
+            resin.header = self.input.header
+            resin.time = self.input.time
+
+            progressBar.setValue(5)
+            QApplication.processEvents()
+
+            with Serafin.Write(filename, self.input.language, overwrite) as resout:
+                process = SynchMaxThread(resin, selected_vars[1:], time_indices, var)
+                progressBar.connectToThread(process)
+                values = process.run()
+
+                if not process.canceled:
+                    resout.write_header(output_header)
+                    resout.write_entire_frame(output_header, self.input.time[0], values)
+                    progressBar.outputFinished()
+
+        progressBar.exec_()
+        self.parent.outDialog()
+
+
 class MaxMinMeanGUI(TelToolWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -841,14 +1112,16 @@ class MaxMinMeanGUI(TelToolWidget):
         self.input = InputTab(self)
         self.maxMinTab = MaxMinMeanTab(self.input, self)
         self.arrivalDurationTab = ArrivalDurationTab(self.input, self)
+        self.syncMaxTab = SynchMaxTab(self.input, self)
 
         self.tab = QTabWidget()
         self.tab.addTab(self.input, 'Input')
         self.tab.addTab(self.maxMinTab, 'Max/Min/Mean')
         self.tab.addTab(self.arrivalDurationTab, 'Arrival/Duration')
+        self.tab.addTab(self.syncMaxTab, 'SynchMax')
 
-        self.tab.setTabEnabled(1, False)
-        self.tab.setTabEnabled(2, False)
+        for i in range(1, 4):
+            self.tab.setTabEnabled(i, False)
 
         self.tab.setStyleSheet('QTabBar::tab { height: 40px; min-width: 200px; }')
 
@@ -857,12 +1130,12 @@ class MaxMinMeanGUI(TelToolWidget):
         self.setLayout(mainLayout)
 
     def reset(self):
-        for i, tab in enumerate([self.maxMinTab, self.arrivalDurationTab]):
+        for i, tab in enumerate([self.maxMinTab, self.arrivalDurationTab, self.syncMaxTab]):
             tab.reset()
             self.tab.setTabEnabled(i+1, False)
 
     def getInput(self):
-        for i, tab in enumerate([self.maxMinTab, self.arrivalDurationTab]):
+        for i, tab in enumerate([self.maxMinTab, self.arrivalDurationTab, self.syncMaxTab]):
             tab.getInput()
             self.tab.setTabEnabled(i+1, True)
 

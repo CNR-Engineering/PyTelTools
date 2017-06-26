@@ -308,6 +308,52 @@ class ProjectMeshCalculator:
                                           self.first_in.time[first_time_index], values)
 
 
+class SynchMaxCalculator:
+    def __init__(self, input_stream, selected_vars, time_indices, ref_var):
+        self.input_stream = input_stream
+        self.selected_vars = selected_vars
+        self.time_indices = time_indices
+        self.ref_var = ref_var
+
+        self.read_ref = False
+        if ref_var not in selected_vars:
+            self.read_ref = True
+        self.nb_nodes = input_stream.header.nb_nodes
+        self.current_values = {'time': np.ones((self.nb_nodes,)) * self.input_stream.time[time_indices[0]]}
+
+        for var, _, _ in selected_vars:
+            self.current_values[var] = self.input_stream.read_var_in_frame(time_indices[0], var)
+        if self.read_ref:
+            self.current_values[ref_var] = self.input_stream.read_var_in_frame(time_indices[0], ref_var)
+
+    def synch_max_in_frame(self, time_index):
+        values = {}
+        for var, _, _ in self.selected_vars:
+            values[var] = self.input_stream.read_var_in_frame(time_index, var)
+        if self.read_ref:
+            values[self.ref_var] = self.input_stream.read_var_in_frame(time_index, self.ref_var)
+
+        flags = values[self.ref_var] > self.current_values[self.ref_var]
+        for var, _, _ in self.selected_vars:
+            self.current_values[var] = np.where(flags, values[var], self.current_values[var])
+        self.current_values[self.ref_var] = np.where(flags, values[self.ref_var], self.current_values[self.ref_var])
+
+        time_value = self.input_stream.time[time_index]
+        self.current_values['time'] = np.where(flags, time_value, self.current_values['time'])
+
+    def finishing_up(self):
+        values = np.empty((len(self.selected_vars)+1, self.nb_nodes))
+        values[0, :] = self.current_values['time']
+        for i, (var, _, _) in enumerate(self.selected_vars):
+            values[i+1, :] = self.current_values[var]
+        return values
+
+    def run(self):
+        for time_index in self.time_indices[1:]:
+            self.synch_max_in_frame(time_index)
+        return self.finishing_up()
+
+
 def scalars_vectors(known_vars, selected_vars, us_equation=None):
     """!
     @brief Separate the scalars from vectors, allowing different max/min computations
