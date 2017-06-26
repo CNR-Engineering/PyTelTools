@@ -974,7 +974,7 @@ class ConditionDialog(QDialog):
         mainLayout.addWidget(QLabel('<p style="font-size:10pt">'
                                     '<b>Help</b>: use <b>Add</b> button to add variables to the expression.<br>'
                                     'You can also enter operators, parentheses and numbers.<br>'
-                                    'Supported operators: <tt>+ - * / ^ sqrt</tt>.'))
+                                    'Supported operators: <tt>+ - * / ^ sqrt</tt>.</p>'))
 
         mainLayout.addItem(QSpacerItem(50, 15))
         hlayout = QHBoxLayout()

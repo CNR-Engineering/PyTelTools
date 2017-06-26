@@ -24,7 +24,7 @@ doc: doxygen.config
 
 update_doc: doc
 	rm -r ${DOC_PATH} && cp -r doc/html ${DOC_PATH}
-	cd ${DOC_PATH} && git add -A && git commit -m "Update doc" && git push && cd -
+	cd ${DOC_PATH} && git add -A && git commit -m "Update doc" && git pull && git push && cd -
 
 venv:
 	virtualenv venv --python=python3

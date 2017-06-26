@@ -234,6 +234,9 @@ class ArrivalDurationCalculator:
 
 
 class Condition:
+    """!
+    Condition to compare a variable with a threshold for arrival/duration
+    """
     def __init__(self, expression, literal_expression, comparator, threshold):
         self.expression = expression
         self.literal_expression = literal_expression
@@ -248,6 +251,9 @@ class Condition:
 
 
 class ProjectMeshCalculator:
+    """!
+    Projection and operations between two different meshes
+    """
     def __init__(self, first_in, second_in, selected_vars, is_inside, point_interpolators,
                  time_indices, operation_type):
         self.first_in = first_in
@@ -309,6 +315,9 @@ class ProjectMeshCalculator:
 
 
 class SynchMaxCalculator:
+    """!
+    Compute multiple synchronized maximums from a reference variable
+    """
     def __init__(self, input_stream, selected_vars, time_indices, ref_var):
         self.input_stream = input_stream
         self.selected_vars = selected_vars
@@ -523,6 +532,13 @@ def vectors_to_shp(slf_name, slf_header, shp_name, vector_couple):
 
 
 def scalar_to_xml(slf_name, slf_header, xml_name, scalar):
+    """!
+    @brief Write LandXML file from a scalar variable of a .slf file (and its first frame)
+    @param <str> slf_name: path to the input .slf file
+    @param <slf.Serafin.SerafinHeader> slf_header: input Serafin header
+    @param <str> xml_name: output LandXML filename
+    @param <str> scalar: variable to write
+    """
     with Serafin.Read(slf_name, slf_header.language) as slf:
         slf.header = slf_header
 

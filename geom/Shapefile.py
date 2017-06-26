@@ -148,7 +148,7 @@ class MyWriter(shapefile.Writer):
                 try:
                     f.write(pack("<4d", *self.__bbox([s])))
                 except error:
-                    raise RuntimeError("Falied to write bounding box for record %s. Expected floats." % recNum)
+                    raise RuntimeError("Failed to write bounding box for record %s. Expected floats." % recNum)
             # Shape types with parts
             if s.shapeType in (3,5,13,15,23,25,31):
                 # Number of parts

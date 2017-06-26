@@ -55,7 +55,7 @@ class OptimizationDialog(QDialog):
         mainLayout.addItem(QSpacerItem(50, 10))
         mainLayout.addWidget(QLabel('<p style="font-size:10pt">'
                                     '<b>Help</b>: type or copy/paste coordinates (2 or 3 columns) '
-                                    'in both coordinate systems<br>then click <b>Run</b>.'))
+                                    'in both coordinate systems<br>then click <b>Run</b>.</p>'))
         mainLayout.addItem(QSpacerItem(50, 20))
         hlayout = QHBoxLayout()
         hlayout.addWidget(self.pointBox)
