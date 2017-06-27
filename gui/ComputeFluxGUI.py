@@ -229,6 +229,7 @@ class InputTab(QWidget):
             text = self.fluxBox.itemText(i)
             if text == flux_type:
                 self.fluxBox.setCurrentIndex(i)
+                self.btnSubmit.setEnabled(True)
                 break
 
     def _addFluxOptions(self, header):

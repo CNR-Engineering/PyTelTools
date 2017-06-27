@@ -542,7 +542,7 @@ def scalar_to_xml(slf_name, slf_header, xml_name, scalar):
     with Serafin.Read(slf_name, slf_header.language) as slf:
         slf.header = slf_header
 
-        # fetch vector variable values
+        # fetch scalar variable values
         scalar_values = slf.read_var_in_frame(0, scalar)
 
     # write shp
