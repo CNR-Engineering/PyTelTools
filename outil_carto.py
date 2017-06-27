@@ -1,5 +1,6 @@
 import sys
 import os
+os.chdir(os.path.dirname(os.path.realpath(__file__)))
 import shutil
 import uuid
 import subprocess
