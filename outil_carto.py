@@ -72,7 +72,7 @@ class LandXMLtoTinDialog(QDialog):
                 os.mkdir(os.path.join(dir_path, 'sig'))
 
             # LandXML
-            xml_name = os.path.join(dir_path, 'sig', self.slf_name[:-4] + '_scalar.xml')
+            xml_name = os.path.join(dir_path, 'sig', self.slf_name[:-4] + '_scalar_%s.xml' % self.var)
             if not os.path.exists(xml_name):
                 convert.scalar_to_xml(os.path.join(dir_path, self.slf_name),
                                       file_header, xml_name, self.var)
@@ -81,13 +81,13 @@ class LandXMLtoTinDialog(QDialog):
             QApplication.processEvents()
 
             # tin
-            if os.path.exists(os.path.join(dir_path, 'sig', self.slf_name[:-4] + '_scalar')):
+            if os.path.exists(os.path.join(dir_path, 'sig', self.slf_name[:-4] + '_scalar_%s' % self.var)):
                 self.table.item(i, 2).setBackground(green)
                 QApplication.processEvents()
                 continue
 
             out = subprocess.Popen([python_path, script_name, xml_name, os.path.join(dir_path, 'sig'),
-                                    self.slf_name[:-4] + '_scalar'],
+                                    self.slf_name[:-4] + '_scalar_%s' % self.var],
                                     stdout=subprocess.PIPE)
             result, returncode = out.communicate()[0], out.returncode
             if returncode == 1:
@@ -527,7 +527,8 @@ class SecondStep(QWidget):
                                              self.parent.headers):
                 if not os.path.exists(os.path.join(dir_path, 'sig')):
                     os.mkdir(os.path.join(dir_path, 'sig'))
-                shp_name = os.path.join(dir_path, 'sig', self.parent.first_step.slf_name[:-4] + '_vector.shp')
+                shp_name = os.path.join(dir_path, 'sig', self.parent.first_step.slf_name[:-4] +
+                                                         '_vector_%s_%s.shp' % vector)
                 if not os.path.exists(shp_name):
                     convert.vectors_to_shp(os.path.join(dir_path, self.parent.first_step.slf_name),
                                            file_header, shp_name, vector)
