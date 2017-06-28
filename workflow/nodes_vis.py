@@ -1,4 +1,5 @@
 from PyQt5.QtWidgets import *
+from PyQt5.QtCore import *
 from itertools import islice, cycle
 import datetime
 import numpy as np
@@ -243,94 +244,6 @@ class LocatePolygonsNode(DoubleInputNode):
             mesh = Mesh2D(self.first_in_port.mother.parentItem().data.header)
             self.map.canvas.reinitFigure(mesh, line_node.data.lines,
                                          ['Polygon %d' % (i+1) for i in range(len(line_node.data))])
-
-            self.has_map = True
-            self.map.canvas.draw()
-        self.success()
-
-
-class LocateOpenLinesNode(DoubleInputNode):
-    def __init__(self, index):
-        super().__init__(index)
-        self.category = 'Visualization'
-        self.label = 'Locate\nOpen\nLines'
-        self.first_in_port.data_type = 'slf'
-        self.second_in_port.data_type = 'polyline 2d'
-        self.state = Node.READY
-
-        canvas = LineMapCanvas()
-        self.map = MapViewer(canvas)
-        self.has_map = False
-
-    def save(self):
-        return '|'.join([self.category, self.name(), str(self.index()),
-                         str(self.pos().x()), str(self.pos().y()), ''])
-
-    def load(self, options):
-        self.state = Node.READY
-
-    def reconfigure(self):
-        super().reconfigure()
-        self.has_map = False
-
-    def configure(self):
-        if not self.first_in_port.has_mother() or not self.second_in_port.has_mother():
-            QMessageBox.critical(None, 'Error', 'Connect and run the input before configure this node!',
-                                 QMessageBox.Ok)
-            return
-
-        parent_node = self.first_in_port.mother.parentItem()
-        if parent_node.state != Node.SUCCESS:
-            if parent_node.ready_to_run():
-                parent_node.run()
-            else:
-                QMessageBox.critical(None, 'Error', 'Configure and run the input before configure this node!',
-                                     QMessageBox.Ok)
-                return
-            if parent_node.state != Node.SUCCESS:
-                QMessageBox.critical(None, 'Error', 'Configure and run the input before configure this node!',
-                                     QMessageBox.Ok)
-                return
-
-        line_node = self.second_in_port.mother.parentItem()
-        if line_node.state != Node.SUCCESS:
-            if line_node.ready_to_run():
-                line_node.run()
-            else:
-                QMessageBox.critical(None, 'Error', 'Configure and run the input before configure this node!',
-                                     QMessageBox.Ok)
-                return
-            if line_node.state != Node.SUCCESS:
-                QMessageBox.critical(None, 'Error', 'Configure and run the input before configure this node!',
-                                     QMessageBox.Ok)
-                return
-
-        if self.has_map:
-            self.map.show()
-        else:
-            mesh = Mesh2D(parent_node.data.header)
-            self.map.canvas.reinitFigure(mesh, line_node.data.lines,
-                                         ['Line %d' % (i+1) for i in range(len(line_node.data))],
-                                         list(islice(cycle(['b', 'r', 'g', 'y', 'k', 'c', '#F28AD6', 'm']),
-                                              len(line_node.data))))
-
-            self.has_map = True
-            self.success()
-            self.map.canvas.draw()
-            self.map.show()
-
-    def run(self):
-        success = super().run_upward()
-        if not success:
-            self.fail('input failed.')
-            return
-        if not self.has_map:
-            line_node = self.second_in_port.mother.parentItem()
-            mesh = Mesh2D(self.first_in_port.mother.parentItem().data.header)
-            self.map.canvas.reinitFigure(mesh, line_node.data.lines,
-                                         ['Line %d' % (i+1) for i in range(len(line_node.data))],
-                                         list(islice(cycle(['b', 'r', 'g', 'y', 'k', 'c', '#F28AD6', 'm']),
-                                              len(line_node.data))))
 
             self.has_map = True
             self.map.canvas.draw()

@@ -4,8 +4,7 @@ import os
 import uuid
 
 from workflow.Node import Node, OneInOneOutNode, TwoInOneOutNode
-from workflow.nodes_io import CSVData
-from workflow.nodes_op import BinaryOperatorNode
+from workflow.datatypes import CSVData
 from slf import Serafin
 from slf.volume import TruncatedTriangularPrisms, VolumeCalculator
 from slf.flux import TriangularVectorField, FluxCalculator

@@ -12,11 +12,12 @@ from slf.variables import get_available_variables, get_necessary_equations, do_c
 module_logger = logging.getLogger(__name__)
 
 # constants
-OPERATORS = ['+', '-', '*', '/', '^', 'sqrt']
+OPERATORS = ['+', '-', '*', '/', '^', 'sqrt', 'sin', 'cos', 'atan']
 MAX, MIN, MEAN, ARRIVAL_DURATION, PROJECT, DIFF, REV_DIFF, MAX_BETWEEN, MIN_BETWEEN = 0, 1, 2, 3, 4, 5, 6, 7, 8
 
-_OPERATIONS = {'+': np.add, '-': np.subtract, '*': np.multiply, '/': np.divide, '^': np.power, 'sqrt': np.sqrt}
-_PRECEDENCE = {'(': 1, '-': 2, '+': 2, '*': 3, '/': 3, '^': 4, 'sqrt': 5}
+_OPERATIONS = {'+': np.add, '-': np.subtract, '*': np.multiply, '/': np.divide, '^': np.power, 'sqrt': np.sqrt,
+               'sin': np.sin, 'cos': np.cos, 'atan': np.arctan}
+_PRECEDENCE = {'(': 1, '-': 2, '+': 2, '*': 3, '/': 3, '^': 4, 'sqrt': 5, 'sin': 5, 'cos': 5, 'atan': 5}
 
 _VECTORS = {'U': ('V', 'M'), 'V': ('U', 'M'), 'QSX': ('QSY', 'QS'), 'QSY': ('QSX', 'QS'),
             'QSBLX': ('QSBLY', 'QSBL'), 'QSBLY': ('QSBLX', 'QSBL'),
@@ -457,7 +458,7 @@ def is_valid_postfix(expression):
     try:  # try to evaluate the expression
         for symbol in expression:
             if symbol in OPERATORS:
-                if symbol == 'sqrt':
+                if symbol in ('sqrt', 'sin', 'cos', 'atan'):
                     stack.pop()
                 else:
                     stack.pop()
@@ -487,7 +488,7 @@ def evaluate_expression(input_stream, time_index, expression):
 
     for symbol in expression:
         if symbol in OPERATORS:
-            if symbol == 'sqrt':
+            if symbol in ('sqrt', 'sin', 'cos', 'atan'):
                 operand = stack.pop()
                 stack.append(_OPERATIONS[symbol](operand))
             else:
