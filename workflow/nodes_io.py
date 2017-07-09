@@ -848,7 +848,6 @@ class WriteSerafinDialog(QDialog):
         self.suffix = suffix
         self.in_source_folder = self.source_folder_button.isChecked()
         self.double_name = self.double_name_button.isChecked()
-        print(self.double_name)
         self.overwrite = self.overwrite_button.isChecked()
         self.accept()
 
@@ -866,7 +865,7 @@ class WriteSerafinDialog(QDialog):
     def _open(self):
         self.success = False
         w = QFileDialog()
-        w.setWindowTitle('Choose one or more folders')
+        w.setWindowTitle('Choose the output folder')
         w.setFileMode(QFileDialog.DirectoryOnly)
         w.setOption(QFileDialog.DontUseNativeDialog, True)
         tree = w.findChild(QTreeView)
