@@ -2,6 +2,7 @@ from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 from copy import deepcopy
+import datetime
 
 from workflow.Node import Node, OneInOneOutNode, TwoInOneOutNode
 from gui.util import TableWidgetDragRows, SimpleTimeDateSelection,\
@@ -771,12 +772,18 @@ class SelectSingleFrameNode(OneInOneOutNode):
             self.reconfigure_downward()
 
     def save(self):
+        if self.date is None:
+            str_date = ''
+        else:
+            str_date = self.date.strftime('%Y/%m/%d %H:%M:%S')
         return '|'.join([self.category, self.name(), str(self.index()),
                          str(self.pos().x()), str(self.pos().y()),
-                         str(self.selection)])
+                         str(self.selection), str_date])
 
     def load(self, options):
         self.selection = int(options[0])
+        if options[1]:
+            self.date = datetime.datetime.strptime(options[1], '%Y/%m/%d %H:%M:%S')
 
     def run(self):
         success = super().run_upward()
@@ -915,6 +922,58 @@ class ConvertToSinglePrecisionNode(UnaryOperatorNode):
 
         self.data = input_data.copy()
         self.data.to_single = True
+        self.success()
+
+
+class SelectFirstFrameNode(UnaryOperatorNode):
+    def __init__(self, index):
+        super().__init__(index, None)
+        self.category = 'Basic operations'
+        self.label = 'Select\nFirst\nFrame'
+        self.out_port.data_type = 'slf'
+        self.in_port.data_type = 'slf'
+
+    def run(self):
+        success = super().run_upward()
+        if not success:
+            self.fail('input failed.')
+            return
+        input_data = self.in_port.mother.parentItem().data
+        if input_data.operator is not None:
+            self.fail('cannot select time after computation.')
+            return
+        if len(input_data.selected_time_indices) != len(input_data.time):
+            self.fail('cannot re-select time.')
+            return
+
+        self.data = input_data.copy()
+        self.data.selected_time_indices = [0]
+        self.success()
+
+
+class SelectLastFrameNode(UnaryOperatorNode):
+    def __init__(self, index):
+        super().__init__(index, None)
+        self.category = 'Basic operations'
+        self.label = 'Select\nLast\nFrame'
+        self.out_port.data_type = 'slf'
+        self.in_port.data_type = 'slf'
+
+    def run(self):
+        success = super().run_upward()
+        if not success:
+            self.fail('input failed.')
+            return
+        input_data = self.in_port.mother.parentItem().data
+        if input_data.operator is not None:
+            self.fail('cannot select time after computation.')
+            return
+        if len(input_data.selected_time_indices) != len(input_data.time):
+            self.fail('cannot re-select time.')
+            return
+
+        self.data = input_data.copy()
+        self.data.selected_time_indices = [len(input_data.time)-1]
         self.success()
 
 

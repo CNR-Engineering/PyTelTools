@@ -1,5 +1,4 @@
-from workflow.Node import Port, Box
-from workflow.Link import Link
+from workflow.Node import Port, Box, Link
 from workflow.nodes_io import *
 from workflow.nodes_op import *
 from workflow.nodes_calc import *
@@ -12,6 +11,7 @@ NODES = {'Input/Output': {'Load Serafin': LoadSerafinNode,
                           'Write Serafin': WriteSerafinNode},
          'Basic operations': {'Select Variables': SelectVariablesNode,
                               'Select Time': SelectTimeNode, 'Select Single Frame': SelectSingleFrameNode,
+                              'Select First Frame': SelectFirstFrameNode, 'Select Last Frame': SelectLastFrameNode,
                               'Add Rouse': AddRouseNode, 'Convert to Single Precision': ConvertToSinglePrecisionNode},
          'Operators': {'Max': ComputeMaxNode, 'Min': ComputeMinNode, 'Mean': ComputeMeanNode,
                        'Project B on A': ProjectMeshNode, 'A Minus B': MinusNode, 'B Minus A': ReverseMinusNode,
@@ -161,7 +161,7 @@ class TreeScene(QGraphicsScene):
                     self.nb_nodes += 1
                 for i in range(nb_links):
                     from_node_index, from_port_index, \
-                                     to_node_index, to_port_index = map(int,  f.readline().rstrip().split('|'))
+                                     to_node_index, to_port_index = map(int, f.readline().rstrip().split('|'))
                     from_node = self.nodes[from_node_index]
                     to_node = self.nodes[to_node_index]
                     from_port = from_node.ports[from_port_index]

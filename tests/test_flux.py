@@ -1,5 +1,5 @@
 """!
-Unittest for slf.flux module
+Unittest for slf.variables module
 """
 
 import os
@@ -9,7 +9,7 @@ import unittest
 import numpy as np
 
 from slf import Serafin
-from geom.geometry import Polyline
+from geom.Geometry import Polyline
 from slf.flux import FluxCalculator
 
 
