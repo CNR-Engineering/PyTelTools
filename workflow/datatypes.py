@@ -4,7 +4,8 @@ from slf import Serafin
 
 
 class SerafinData:
-    def __init__(self, filename, language):
+    def __init__(self, job_id, filename, language):
+        self.job_id = job_id
         self.language = language
         self.filename = filename
         self.has_index = False
@@ -49,7 +50,7 @@ class SerafinData:
         return True
 
     def copy(self):
-        copy_data = SerafinData(self.filename, self.language)
+        copy_data = SerafinData(self.job_id, self.filename, self.language)
         copy_data.has_index = self.has_index
         copy_data.index = self.index
         copy_data.triangles = self.triangles
