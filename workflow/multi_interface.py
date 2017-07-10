@@ -1,15 +1,15 @@
 import sys
+import os
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
-
 from workflow.multi_func import read_slf, Workers
 from workflow.MultiTree import MultiTreeScene
 
 
 class MultiTreeView(QGraphicsView):
-    def __init__(self, parent):
-        super().__init__(MultiTreeScene())
+    def __init__(self, parent, table):
+        super().__init__(MultiTreeScene(table))
         self.parent = parent
         self.setAlignment(Qt.AlignTop | Qt.AlignLeft)
         self.setAcceptDrops(True)
@@ -19,10 +19,91 @@ class MultiTreeView(QGraphicsView):
         self.scene().setSceneRect(QRectF(0, 0, self.width()-10, self.height()-10))
 
 
+class MultiTreeTable(QTableWidget):
+    def __init__(self):
+        super().__init__()
+        self.yellow = QColor(245, 255, 207, 255)
+        self.green = QColor(180, 250, 165, 255)
+        self.grey = QColor(211, 211, 211, 255)
+
+        self.setRowCount(1)
+        self.setColumnCount(0)
+        self.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.setFocusPolicy(Qt.NoFocus)
+        self.setSelectionMode(QAbstractItemView.NoSelection)
+        self.setVerticalHeaderLabels(['Load Serafin'])
+
+        self.input_columns = {}
+
+    def update_rows(self, nodes, ordered_nodes):
+        self.setRowCount(len(ordered_nodes))
+        self.setColumnCount(0)
+        self.setVerticalHeaderLabels([nodes[u].name() for u in ordered_nodes])
+
+    def update_columns(self, node_index, new_ids, downstream_nodes):
+        if node_index not in self.input_columns:
+            self.add_files(node_index, new_ids, downstream_nodes)
+        else:
+            self.update_files(node_index, new_ids, downstream_nodes)
+
+    def add_files(self, node_index, new_ids, downstream_nodes):
+        self.input_columns[node_index] = []
+        offset = self.columnCount()
+        self.setColumnCount(offset + len(new_ids))
+
+        new_labels = []
+        for j in range(offset):
+            new_labels.append(self.horizontalHeaderItem(j).text())
+        new_labels.extend(new_ids)
+        self.setHorizontalHeaderLabels(new_labels)
+
+        for i in range(self.rowCount()):
+            for j in range(len(new_ids)):
+                self.input_columns[node_index].append(offset+j)
+                item = QTableWidgetItem()
+                self.setItem(i, offset+j, item)
+                if i in downstream_nodes:
+                    self.item(i, offset+j).setBackground(self.yellow)
+                else:
+                    self.item(i, offset+j).setBackground(self.grey)
+
+    def update_files(self, node_index, new_ids, downstream_nodes):
+        old_columns = self.input_columns[node_index]
+        new_labels = []
+        offset = 0
+        old_items = {}
+        for i in range(self.rowCount()):
+            old_items[i] = []
+
+        for j in range(self.columnCount()):
+            if j in old_columns:
+                continue
+            offset += 1
+            new_labels.append(self.horizontalHeaderItem(j).text())
+            for i in range(self.rowCount()):
+                old_items[i].append(self.item(i, j))
+        new_labels.extend(new_ids)
+        self.setColumnCount(len(new_labels))
+        self.setHorizontalHeaderLabels(new_labels)
+
+        for i in range(self.rowCount()):
+            for j in range(offset):
+                self.setItem(i, j, old_items[i][j])
+            for j in range(len(new_ids)):
+                self.input_columns[node_index].append(offset+j)
+                item = QTableWidgetItem()
+                self.setItem(i, offset+j, item)
+                if i in downstream_nodes:
+                    self.item(i, offset+j).setBackground(self.yellow)
+                else:
+                    self.item(i, offset+j).setBackground(self.grey)
+
+
 class MultiTreePanel(QWidget):
     def __init__(self):
         super().__init__()
-        self.view = MultiTreeView(self)
+        self.table = MultiTreeTable()
+        self.view = MultiTreeView(self, self.table)
 
         self.toolbar = QToolBar()
         self.node_label = QLineEdit()
@@ -39,11 +120,9 @@ class MultiTreePanel(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         left_panel.setLayout(layout)
 
-        right_panel = QWidget()
-
         splitter = QSplitter()
         splitter.addWidget(left_panel)
-        splitter.addWidget(right_panel)
+        splitter.addWidget(self.table)
         splitter.setHandleWidth(10)
         splitter.setCollapsible(0, False)
         splitter.setCollapsible(1, False)
@@ -55,22 +134,6 @@ class MultiTreePanel(QWidget):
 
         self.proc = Workers()
 
-    def run(self):
-        if self.proc.stopped:
-            print('cannot re-run.')
-            return
-        # initial tasks
-        tasks = [(read_slf, ('../testdata/test.slf', 0)), (read_slf, ('../testdata/test_copy.slf', 1))]
-        self.proc.start(tasks)
-
-        while not self.proc.stopped:
-            success, job_id = self.proc.done_queue.get()
-            if job_id == 1:
-                self.proc.task_queue.put((read_slf, ('../testdata/testcopy.slf', 2)))
-            elif job_id == 2:
-                self.proc.stop()
-        print('stopped')
-
     def init_toolbar(self):
         for act in [self.save_act, self.load_act, self.run_act]:
             button = QToolButton(self)
@@ -81,7 +144,36 @@ class MultiTreePanel(QWidget):
             self.toolbar.addWidget(button)
             self.toolbar.addSeparator()
 
+    def run(self):
+        if not self.view.scene().ready_to_run:
+            return
+        if self.proc.stopped:
+            print('cannot re-run.')
+            return
+
+        # initial tasks
+        init_tasks = []
+        fid = 0
+        for node_index in self.view.scene().ordered_input_indices:
+            paths, name, job_ids = self.view.scene().inputs[node_index]
+            for path, job_id in zip(paths, job_ids):
+                init_tasks.append((read_slf, (os.path.join(path, name), self.view.scene().language, job_id, fid)))
+                fid += 1
+        self.proc.start(init_tasks)
+
+        while not self.proc.stopped:
+            success, fid, data = self.proc.done_queue.get()
+            if fid == 1:
+                self.proc.task_queue.put((read_slf, ('../testdata/testcopy.slf', 'fr', 'magic', 10)))
+            elif fid == 10:
+                self.proc.stop()
+        print('stopped')
+
     def save(self):
+        if not self.view.scene().ready_to_run:
+            QMessageBox.critical(None, 'Error', 'Configure all input nodes before saving!',
+                                 QMessageBox.Ok)
+            return
         filename, _ = QFileDialog.getSaveFileName(None, 'Choose the file name', '', 'All files (*)',
                                                   options=QFileDialog.Options() | QFileDialog.DontUseNativeDialog)
         if not filename:

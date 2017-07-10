@@ -117,6 +117,7 @@ class WriteSerafinNode(OneInOneOutNode):
         self.dir_path = options[2]
         self.double_name = bool(int(options[3]))
         self.overwrite = bool(int(options[4]))
+        self.state = Node.READY
 
         if not self.in_source_folder:
             if not os.path.exists(self.dir_path):

@@ -1,5 +1,6 @@
-from slf import Serafin
 from multiprocessing import Process, Queue, current_process
+from workflow.datatypes import SerafinData
+from slf import Serafin
 
 
 class Workers:
@@ -31,10 +32,11 @@ def worker(input, output):
         output.put(result)
 
 
-def read_slf(filename, job_id):
+def read_slf(filename, language, job_id, fid):
     print('reading', filename, 'with', current_process().name)
-    with Serafin.Read(filename, 'fr') as f:
-        f.read_header()
-        if f.header.is_2d:
-            return False, job_id
-        return True, job_id
+    data = SerafinData(job_id, filename, language)
+    success = data.read()
+    return success, fid, data
+
+
+

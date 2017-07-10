@@ -12,6 +12,10 @@ class MultiLoadSerafinNode(MultiSingleOutputNode):
         self.label = 'Load\nSerafin'
         self.state = MultiNode.NOT_CONFIGURED
 
+    def save(self):
+        return '|'.join([self.category, self.name(), str(self.index()),
+                         str(self.pos().x()), str(self.pos().y()), '', '', ''])
+
     def configure(self, old_options):
         dlg = MultiLoadSerafinDialog(old_options)
         if dlg.exec_() == QDialog.Accepted:
@@ -26,12 +30,25 @@ class MultiWriteSerafinNode(MultiOneInOneOutNode):
         super().__init__(index)
         self.category = 'Input/Output'
         self.label = 'Write\nSerafin'
-        self.state = MultiNode.NOT_CONFIGURED
 
-    def configure(self):
+        self.suffix = ''
+        self.in_source_folder = True
+        self.dir_path = ''
+        self.double_name = False
+        self.overwrite = False
 
-        self.state = MultiNode.READY
-        return True, []
+    def save(self):
+        return '|'.join([self.category, self.name(), str(self.index()),
+                         str(self.pos().x()), str(self.pos().y()), self.suffix,
+                         str(int(self.in_source_folder)), self.dir_path,
+                         str(int(self.double_name)), str(int(self.overwrite))])
+
+    def load(self, options):
+        self.suffix = options[0]
+        self.in_source_folder = bool(int(options[1]))
+        self.dir_path = options[2]
+        self.double_name = bool(int(options[3]))
+        self.overwrite = bool(int(options[4]))
 
 
 class MultiLoadSerafinDialog(QDialog):
@@ -136,6 +153,10 @@ class MultiLoadSerafinDialog(QDialog):
             name = tree.model().data(index)
             dir_names.append(name)
             self.dir_paths.append(os.path.join(current_dir, name))
+        if not self.dir_paths:
+            QMessageBox.critical(None, 'Error', 'Choose at least one folder.',
+                                 QMessageBox.Ok)
+            return
 
         all_slfs = set()
         for name, path in zip(dir_names, self.dir_paths):
@@ -146,6 +167,7 @@ class MultiLoadSerafinDialog(QDialog):
             if not slfs:
                 QMessageBox.critical(None, 'Error', "The folder %s doesn't have any .slf file!" % name,
                                      QMessageBox.Ok)
+                self.dir_paths = []
                 return
             if not all_slfs:
                 all_slfs = slfs.copy()
@@ -154,6 +176,7 @@ class MultiLoadSerafinDialog(QDialog):
             if not all_slfs:
                 QMessageBox.critical(None, 'Error', 'These folder do not share identical .slf file names!',
                                      QMessageBox.Ok)
+                self.dir_paths = []
                 return
         self.nb_files = len(dir_names)
 
@@ -168,132 +191,4 @@ class MultiLoadSerafinDialog(QDialog):
             name_item.setFlags(Qt.NoItemFlags)
             self.table.setItem(i, 0, name_item)
             self.table.setItem(i, 1, id_item)
-        self.success = True
-
-
-class MultiWriteSerafinDialog(QDialog):
-    def __init__(self, old_options):
-        super().__init__()
-
-        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel,
-                                   Qt.Horizontal, self)
-        buttons.accepted.connect(self.check)
-        buttons.rejected.connect(self.reject)
-
-        folder_box = QGroupBox('Select output folder')
-        self.source_folder_button = QRadioButton('Input folder')
-        self.another_folder_button = QRadioButton('Another folder')
-        self.open_button = QPushButton('Open')
-        self.open_button.setEnabled(False)
-        self.folder_text = QLineEdit()
-        self.folder_text.setReadOnly(True)
-        vlayout = QVBoxLayout()
-        hlayout = QHBoxLayout()
-        hlayout.addWidget(self.source_folder_button)
-        vlayout.addLayout(hlayout)
-        hlayout = QHBoxLayout()
-        hlayout.addWidget(self.another_folder_button)
-        vlayout.addLayout(hlayout)
-        hlayout = QHBoxLayout()
-        hlayout.addWidget(self.open_button)
-        hlayout.addWidget(self.folder_text)
-        vlayout.addLayout(hlayout)
-        folder_box.setLayout(vlayout)
-        self.source_folder_button.toggled.connect(self._toggle_folder)
-        self.open_button.clicked.connect(self._open)
-
-        name_box = QGroupBox('Select output name')
-        self.suffix_box = QLineEdit()
-        self.simple_name_button = QRadioButton('input_name + suffix')
-        self.double_name_button = QRadioButton('input_name + job_id + suffix')
-        self.simple_name_button.setChecked(True)
-        vlayout = QVBoxLayout()
-        hlayout = QHBoxLayout()
-        hlayout.addWidget(QLabel('Suffix'))
-        hlayout.addWidget(self.suffix_box)
-        vlayout.addLayout(hlayout)
-        hlayout = QHBoxLayout()
-        hlayout.addWidget(self.simple_name_button)
-        hlayout.addWidget(self.double_name_button)
-        vlayout.addLayout(hlayout)
-        name_box.setLayout(vlayout)
-
-        overwrite_box = QGroupBox('Overwrite if file already exists')
-        self.overwrite_button = QRadioButton('Yes')
-        no_button = QRadioButton('No')
-        no_button.setChecked(True)
-        hlayout = QHBoxLayout()
-        hlayout.addWidget(self.overwrite_button)
-        hlayout.addWidget(no_button)
-        overwrite_box.setLayout(hlayout)
-
-        self.success = True
-        self.suffix, self.in_source_folder, self.dir_path, self.double_name, self.overwrite = old_options
-        self.suffix_box.setText(self.suffix)
-        self.folder_text.setText(self.dir_path)
-        if not self.in_source_folder:
-            self.another_folder_button.setChecked(True)
-        else:
-            self.source_folder_button.setChecked(True)
-        if self.double_name:
-            self.double_name_button.setChecked(True)
-        if self.overwrite:
-            self.overwrite_button.setChecked(True)
-
-        vlayout = QVBoxLayout()
-        vlayout.addWidget(folder_box)
-        vlayout.addWidget(name_box)
-        vlayout.addWidget(overwrite_box)
-        vlayout.addStretch()
-        vlayout.addWidget(buttons, Qt.AlignRight)
-        self.setLayout(vlayout)
-        self.setWindowTitle('Select output file')
-
-    def check(self):
-        if not self.success:
-            self.reject()
-        suffix = self.suffix_box.text()
-        if not all(c.isalnum() or c == '_' for c in suffix):
-            QMessageBox.critical(None, 'Error', 'The suffix should only contain letters, numbers and underscores.',
-                                 QMessageBox.Ok)
-            return
-        self.suffix = suffix
-        self.in_source_folder = self.source_folder_button.isChecked()
-        self.double_name = self.double_name_button.isChecked()
-        self.overwrite = self.overwrite_button.isChecked()
-        self.accept()
-
-    def _toggle_folder(self, source_folder):
-        if not source_folder:
-            self.double_name_button.setChecked(True)
-            self.simple_name_button.setEnabled(False)
-            self.open_button.setEnabled(True)
-            self.success = False
-        else:
-            self.simple_name_button.setEnabled(True)
-            self.folder_text.clear()
-            self.success = True
-
-    def _open(self):
-        self.success = False
-        w = QFileDialog()
-        w.setWindowTitle('Choose the output folder')
-        w.setFileMode(QFileDialog.DirectoryOnly)
-        w.setOption(QFileDialog.DontUseNativeDialog, True)
-        tree = w.findChild(QTreeView)
-        if tree:
-            tree.setSelectionBehavior(QAbstractItemView.SelectRows)
-
-        if w.exec_() != QDialog.Accepted:
-            return
-        current_dir = w.directory().path()
-        for index in tree.selectionModel().selectedRows():
-            name = tree.model().data(index)
-            self.dir_path = os.path.join(current_dir, name)
-            break
-        if not self.dir_path:
-            QMessageBox.critical(None, 'Error', 'Choose a folder !',
-                                 QMessageBox.Ok)
-            return
-        self.folder_text.setText(self.dir_path)
         self.success = True
