@@ -30,25 +30,13 @@ class MultiWriteSerafinNode(MultiOneInOneOutNode):
         super().__init__(index)
         self.category = 'Input/Output'
         self.label = 'Write\nSerafin'
-
-        self.suffix = ''
-        self.in_source_folder = True
-        self.dir_path = ''
-        self.double_name = False
-        self.overwrite = False
+        self.options = ('', True, '', False, False)
 
     def save(self):
         return '|'.join([self.category, self.name(), str(self.index()),
-                         str(self.pos().x()), str(self.pos().y()), self.suffix,
-                         str(int(self.in_source_folder)), self.dir_path,
-                         str(int(self.double_name)), str(int(self.overwrite))])
-
-    def load(self, options):
-        self.suffix = options[0]
-        self.in_source_folder = bool(int(options[1]))
-        self.dir_path = options[2]
-        self.double_name = bool(int(options[3]))
-        self.overwrite = bool(int(options[4]))
+                         str(self.pos().x()), str(self.pos().y()), self.options[0],
+                         str(int(self.options[1])), self.options[2],
+                         str(int(self.options[3])), str(int(self.options[4]))])
 
 
 class MultiLoadSerafinDialog(QDialog):
@@ -115,6 +103,11 @@ class MultiLoadSerafinDialog(QDialog):
         self.job_ids = []
         for row in range(self.table.rowCount()):
             job_id = self.table.item(row, 1).text()
+            if not job_id:
+                QMessageBox.critical(None, 'Error', 'Job ID cannot be empty.',
+                                     QMessageBox.Ok)
+                return
+
             if not all(c.isalnum() or c == '_' for c in job_id):
                 QMessageBox.critical(None, 'Error', 'Job ID should only contain letters, numbers and underscores.',
                                      QMessageBox.Ok)
@@ -152,12 +145,15 @@ class MultiLoadSerafinDialog(QDialog):
         for index in tree.selectionModel().selectedRows():
             name = tree.model().data(index)
             dir_names.append(name)
-            self.dir_paths.append(os.path.join(current_dir, name))
+            if os.path.exists(os.path.join(current_dir, name)):
+                self.dir_paths.append(os.path.join(current_dir, name))
+            else:
+                self.dir_paths = [current_dir]
+                break
         if not self.dir_paths:
             QMessageBox.critical(None, 'Error', 'Choose at least one folder.',
                                  QMessageBox.Ok)
             return
-
         all_slfs = set()
         for name, path in zip(dir_names, self.dir_paths):
             slfs = set()
@@ -187,6 +183,8 @@ class MultiLoadSerafinDialog(QDialog):
         self.table.setRowCount(self.nb_files)
         for i, name in enumerate(dir_names):
             filtered_name = ''.join(c for c in name if c.isalnum() or c == '_')
+            if not filtered_name:   # please do not name a directory with only special letters :D
+                filtered_name = 'default__'
             name_item, id_item = QTableWidgetItem(name), QTableWidgetItem(filtered_name)
             name_item.setFlags(Qt.NoItemFlags)
             self.table.setItem(i, 0, name_item)

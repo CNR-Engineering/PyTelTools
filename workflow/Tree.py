@@ -63,6 +63,7 @@ class TreeScene(QGraphicsScene):
         pen.setWidth(2)
         self.current_line.setPen(pen)
         self.current_port = None
+        self.adj_list = {0: set()}
 
         for node in self.nodes.values():
             self.addItem(node)
@@ -115,6 +116,7 @@ class TreeScene(QGraphicsScene):
     def add_node(self, node, pos):
         self.addItem(node)
         self.nodes[node.index()] = node
+        self.adj_list[node.index()] = set()
         self.nb_nodes += 1
         node.moveBy(pos.x(), pos.y())
 
@@ -146,6 +148,7 @@ class TreeScene(QGraphicsScene):
 
         self.nb_nodes = 0
         self.nodes = {}
+        self.adj_list = {}
         try:
             with open(filename, 'r') as f:
                 self.language, self.csv_separator = f.readline().rstrip().split('.')
@@ -159,6 +162,7 @@ class TreeScene(QGraphicsScene):
                     self.addItem(node)
                     node.moveBy(float(x), float(y))
                     self.nb_nodes += 1
+                    self.adj_list[int(index)] = set()
                 for i in range(nb_links):
                     from_node_index, from_port_index, \
                                      to_node_index, to_port_index = map(int, f.readline().rstrip().split('|'))
@@ -172,10 +176,15 @@ class TreeScene(QGraphicsScene):
                     to_node.add_link(link)
                     self.addItem(link)
                     link.setZValue(-1)
+                    self.adj_list[from_node_index].add(to_node_index)
+                    self.adj_list[to_node_index].add(from_node_index)
         except (IndexError, ValueError, KeyError):
             QMessageBox.critical(None, 'Error',
                                  'The workspace file is not valid.',
                                  QMessageBox.Ok)
+            self.nb_nodes = 0
+            self.nodes = {}
+            self.adj_list = {}
         self.update()
 
     def run_all(self):
@@ -242,6 +251,8 @@ class TreeScene(QGraphicsScene):
             self.addItem(link)
             link.setZValue(-1)
             self.update()
+            self.adj_list[from_node.index()].add(to_node.index())
+            self.adj_list[to_node.index()].add(from_node.index())
         else:
             if cause == 'already':
                 QMessageBox.critical(None, 'Error', 'These two ports are already connected.',
@@ -261,6 +272,9 @@ class TreeScene(QGraphicsScene):
                                   QMessageBox.Ok)
         if msg == QMessageBox.Cancel:
             return
+        from_index, to_index = target_item.from_port.parentItem().index(), target_item.to_port.parentItem().index()
+        self.adj_list[from_index].remove(to_index)
+        self.adj_list[to_index].remove(from_index)
         target_item.remove()
         self.removeItem(target_item)
 
@@ -284,6 +298,13 @@ class TreeScene(QGraphicsScene):
             new_nodes[index] = node
             node.set_index(index)
         self.nodes = new_nodes
+
+        self.adj_list = {node: set() for node in self.nodes}
+        for item in self.items():
+            if isinstance(item, Link):
+                from_index, to_index = item.from_port.parentItem().index(), item.to_port.parentItem().index()
+                self.adj_list[from_index].remove(to_index)
+                self.adj_list[to_index].remove(from_index)
 
     def _permute(self, first_node_index, first_port_index, second_node_index, second_port_index):
         first_node = self.nodes[first_node_index]

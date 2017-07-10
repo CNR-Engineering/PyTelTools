@@ -6,6 +6,28 @@ from PyQt5.QtGui import *
 from workflow.Tree import TreeScene, NODES
 
 
+def count_cc(nodes, adj_list):
+    """returns the number of CC and the CC as a map(node, label)"""
+    labels = {}
+    current_label = 0
+    for node in nodes:
+        labels[node] = -1
+
+    def label_connected_component(labels, start_node, current_label):
+        labels[start_node] = current_label
+        for neighbor in adj_list[start_node]:
+            if labels[neighbor] == -1:
+                labels = label_connected_component(labels, neighbor, current_label)
+        return labels
+
+    for node in nodes:
+        if labels[node] == -1:
+            labels = label_connected_component(labels, node, current_label)
+            current_label += 1
+    return current_label, labels
+
+
+
 class TreeView(QGraphicsView):
     def __init__(self, parent):
         super().__init__(TreeScene())
@@ -90,6 +112,13 @@ class TreePanel(QWidget):
             self.toolbar.addWidget(button)
 
     def save(self):
+        nb_cc, labels = count_cc(list(self.view.scene().adj_list.keys()), self.view.scene().adj_list)
+        if nb_cc > 1:
+            QMessageBox.critical(None, 'Error',
+                                 'You have disconnected nodes. The workspace cannot be saved.',
+                                 QMessageBox.Ok)
+            return
+
         filename, _ = QFileDialog.getSaveFileName(None, 'Choose the file name', '', 'All files (*)',
                                                   options=QFileDialog.Options() | QFileDialog.DontUseNativeDialog)
         if not filename:

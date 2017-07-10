@@ -91,8 +91,11 @@ class MultiTreeScene(QGraphicsScene):
                 success, options = node.configure(self.inputs[node.index()])
                 if success:
                     self.inputs[node.index()] = options
-                    downstream_nodes = visit(self.adj_list, node.index())
-                    self.table.update_columns(node.index(), options[2], downstream_nodes)
+                    if node.index() not in self.table.input_columns:
+                        downstream_nodes = visit(self.adj_list, node.index())
+                        self.table.add_files(node.index(), options[2], downstream_nodes)
+                    else:
+                        self.table.update_files(node.index(), options[2])
                     QApplication.processEvents()
 
                     if all(self.inputs.values()):
@@ -178,15 +181,24 @@ class MultiTreeScene(QGraphicsScene):
                         job_ids = line[3+nb_files:]
                         self.inputs[node_index] = [paths, slf_name, job_ids]
                         downstream_nodes = visit(self.adj_list, node_index)
-                        self.table.update_files(job_ids, downstream_nodes)
+                        self.table.add_files(node_index, job_ids, downstream_nodes)
                         self.nodes[node_index].state = MultiNode.READY
                     self.update()
                     self.ready_to_run = True
                     QApplication.processEvents()
-
+            return True
         except (IndexError, ValueError, KeyError):
             QMessageBox.critical(None, 'Error',
                                  'The workspace file is not valid.',
                                  QMessageBox.Ok)
+            self.clear()
+            self.nodes = {0: MultiLoadSerafinNode(0)}
+            self.nodes[0].moveBy(50, 50)
 
+            self.ready_to_run = False
+            self.inputs = {0: []}
+            self.ordered_input_indices = [0]
+            self.adj_list = {0: set()}
+            self.table.reinit()
+            return False
 

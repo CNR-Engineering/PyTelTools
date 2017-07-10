@@ -87,6 +87,7 @@ class MultiNode(QGraphicsItem):
         self.message = ''
 
         self.ports = []
+        self.options = tuple()
 
     def index(self):
         return self._index
@@ -117,7 +118,7 @@ class MultiNode(QGraphicsItem):
                          str(self.pos().x()), str(self.pos().y()), ''])
 
     def load(self, options):
-        pass
+        self.options = tuple(options)
 
 
 class MultiLink(QGraphicsLineItem):

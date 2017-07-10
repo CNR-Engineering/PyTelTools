@@ -700,6 +700,10 @@ class LoadSerafinDialog(QDialog):
             return
         self.slf_name = self.file_box.currentText()
         job_id = self.table.item(0, 1).text()
+        if not job_id:
+            QMessageBox.critical(None, 'Error', 'Job ID cannot be empty.',
+                                 QMessageBox.Ok)
+            return
         if not all(c.isalnum() or c == '_' for c in job_id):
             QMessageBox.critical(None, 'Error', 'Job ID should only contain letters, numbers and underscores.',
                                  QMessageBox.Ok)
@@ -731,11 +735,15 @@ class LoadSerafinDialog(QDialog):
         for index in tree.selectionModel().selectedRows():
             name = tree.model().data(index)
             dir_name = name
-            self.dir_path = os.path.join(current_dir, name)
+            if os.path.exists(os.path.join(current_dir, name)):
+                self.dir_path = os.path.join(current_dir, name)
+            else:
+                self.dir_path = current_dir
             break
         if not self.dir_path:
             QMessageBox.critical(None, 'Error', 'Choose a folder !',
                                  QMessageBox.Ok)
+            self.dir_path = ''
             return
 
         slfs = set()
@@ -745,6 +753,7 @@ class LoadSerafinDialog(QDialog):
         if not slfs:
             QMessageBox.critical(None, 'Error', "The folder %s doesn't have any .slf file!" % name,
                                  QMessageBox.Ok)
+            self.dir_path = ''
             return
 
         self.file_box.clear()
@@ -842,6 +851,10 @@ class WriteSerafinDialog(QDialog):
         if not self.success:
             self.reject()
         suffix = self.suffix_box.text()
+        if len(suffix) < 1:
+            QMessageBox.critical(None, 'Error', 'The suffix cannot be empty!',
+                                 QMessageBox.Ok)
+            return
         if not all(c.isalnum() or c == '_' for c in suffix):
             QMessageBox.critical(None, 'Error', 'The suffix should only contain letters, numbers and underscores.',
                                  QMessageBox.Ok)
