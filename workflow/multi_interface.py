@@ -1,10 +1,9 @@
 import sys
-from multiprocessing import Process, Queue
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 
-from slf import Serafin
+from workflow.multi_func import read_slf, Workers
 from workflow.MultiTree import MultiTreeScene
 
 
@@ -54,8 +53,23 @@ class MultiTreePanel(QWidget):
         mainLayout.addWidget(splitter)
         self.setLayout(mainLayout)
 
+        self.proc = Workers()
+
     def run(self):
-        pass
+        if self.proc.stopped:
+            print('cannot re-run.')
+            return
+        # initial tasks
+        tasks = [(read_slf, ('../testdata/test.slf', 0)), (read_slf, ('../testdata/test_copy.slf', 1))]
+        self.proc.start(tasks)
+
+        while not self.proc.stopped:
+            success, job_id = self.proc.done_queue.get()
+            if job_id == 1:
+                self.proc.task_queue.put((read_slf, ('../testdata/testcopy.slf', 2)))
+            elif job_id == 2:
+                self.proc.stop()
+        print('stopped')
 
     def init_toolbar(self):
         for act in [self.save_act, self.load_act, self.run_act]:
@@ -96,57 +110,12 @@ def exception_hook(exctype, value, traceback):
     sys.exit(1)
 
 
-def read_slf(filename, job_id):
-    print('reading', filename)
-    with Serafin.Read(filename, 'fr') as f:
-        f.read_header()
-        if f.header.is_2d:
-            return False, job_id
-        return True, job_id
-
-
-class Workers:
-    def __init__(self, initial_tasks):
-        self.nb_processes = 4
-        self.stopped = False
-        self.task_queue = Queue()
-        for task in initial_tasks:
-            self.task_queue.put(task)
-        self.done_queue = Queue()
-
-        for i in range(self.nb_processes):
-            Process(target=worker, args=(self.task_queue, self.done_queue)).start()
-
-    def stop(self):
-        for i in range(self.nb_processes):
-            self.task_queue.put('STOP')
-        self.stopped = True
-
-
-def worker(input, output):
-    for func, args in iter(input.get, 'STOP'):
-        result = func(*args)
-        output.put(result)
-
-
 if __name__ == '__main__':
     # suppress explicitly traceback silencing
     sys._excepthook = sys.excepthook
     sys.excepthook = exception_hook
 
-    # initial tasks
-    tasks = [(read_slf, ('testdata/aaaaaa.slf', 0)), (read_slf, ('testdata/onlyU.slf', 1))]
-    proc = Workers(tasks)
-
     app = QApplication(sys.argv)
     widget = MultiTreePanel()
     widget.show()
-
-    while not proc.stopped:
-        success, job_id = proc.done_queue.get()
-        if job_id == 1:
-            proc.task_queue.put((read_slf, ('testdata/test.slf', 2)))
-        elif job_id == 2:
-            proc.stop()
-
     app.exec_()
