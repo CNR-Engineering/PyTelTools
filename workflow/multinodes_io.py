@@ -12,10 +12,6 @@ class MultiLoadSerafinNode(MultiSingleOutputNode):
         self.label = 'Load\nSerafin'
         self.state = MultiNode.NOT_CONFIGURED
 
-    def save(self):
-        return '|'.join([self.category, self.name(), str(self.index()),
-                         str(self.pos().x()), str(self.pos().y()), '', '', ''])
-
     def configure(self, old_options):
         dlg = MultiLoadSerafinDialog(old_options)
         if dlg.exec_() == QDialog.Accepted:
@@ -30,13 +26,6 @@ class MultiWriteSerafinNode(MultiOneInOneOutNode):
         super().__init__(index)
         self.category = 'Input/Output'
         self.label = 'Write\nSerafin'
-        self.options = ('', True, '', False, False)
-
-    def save(self):
-        return '|'.join([self.category, self.name(), str(self.index()),
-                         str(self.pos().x()), str(self.pos().y()), self.options[0],
-                         str(int(self.options[1])), self.options[2],
-                         str(int(self.options[3])), str(int(self.options[4]))])
 
 
 class MultiLoadSerafinDialog(QDialog):

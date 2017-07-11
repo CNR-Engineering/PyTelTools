@@ -76,6 +76,17 @@ class MultiTreeScene(QGraphicsScene):
         for node in self.nodes.values():
             self.addItem(node)
 
+    def reinit(self):
+        self.clear()
+        self.nodes = {0: MultiLoadSerafinNode(0)}
+        self.nodes[0].moveBy(50, 50)
+
+        self.ready_to_run = False
+        self.inputs = {0: []}
+        self.ordered_input_indices = [0]
+        self.adj_list = {0: set()}
+        self.update()
+
     def add_node(self, node, pos):
         self.addItem(node)
         self.nodes[node.index()] = node
@@ -101,28 +112,15 @@ class MultiTreeScene(QGraphicsScene):
                     if all(self.inputs.values()):
                         self.ready_to_run = True
 
-    def save(self, filename):
-        links = []
-        for item in self.items():
-            if isinstance(item, MultiLink):
-                links.append(item.save())
-
-        with open(filename, 'w') as f:
-            f.write('.'.join([self.language, self.csv_separator]) + '\n')
-            f.write('%d %d\n' % (len(list(self.adj_list.keys())), len(links)))
-            for node in self.nodes.values():
-                f.write(node.save())
-                f.write('\n')
-            for link in links:
-                f.write(link)
-                f.write('\n')
-            f.write('%d\n' % len(self.ordered_input_indices))
-            for node_index in self.ordered_input_indices:
-                paths, name, job_ids = self.inputs[node_index]
-                nb_files = str(len(paths))
-                line = [str(node_index), nb_files, name, '|'.join(paths), '|'.join(job_ids)]
-                f.write('|'.join(line))
-                f.write('\n')
+    def save(self):
+        if not self.ready_to_run:
+            return
+        yield str(len(self.ordered_input_indices))
+        for node_index in self.ordered_input_indices:
+            paths, name, job_ids = self.inputs[node_index]
+            nb_files = str(len(paths))
+            line = [str(node_index), nb_files, name, '|'.join(paths), '|'.join(job_ids)]
+            yield '|'.join(line)
 
     def load(self, filename):
         self.clear()
@@ -173,12 +171,13 @@ class MultiTreeScene(QGraphicsScene):
                 if next_line:
                     nb_inputs = int(next_line)
                     for i in range(nb_inputs):
-                        line = f.readline().rstrip().split('|')
-                        node_index = int(line[0])
-                        nb_files = int(line[1])
-                        slf_name = line[2]
-                        paths = line[3:3+nb_files]
-                        job_ids = line[3+nb_files:]
+                        line = f.readline()
+                        split_line = line.rstrip().split('|')
+                        node_index = int(split_line[0])
+                        nb_files = int(split_line[1])
+                        slf_name = split_line[2]
+                        paths = split_line[3:3+nb_files]
+                        job_ids = split_line[3+nb_files:]
                         self.inputs[node_index] = [paths, slf_name, job_ids]
                         downstream_nodes = visit(self.adj_list, node_index)
                         self.table.add_files(node_index, job_ids, downstream_nodes)
@@ -186,19 +185,9 @@ class MultiTreeScene(QGraphicsScene):
                     self.update()
                     self.ready_to_run = True
                     QApplication.processEvents()
+
             return True
         except (IndexError, ValueError, KeyError):
-            QMessageBox.critical(None, 'Error',
-                                 'The workspace file is not valid.',
-                                 QMessageBox.Ok)
-            self.clear()
-            self.nodes = {0: MultiLoadSerafinNode(0)}
-            self.nodes[0].moveBy(50, 50)
-
-            self.ready_to_run = False
-            self.inputs = {0: []}
-            self.ordered_input_indices = [0]
-            self.adj_list = {0: set()}
+            self.reinit()
             self.table.reinit()
             return False
-

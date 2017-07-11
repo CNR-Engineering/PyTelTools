@@ -68,6 +68,23 @@ class TreeScene(QGraphicsScene):
         for node in self.nodes.values():
             self.addItem(node)
 
+    def reinit(self):
+        self.clear()
+        self.current_line = QGraphicsLineItem()
+        self.addItem(self.current_line)
+        self.current_line.setVisible(False)
+        pen = QPen(QColor(0, 0, 0))
+        pen.setWidth(2)
+        self.current_line.setPen(pen)
+        self.current_port = None
+
+        self.nodes = {0: LoadSerafinNode(0)}
+        self.nodes[0].moveBy(50, 50)
+        self.addItem(self.nodes[0])
+        self.nb_nodes = 1
+        self.adj_list = {0: set()}
+        self.update()
+
     def mousePressEvent(self, event):
         super().mousePressEvent(event)
         for node_index, node in enumerate(self.nodes.values()):
@@ -120,21 +137,19 @@ class TreeScene(QGraphicsScene):
         self.nb_nodes += 1
         node.moveBy(pos.x(), pos.y())
 
-    def save(self, filename):
+    def save(self):
         links = []
         for item in self.items():
             if isinstance(item, Link):
                 links.append(item.save())
 
-        with open(filename, 'w') as f:
-            f.write('.'.join([self.language, self.csv_separator]) + '\n')
-            f.write('%d %d\n' % (self.nb_nodes, len(links)))
-            for node in self.nodes.values():
-                f.write(node.save())
-                f.write('\n')
-            for link in links:
-                f.write(link)
-                f.write('\n')
+        yield '.'.join([self.language, self.csv_separator])
+        yield '%d %d' % (self.nb_nodes, len(links))
+        for node in self.nodes.values():
+            yield node.save()
+
+        for link in links:
+            yield link
 
     def load(self, filename):
         self.clear()
@@ -178,14 +193,11 @@ class TreeScene(QGraphicsScene):
                     link.setZValue(-1)
                     self.adj_list[from_node_index].add(to_node_index)
                     self.adj_list[to_node_index].add(from_node_index)
+            self.update()
+            return True
         except (IndexError, ValueError, KeyError):
-            QMessageBox.critical(None, 'Error',
-                                 'The workspace file is not valid.',
-                                 QMessageBox.Ok)
-            self.nb_nodes = 0
-            self.nodes = {}
-            self.adj_list = {}
-        self.update()
+            self.reinit()
+            return False
 
     def run_all(self):
         roots = self._to_sources()
@@ -303,8 +315,8 @@ class TreeScene(QGraphicsScene):
         for item in self.items():
             if isinstance(item, Link):
                 from_index, to_index = item.from_port.parentItem().index(), item.to_port.parentItem().index()
-                self.adj_list[from_index].remove(to_index)
-                self.adj_list[to_index].remove(from_index)
+                self.adj_list[from_index].add(to_index)
+                self.adj_list[to_index].add(from_index)
 
     def _permute(self, first_node_index, first_port_index, second_node_index, second_port_index):
         first_node = self.nodes[first_node_index]
@@ -316,6 +328,13 @@ class TreeScene(QGraphicsScene):
         elif p1.type == Port.INPUT and p2.type == Port.OUTPUT:
             return second_node, first_node, p2, p1
         return None, None, None, None
+
+    def suffix_pool(self):
+        suffix = []
+        for node in self.nodes.values():
+            if hasattr(node, 'suffix'):
+                suffix.append(node.suffix)
+        return suffix
 
 
 class GlobalConfigDialog(QDialog):
@@ -362,7 +381,7 @@ class GlobalConfigDialog(QDialog):
         layout.addWidget(buttons)
         self.setLayout(layout)
 
-        self.setWindowTitle('Workspace global configuration')
+        self.setWindowTitle('Global configuration')
         self.resize(self.sizeHint())
 
     def _select(self):

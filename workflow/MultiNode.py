@@ -113,10 +113,6 @@ class MultiNode(QGraphicsItem):
     def name(self):
         return ' '.join(self.label.split())
 
-    def save(self):
-        return '|'.join([self.category, self.name(), str(self.index()),
-                         str(self.pos().x()), str(self.pos().y()), ''])
-
     def load(self, options):
         self.options = tuple(options)
 
