@@ -33,6 +33,12 @@ class MultiLoadPolygon2DNode(MultiSingleOutputNode):
         self.category = 'Input/Output'
         self.label = 'Load 2D\nPolygons'
 
+    def load(self, options):
+        if not options[0]:
+            self.state = MultiNode.NOT_CONFIGURED
+        else:
+            super().load(options)
+
 
 class MultiLoadSerafinDialog(QDialog):
     def __init__(self, old_options):

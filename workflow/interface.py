@@ -403,6 +403,28 @@ class MultiTreeWidget(QWidget):
         self.setEnabled(False)
         csv_separator = self.scene.csv_separator
 
+        # first get auxiliary tasks done
+        success = self._prepare_auxiliary_tasks()
+        if not success:
+            self.worker.stop()
+            self.message_box.appendPlainText('Done!')
+            self.setEnabled(True)
+            self.worker = worker.Workers()
+            return
+
+        # prepare slf input tasks
+        nb_tasks = self._prepare_input_tasks()
+
+        while not self.worker.stopped:
+            nb_tasks = self._listen(nb_tasks, csv_separator)
+            if nb_tasks == 0:
+                self.worker.stop()
+
+        self.message_box.appendPlainText('Done!')
+        self.setEnabled(True)
+        self.worker = worker.Workers()
+
+    def _prepare_auxiliary_tasks(self):
         # auxiliary input tasks for N-1 type of double input nodes
         aux_tasks = []
         for node_id in self.scene.auxiliary_input_nodes:
@@ -428,15 +450,9 @@ class MultiTreeWidget(QWidget):
                 for next_node_id in next_nodes:
                     next_node = self.scene.nodes[next_node_id]
                     next_node.get_auxiliary_data(data)
+        return all_success
 
-        if not all_success:
-            self.worker.stop()
-            self.message_box.appendPlainText('Done!')
-            self.setEnabled(True)
-            self.worker = worker.Workers()
-            return
-
-        # slf inputs start the flow
+    def _prepare_input_tasks(self):
         slf_tasks = []
         for node_id in self.scene.ordered_input_indices:
             paths, name, job_ids = self.view.scene().inputs[node_id]
@@ -446,49 +462,45 @@ class MultiTreeWidget(QWidget):
         self.worker.add_tasks(slf_tasks)
         if not self.worker.started:
             self.worker.start()
-        nb_tasks = len(slf_tasks)
+        return len(slf_tasks)
 
-        while not self.worker.stopped:
-            success, node_id, fid, data, message = self.worker.done_queue.get()
-            nb_tasks -= 1
-            self.message_box.appendPlainText(message)
-            current_node = self.scene.nodes[node_id]
-            self.table.get_result(success, node_id, fid)
+    def _listen(self, nb_tasks, csv_separator):
+        # get one task result
+        success, node_id, fid, data, message = self.worker.done_queue.get()
+        nb_tasks -= 1
+        self.message_box.appendPlainText(message)
+        current_node = self.scene.nodes[node_id]
+        self.table.get_result(success, node_id, fid)
 
-            # enqueue tasks from child nodes
-            if success:
-                current_node.nb_success += 1
+        # enqueue tasks from child nodes
+        if success:
+            current_node.nb_success += 1
 
-                next_nodes = self.scene.adj_list[node_id]
-                for next_node_id in next_nodes:
-                    next_node = self.scene.nodes[next_node_id]
-                    fun = worker.FUNCTIONS[next_node.name()]
-                    if next_node.double_input:   # only compute volume for the moment
-                        self.worker.task_queue.put((fun, (next_node_id, fid, data, next_node.auxiliary_data,
-                                                          next_node.options, csv_separator)))
-                    else:
-                        self.worker.task_queue.put((fun, (next_node_id, fid, data, next_node.options)))
-                    nb_tasks += 1
-            else:
-                current_node.nb_fail += 1
-
-            # change box color
-            if current_node.nb_success + current_node.nb_fail == current_node.nb_files():
-                if current_node.nb_fail == 0:
-                    current_node.state = MultiNode.SUCCESS
-                elif current_node.nb_success == 0:
-                    current_node.state = MultiNode.FAIL
+            next_nodes = self.scene.adj_list[node_id]
+            for next_node_id in next_nodes:
+                next_node = self.scene.nodes[next_node_id]
+                fun = worker.FUNCTIONS[next_node.name()]
+                if next_node.double_input:   # only compute volume for the moment
+                    self.worker.task_queue.put((fun, (next_node_id, fid, data, next_node.auxiliary_data,
+                                                      next_node.options, csv_separator)))
                 else:
-                    current_node.state = MultiNode.PARTIAL_FAIL
-                current_node.update()
-            QApplication.processEvents()
+                    self.worker.task_queue.put((fun, (next_node_id, fid, data, next_node.options)))
+                nb_tasks += 1
+        else:
+            current_node.nb_fail += 1
 
-            if nb_tasks == 0:
-                self.worker.stop()
+        # change box color
+        if current_node.nb_success + current_node.nb_fail == current_node.nb_files():
+            if current_node.nb_fail == 0:
+                current_node.state = MultiNode.SUCCESS
+            elif current_node.nb_success == 0:
+                current_node.state = MultiNode.FAIL
+            else:
+                current_node.state = MultiNode.PARTIAL_FAIL
+            current_node.update()
+        QApplication.processEvents()
 
-        self.message_box.appendPlainText('Done!')
-        self.setEnabled(True)
-        self.worker = worker.Workers()
+        return nb_tasks
 
 
 class ProjectWindow(QWidget):

@@ -415,6 +415,14 @@ class LoadPolygon2DNode(SingleOutputNode):
         open_button.clicked.connect(self._open)
         return option_panel
 
+    def configure(self):
+        if super().configure():
+            if not self.filename:
+                self.state = Node.NOT_CONFIGURED
+                self.update()
+            else:
+                self.reconfigure_downward()
+
     def _open(self):
         filename, _ = QFileDialog.getOpenFileName(None, 'Open a polygon file', '',
                                                   'Polygon file (*.i2s *.shp)',
@@ -511,6 +519,14 @@ class LoadOpenPolyline2DNode(SingleOutputNode):
             self.filename = filename
             self.name_box.setText(filename)
 
+    def configure(self):
+        if super().configure():
+            if not self.filename:
+                self.state = Node.NOT_CONFIGURED
+                self.update()
+            else:
+                self.reconfigure_downward()
+
     def save(self):
         return '|'.join([self.category, self.name(), str(self.index()),
                          str(self.pos().x()), str(self.pos().y()), self.filename])
@@ -597,6 +613,14 @@ class LoadPoint2DNode(SingleOutputNode):
         if filename:
             self.filename = filename
             self.name_box.setText(filename)
+
+    def configure(self):
+        if super().configure():
+            if not self.filename:
+                self.state = Node.NOT_CONFIGURED
+                self.update()
+            else:
+                self.reconfigure_downward()
 
     def save(self):
         return '|'.join([self.category, self.name(), str(self.index()),

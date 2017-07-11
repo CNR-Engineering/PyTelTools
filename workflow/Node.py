@@ -468,10 +468,6 @@ class SingleOutputNode(Node):
         super().reconfigure()
         self.reconfigure_downward()
 
-    def configure(self):
-        if super().configure():
-            self.reconfigure_downward()
-
     def help(self):
         QMessageBox.information(None, 'Help',
                                 'Output type: %s' % self.out_port.data_type,
