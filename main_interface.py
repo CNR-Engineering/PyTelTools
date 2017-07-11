@@ -2,7 +2,6 @@ import sys
 
 from PyQt5.QtWidgets import *
 from gui.MainWindow import MyMainWindow as GUIWindow
-from workflow.interface import MyMainWindow as WorkflowWindow
 
 
 class HelloWorld(QDialog):
