@@ -66,9 +66,10 @@ class Box(QGraphicsRectItem):
         
 
 class MultiNode(QGraphicsItem):
-    NOT_CONFIGURED, READY, SUCCESS, FAIL = 'Not configured', 'Ready', 'Success', 'Fail'
+    NOT_CONFIGURED, READY, SUCCESS, PARTIAL_FAIL, FAIL = 'Not configured', 'Ready', 'Success', 'Partial success', 'Fail'
     COLOR = {NOT_CONFIGURED: QColor(220, 255, 255, 255), READY: QColor(250, 220, 165, 255),
-             SUCCESS: QColor(180, 250, 165, 255), FAIL: QColor(255, 160, 160, 255)}
+             SUCCESS: QColor(180, 250, 165, 255), PARTIAL_FAIL: QColor(255, 190, 160, 255),
+             FAIL: QColor(255, 160, 160, 255)}
 
     def __init__(self, index):
         super().__init__()
@@ -86,6 +87,9 @@ class MultiNode(QGraphicsItem):
         self.state = MultiNode.READY
         self.message = ''
 
+        self.expected_input = (0,)
+        self.nb_success = 0
+        self.nb_fail = 0
         self.ports = []
         self.options = tuple()
 
@@ -115,6 +119,12 @@ class MultiNode(QGraphicsItem):
 
     def load(self, options):
         self.options = tuple(options)
+
+    def update_input(self, nb_input):
+        self.expected_input = (nb_input,)
+
+    def nb_files(self):
+        return max(self.expected_input)
 
 
 class MultiLink(QGraphicsLineItem):
@@ -278,4 +288,6 @@ class MultiOneInOneOutNode(MultiNode):
         self.out_port = MultiOutputPort(1, Box.WIDTH/2-MultiPort.WIDTH/2, Box.HEIGHT)
         self.add_port(self.in_port)
         self.add_port(self.out_port)
+        self.expected_input = (0,)
+
 

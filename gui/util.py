@@ -1907,21 +1907,3 @@ def handleOverwrite(filename):
         return True
     return False
 
-
-def exception_hook(exctype, value, traceback):
-    """!
-    @brief Needed for suppressing traceback silencing in newer version of PyQt5
-    """
-    sys._excepthook(exctype, value, traceback)
-    sys.exit(1)
-
-
-if __name__ == '__main__':
-    # suppress explicitly traceback silencing
-    sys._excepthook = sys.excepthook
-    sys.excepthook = exception_hook
-
-    app = QApplication(sys.argv)
-    widget = PlotViewer()
-    widget.show()
-    sys.exit(app.exec_())

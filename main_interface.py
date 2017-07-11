@@ -10,7 +10,7 @@ class HelloWorld(QDialog):
         super().__init__()
         self.choice = None
         left_button = QPushButton('Classic\nInterface')
-        right_button = QPushButton('Workflow\nInterface\n(Experimental)')
+        right_button = QPushButton('Workflow\nInterface\n(Not available)')
         for bt in [left_button, right_button]:
             bt.setFixedSize(150, 200)
 
@@ -40,7 +40,8 @@ if __name__ == '__main__':
         if dlg.choice == 1:
             widget = GUIWindow()
         else:
-            widget = WorkflowWindow()
+            QMessageBox.critical(None, 'Error', 'Not available.', QMessageBox.Ok)
+            sys.exit(0)
         widget.showMaximized()
     else:
         sys.exit(0)

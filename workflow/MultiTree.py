@@ -99,18 +99,7 @@ class MultiTreeScene(QGraphicsScene):
         if isinstance(target_item, Box):
             node = target_item.parentItem()
             if node.category == 'Input/Output' and node.name() == 'Load Serafin':
-                success, options = node.configure(self.inputs[node.index()])
-                if success:
-                    self.inputs[node.index()] = options
-                    if node.index() not in self.table.input_columns:
-                        downstream_nodes = visit(self.adj_list, node.index())
-                        self.table.add_files(node.index(), options[2], downstream_nodes)
-                    else:
-                        self.table.update_files(node.index(), options[2])
-                    QApplication.processEvents()
-
-                    if all(self.inputs.values()):
-                        self.ready_to_run = True
+                self._handle_add_input(node)
 
     def save(self):
         if not self.ready_to_run:
@@ -182,6 +171,9 @@ class MultiTreeScene(QGraphicsScene):
                         downstream_nodes = visit(self.adj_list, node_index)
                         self.table.add_files(node_index, job_ids, downstream_nodes)
                         self.nodes[node_index].state = MultiNode.READY
+                        for u in downstream_nodes:
+                            self.nodes[u].update_input(len(job_ids))
+
                     self.update()
                     self.ready_to_run = True
                     QApplication.processEvents()
@@ -191,3 +183,29 @@ class MultiTreeScene(QGraphicsScene):
             self.reinit()
             self.table.reinit()
             return False
+
+    def _handle_add_input(self, node):
+        success, options = node.configure(self.inputs[node.index()])
+        if not success:
+            return
+
+        self.inputs[node.index()] = options
+        job_ids = options[2]
+        downstream_nodes = visit(self.adj_list, node.index())
+        if node.index() not in self.table.input_columns:
+            self.table.add_files(node.index(), job_ids, downstream_nodes)
+        else:
+            self.table.update_files(node.index(), job_ids)
+        QApplication.processEvents()
+
+        for u in downstream_nodes:
+            self.nodes[u].update_input(len(job_ids))
+
+        if all(self.inputs.values()):
+            self.ready_to_run = True
+
+    def prepare_to_run(self):
+        for node in self.nodes.values():
+            node.state = MultiNode.READY
+            node.nb_success = 0
+            node.nb_fail = 0

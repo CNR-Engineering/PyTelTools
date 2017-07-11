@@ -4,6 +4,7 @@ from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 
+from workflow.MultiNode import MultiNode
 from workflow.Tree import TreeScene, NODES
 import workflow.multi_func as worker
 from workflow.MultiTree import MultiTreeScene
@@ -384,10 +385,11 @@ class MultiTreeWidget(QWidget):
         if not self.scene.ready_to_run:
             return
 
+        self.scene.prepare_to_run()
         self.setEnabled(False)
         # initial tasks
         init_tasks = []
-        for node_id in self.view.scene().ordered_input_indices:
+        for node_id in self.scene.ordered_input_indices:
             paths, name, job_ids = self.view.scene().inputs[node_id]
             for path, job_id, fid in zip(paths, job_ids, self.table.input_columns[node_id]):
                 init_tasks.append((worker.read_slf, (node_id, fid, os.path.join(path, name),
@@ -399,10 +401,11 @@ class MultiTreeWidget(QWidget):
             success, node_id, fid, data, message = self.worker.done_queue.get()
             nb_tasks -= 1
             self.message_box.appendPlainText(message)
+            current_node = self.scene.nodes[node_id]
 
             if success:
+                current_node.nb_success += 1
                 self.table.item(node_id, fid).setBackground(self.table.green)
-                QApplication.processEvents()
 
                 next_nodes = self.scene.adj_list[node_id]
                 for next_node_id in next_nodes:
@@ -412,8 +415,18 @@ class MultiTreeWidget(QWidget):
                     self.worker.task_queue.put((fun, (next_node_id, fid, data, next_node.options)))
                     nb_tasks += 1
             else:
+                current_node.nb_fail += 1
                 self.table.item(node_id, fid).setBackground(self.table.red)
-                QApplication.processEvents()
+
+            if current_node.nb_success + current_node.nb_fail == current_node.nb_files():
+                if current_node.nb_fail == 0:
+                    current_node.state = MultiNode.SUCCESS
+                elif current_node.nb_success == 0:
+                    current_node.state = MultiNode.FAIL
+                else:
+                    current_node.state = MultiNode.PARTIAL_FAIL
+                current_node.update()
+            QApplication.processEvents()
 
             if nb_tasks == 0:
                 self.worker.stop()
