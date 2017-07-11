@@ -130,12 +130,12 @@ class TreeScene(QGraphicsScene):
         else:
             view.deselect_node()
 
-    def add_node(self, node, pos):
+    def add_node(self, node, x, y):
         self.addItem(node)
         self.nodes[node.index()] = node
         self.adj_list[node.index()] = set()
         self.nb_nodes += 1
-        node.moveBy(pos.x(), pos.y())
+        node.moveBy(x, y)
 
     def save(self):
         links = []
@@ -173,11 +173,8 @@ class TreeScene(QGraphicsScene):
                     category, name, index, x, y = line[:5]
                     node = NODES[category][name](int(index))
                     node.load(line[5:])
-                    self.nodes[int(index)] = node
-                    self.addItem(node)
-                    node.moveBy(float(x), float(y))
-                    self.nb_nodes += 1
-                    self.adj_list[int(index)] = set()
+                    self.add_node(node, float(x), float(y))
+
                 for i in range(nb_links):
                     from_node_index, from_port_index, \
                                      to_node_index, to_port_index = map(int, f.readline().rstrip().split('|'))
@@ -193,6 +190,7 @@ class TreeScene(QGraphicsScene):
                     link.setZValue(-1)
                     self.adj_list[from_node_index].add(to_node_index)
                     self.adj_list[to_node_index].add(from_node_index)
+
             self.update()
             return True
         except (IndexError, ValueError, KeyError):

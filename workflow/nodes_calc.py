@@ -3,7 +3,7 @@ from PyQt5.QtCore import *
 import os
 import uuid
 
-from workflow.Node import Node, OneInOneOutNode, TwoInOneOutNode
+from workflow.Node import Node, OneInOneOutNode, TwoInOneOutNode, OutputDialogPanel
 from workflow.datatypes import CSVData
 from slf import Serafin
 from slf.volume import TruncatedTriangularPrisms, VolumeCalculator
@@ -308,20 +308,25 @@ class ComputeVolumeNode(TwoInOneOutNode):
         self.sup_volume = False
         self.new_options = tuple()
 
-        self.auto_box = None
-        self.name_box = None
-        self.filename = ''
-        self.auto = True
-
         self.first_var_box = None
         self.second_var_box = None
         self.sup_volume_box = None
 
+        self.suffix = '_volume'
+        self.in_source_folder = True
+        self.dir_path = ''
+        self.double_name = False
+        self.overwrite = False
+        self.output_panel = None
+
     def get_option_panel(self):
         self.first_var_box = QComboBox()
-        self.first_var_box.setFixedSize(400, 30)
+        self.first_var_box.setFixedHeight(30)
+        self.first_var_box.setMaximumWidth(300)
         self.second_var_box = QComboBox()
-        self.second_var_box.setFixedSize(400, 30)
+        self.second_var_box.setFixedHeight(30)
+        self.second_var_box.setMaximumWidth(300)
+
         self.sup_volume_box = QCheckBox('Compute positive and negative volumes (slow)', None)
 
         self.second_var_box.addItem('0')
@@ -342,22 +347,8 @@ class ComputeVolumeNode(TwoInOneOutNode):
                 self.second_var_box.setCurrentIndex(2 + available_vars.index(self.second_var))
         self.sup_volume_box.setChecked(self.sup_volume)
 
-        open_button = QPushButton(QWidget().style().standardIcon(QStyle.SP_DialogSaveButton),
-                                  'Save CSV')
-        open_button.setToolTip('<b>Save</b> a .csv file')
-        open_button.setFixedHeight(30)
-        if self.auto:
-            open_button.setEnabled(False)
-
-        self.auto_box = QCheckBox('Use automatic output naming')
-        self.auto_box.setChecked(self.auto)
-        self.auto_box.toggled.connect(lambda checked: open_button.setEnabled(not checked))
-        self.name_box = QLineEdit(self.filename)
-        self.name_box.setReadOnly(True)
-        self.name_box.setFixedHeight(30)
-
         option_panel = QWidget()
-        layout = QVBoxLayout()
+        hlayout = QHBoxLayout()
         glayout = QGridLayout()
         glayout.addWidget(QLabel('     Select the principal variable'), 1, 1)
         glayout.addWidget(self.first_var_box, 1, 2)
@@ -365,28 +356,11 @@ class ComputeVolumeNode(TwoInOneOutNode):
         glayout.addWidget(self.second_var_box, 2, 2)
         glayout.addWidget(QLabel('     Positive / negative volumes'), 3, 1)
         glayout.addWidget(self.sup_volume_box, 3, 2)
-        layout.addLayout(glayout)
-        layout.addItem(QSpacerItem(10, 10))
-
-        layout.addWidget(self.auto_box)
-        hlayout = QHBoxLayout()
-        hlayout.addWidget(open_button)
-        hlayout.addWidget(self.name_box)
-        layout.addLayout(hlayout)
-        layout.setSpacing(15)
-        option_panel.setLayout(layout)
-        open_button.clicked.connect(self._open)
+        hlayout.addLayout(glayout)
+        hlayout.addWidget(self.output_panel)
+        option_panel.setLayout(hlayout)
         option_panel.destroyed.connect(self._select)
         return option_panel
-
-    def _open(self):
-        filename, _ = QFileDialog.getSaveFileName(None, 'Choose the output file name', '',
-                                                  'CSV Files (*.csv)',
-                                                  options=QFileDialog.Options() | QFileDialog.DontUseNativeDialog)
-        if filename:
-            if len(filename) < 5 or filename[-4:] != '.csv':
-                filename += '.csv'
-            self.name_box.setText(filename)
 
     def _select(self):
         first_var = self.first_var_box.currentText().split('(')[0][:-1]
@@ -398,7 +372,7 @@ class ComputeVolumeNode(TwoInOneOutNode):
         else:
             second_var = VolumeCalculator.INIT_VALUE
         sup_volume = self.sup_volume_box.isChecked()
-        self.new_options = (first_var, second_var, sup_volume, self.auto_box.isChecked(), self.name_box.text())
+        self.new_options = (first_var, second_var, sup_volume)
 
     def _reset(self):
         self.in_data = self.first_in_port.mother.parentItem().data
@@ -473,10 +447,13 @@ class ComputeVolumeNode(TwoInOneOutNode):
                 QMessageBox.critical(None, 'Error', 'No variable available.',
                                      QMessageBox.Ok)
                 return
-        if super().configure():
-            self.first_var, self.second_var, self.sup_volume, self.auto, self.filename = self.new_options
-            if self.auto:
-                self.filename = ''
+        old_options = (self.suffix, self.in_source_folder, self.dir_path, self.double_name, self.overwrite)
+        self.output_panel = OutputDialogPanel(old_options)
+
+        if super().configure(self.output_panel.check):
+            self.first_var, self.second_var, self.sup_volume = self.new_options
+            self.suffix, self.in_source_folder, self.dir_path, \
+            self.double_name, self.overwrite = self.output_panel.get_options()
             self.reconfigure_downward()
 
     def save(self):
@@ -484,25 +461,22 @@ class ComputeVolumeNode(TwoInOneOutNode):
         second = '' if self.second_var is None else self.second_var
         return '|'.join([self.category, self.name(), str(self.index()),
                          str(self.pos().x()), str(self.pos().y()),
-                         first, second, str(int(self.sup_volume)), self.filename])
+                         first, second, str(int(self.sup_volume)), self.suffix,
+                         str(int(self.in_source_folder)), self.dir_path,
+                         str(int(self.double_name)), str(int(self.overwrite))])
 
     def load(self, options):
-        first, second, sup, filename = options
+        first, second, sup = options[0:3]
+        self.suffix = options[3]
+        self.in_source_folder = bool(int(options[4]))
+        self.dir_path = options[5]
+        self.double_name = bool(int(options[6]))
+        self.overwrite = bool(int(options[7]))
         if first:
             self.first_var = first
         if second:
             self.second_var = second
         self.sup_volume = bool(int(sup))
-        try:
-            with open(filename, 'w') as f:
-                pass
-        except (PermissionError, FileNotFoundError):
-            self.filename = ''
-            self.state = Node.NOT_CONFIGURED
-            return
-        if filename:
-            self.auto = False
-            self.filename = filename
 
     def _run_volume(self):
         # process options
@@ -565,23 +539,32 @@ class ComputeVolumeNode(TwoInOneOutNode):
             return
 
         self.in_data = self.first_in_port.mother.parentItem().data
-        if self.auto:  # use automatic naming
-            head, tail = os.path.splitext(self.in_data.filename)
-            self.filename = ''.join([head, '_volume_', str(uuid.uuid4()), '.csv'])
+        input_name = os.path.split(self.in_data.filename)[1][:-4]
+        if self.double_name:
+            output_name = input_name + '_' + self.in_data.job_id + self.suffix + '.csv'
+        else:
+            output_name = input_name + self.suffix + '.csv'
+        if self.in_source_folder:
+            filename = os.path.join(os.path.split(self.in_data.filename)[0], output_name)
+        else:
+            filename = os.path.join(self.dir_path, output_name)
+        if not self.overwrite:
+            if os.path.exists(filename):
+                self.data = CSVData(self.in_data.filename, None, filename)
+                self.data.metadata = {'var': self.first_var, 'second var': self.second_var,
+                                      'start time': self.in_data.start_time, 'language': self.in_data.language}
+                self.success('Reload existing file.')
+                return
         try:
-            with open(self.filename, 'w') as f:
+            with open(filename, 'w') as f:
                 pass
         except PermissionError:
             self.fail('Access denied.')
             return
 
         self._run_volume()
-
-        with open(self.filename, 'w') as output_stream:
-            self.data.write(self.filename, output_stream, self.scene().csv_separator)
-
-        self.auto = False
-        self.success('Output saved to {}.'.format(self.filename))
+        self.data.write(filename, self.scene().csv_separator)
+        self.success()
 
 
 class ComputeFluxNode(TwoInOneOutNode):

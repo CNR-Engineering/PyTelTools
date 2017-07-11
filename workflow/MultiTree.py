@@ -3,11 +3,14 @@ from copy import deepcopy
 from workflow.MultiNode import Box, MultiLink
 from workflow.multinodes_io import *
 from workflow.multinodes_op import *
+from workflow.multinodes_calc import *
 
 
-NODES = {'Input/Output': {'Load Serafin': MultiLoadSerafinNode, 'Write Serafin': MultiWriteSerafinNode},
+NODES = {'Input/Output': {'Load Serafin': MultiLoadSerafinNode, 'Write Serafin': MultiWriteSerafinNode,
+                          'Load 2D Polygons': MultiLoadPolygon2DNode},
          'Basic operations': {'Select Last Frame': MultiSelectLastFrameNode},
-         'Operators': {'Max': MultiComputeMaxNode, 'Min': MultiComputeMinNode}}
+         'Operators': {'Max': MultiComputeMaxNode, 'Min': MultiComputeMinNode},
+         'Calculations': {'Compute Volume': MultiComputeVolumeNode}}
 
 
 def topological_ordering(graph):
@@ -76,10 +79,13 @@ class MultiTreeScene(QGraphicsScene):
         for node in self.nodes.values():
             self.addItem(node)
 
+        self.auxiliary_input_nodes = []
+
     def reinit(self):
         self.clear()
         self.nodes = {0: MultiLoadSerafinNode(0)}
         self.nodes[0].moveBy(50, 50)
+        self.auxiliary_input_nodes = []
 
         self.ready_to_run = False
         self.inputs = {0: []}
@@ -87,11 +93,14 @@ class MultiTreeScene(QGraphicsScene):
         self.adj_list = {0: set()}
         self.update()
 
-    def add_node(self, node, pos):
+    def add_node(self, node, x, y):
         self.addItem(node)
         self.nodes[node.index()] = node
-        self.nb_nodes += 1
-        node.moveBy(pos.x(), pos.y())
+        node.moveBy(x, y)
+        self.adj_list[node.index()] = set()
+        if node.category == 'Input/Output':
+            if node.name() == 'Load 2D Polygons':
+                self.auxiliary_input_nodes.append(node.index())
 
     def mouseDoubleClickEvent(self, event):
         super().mouseDoubleClickEvent(event)
@@ -118,6 +127,8 @@ class MultiTreeScene(QGraphicsScene):
         self.nodes = {}
         self.adj_list = {}
         self.ordered_input_indices = []
+        self.auxiliary_input_nodes = []
+
         try:
             with open(filename, 'r') as f:
                 self.language, self.csv_separator = f.readline().rstrip().split('.')
@@ -128,10 +139,7 @@ class MultiTreeScene(QGraphicsScene):
                     index = int(index)
                     node = NODES[category][name](index)
                     node.load(line[5:])
-                    self.nodes[index] = node
-                    self.addItem(node)
-                    node.moveBy(float(x), float(y))
-                    self.adj_list[index] = set()
+                    self.add_node(node, float(x), float(y))
 
                     if category == 'Input/Output' and name == 'Load Serafin':
                         self.inputs[index] = []
@@ -153,7 +161,7 @@ class MultiTreeScene(QGraphicsScene):
 
                 self.update()
                 ordered_nodes = topological_ordering(self.adj_list)
-                self.table.update_rows(self.nodes, ordered_nodes)
+                self.table.update_rows(self.nodes, [u for u in ordered_nodes if u not in self.auxiliary_input_nodes])
                 QApplication.processEvents()
 
                 next_line = f.readline()
@@ -204,8 +212,15 @@ class MultiTreeScene(QGraphicsScene):
         if all(self.inputs.values()):
             self.ready_to_run = True
 
+    def all_configured(self):
+        for node in self.nodes.values():
+            if node.state == MultiNode.NOT_CONFIGURED:
+                return False
+        return True
+
     def prepare_to_run(self):
         for node in self.nodes.values():
             node.state = MultiNode.READY
             node.nb_success = 0
             node.nb_fail = 0
+        self.update()

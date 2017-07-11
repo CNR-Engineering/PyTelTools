@@ -90,6 +90,7 @@ class MultiNode(QGraphicsItem):
         self.expected_input = (0,)
         self.nb_success = 0
         self.nb_fail = 0
+        self.double_input = False
         self.ports = []
         self.options = tuple()
 
@@ -290,4 +291,16 @@ class MultiOneInOneOutNode(MultiNode):
         self.add_port(self.out_port)
         self.expected_input = (0,)
 
+
+class MultiTwoInOneOutNode(MultiNode):
+    def __init__(self, index):
+        super().__init__(index)
+        self.first_in_port = MultiInputPort(0, -MultiPort.WIDTH, Box.HEIGHT/4-MultiPort.WIDTH/2)
+        self.second_in_port = MultiInputPort(1, -MultiPort.WIDTH, 3*Box.HEIGHT/4-MultiPort.WIDTH/2)
+        self.out_port = MultiOutputPort(2, Box.WIDTH/2-MultiPort.WIDTH/2, Box.HEIGHT)
+        self.add_port(self.first_in_port)
+        self.add_port(self.second_in_port)
+        self.add_port(self.out_port)
+        self.expected_input = (0, 0)
+        self.double_input = True
 

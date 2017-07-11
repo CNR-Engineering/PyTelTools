@@ -1,7 +1,6 @@
 import os
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
-from PyQt5.QtGui import *
 from workflow.MultiNode import MultiNode, MultiOneInOneOutNode, MultiSingleOutputNode
 
 
@@ -26,6 +25,13 @@ class MultiWriteSerafinNode(MultiOneInOneOutNode):
         super().__init__(index)
         self.category = 'Input/Output'
         self.label = 'Write\nSerafin'
+
+
+class MultiLoadPolygon2DNode(MultiSingleOutputNode):
+    def __init__(self, index):
+        super().__init__(index)
+        self.category = 'Input/Output'
+        self.label = 'Load 2D\nPolygons'
 
 
 class MultiLoadSerafinDialog(QDialog):

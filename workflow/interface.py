@@ -45,10 +45,14 @@ class TreeView(QGraphicsView):
     def dropEvent(self, event):
         if event.mimeData().hasText():
             event.acceptProposedAction()
-            category, label = event.mimeData().text().split('|')
+            try:
+                category, label = event.mimeData().text().split('|')
+            except ValueError:
+                event.ignore()
+                return
             node = NODES[category][label](self.scene().nb_nodes)
             pos = self.mapToScene(event.pos())
-            self.scene().add_node(node, pos)
+            self.scene().add_node(node, pos.x(), pos.y())
             event.accept()
         else:
             event.ignore()
@@ -115,9 +119,9 @@ class TreePanel(QWidget):
 
     def save(self):
         if not self.parent.save():
-            QMessageBox.critical(None, 'Error',
-                                 'You have duplicated suffix.',
-                                 QMessageBox.Ok)
+            QMessageBox.critical(None, 'Error', 'You have duplicated suffix.', QMessageBox.Ok)
+        else:
+            QMessageBox.information(None, 'Success', 'Project saved.', QMessageBox.Ok)
 
     def run_all(self):
         self.view.scene().run_all()
@@ -239,6 +243,8 @@ class MultiTreeTable(QTableWidget):
         self.setSelectionMode(QAbstractItemView.NoSelection)
         self.setVerticalHeaderLabels(['Load Serafin'])
 
+        self.row_to_node = {}
+        self.node_to_row = {}
         self.input_columns = {}
         self.yellow_nodes = {}
 
@@ -250,6 +256,8 @@ class MultiTreeTable(QTableWidget):
         self.yellow_nodes = {}
 
     def update_rows(self, nodes, ordered_nodes):
+        self.row_to_node = {i: ordered_nodes[i] for i in range(len(ordered_nodes))}
+        self.node_to_row = {ordered_nodes[i]: i for i in range(len(ordered_nodes))}
         self.setRowCount(len(ordered_nodes))
         self.setColumnCount(0)
         self.setVerticalHeaderLabels([nodes[u].name() for u in ordered_nodes])
@@ -273,7 +281,7 @@ class MultiTreeTable(QTableWidget):
             for i in range(self.rowCount()):
                 item = QTableWidgetItem()
                 self.setItem(i, offset+j, item)
-                if i in downstream_nodes:
+                if self.row_to_node[i] in downstream_nodes:
                     self.item(i, offset+j).setBackground(self.yellow)
                 else:
                     self.item(i, offset+j).setBackground(self.grey)
@@ -313,10 +321,16 @@ class MultiTreeTable(QTableWidget):
             for i in range(self.rowCount()):
                 item = QTableWidgetItem()
                 self.setItem(i, offset+j, item)
-                if i in self.yellow_nodes[node_index]:
+                if self.row_to_node[i] in self.yellow_nodes[node_index]:
                     self.item(i, offset+j).setBackground(self.yellow)
                 else:
                     self.item(i, offset+j).setBackground(self.grey)
+
+    def get_result(self, success, node_id, fid):
+        if success:
+            self.item(self.node_to_row[node_id], fid).setBackground(self.green)
+        else:
+            self.item(self.node_to_row[node_id], fid).setBackground(self.red)
 
 
 class MultiTreeWidget(QWidget):
@@ -375,49 +389,90 @@ class MultiTreeWidget(QWidget):
 
     def save(self):
         if not self.scene.ready_to_run:
-            QMessageBox.critical(None, 'Error',
-                                 'Configure all input nodes before saving.',
-                                 QMessageBox.Ok)
+            QMessageBox.critical(None, 'Error', 'Configure all input nodes before saving.', QMessageBox.Ok)
             return
         self.parent.save()
+        QMessageBox.information(None, 'Success', 'Project saved.', QMessageBox.Ok)
 
     def run(self):
-        if not self.scene.ready_to_run:
+        if not self.scene.all_configured():
+            QMessageBox.critical(None, 'Error', 'Configure all nodes first!', QMessageBox.Ok)
             return
 
         self.scene.prepare_to_run()
         self.setEnabled(False)
-        # initial tasks
-        init_tasks = []
+        csv_separator = self.scene.csv_separator
+
+        # auxiliary input tasks for N-1 type of double input nodes
+        aux_tasks = []
+        for node_id in self.scene.auxiliary_input_nodes:
+            fun = worker.FUNCTIONS[self.scene.nodes[node_id].name()]
+            aux_tasks.append((fun, (node_id, self.scene.nodes[node_id].options[0])))
+
+        all_success = True
+        if aux_tasks:
+            self.worker.add_tasks(aux_tasks)
+            self.worker.start()
+            for i in range(len(aux_tasks)):
+                success, node_id, data, message = self.worker.done_queue.get()
+                self.message_box.appendPlainText(message)
+
+                if not success:
+                    self.scene.nodes[node_id].state = MultiNode.FAIL
+                    all_success = False
+                    continue
+
+                self.scene.nodes[node_id].state = MultiNode.SUCCESS
+                # using the fact that auxiliary input nodes are always directly connected to double input nodes
+                next_nodes = self.scene.adj_list[node_id]
+                for next_node_id in next_nodes:
+                    next_node = self.scene.nodes[next_node_id]
+                    next_node.get_auxiliary_data(data)
+
+        if not all_success:
+            self.worker.stop()
+            self.message_box.appendPlainText('Done!')
+            self.setEnabled(True)
+            self.worker = worker.Workers()
+            return
+
+        # slf inputs start the flow
+        slf_tasks = []
         for node_id in self.scene.ordered_input_indices:
             paths, name, job_ids = self.view.scene().inputs[node_id]
             for path, job_id, fid in zip(paths, job_ids, self.table.input_columns[node_id]):
-                init_tasks.append((worker.read_slf, (node_id, fid, os.path.join(path, name),
-                                                     self.scene.language, job_id)))
+                slf_tasks.append((worker.read_slf, (node_id, fid, os.path.join(path, name),
+                                                    self.scene.language, job_id)))
+        self.worker.add_tasks(slf_tasks)
+        if not self.worker.started:
+            self.worker.start()
+        nb_tasks = len(slf_tasks)
 
-        self.worker.start(init_tasks)
-        nb_tasks = len(init_tasks)
         while not self.worker.stopped:
             success, node_id, fid, data, message = self.worker.done_queue.get()
             nb_tasks -= 1
             self.message_box.appendPlainText(message)
             current_node = self.scene.nodes[node_id]
+            self.table.get_result(success, node_id, fid)
 
+            # enqueue tasks from child nodes
             if success:
                 current_node.nb_success += 1
-                self.table.item(node_id, fid).setBackground(self.table.green)
 
                 next_nodes = self.scene.adj_list[node_id]
                 for next_node_id in next_nodes:
                     next_node = self.scene.nodes[next_node_id]
-
                     fun = worker.FUNCTIONS[next_node.name()]
-                    self.worker.task_queue.put((fun, (next_node_id, fid, data, next_node.options)))
+                    if next_node.double_input:   # only compute volume for the moment
+                        self.worker.task_queue.put((fun, (next_node_id, fid, data, next_node.auxiliary_data,
+                                                          next_node.options, csv_separator)))
+                    else:
+                        self.worker.task_queue.put((fun, (next_node_id, fid, data, next_node.options)))
                     nb_tasks += 1
             else:
                 current_node.nb_fail += 1
-                self.table.item(node_id, fid).setBackground(self.table.red)
 
+            # change box color
             if current_node.nb_success + current_node.nb_fail == current_node.nb_files():
                 if current_node.nb_fail == 0:
                     current_node.state = MultiNode.SUCCESS
@@ -436,49 +491,10 @@ class MultiTreeWidget(QWidget):
         self.worker = worker.Workers()
 
 
-class ProjectDialog(QDialog):
-    def __init__(self):
+class ProjectWindow(QWidget):
+    def __init__(self, welcome):
         super().__init__()
-        self.choice = None
-        left_button = QPushButton('Create New\nProject')
-        right_button = QPushButton('Load\nExisting\nProject')
-        for bt in [left_button, right_button]:
-            bt.setFixedSize(150, 200)
-
-        left_button.clicked.connect(self.choose_left)
-        right_button.clicked.connect(self.choose_right)
-
-        vlayout = QHBoxLayout()
-        vlayout.addWidget(left_button)
-        vlayout.addWidget(right_button)
-        self.setLayout(vlayout)
-        self.setWindowTitle('TelTools')
-
-        self.new = False
-        self.filename = ''
-
-    def choose_left(self):
-        filename, _ = QFileDialog.getSaveFileName(None, 'Choose the project file name', '',
-                                                  'All Files (*)',
-                                                  options=QFileDialog.Options() | QFileDialog.DontUseNativeDialog)
-        if not filename:
-            return
-        self.new = True
-        self.filename = filename
-        self.accept()
-
-    def choose_right(self):
-        filename, _ = QFileDialog.getOpenFileName(None, 'Choose the project file', '', 'All files (*)',
-                                                  options=QFileDialog.Options() | QFileDialog.DontUseNativeDialog)
-        if not filename:
-            return
-        self.filename = filename
-        self.accept()
-
-
-class MyMainWindow(QWidget):
-    def __init__(self):
-        super().__init__()
+        self.welcome = welcome
         self.mono = MonoTreeWidget(self)
         self.multi = MultiTreeWidget(self)
         self.tab = QTabWidget()
@@ -548,39 +564,69 @@ class MyMainWindow(QWidget):
     def multi_to_mono(self):
         self.save()
 
-    def welcome(self):
-        self.hide()
-        while True:
-            dlg = ProjectDialog()
-            value = dlg.exec_()
-            if value == QDialog.Accepted:
-                if dlg.new:
-                    self.mono.scene.reinit()
-                    self.multi.scene.reinit()
-                    self.create_new(dlg.filename)
-                    self.showMaximized()
-                    break
-                elif self.load(dlg.filename):
-                    self.tab.setCurrentIndex(0)
-                    self.showMaximized()
-                    break
-                else:
-                    QMessageBox.critical(None, 'Error',
-                                         'The project file is not valid.',
-                                         QMessageBox.Ok)
-            else:
-                sys.exit(0)
-
     def closeEvent(self, event):
         if not self.save():
             value = QMessageBox.question(None, 'Confirm exit', 'Are your sure to exit?\n'
                                          '(The project cannot be saved because it has duplicated suffix)',
                                          QMessageBox.Ok | QMessageBox.Cancel)
             if value == QMessageBox.Cancel:
-                event.ignore()
                 return
-        self.welcome()
-        event.ignore()
+        self.welcome.show()
+
+
+class ProjectWelcome(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.window = ProjectWindow(self)
+
+        left_button = QPushButton('Create New\nProject')
+        right_button = QPushButton('Load\nExisting\nProject')
+        for bt in [left_button, right_button]:
+            bt.setFixedSize(200, 150)
+
+        left_button.clicked.connect(self.choose_left)
+        right_button.clicked.connect(self.choose_right)
+
+        vlayout = QHBoxLayout()
+        vlayout.addWidget(left_button)
+        vlayout.addWidget(right_button)
+        self.setLayout(vlayout)
+        self.setWindowTitle('TelTools')
+
+        self.new = False
+        self.filename = ''
+
+    def choose_left(self):
+        filename, _ = QFileDialog.getSaveFileName(None, 'Choose the project file name', '',
+                                                  'All Files (*)',
+                                                  options=QFileDialog.Options() | QFileDialog.DontUseNativeDialog)
+        if not filename:
+            return
+        self.new = True
+        self.filename = filename
+        self.open_project()
+
+    def choose_right(self):
+        filename, _ = QFileDialog.getOpenFileName(None, 'Choose the project file', '', 'All files (*)',
+                                                  options=QFileDialog.Options() | QFileDialog.DontUseNativeDialog)
+        if not filename:
+            return
+        self.filename = filename
+        self.open_project()
+
+    def open_project(self):
+        if self.new:
+            self.window.mono.scene.reinit()
+            self.window.multi.scene.reinit()
+            self.window.create_new(self.filename)
+            self.window.showMaximized()
+            self.hide()
+        else:
+            if self.window.load(self.filename):
+                self.window.showMaximized()
+                self.hide()
+            else:
+                QMessageBox.critical(None, 'Error', 'The project file is not valid.', QMessageBox.Ok)
 
 
 def exception_hook(exctype, value, traceback):
@@ -597,9 +643,8 @@ if __name__ == '__main__':
     sys.excepthook = exception_hook
 
     app = QApplication(sys.argv)
-
-    widget = MyMainWindow()
-    widget.welcome()
+    widget = ProjectWelcome()
+    widget.show()
     app.exec_()
 
 

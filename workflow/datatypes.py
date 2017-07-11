@@ -85,20 +85,36 @@ class SerafinData:
 
 
 class CSVData:
-    def __init__(self, filename, header):
+    def __init__(self, filename, header=None, out_name=''):
         self.filename = filename
         self.out_name = ''
-        self.table = [header]
         self.metadata = {}
-        self.separator = ''
+
+        if header is None:  # read existing file
+            separator = ''
+            with open(out_name, 'r') as f:
+                line = f.readline().rstrip()
+                for sep in (';', ',', '\t'):
+                    if len(line.split(sep)) > 1:
+                        separator = sep
+                        break
+
+            self.table = []
+            self.out_name = out_name
+            with open(out_name, 'r') as f:
+                for line in f.readlines():
+                    self.table.append(line.rstrip().split(separator))
+        else:
+            self.table = [header]
 
     def add_row(self, row):
         self.table.append(row)
 
-    def write(self, filename, output_stream, separator):
-        for line in self.table:
-            output_stream.write(separator.join(line))
-            output_stream.write('\n')
+    def write(self, filename, separator):
+        with open(filename, 'w') as output_stream:
+            for line in self.table:
+                output_stream.write(separator.join(line))
+                output_stream.write('\n')
         self.out_name = filename
 
 

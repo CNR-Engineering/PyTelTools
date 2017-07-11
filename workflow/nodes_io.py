@@ -3,9 +3,8 @@ from PyQt5.QtCore import *
 import numpy as np
 
 import os
-import uuid
 import struct
-from workflow.Node import Node, SingleOutputNode, OneInOneOutNode
+from workflow.Node import Node, SingleOutputNode, OneInOneOutNode, OutputDialog
 from slf import Serafin
 from slf.interpolation import MeshInterpolator
 from slf.variables import do_calculations_in_frame
@@ -95,11 +94,10 @@ class WriteSerafinNode(OneInOneOutNode):
 
     def configure(self):
         old_options = (self.suffix, self.in_source_folder, self.dir_path, self.double_name, self.overwrite)
-        dlg = WriteSerafinDialog(old_options)
+        dlg = OutputDialog(old_options)
         if dlg.exec_() == QDialog.Accepted:
             self.state = Node.READY
-            self.suffix, self.in_source_folder, self.dir_path, self.double_name, self.overwrite = dlg.suffix, \
-                         dlg.in_source_folder, dlg.dir_path, dlg.double_name, dlg.overwrite
+            self.suffix, self.in_source_folder, self.dir_path, self.double_name, self.overwrite = dlg.get_options()
             self.update()
             self.reconfigure_downward()
             return True
@@ -768,134 +766,3 @@ class LoadSerafinDialog(QDialog):
         self.table.setItem(0, 1, id_item)
         self.success = True
 
-
-class WriteSerafinDialog(QDialog):
-    def __init__(self, old_options):
-        super().__init__()
-
-        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel,
-                                   Qt.Horizontal, self)
-        buttons.accepted.connect(self.check)
-        buttons.rejected.connect(self.reject)
-
-        folder_box = QGroupBox('Select output folder')
-        self.source_folder_button = QRadioButton('Input folder')
-        self.another_folder_button = QRadioButton('Another folder')
-        self.open_button = QPushButton('Open')
-        self.open_button.setEnabled(False)
-        self.folder_text = QLineEdit()
-        self.folder_text.setReadOnly(True)
-        vlayout = QVBoxLayout()
-        hlayout = QHBoxLayout()
-        hlayout.addWidget(self.source_folder_button)
-        vlayout.addLayout(hlayout)
-        hlayout = QHBoxLayout()
-        hlayout.addWidget(self.another_folder_button)
-        vlayout.addLayout(hlayout)
-        hlayout = QHBoxLayout()
-        hlayout.addWidget(self.open_button)
-        hlayout.addWidget(self.folder_text)
-        vlayout.addLayout(hlayout)
-        folder_box.setLayout(vlayout)
-        self.source_folder_button.toggled.connect(self._toggle_folder)
-        self.open_button.clicked.connect(self._open)
-
-        name_box = QGroupBox('Select output name')
-        self.suffix_box = QLineEdit()
-        self.simple_name_button = QRadioButton('input_name + suffix')
-        self.double_name_button = QRadioButton('input_name + job_id + suffix')
-        self.simple_name_button.setChecked(True)
-        vlayout = QVBoxLayout()
-        hlayout = QHBoxLayout()
-        hlayout.addWidget(QLabel('Suffix'))
-        hlayout.addWidget(self.suffix_box)
-        vlayout.addLayout(hlayout)
-        hlayout = QHBoxLayout()
-        hlayout.addWidget(self.simple_name_button)
-        hlayout.addWidget(self.double_name_button)
-        vlayout.addLayout(hlayout)
-        name_box.setLayout(vlayout)
-
-        overwrite_box = QGroupBox('Overwrite if file already exists')
-        self.overwrite_button = QRadioButton('Yes')
-        no_button = QRadioButton('No')
-        no_button.setChecked(True)
-        hlayout = QHBoxLayout()
-        hlayout.addWidget(self.overwrite_button)
-        hlayout.addWidget(no_button)
-        overwrite_box.setLayout(hlayout)
-
-        self.success = True
-        self.suffix, self.in_source_folder, self.dir_path, self.double_name, self.overwrite = old_options
-        self.suffix_box.setText(self.suffix)
-        self.folder_text.setText(self.dir_path)
-        if not self.in_source_folder:
-            self.another_folder_button.setChecked(True)
-        else:
-            self.source_folder_button.setChecked(True)
-        if self.double_name:
-            self.double_name_button.setChecked(True)
-        if self.overwrite:
-            self.overwrite_button.setChecked(True)
-
-        vlayout = QVBoxLayout()
-        vlayout.addWidget(folder_box)
-        vlayout.addWidget(name_box)
-        vlayout.addWidget(overwrite_box)
-        vlayout.addStretch()
-        vlayout.addWidget(buttons, Qt.AlignRight)
-        self.setLayout(vlayout)
-        self.setWindowTitle('Select output file')
-
-    def check(self):
-        if not self.success:
-            self.reject()
-        suffix = self.suffix_box.text()
-        if len(suffix) < 1:
-            QMessageBox.critical(None, 'Error', 'The suffix cannot be empty!',
-                                 QMessageBox.Ok)
-            return
-        if not all(c.isalnum() or c == '_' for c in suffix):
-            QMessageBox.critical(None, 'Error', 'The suffix should only contain letters, numbers and underscores.',
-                                 QMessageBox.Ok)
-            return
-        self.suffix = suffix
-        self.in_source_folder = self.source_folder_button.isChecked()
-        self.double_name = self.double_name_button.isChecked()
-        self.overwrite = self.overwrite_button.isChecked()
-        self.accept()
-
-    def _toggle_folder(self, source_folder):
-        if not source_folder:
-            self.double_name_button.setChecked(True)
-            self.simple_name_button.setEnabled(False)
-            self.open_button.setEnabled(True)
-            self.success = False
-        else:
-            self.simple_name_button.setEnabled(True)
-            self.folder_text.clear()
-            self.success = True
-
-    def _open(self):
-        self.success = False
-        w = QFileDialog()
-        w.setWindowTitle('Choose the output folder')
-        w.setFileMode(QFileDialog.DirectoryOnly)
-        w.setOption(QFileDialog.DontUseNativeDialog, True)
-        tree = w.findChild(QTreeView)
-        if tree:
-            tree.setSelectionBehavior(QAbstractItemView.SelectRows)
-
-        if w.exec_() != QDialog.Accepted:
-            return
-        current_dir = w.directory().path()
-        for index in tree.selectionModel().selectedRows():
-            name = tree.model().data(index)
-            self.dir_path = os.path.join(current_dir, name)
-            break
-        if not self.dir_path:
-            QMessageBox.critical(None, 'Error', 'Choose a folder !',
-                                 QMessageBox.Ok)
-            return
-        self.folder_text.setText(self.dir_path)
-        self.success = True
