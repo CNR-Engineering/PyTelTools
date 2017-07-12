@@ -46,7 +46,6 @@ class Equation():
         self.output = output_variable
         self.operator = operator
 
-
 def build_variables():
     """!
     @brief Initialize the BASIC_VARIABLES constant
@@ -122,13 +121,6 @@ def compute_NIKURADSE(w, h, m):
         return np.sqrt(np.power(m, 2) * KARMAN**2 / np.power(np.log(30 * h / np.exp(1) / w), 2))
 
 
-def compute_ROUSE(ws):
-    def _compute_ROUSE(us):
-        with np.errstate(divide='ignore'):
-            return np.where(us != 0, ws / us / KARMAN, float('Inf'))
-    return _compute_ROUSE
-
-
 # define the operators (relations between variables) as constants
 PLUS, MINUS, TIMES, NORM2 = 1, 2, 3, 4
 COMPUTE_TAU, COMPUTE_DMAX = 5, 6
@@ -168,8 +160,22 @@ STRICKLER_EQUATION = Equation((W, H, M), US, COMPUTE_STRICKLER)
 MANNING_EQUATION = Equation((W, H, M), US, COMPUTE_MANNING)
 NIKURADSE_EQUATION = Equation((W, H, M), US, COMPUTE_NIKURADSE)
 
+
 # a very special equation
-rouse_equation = lambda ws_id, ws: Equation((Variable(ws_id, None, None, None, -1), US), ROUSE, compute_ROUSE(ws))
+class RouseEquation():
+    """!
+    needed a pickle-able top-level equation object when computing Rouse in multi-process
+    """
+    def __init__(self, ws, ws_id):
+        var = Variable(ws_id, None, None, None, -1), US
+        self.input = (var, US)
+        self.output = ROUSE
+        self.ws = ws
+        self.operator = self.compute_rouse
+
+    def compute_rouse(self, us):
+        with np.errstate(divide='ignore'):
+            return np.where(us != 0, self.ws / us / KARMAN, float('Inf'))
 
 
 def is_basic_variable(var_ID):
@@ -342,7 +348,7 @@ def get_necessary_equations(known_var_IDs, needed_var_IDs, us_equation):
     for var_ID in selected_unknown_var_IDs:
         if var_ID[:5] == 'ROUSE':
             rouse_value = float(var_ID[6:])
-            necessary_equations.append(rouse_equation(var_ID, rouse_value))
+            necessary_equations.append(RouseEquation(rouse_value, var_ID))
 
     # add QS
     if 'QS' in selected_unknown_var_IDs:

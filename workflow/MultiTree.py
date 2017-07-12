@@ -1,4 +1,5 @@
 from copy import deepcopy
+from PyQt5.QtGui import *
 
 from workflow.MultiNode import Box, MultiLink
 from workflow.multinodes_io import *
@@ -10,9 +11,11 @@ NODES = {'Input/Output': {'Load Serafin': MultiLoadSerafinNode, 'Write Serafin':
                           'Load 2D Polygons': MultiLoadPolygon2DNode,
                           'Load 2D Open Polylines': MultiLoadOpenPolyline2DNode,
                           'Load 2D Points': MultiLoadPoint2DNode},
-         'Basic operations': {'Convert to Single Precision': MultiConvertToSinglePrecisionNode,
+         'Basic operations': {'Select Variables': MultiSelectVariablesNode, 'Add Rouse': MultiAddRouseNode,
+                              'Convert to Single Precision': MultiConvertToSinglePrecisionNode,
                               'Select First Frame': MultiSelectFirstFrameNode,
-                              'Select Last Frame': MultiSelectLastFrameNode},
+                              'Select Last Frame': MultiSelectLastFrameNode, 'Select Time': MultiSelectTimeNode,
+                              'Select Single Frame': MultiSelectSingleFrameNode},
          'Operators': {'Max': MultiComputeMaxNode, 'Min': MultiComputeMinNode, 'Mean': MultiComputeMeanNode},
          'Calculations': {'Compute Arrival Duration': MultiArrivalDurationNode,
                           'Compute Volume': MultiComputeVolumeNode, 'Compute Flux': MultiComputeFluxNode,
@@ -79,7 +82,7 @@ class MultiTreeScene(QGraphicsScene):
         self.nodes = {0: MultiLoadSerafinNode(0)}
         self.nodes[0].moveBy(50, 50)
 
-        self.ready_to_run = False
+        self.has_input = False
         self.inputs = {0: []}
         self.ordered_input_indices = [0]
         self.adj_list = {0: set()}
@@ -95,7 +98,7 @@ class MultiTreeScene(QGraphicsScene):
         self.nodes[0].moveBy(50, 50)
         self.auxiliary_input_nodes = []
 
-        self.ready_to_run = False
+        self.has_input = False
         self.inputs = {0: []}
         self.ordered_input_indices = [0]
         self.adj_list = {0: set()}
@@ -119,7 +122,7 @@ class MultiTreeScene(QGraphicsScene):
                 self._handle_add_input(node)
 
     def save(self):
-        if not self.ready_to_run:
+        if not self.has_input:
             return
         yield str(len(self.ordered_input_indices))
         for node_index in self.ordered_input_indices:
@@ -130,7 +133,7 @@ class MultiTreeScene(QGraphicsScene):
 
     def load(self, filename):
         self.clear()
-        self.ready_to_run = False
+        self.has_input = False
         self.inputs = {}
         self.nodes = {}
         self.adj_list = {}
@@ -198,7 +201,7 @@ class MultiTreeScene(QGraphicsScene):
                             self.nodes[u].update_input(len(job_ids))
 
                     self.update()
-                    self.ready_to_run = True
+                    self.has_input = True
                     QApplication.processEvents()
 
             return True
@@ -222,10 +225,13 @@ class MultiTreeScene(QGraphicsScene):
         QApplication.processEvents()
 
         for u in downstream_nodes:
-            self.nodes[u].update_input(len(job_ids))
+            u_node = self.nodes[u]
+            u_node.update_input(len(job_ids))
+            if u_node.state != MultiNode.NOT_CONFIGURED:
+                u_node.state = MultiNode.READY
 
         if all(self.inputs.values()):
-            self.ready_to_run = True
+            self.has_input = True
 
     def all_configured(self):
         for node in self.nodes.values():

@@ -388,7 +388,7 @@ class MultiTreeWidget(QWidget):
             self.toolbar.addSeparator()
 
     def save(self):
-        if not self.scene.ready_to_run:
+        if not self.scene.has_input:
             QMessageBox.critical(None, 'Error', 'Configure all input nodes before saving.', QMessageBox.Ok)
             return
         self.parent.save()

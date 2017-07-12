@@ -9,7 +9,7 @@ from workflow.datatypes import SerafinData, PolylineData, PointData, CSVData
 from geom import BlueKenue, Shapefile
 import slf.misc as operations
 from slf import Serafin
-from slf.variables import do_calculations_in_frame
+import slf.variables as variables
 from slf.volume import TruncatedTriangularPrisms, VolumeCalculator
 from slf.flux import TriangularVectorField, FluxCalculator
 from slf.interpolation import MeshInterpolator
@@ -42,10 +42,10 @@ class Workers:
         self.stopped = True
 
 
-def worker(input, output):
-    for func, args in iter(input.get, 'STOP'):
+def worker(input_queue, output_queue):
+    for func, args in iter(input_queue.get, 'STOP'):
         result = func(*args)
-        output.put(result)
+        output_queue.put(result)
 
 
 def success_message(node_name, job_id, info=''):
@@ -160,6 +160,126 @@ def read_points(node_id, filename):
     return True, node_id, data, success_message('Load 2D Points', 'all')
 
 
+def select_variables(node_id, fid, data, options):
+    if data.operator is not None:
+        return False, node_id, fid, None, fail_message('cannot select variable after computation',
+                                                       'Select Variables', data.job_id)
+    us_equation, selected_vars, selected_vars_names = options
+
+    # check if all selected variables are computable
+    known_vars = [var for var in data.header.var_IDs if var in data.selected_vars]
+    new_vars = known_vars[:]
+    new_vars.extend(list(map(lambda x: x.ID(), variables.get_available_variables(new_vars))))
+    if us_equation is not None:
+        us_vars = []
+        variables.add_US(us_vars, known_vars)
+        new_vars.extend([x.ID() for x in us_vars])
+    if not all(var in new_vars for var in selected_vars):
+        return False, node_id, fid, None, fail_message('not all selected variables are available',
+                                                       'Select Variables', data.job_id)
+
+    new_data = data.copy()
+    new_data.us_equation = us_equation
+    new_data.equations = variables.get_necessary_equations(data.header.var_IDs, selected_vars, us_equation)
+    new_data.selected_vars = selected_vars
+    new_data.selected_vars_names = {}
+    for var_ID, (var_name, var_unit) in selected_vars_names.items():
+        new_data.selected_vars_names[var_ID] = (var_name, var_unit)
+    return True, node_id, fid, new_data, success_message('Select Variables', data.job_id)
+
+
+def add_rouse(node_id, fid, data, options):
+    if data.operator is not None:
+        return False, node_id, fid, None, fail_message('cannot add Rouse after computation',
+                                                       'Add Rouse', data.job_id)
+    if 'US' not in data.selected_vars:
+        return False, node_id, fid, None, fail_message('US not found', 'Add Rouse', data.job_id)
+        
+    rouse_table = options[0]
+    new_rouse = [rouse_table[i][0] for i in range(len(rouse_table))]
+    new_names = [rouse_table[i][1] for i in range(len(rouse_table))]
+    old_names = [data.selected_vars_names[var][0].decode('utf-8').strip()
+                 for var in data.selected_vars]
+    for rouse in new_rouse:
+        if rouse in data.selected_vars:
+            return False, node_id, fid, None, fail_message('duplicated value', 'Add Rouse', data.job_id)
+    for name in new_names:
+        if name in old_names:
+            return False, node_id, fid, None, fail_message('duplicated name', 'Add Rouse', data.job_id)
+
+    new_data = data.copy()
+    new_data.selected_vars.extend([rouse_table[i][0] for i in range(len(rouse_table))])
+    for i in range(len(rouse_table)):
+        new_data.selected_vars_names[rouse_table[i][0]] = (bytes(rouse_table[i][1], 'utf-8').ljust(16),
+                                                           bytes(rouse_table[i][2], 'utf-8').ljust(16))
+    new_data.equations = variables.get_necessary_equations(data.header.var_IDs, new_data.selected_vars,
+                                                           data.us_equation)
+    return True, node_id, fid, new_data, success_message('Add Rouse', data.job_id)
+
+
+def select_time(node_id, fid, data, options):
+    if data.operator is not None:
+        return False, node_id, fid, None, fail_message('cannot select time after computation',
+                                                       'Select Time', data.job_id)
+    if len(data.selected_time_indices) != len(data.time):
+        return False, node_id, fid, None, fail_message('cannot re-select time', 'Select Time', data.job_id)
+
+    start_date, end_date, sampling_frequency = options
+    available_dates = list(map(lambda x: x + data.start_time, data.time_second))
+    if start_date in available_dates:
+        start_index = available_dates.index(start_date)
+    else:
+        return False, node_id, fid, None, fail_message('selected date not available', 'Select Time', data.job_id)
+    if end_date in available_dates:
+        end_index = available_dates.index(end_date)
+    else:
+        return False, node_id, fid, None, fail_message('selected date not available', 'Select Time', data.job_id)
+
+    new_data = data.copy()
+    new_data.selected_time_indices = list(range(start_index, end_index+1, sampling_frequency))
+    return True, node_id, fid, new_data, success_message('Select Time', data.job_id)
+
+
+def select_single_frame(node_id, fid, data, options):
+    if data.operator is not None:
+        return False, node_id, fid, None, fail_message('cannot select time after computation', 'Select Time', data.job_id)
+    if len(data.selected_time_indices) != len(data.time):
+        return False, node_id, fid, None, fail_message('cannot re-select time', 'Select Time', data.job_id)
+
+    selected_date = options[0]
+    available_dates = list(map(lambda x: x + data.start_time, data.time_second))
+    if selected_date in available_dates:
+        selected_index = available_dates.index(selected_date)
+    else:
+        return False, node_id, fid, None, fail_message('selected date not available', 'Select Time', data.job_id)
+
+    new_data = data.copy()
+    new_data.selected_time_indices = [selected_index]
+    return True, node_id, fid, new_data, success_message('Select Time', data.job_id)
+
+
+def select_first_frame(node_id, fid, data, options):
+    if data.operator is not None:
+        return False, node_id, fid, None, fail_message('cannot select time after computation',
+                                                       'Select First Frame', data.job_id)
+    if len(data.selected_time_indices) != len(data.time):
+        return False, node_id, fid, None, fail_message('cannot re-select time', 'Select First Frame', data.job_id)
+    new_data = data.copy()
+    new_data.selected_time_indices = [0]
+    return True, node_id, fid, new_data, success_message('Select First Frame', data.job_id)
+
+
+def select_last_frame(node_id, fid, data, options):
+    if data.operator is not None:
+        return False, node_id, fid, None, fail_message('cannot select time after computation',
+                                                       'Select Last Frame', data.job_id)
+    if len(data.selected_time_indices) != len(data.time):
+        return False, node_id, fid, None, fail_message('cannot re-select time', 'Select Last Frame', data.job_id)
+    new_data = data.copy()
+    new_data.selected_time_indices = [len(data.time)-1]
+    return True, node_id, fid, new_data, success_message('Select Last Frame', data.job_id)
+
+
 def compute_max(node_id, fid, data, options):
     if data.operator is not None:
         return False, node_id, fid, None, fail_message('duplicated operator', 'Max', data.job_id)
@@ -215,28 +335,6 @@ def convert_to_single(node_id, fid, data, options):
     return True, node_id, fid, new_data, success_message('Convert to Single Precision', data.job_id)
 
 
-def select_first(node_id, fid, data, options):
-    if data.operator is not None:
-        return False, node_id, fid, None, fail_message('cannot select time after computation',
-                                                       'Select First Frame', data.job_id)
-    if len(data.selected_time_indices) != len(data.time):
-        return False, node_id, fid, None, fail_message('cannot re-select time', 'Select First Frame', data.job_id)
-    new_data = data.copy()
-    new_data.selected_time_indices = [0]
-    return True, node_id, fid, new_data, success_message('Select First Frame', data.job_id)
-
-
-def select_last(node_id, fid, data, options):
-    if data.operator is not None:
-        return False, node_id, fid, None, fail_message('cannot select time after computation',
-                                                       'Select Last Frame', data.job_id)
-    if len(data.selected_time_indices) != len(data.time):
-        return False, node_id, fid, None, fail_message('cannot re-select time', 'Select Last Frame', data.job_id)
-    new_data = data.copy()
-    new_data.selected_time_indices = [len(data.time)-1]
-    return True, node_id, fid, new_data, success_message('Select Last Frame', data.job_id)
-
-
 def write_slf(node_id, fid, data, options):
     suffix, in_source_folder, dir_path, double_name, overwrite = options
 
@@ -281,9 +379,9 @@ def write_simple_slf(input_data, filename):
         with Serafin.Write(filename, input_data.language, True) as resout:
             resout.write_header(output_header)
             for i, time_index in enumerate(input_data.selected_time_indices):
-                values = do_calculations_in_frame(input_data.equations, input_data.us_equation,
-                                                  resin, time_index, input_data.selected_vars,
-                                                  output_header.np_float_type)
+                values = variables.do_calculations_in_frame(input_data.equations, input_data.us_equation,
+                                                            resin, time_index, input_data.selected_vars,
+                                                            output_header.np_float_type)
                 resout.write_entire_frame(output_header, input_data.time[time_index], values)
     return True, success_message('Write Serafin', input_data.job_id)
 
@@ -834,9 +932,11 @@ def project_lines(node_id, fid, data, aux_data, options, csv_separator):
                                                          's intersect' if nb_nonempty > 1 else ' intersects'))
 
 
-FUNCTIONS = {'Max': compute_max, 'Min': compute_min, 'Mean': compute_mean,
+FUNCTIONS = {'Select Variables': select_variables, 'Add Rouse': add_rouse, 'Select Time': select_time,
+             'Select Single Frame': select_single_frame,
+             'Select First Frame': select_first_frame, 'Select Last Frame': select_last_frame,
+             'Max': compute_max, 'Min': compute_min, 'Mean': compute_mean,
              'Convert to Single Precision': convert_to_single, 'Compute Arrival Duration': arrival_duration,
-             'Select First Frame': select_first, 'Select Last Frame': select_last,
              'Load 2D Polygons': read_polygons, 'Load 2D Open Polylines': read_polylines, 'Load 2D Points': read_points,
              'Write Serafin': write_slf, 'Compute Volume': compute_volume, 'Compute Flux': compute_flux,
              'Interpolate on Points': interpolate_points, 'Interpolate along Lines': interpolate_lines,

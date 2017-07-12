@@ -23,6 +23,7 @@ class SelectVariablesNode(OneInOneOutNode):
         self.selected_vars = []
         self.selected_vars_names = {}
         self.new_options = tuple()
+        self.friction_law = -1
         self.us_equation = None
         self.us_button = None
         self.ws_button = None
@@ -93,6 +94,17 @@ class SelectVariablesNode(OneInOneOutNode):
                 self.second_table.item(row, 1).setBackground(self.YELLOW)
                 self.second_table.item(row, 2).setBackground(self.YELLOW)
 
+        self.us_button = QPushButton('Add US from friction law')
+        self.us_button.setToolTip('Compute <b>US</b> based on a friction law')
+        self.us_button.setEnabled(False)
+        self.us_button.setFixedWidth(200)
+
+        if 'US' not in self.in_data.selected_vars and 'W' in self.in_data.selected_vars and self.us_equation is None:
+            available_var_IDs = list(map(lambda x: x.ID(), computable_vars))
+            available_var_IDs.extend(self.in_data.selected_vars)
+            if 'H' in available_var_IDs and 'M' in available_var_IDs:
+                self.us_button.setEnabled(True)
+
         if 'US' not in self.in_data.selected_vars and self.us_equation is not None:
             new_vars = []
             add_US(new_vars, self.in_data.selected_vars)
@@ -119,17 +131,6 @@ class SelectVariablesNode(OneInOneOutNode):
                     self.second_table.setItem(row, 2, unit_item)
                     for j in range(3):
                         self.second_table.item(row, j).setBackground(self.GREEN)
-
-        self.us_button = QPushButton('Add US from friction law')
-        self.us_button.setToolTip('Compute <b>US</b> based on a friction law')
-        self.us_button.setEnabled(False)
-        self.us_button.setFixedWidth(200)
-
-        if 'US' not in self.in_data.selected_vars and 'W' in self.in_data.selected_vars and self.us_equation is None:
-            available_var_IDs = list(map(lambda x: x.ID(), computable_vars))
-            available_var_IDs.extend(self.in_data.selected_vars)
-            if 'H' in available_var_IDs and 'M' in available_var_IDs:
-                self.us_button.setEnabled(True)
 
         hlayout = QHBoxLayout()
         vlayout = QVBoxLayout()
@@ -177,10 +178,10 @@ class SelectVariablesNode(OneInOneOutNode):
         if value != QDialog.Accepted:
             return
 
-        friction_law = msg.getChoice()
-        self.us_equation = get_US_equation(friction_law)
+        self.friction_law = msg.getChoice()
+        self.us_equation = get_US_equation(self.friction_law)
         new_vars = []
-        add_US(new_vars, self.in_data.selected_vars)
+        add_US(new_vars, self.in_data.header.var_IDs)
 
         for i, var in enumerate(new_vars):
             row = self.first_table.rowCount()
@@ -200,9 +201,15 @@ class SelectVariablesNode(OneInOneOutNode):
     def _reset(self):
         self.in_data = self.in_port.mother.parentItem().data
         if self.selected_vars:
-            new_vars = self.in_data.selected_vars[:]
+            known_vars = [var for var in self.in_data.header.var_IDs if var in self.in_data.selected_vars]
+            new_vars = known_vars[:]
             new_vars.extend(list(map(lambda x: x.ID(), get_available_variables(new_vars))))
+            if self.us_equation is not None:
+                us_vars = []
+                add_US(us_vars, known_vars)
+                new_vars.extend([x.ID() for x in us_vars])
             intersection = [var for var in self.selected_vars if var in new_vars]
+
             if intersection:
                 self.selected_vars = intersection
                 self.selected_vars_names = {var_id: self.selected_vars_names[var_id]
@@ -286,8 +293,6 @@ class SelectVariablesNode(OneInOneOutNode):
                 self.state = Node.NOT_CONFIGURED
             else:
                 self.reconfigure_downward()
-        else:
-            self.us_equation = None
         self.update()
 
     def save(self):
@@ -298,11 +303,14 @@ class SelectVariablesNode(OneInOneOutNode):
             names.append(name.decode('utf-8').strip())
             units.append(unit.decode('utf-8').strip())
         return '|'.join([self.category, self.name(), str(self.index()),
-                         str(self.pos().x()), str(self.pos().y()),
+                         str(self.pos().x()), str(self.pos().y()), str(self.friction_law),
                          vars, ','.join(names), ','.join(units)])
 
     def load(self, options):
-        vars, names, units = options
+        friction_law, vars, names, units = options
+        self.friction_law = int(friction_law)
+        if self.friction_law > -1:
+            self.us_equation = get_US_equation(self.friction_law)
         if vars:
             for var, name, unit in zip(vars.split(','), names.split(','), units.split(',')):
                 self.selected_vars.append(var)
@@ -344,18 +352,29 @@ class AddRouseNode(OneInOneOutNode):
         msg = FallVelocityMessage(self.fall_velocities, self.table)
         value = msg.exec_()
         if value != QDialog.Accepted:
-            return False
+            return 0
         self.table = msg.get_table()
         new_rouse = [self.table[i][0] for i in range(len(self.table))]
+        new_names = [self.table[i][1] for i in range(len(self.table))]
+        old_names = [self.in_data.selected_vars_names[var][0].decode('utf-8').strip()
+                     for var in self.in_data.selected_vars]
         for rouse in new_rouse:
             if rouse in self.in_data.selected_vars:
-                QMessageBox.critical(None, 'Error', 'Duplicated values found.',
+                QMessageBox.critical(None, 'Error', 'Duplicated value found.',
                                      QMessageBox.Ok)
                 self.table = []
-                return False
+                self.fall_velocities = []
+                return 1
+        for name in new_names:
+            if name in old_names:
+                QMessageBox.critical(None, 'Error', 'Duplicated name found.',
+                                     QMessageBox.Ok)
+                self.table = []
+                self.fall_velocities = []
+                return 1
         for i in range(len(self.table)):
             self.fall_velocities.append(float(self.table[i][0][6:]))
-        return True
+        return 2
 
     def _reset(self):
         self.in_data = self.in_port.mother.parentItem().data
@@ -364,9 +383,22 @@ class AddRouseNode(OneInOneOutNode):
             self.in_data = None
         elif self.fall_velocities:
             old_rouse = [self.table[i][0] for i in range(len(self.table))]
+            old_names = [self.table[i][1] for i in range(len(self.table))]
+            new_names = [self.in_data.selected_vars_names[var][0].decode('utf-8').strip()
+                         for var in self.in_data.selected_vars]
             for rouse in old_rouse:
-                if rouse in self.in_data.selected_vars:
+                if rouse in self.in_data.selected_vars:  # duplicated value
                     self.state = Node.NOT_CONFIGURED
+                    self.fall_velocities = []
+                    self.table = []
+                    self.in_data = None
+                    self.update()
+                    return
+            for name in old_names:
+                if name in new_names:   # duplicated value
+                    self.state = Node.NOT_CONFIGURED
+                    self.fall_velocities = []
+                    self.table = []
                     self.in_data = None
                     self.update()
                     return
@@ -422,33 +454,25 @@ class AddRouseNode(OneInOneOutNode):
                     return
             else:
                 QMessageBox.critical(None, 'Error', 'Configure and run the input before configure this node!',
-                                         QMessageBox.Ok)
+                                     QMessageBox.Ok)
                 return
-            if self.fall_velocities:
-                old_rouse = [self.table[i][0] for i in range(len(self.table))]
-                for rouse in old_rouse:
-                    if rouse in self.in_data.selected_vars:
-                        QMessageBox.critical(None, 'Error', 'Duplicated values found.',
-                                             QMessageBox.Ok)
-                        return
+            self._reset()
         else:
             self.in_data = parent_node.data
             if 'US' not in self.in_data.selected_vars:
                 QMessageBox.critical(None, 'Error', 'US not found.',
                                      QMessageBox.Ok)
                 return
-            old_rouse = [self.table[i][0] for i in range(len(self.table))]
-            for rouse in old_rouse:
-                if rouse in self.in_data.selected_vars:
-                    QMessageBox.critical(None, 'Error', 'Duplicated values found.',
-                                         QMessageBox.Ok)
-                    return
+            self._reset()
 
-        if self._configure():
+        value = self._configure()
+        if value == 0:
+            return
+        if value == 2:
             self.state = Node.READY
-            self.reconfigure_downward()
         else:
             self.state = Node.NOT_CONFIGURED
+        self.reconfigure_downward()
         self.update()
 
     def save(self):
@@ -635,13 +659,22 @@ class SelectTimeNode(OneInOneOutNode):
             self.reconfigure_downward()
 
     def save(self):
+        if self.start_date is None:
+            str_start_date = ''
+            str_end_date = ''
+        else:
+            str_start_date = self.start_date.strftime('%Y/%m/%d %H:%M:%S')
+            str_end_date = self.start_date.strftime('%Y/%m/%d %H:%M:%S')
+
         return '|'.join([self.category, self.name(), str(self.index()),
                          str(self.pos().x()), str(self.pos().y()),
-                         str(self.start_index), str(self.end_index), str(self.sampling_frequency)])
+                         str_start_date, str_end_date, str(self.sampling_frequency)])
 
     def load(self, options):
-        self.start_index = int(options[0])
-        self.end_index = int(options[1])
+        start_date, end_date = options[0:2]
+        if start_date:
+            self.start_date = datetime.datetime.strptime(start_date, '%Y/%m/%d %H:%M:%S')
+            self.end_date = datetime.datetime.strptime(start_date, '%Y/%m/%d %H:%M:%S')
         self.sampling_frequency = int(options[2])
 
     def run(self):
@@ -774,13 +807,11 @@ class SelectSingleFrameNode(OneInOneOutNode):
         else:
             str_date = self.date.strftime('%Y/%m/%d %H:%M:%S')
         return '|'.join([self.category, self.name(), str(self.index()),
-                         str(self.pos().x()), str(self.pos().y()),
-                         str(self.selection), str_date])
+                         str(self.pos().x()), str(self.pos().y()), str_date])
 
     def load(self, options):
-        self.selection = int(options[0])
-        if options[1]:
-            self.date = datetime.datetime.strptime(options[1], '%Y/%m/%d %H:%M:%S')
+        if options[0]:
+            self.date = datetime.datetime.strptime(options[0], '%Y/%m/%d %H:%M:%S')
 
     def run(self):
         success = super().run_upward()
