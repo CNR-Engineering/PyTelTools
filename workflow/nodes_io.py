@@ -119,7 +119,7 @@ class WriteSerafinNode(OneInOneOutNode):
 
     def _run_simple(self, input_data):
         output_header = input_data.default_output_header()
-        with Serafin.Read(input_data.filename, self.scene().language) as resin:
+        with Serafin.Read(input_data.filename, input_data.language) as resin:
             resin.header = input_data.header
             resin.time = input_data.time
             with Serafin.Write(self.filename, input_data.language, True) as resout:

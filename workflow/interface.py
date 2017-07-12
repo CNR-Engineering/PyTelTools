@@ -480,7 +480,7 @@ class MultiTreeWidget(QWidget):
             for next_node_id in next_nodes:
                 next_node = self.scene.nodes[next_node_id]
                 fun = worker.FUNCTIONS[next_node.name()]
-                if next_node.double_input:   # only compute volume for the moment
+                if next_node.double_input:
                     self.worker.task_queue.put((fun, (next_node_id, fid, data, next_node.auxiliary_data,
                                                       next_node.options, csv_separator)))
                 else:

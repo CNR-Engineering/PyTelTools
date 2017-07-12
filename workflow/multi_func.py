@@ -9,6 +9,7 @@ from workflow.datatypes import SerafinData, PolylineData, PointData, CSVData
 from geom import BlueKenue, Shapefile
 import slf.misc as operations
 from slf import Serafin
+from slf.variables import do_calculations_in_frame
 from slf.volume import TruncatedTriangularPrisms, VolumeCalculator
 from slf.flux import TriangularVectorField, FluxCalculator
 from slf.interpolation import MeshInterpolator
@@ -183,6 +184,25 @@ def compute_mean(node_id, fid, data, options):
     return True, node_id, fid, new_data, success_message('Mean', data.job_id)
 
 
+def arrival_duration(node_id, fid, data, options):
+    if data.operator is not None:
+        return False, node_id, fid, None, fail_message('duplicated operator', 'Compute Arrival Duration', data.job_id)
+    table, conditions, time_unit = options
+    needed_vars = set()
+    for condition in conditions:
+        expression = condition.expression
+        for item in expression:
+            if item[0] == '[':
+                needed_vars.add(item[1:-1])
+    available_vars = [var for var in data.selected_vars if var in data.header.var_IDs]
+    if not all([var in available_vars for var in needed_vars]):
+        return False, node_id, fid, None, fail_message('variable not available', 'Compute Arrival Duration', data.job_id)
+    new_data = data.copy()
+    new_data.operator = operations.ARRIVAL_DURATION
+    new_data.metadata = {'conditions': conditions, 'table': table, 'time unit': time_unit}
+    return True, node_id, fid, new_data, success_message('Mean', data.job_id)
+
+
 def convert_to_single(node_id, fid, data, options):
     if data.header.float_type != 'd':
         return False, node_id, fid, None, fail_message('the input file is not of double-precision format',
@@ -241,15 +261,34 @@ def write_slf(node_id, fid, data, options):
     except PermissionError:
         return False, node_id, fid, None, fail_message('access denied', 'Write Serafin', data.job_id)
 
-    if data.operator in (operations.MAX, operations.MIN, operations.MEAN):
-        success, message = run_max_min_mean(data, filename)
+    if data.operator is None:
+        success, message = write_simple_slf(data, filename)
+    elif data.operator in (operations.MAX, operations.MIN, operations.MEAN):
+        success, message = write_max_min_mean(data, filename)
+    elif data.operator == operations.ARRIVAL_DURATION:
+        success, message = write_arrival_duration(data, filename)
     else:
         success, message = True, success_message('Write Serafin', data.job_id)
 
     return success, node_id, fid, data, message
 
 
-def run_max_min_mean(input_data, filename):
+def write_simple_slf(input_data, filename):
+    output_header = input_data.default_output_header()
+    with Serafin.Read(input_data.filename, input_data.language) as resin:
+        resin.header = input_data.header
+        resin.time = input_data.time
+        with Serafin.Write(filename, input_data.language, True) as resout:
+            resout.write_header(output_header)
+            for i, time_index in enumerate(input_data.selected_time_indices):
+                values = do_calculations_in_frame(input_data.equations, input_data.us_equation,
+                                                  resin, time_index, input_data.selected_vars,
+                                                  output_header.np_float_type)
+                resout.write_entire_frame(output_header, input_data.time[time_index], values)
+    return True, success_message('Write Serafin', input_data.job_id)
+
+
+def write_max_min_mean(input_data, filename):
     selected = [(var, input_data.selected_vars_names[var][0],
                       input_data.selected_vars_names[var][1]) for var in input_data.selected_vars]
     scalars, vectors, additional_equations = operations.scalars_vectors(input_data.header.var_IDs,
@@ -292,6 +331,57 @@ def run_max_min_mean(input_data, filename):
             values = vector_calculator.finishing_up()
         else:
             values = np.vstack((scalar_calculator.finishing_up(), vector_calculator.finishing_up()))
+
+        with Serafin.Write(filename, input_data.language, True) as resout:
+            resout.write_header(output_header)
+            resout.write_entire_frame(output_header, input_data.time[0], values)
+
+    return True, success_message('Write Serafin', input_data.job_id)
+
+
+def write_arrival_duration(input_data, filename):
+    conditions, table, time_unit = input_data.metadata['conditions'], \
+                                   input_data.metadata['table'], input_data.metadata['time unit']
+
+    output_header = input_data.header.copy()
+    output_header.nb_var = 2 * len(conditions)
+    output_header.var_IDs, output_header.var_names, output_header.var_units = [], [], []
+    for row in range(len(table)):
+        a_name = table[row][1]
+        d_name = table[row][2]
+        for name in [a_name, d_name]:
+            output_header.var_IDs.append('')
+            output_header.var_names.append(bytes(name, 'utf-8').ljust(16))
+            output_header.var_units.append(bytes(time_unit.upper(), 'utf-8').ljust(16))
+    if input_data.to_single:
+        output_header.to_single_precision()
+
+    with Serafin.Read(input_data.filename, input_data.language) as input_stream:
+        input_stream.header = input_data.header
+        input_stream.time = input_data.time
+        calculators = []
+
+        for i, condition in enumerate(conditions):
+            calculators.append(operations.ArrivalDurationCalculator(input_stream, input_data.selected_time_indices,
+                                                                    condition))
+        for i, index in enumerate(input_data.selected_time_indices[1:]):
+            for calculator in calculators:
+                calculator.arrival_duration_in_frame(index)
+
+        values = np.empty((2*len(conditions), input_data.header.nb_nodes))
+        for i, calculator in enumerate(calculators):
+            values[2*i, :] = calculator.arrival
+            values[2*i+1, :] = calculator.duration
+
+        if time_unit == 'minute':
+            values /= 60
+        elif time_unit == 'hour':
+            values /= 3600
+        elif time_unit == 'day':
+            values /= 86400
+        elif time_unit == 'percentage':
+            values *= 100 / (input_data.time[input_data.selected_time_indices[-1]]
+                             - input_data.time[input_data.selected_time_indices[0]])
 
         with Serafin.Write(filename, input_data.language, True) as resout:
             resout.write_header(output_header)
@@ -745,7 +835,7 @@ def project_lines(node_id, fid, data, aux_data, options, csv_separator):
 
 
 FUNCTIONS = {'Max': compute_max, 'Min': compute_min, 'Mean': compute_mean,
-             'Convert to Single Precision': convert_to_single,
+             'Convert to Single Precision': convert_to_single, 'Compute Arrival Duration': arrival_duration,
              'Select First Frame': select_first, 'Select Last Frame': select_last,
              'Load 2D Polygons': read_polygons, 'Load 2D Open Polylines': read_polylines, 'Load 2D Points': read_points,
              'Write Serafin': write_slf, 'Compute Volume': compute_volume, 'Compute Flux': compute_flux,

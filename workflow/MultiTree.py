@@ -14,7 +14,8 @@ NODES = {'Input/Output': {'Load Serafin': MultiLoadSerafinNode, 'Write Serafin':
                               'Select First Frame': MultiSelectFirstFrameNode,
                               'Select Last Frame': MultiSelectLastFrameNode},
          'Operators': {'Max': MultiComputeMaxNode, 'Min': MultiComputeMinNode, 'Mean': MultiComputeMeanNode},
-         'Calculations': {'Compute Volume': MultiComputeVolumeNode, 'Compute Flux': MultiComputeFluxNode,
+         'Calculations': {'Compute Arrival Duration': MultiArrivalDurationNode,
+                          'Compute Volume': MultiComputeVolumeNode, 'Compute Flux': MultiComputeFluxNode,
                           'Interpolate on Points': MultiInterpolateOnPointsNode,
                           'Interpolate along Lines': MultiInterpolateAlongLinesNode,
                           'Project Lines': MultiProjectLinesNode}}

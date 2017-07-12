@@ -1,5 +1,33 @@
 import os
-from workflow.MultiNode import MultiNode, MultiDoubleInputNode
+import slf.misc as operations
+from workflow.MultiNode import MultiNode, MultiOneInOneOutNode, MultiDoubleInputNode
+
+
+class MultiArrivalDurationNode(MultiOneInOneOutNode):
+    def __init__(self, index):
+        super().__init__(index)
+        self.category = 'Calculations'
+        self.label = 'Compute\nArrival\nDuration'
+
+    def load(self, options):
+        table = []
+        conditions = []
+        str_conditions, str_table, time_unit = options
+        str_table = str_table.split(',')
+        for i in range(int(len(str_table)/3)):
+            line = []
+            for j in range(3):
+                line.append(str_table[3*i+j])
+            table.append(line)
+        str_conditions = str_conditions.split(',')
+        for i, condition in zip(range(len(table)), str_conditions):
+            literal = table[i][0]
+            condition = condition.split()
+            expression = condition[:-2]
+            comparator = condition[-2]
+            threshold = float(condition[-1])
+            conditions.append(operations.Condition(expression, literal, comparator, threshold))
+        self.options = (table, conditions, time_unit)
 
 
 class MultiComputeVolumeNode(MultiDoubleInputNode):
@@ -112,7 +140,7 @@ class MultiProjectLinesNode(MultiDoubleInputNode):
         reference_index = int(options[5])
         if reference_index == -1:
             self.state = MultiNode.NOT_CONFIGURED
-            return 
+            return
         self.options = (suffix, in_source_folder, dir_path, double_name, overwrite, reference_index)
 
 

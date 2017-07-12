@@ -221,7 +221,7 @@ class ArrivalDurationNode(OneInOneOutNode):
         self.reconfigure_downward()
         self.update()
 
-    def configure(self):
+    def configure(self, check=None):
         if not self.in_port.has_mother():
             QMessageBox.critical(None, 'Error', 'Connect and run the input before configure this node!',
                                  QMessageBox.Ok)
