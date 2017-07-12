@@ -4,7 +4,7 @@ import numpy as np
 
 import os
 import struct
-from workflow.Node import Node, SingleOutputNode, OneInOneOutNode, OutputDialog
+from workflow.Node import Node, SingleOutputNode, OneInOneOutNode, OutputOptionPanel
 from slf import Serafin
 from slf.interpolation import MeshInterpolator
 from slf.variables import do_calculations_in_frame
@@ -25,15 +25,14 @@ class LoadSerafinNode(SingleOutputNode):
         self.job_id = ''
         self.data = None
 
-    def configure(self):
+    def configure(self, check=None):
         old_options = (self.dir_path, self.slf_name, self.job_id)
         dlg = LoadSerafinDialog(old_options)
         if dlg.exec_() == QDialog.Accepted:
             self.state = Node.READY
             self.dir_path, self.slf_name, self.job_id = dlg.dir_path, dlg.slf_name, dlg.job_id
             self.update()
-            return True
-        return False
+            self.reconfigure_downward()
 
     def save(self):
         return '|'.join([self.category, self.name(), str(self.index()),
@@ -81,27 +80,22 @@ class WriteSerafinNode(OneInOneOutNode):
         self.label = 'Write\nSerafin'
         self.filename = ''
 
+        self.panel = None
         self.suffix = '_result'
         self.in_source_folder = True
         self.dir_path = ''
         self.double_name = False
         self.overwrite = False
 
-        self.op = {None: '', operations.MAX: '_max_', operations.MIN: '_min_', operations.MEAN: '_mean_',
-                   operations.PROJECT: '_project_', operations.ARRIVAL_DURATION: '_arr_dur_',
-                   operations.DIFF: '_AminusB_', operations.REV_DIFF: '_BminusA_', operations.MAX_BETWEEN: '_maxAB_',
-                   operations.MIN_BETWEEN: '_minAB_'}
+    def get_option_panel(self):
+        return self.panel
 
-    def configure(self):
+    def configure(self, check=None):
         old_options = (self.suffix, self.in_source_folder, self.dir_path, self.double_name, self.overwrite)
-        dlg = OutputDialog(old_options)
-        if dlg.exec_() == QDialog.Accepted:
-            self.state = Node.READY
-            self.suffix, self.in_source_folder, self.dir_path, self.double_name, self.overwrite = dlg.get_options()
-            self.update()
+        self.panel = OutputOptionPanel(old_options)
+        if super().configure(self.panel.check):
+            self.suffix, self.in_source_folder, self.dir_path, self.double_name, self.overwrite = self.panel.get_options()
             self.reconfigure_downward()
-            return True
-        return False
 
     def save(self):
         return '|'.join([self.category, self.name(), str(self.index()),
@@ -122,7 +116,6 @@ class WriteSerafinNode(OneInOneOutNode):
                 self.in_source_folder = True
                 self.dir_path = ''
                 self.state = Node.NOT_CONFIGURED
-                return
 
     def _run_simple(self, input_data):
         output_header = input_data.default_output_header()
@@ -415,7 +408,7 @@ class LoadPolygon2DNode(SingleOutputNode):
         open_button.clicked.connect(self._open)
         return option_panel
 
-    def configure(self):
+    def configure(self, check=None):
         if super().configure():
             if not self.filename:
                 self.state = Node.NOT_CONFIGURED
@@ -519,7 +512,7 @@ class LoadOpenPolyline2DNode(SingleOutputNode):
             self.filename = filename
             self.name_box.setText(filename)
 
-    def configure(self):
+    def configure(self, check=None):
         if super().configure():
             if not self.filename:
                 self.state = Node.NOT_CONFIGURED
@@ -614,7 +607,7 @@ class LoadPoint2DNode(SingleOutputNode):
             self.filename = filename
             self.name_box.setText(filename)
 
-    def configure(self):
+    def configure(self, check=None):
         if super().configure():
             if not self.filename:
                 self.state = Node.NOT_CONFIGURED
@@ -657,7 +650,7 @@ class LoadPoint2DNode(SingleOutputNode):
             return
         self.data.set_fields(Shapefile.get_all_fields(self.filename))
         if self.data.is_empty():
-            self.fail('the file does not contain any points.')
+            self.fail('the file does not contain any point.')
             return
         self.success('The file contains {} point{}.'.format(len(self.data),
                                                             's' if len(self.data) > 1 else ''))

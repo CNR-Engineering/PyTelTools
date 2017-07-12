@@ -102,7 +102,7 @@ class LocateOpenLinesNode(DoubleInputNode):
         super().reconfigure()
         self.has_map = False
 
-    def configure(self):
+    def configure(self, check=None):
         if not self.first_in_port.has_mother() or not self.second_in_port.has_mother():
             QMessageBox.critical(None, 'Error', 'Connect and run the input before configure this node!',
                                  QMessageBox.Ok)
@@ -274,7 +274,7 @@ class LocatePointsNode(DoubleInputNode):
         super().reconfigure()
         self.has_map = False
 
-    def configure(self):
+    def configure(self, check=None):
         if not self.first_in_port.has_mother() or not self.second_in_port.has_mother():
             QMessageBox.critical(None, 'Error', 'Connect and run the input before configure this node!',
                                  QMessageBox.Ok)
@@ -371,7 +371,7 @@ class VolumePlotNode(SingleInputNode):
         self.plot_viewer.reset()
         self.plot_viewer.current_columns = ('Polygon 1',)
 
-    def configure(self):
+    def configure(self, check=None):
         if not self.in_port.has_mother():
             QMessageBox.critical(None, 'Error', 'Connect and run the input before configure this node!',
                                  QMessageBox.Ok)
@@ -433,7 +433,7 @@ class FluxPlotNode(SingleInputNode):
         self.plot_viewer.reset()
         self.plot_viewer.current_columns = ('Section 1',)
 
-    def configure(self):
+    def configure(self, check=None):
         if not self.in_port.has_mother():
             QMessageBox.critical(None, 'Error', 'Connect and run the input before configure this node!',
                                  QMessageBox.Ok)
@@ -457,7 +457,7 @@ class FluxPlotNode(SingleInputNode):
         else:
             self.plot_viewer.get_data(parent_node.data)
             self.has_plot = True
-            self.plot_viewer.draw()
+            self.plot_viewer.show()
             self.success()
 
     def run(self):
@@ -555,7 +555,7 @@ class PointAttributeTableNode(SingleInputNode):
         super().reconfigure()
         self.has_table = False
 
-    def configure(self):
+    def configure(self, check=None):
         if not self.in_port.has_mother():
             QMessageBox.critical(None, 'Error', 'Connect and run the input before configure this node!',
                                  QMessageBox.Ok)

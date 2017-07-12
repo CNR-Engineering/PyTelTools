@@ -3,7 +3,7 @@ from PyQt5.QtCore import *
 import os
 import uuid
 
-from workflow.Node import Node, OneInOneOutNode, TwoInOneOutNode, OutputDialogPanel
+from workflow.Node import Node, OneInOneOutNode, TwoInOneOutNode, OutputOptionPanel
 from workflow.datatypes import CSVData
 from slf import Serafin
 from slf.volume import TruncatedTriangularPrisms, VolumeCalculator
@@ -418,7 +418,7 @@ class ComputeVolumeNode(TwoInOneOutNode):
         self.reconfigure_downward()
         self.update()
 
-    def configure(self):
+    def configure(self, check=None):
         if not self.first_in_port.has_mother():
             QMessageBox.critical(None, 'Error', 'Connect and run the input before configure this node!',
                                  QMessageBox.Ok)
@@ -448,7 +448,7 @@ class ComputeVolumeNode(TwoInOneOutNode):
                                      QMessageBox.Ok)
                 return
         old_options = (self.suffix, self.in_source_folder, self.dir_path, self.double_name, self.overwrite)
-        self.output_panel = OutputDialogPanel(old_options)
+        self.output_panel = OutputOptionPanel(old_options)
 
         if super().configure(self.output_panel.check):
             self.first_var, self.second_var, self.sup_volume = self.new_options
@@ -477,6 +477,10 @@ class ComputeVolumeNode(TwoInOneOutNode):
         if second:
             self.second_var = second
         self.sup_volume = bool(int(sup))
+        if not self.in_source_folder:
+            if not os.path.exists(self.dir_path):
+                self.in_source_folder = True
+                self.dir_path = ''
 
     def _run_volume(self):
         # process options
@@ -564,7 +568,7 @@ class ComputeVolumeNode(TwoInOneOutNode):
 
         self._run_volume()
         self.data.write(filename, self.scene().csv_separator)
-        self.success()
+        self.success('Output saved to %s' % filename)
 
 
 class ComputeFluxNode(TwoInOneOutNode):
@@ -577,31 +581,20 @@ class ComputeFluxNode(TwoInOneOutNode):
         self.second_in_port.data_type = 'polyline 2d'
         self.in_data = None
         self.data = None
-        self.auto_box = None
-        self.name_box = None
-        self.filename = ''
-        self.auto = True
 
         self.flux_options = ''
-        self.new_options = tuple()
+        self.new_options = ''
 
         self.flux_type_box = None
 
+        self.suffix = '_flux'
+        self.in_source_folder = True
+        self.dir_path = ''
+        self.double_name = False
+        self.overwrite = False
+        self.output_panel = None
+
     def get_option_panel(self):
-        open_button = QPushButton(QWidget().style().standardIcon(QStyle.SP_DialogSaveButton),
-                                  'Save CSV')
-        open_button.setToolTip('<b>Save</b> a .csv file')
-        open_button.setFixedHeight(30)
-        if self.auto:
-            open_button.setEnabled(False)
-
-        self.auto_box = QCheckBox('Use automatic output naming')
-        self.auto_box.setChecked(self.auto)
-        self.auto_box.toggled.connect(lambda checked: open_button.setEnabled(not checked))
-        self.name_box = QLineEdit(self.filename)
-        self.name_box.setReadOnly(True)
-        self.name_box.setFixedHeight(30)
-
         option_panel = QWidget()
         layout = QVBoxLayout()
         hlayout = QHBoxLayout()
@@ -609,28 +602,14 @@ class ComputeFluxNode(TwoInOneOutNode):
         hlayout.addWidget(self.flux_type_box)
         layout.addLayout(hlayout)
         layout.addItem(QSpacerItem(10, 10))
-        layout.addWidget(self.auto_box)
-        hlayout = QHBoxLayout()
-        hlayout.addWidget(open_button)
-        hlayout.addWidget(self.name_box)
-        layout.addLayout(hlayout)
+        layout.addWidget(self.output_panel)
         layout.setSpacing(15)
         option_panel.setLayout(layout)
-        open_button.clicked.connect(self._open)
         option_panel.destroyed.connect(self._select)
         return option_panel
 
-    def _open(self):
-        filename, _ = QFileDialog.getSaveFileName(None, 'Choose the output file name', '',
-                                                  'CSV Files (*.csv)',
-                                                  options=QFileDialog.Options() | QFileDialog.DontUseNativeDialog)
-        if filename:
-            if len(filename) < 5 or filename[-4:] != '.csv':
-                filename += '.csv'
-            self.name_box.setText(filename)
-
     def _select(self):
-        self.new_options = (self.flux_type_box.currentText(), self.auto_box.isChecked(), self.name_box.text())
+        self.new_options = self.flux_type_box.currentText()
 
     def _prepare_options(self, available_vars, available_var_names):
         self.flux_type_box = QComboBox()
@@ -728,7 +707,7 @@ class ComputeFluxNode(TwoInOneOutNode):
         self.reconfigure_downward()
         self.update()
 
-    def configure(self):
+    def configure(self, check=None):
         if not self.first_in_port.has_mother():
             QMessageBox.critical(None, 'Error', 'Connect and run the input before configure this node!',
                                  QMessageBox.Ok)
@@ -759,29 +738,33 @@ class ComputeFluxNode(TwoInOneOutNode):
             return
         elif self.state != Node.SUCCESS:
             self._reset()
-        if super().configure():
-            self.flux_options, self.auto, self.filename = self.new_options
-            if self.auto:
-                self.filename = ''
+
+        old_options = (self.suffix, self.in_source_folder, self.dir_path, self.double_name, self.overwrite)
+        self.output_panel = OutputOptionPanel(old_options)
+        if super().configure(self.output_panel.check):
+            self.flux_options = self.new_options
+            self.suffix, self.in_source_folder, self.dir_path, \
+            self.double_name, self.overwrite = self.output_panel.get_options()
             self.reconfigure_downward()
 
     def save(self):
         return '|'.join([self.category, self.name(), str(self.index()),
                          str(self.pos().x()), str(self.pos().y()),
-                         self.flux_options, self.filename])
+                         self.flux_options, self.suffix,
+                         str(int(self.in_source_folder)), self.dir_path,
+                         str(int(self.double_name)), str(int(self.overwrite))])
 
     def load(self, options):
-        self.flux_options, filename = options
-        try:
-            with open(filename, 'w') as f:
-                pass
-        except (PermissionError, FileNotFoundError):
-            self.filename = ''
-            self.state = Node.NOT_CONFIGURED
-            return
-        if filename:
-            self.filename = filename
-            self.auto = False
+        self.flux_options = options[0]
+        self.suffix = options[1]
+        self.in_source_folder = bool(int(options[2]))
+        self.dir_path = options[3]
+        self.double_name = bool(int(options[4]))
+        self.overwrite = bool(int(options[5]))
+        if not self.in_source_folder:
+            if not os.path.exists(self.dir_path):
+                self.in_source_folder = True
+                self.dir_path = ''
 
     def _run_flux(self):
         # process options
@@ -853,23 +836,33 @@ class ComputeFluxNode(TwoInOneOutNode):
             return
 
         self.in_data = self.first_in_port.mother.parentItem().data
-        if self.auto:  # use automatic naming
-            head, tail = os.path.splitext(self.in_data.filename)
-            self.filename = ''.join([head, '_flux_', str(uuid.uuid4()), '.csv'])
+        input_name = os.path.split(self.in_data.filename)[1][:-4]
+        if self.double_name:
+            output_name = input_name + '_' + self.in_data.job_id + self.suffix + '.csv'
+        else:
+            output_name = input_name + self.suffix + '.csv'
+        if self.in_source_folder:
+            filename = os.path.join(os.path.split(self.in_data.filename)[0], output_name)
+        else:
+            filename = os.path.join(self.dir_path, output_name)
+        if not self.overwrite:
+            if os.path.exists(filename):
+                self.data = CSVData(self.in_data.filename, None, filename)
+                self.data.metadata = {'flux title': self.flux_options,
+                                      'language': self.in_data.language, 'start time': self.in_data.start_time,
+                                      'var IDs': list(self.flux_options.split(':')[1].split('(')[1][:-1].split(', '))}
+                self.success('Reload existing file.')
+                return
         try:
-            with open(self.filename, 'w') as f:
+            with open(filename, 'w') as f:
                 pass
         except PermissionError:
             self.fail('Access denied.')
             return
 
         self._run_flux()
-
-        with open(self.filename, 'w') as output_stream:
-            self.data.write(self.filename, output_stream, self.scene().csv_separator)
-
-        self.auto = False
-        self.success('Output saved to {}.'.format(self.filename))
+        self.data.write(filename, self.scene().csv_separator)
+        self.success('Output saved to %s' % filename)
 
 
 class InterpolateOnPointsNode(TwoInOneOutNode):
@@ -884,87 +877,48 @@ class InterpolateOnPointsNode(TwoInOneOutNode):
         self.data = None
         self.state = Node.READY
 
-        self.auto_box = None
-        self.name_box = None
-        self.filename = ''
-        self.auto = True
-        self.new_options = tuple()
-
-    def get_option_panel(self):
-        open_button = QPushButton(QWidget().style().standardIcon(QStyle.SP_DialogSaveButton),
-                                  'Save CSV')
-        open_button.setToolTip('<b>Save</b> a .csv file')
-        open_button.setFixedHeight(30)
-        if self.auto:
-            open_button.setEnabled(False)
-
-        self.auto_box = QCheckBox('Use automatic output naming')
-        self.auto_box.setChecked(self.auto)
-        self.auto_box.toggled.connect(lambda checked: open_button.setEnabled(not checked))
-        self.name_box = QLineEdit(self.filename)
-        self.name_box.setReadOnly(True)
-        self.name_box.setFixedHeight(30)
-
-        option_panel = QWidget()
-        layout = QVBoxLayout()
-        layout.addWidget(self.auto_box, Qt.AlignLeft)
-        layout.setSpacing(15)
-        hlayout = QHBoxLayout()
-        hlayout.addWidget(open_button)
-
-        hlayout.addWidget(self.name_box)
-        layout.addLayout(hlayout)
-        option_panel.setLayout(layout)
-
-        open_button.clicked.connect(self._open)
-        option_panel.destroyed.connect(self._select)
-        return option_panel
-
-    def _select(self):
-        self.new_options = (self.auto_box.isChecked(), self.name_box.text())
+        self.panel = None
+        self.suffix = '_interpolated'
+        self.in_source_folder = True
+        self.dir_path = ''
+        self.double_name = False
+        self.overwrite = False
+        self.output_panel = None
 
     def reconfigure(self):
         super().reconfigure()
         self.reconfigure_downward()
 
-    def configure(self):
-        if super().configure():
-            auto, filename = self.new_options
-            if auto:
-                self.auto = True
-                self.filename = ''
-            else:
-                self.auto = False
-                self.filename = filename
-            self.reconfigure_downward()
+    def get_option_panel(self):
+        return self.panel
 
-    def _open(self):
-        filename, _ = QFileDialog.getSaveFileName(None, 'Choose the output file name', '',
-                                                  'CSV Files (*.csv)',
-                                                  options=QFileDialog.Options() | QFileDialog.DontUseNativeDialog)
-        if filename:
-            if len(filename) < 5 or filename[-4:] != '.csv':
-                filename += '.csv'
-            self.name_box.setText(filename)
+    def configure(self, check=None):
+        old_options = (self.suffix, self.in_source_folder, self.dir_path, self.double_name, self.overwrite)
+        self.panel = OutputOptionPanel(old_options)
+        if super().configure(self.panel.check):
+            self.suffix, self.in_source_folder, self.dir_path, self.double_name, self.overwrite = self.panel.get_options()
+            self.reconfigure_downward()
 
     def save(self):
         return '|'.join([self.category, self.name(), str(self.index()),
-                         str(self.pos().x()), str(self.pos().y()), self.filename])
+                         str(self.pos().x()), str(self.pos().y()), self.suffix,
+                         str(int(self.in_source_folder)), self.dir_path,
+                         str(int(self.double_name)), str(int(self.overwrite))])
 
     def load(self, options):
-        filename = options[0]
-        try:
-            with open(filename, 'w') as f:
-                pass
-        except (PermissionError, FileNotFoundError):
-            self.filename = ''
-            self.state = Node.NOT_CONFIGURED
-            return
-        if filename:
-            self.auto = False
-            self.filename = filename
+        self.suffix = options[0]
+        self.in_source_folder = bool(int(options[1]))
+        self.dir_path = options[2]
+        self.double_name = bool(int(options[3]))
+        self.overwrite = bool(int(options[4]))
 
-    def _run_interpolate(self, selected_vars):
+        if not self.in_source_folder:
+            if not os.path.exists(self.dir_path):
+                self.in_source_folder = True
+                self.dir_path = ''
+                self.state = Node.NOT_CONFIGURED
+
+    def _prepare_points(self):
         self.progress_bar.setVisible(True)
         points = self.second_in_port.mother.parentItem().data.points
 
@@ -982,10 +936,9 @@ class InterpolateOnPointsNode(TwoInOneOutNode):
         is_inside, point_interpolators = mesh.get_point_interpolators(points)
         point_interpolators = [p for i, p in enumerate(point_interpolators) if is_inside[i]]
         nb_inside = sum(map(int, is_inside))
-        if nb_inside == 0:
-            self.fail('no point inside the mesh.')
-            return
+        return points, point_interpolators, is_inside, nb_inside
 
+    def _run_interpolate(self, points, point_interpolators, is_inside, selected_vars):
         header = ['time']
         for x, y in points:
             for var in selected_vars:
@@ -1018,12 +971,6 @@ class InterpolateOnPointsNode(TwoInOneOutNode):
                 self.progress_bar.setValue(100 * (index+1) / nb_frames)
                 QApplication.processEvents()
 
-        with open(self.filename, 'w') as output_stream:
-            self.data.write(self.filename, output_stream, self.scene().csv_separator)
-
-        self.success('Output saved to {}\n{} point{} inside the mesh.'.format(self.filename, nb_inside,
-                                                                              's are' if nb_inside > 1 else ' is'))
-
     def run(self):
         success = super().run_upward()
         if not success:
@@ -1039,18 +986,42 @@ class InterpolateOnPointsNode(TwoInOneOutNode):
         if not selected_vars:
             self.fail('no variable available.')
             return
-        if self.auto:  # use automatic naming
-            head, tail = os.path.splitext(self.in_data.filename)
-            self.filename = ''.join([head, '_interpolate_points_', str(uuid.uuid4()), '.csv'])
+
+        input_name = os.path.split(self.in_data.filename)[1][:-4]
+        if self.double_name:
+            output_name = input_name + '_' + self.in_data.job_id + self.suffix + '.csv'
+        else:
+            output_name = input_name + self.suffix + '.csv'
+        if self.in_source_folder:
+            filename = os.path.join(os.path.split(self.in_data.filename)[0], output_name)
+        else:
+            filename = os.path.join(self.dir_path, output_name)
+
+        points, point_interpolators, is_inside, nb_inside = self._prepare_points()
+        if is_inside == 0:
+            self.fail('no point inside the mesh.')
+            return
+
+        if not self.overwrite:
+            if os.path.exists(filename):
+                self.data = CSVData(self.in_data.filename, None, filename)
+                self.data.metadata = {'start time': self.in_data.start_time, 'var IDs': selected_vars,
+                                      'point indices': [i for i in range(len(points)) if is_inside[i]],
+                                      'language': self.in_data.language,
+                                      'points': self.second_in_port.mother.parentItem().data}
+                self.success('Reload existing file.')
+                return
         try:
-            with open(self.filename, 'w') as f:
+            with open(filename, 'w') as f:
                 pass
         except PermissionError:
             self.fail('Access denied.')
             return
 
-        self._run_interpolate(selected_vars)
-        self.auto = False
+        self._run_interpolate(points, point_interpolators, is_inside, selected_vars)
+        self.data.write(filename, self.scene().csv_separator)
+        self.success('Output saved to {}\n{} point{} inside the mesh.'.format(filename, nb_inside,
+                                                                              's are' if nb_inside > 1 else ' is'))
 
 
 class InterpolateAlongLinesNode(TwoInOneOutNode):
@@ -1065,81 +1036,42 @@ class InterpolateAlongLinesNode(TwoInOneOutNode):
         self.data = None
         self.state = Node.READY
 
-        self.auto_box = None
-        self.name_box = None
-        self.filename = ''
-        self.auto = True
-        self.new_options = tuple()
+        self.panel = None
+        self.suffix = '_interpolated'
+        self.in_source_folder = True
+        self.dir_path = ''
+        self.double_name = False
+        self.overwrite = False
+        self.output_panel = None
 
     def get_option_panel(self):
-        open_button = QPushButton(QWidget().style().standardIcon(QStyle.SP_DialogSaveButton),
-                                  'Save CSV')
-        open_button.setToolTip('<b>Save</b> a .csv file')
-        open_button.setFixedHeight(30)
-        if self.auto:
-            open_button.setEnabled(False)
+        return self.panel
 
-        self.auto_box = QCheckBox('Use automatic output naming')
-        self.auto_box.setChecked(self.auto)
-        self.auto_box.toggled.connect(lambda checked: open_button.setEnabled(not checked))
-        self.name_box = QLineEdit(self.filename)
-        self.name_box.setReadOnly(True)
-        self.name_box.setFixedHeight(30)
-
-        option_panel = QWidget()
-        layout = QVBoxLayout()
-        layout.addWidget(self.auto_box, Qt.AlignLeft)
-        layout.setSpacing(15)
-        hlayout = QHBoxLayout()
-        hlayout.addWidget(open_button)
-
-        hlayout.addWidget(self.name_box)
-        layout.addLayout(hlayout)
-        option_panel.setLayout(layout)
-
-        open_button.clicked.connect(self._open)
-        option_panel.destroyed.connect(self._select)
-        return option_panel
-
-    def _select(self):
-        self.new_options = (self.auto_box.isChecked(), self.name_box.text())
-
-    def configure(self):
-        if super().configure():
-            auto, filename = self.new_options
-            if auto:
-                self.auto = True
-                self.filename = ''
-            else:
-                self.auto = False
-                self.filename = filename
+    def configure(self, check=None):
+        old_options = (self.suffix, self.in_source_folder, self.dir_path, self.double_name, self.overwrite)
+        self.panel = OutputOptionPanel(old_options)
+        if super().configure(self.panel.check):
+            self.suffix, self.in_source_folder, self.dir_path, self.double_name, self.overwrite = self.panel.get_options()
             self.reconfigure_downward()
-
-    def _open(self):
-        filename, _ = QFileDialog.getSaveFileName(None, 'Choose the output file name', '',
-                                                  'CSV Files (*.csv)',
-                                                  options=QFileDialog.Options() | QFileDialog.DontUseNativeDialog)
-        if filename:
-            if len(filename) < 5 or filename[-4:] != '.csv':
-                filename += '.csv'
-            self.name_box.setText(filename)
 
     def save(self):
         return '|'.join([self.category, self.name(), str(self.index()),
-                         str(self.pos().x()), str(self.pos().y()), self.filename])
+                         str(self.pos().x()), str(self.pos().y()), self.suffix,
+                         str(int(self.in_source_folder)), self.dir_path,
+                         str(int(self.double_name)), str(int(self.overwrite))])
 
     def load(self, options):
-        filename = options[0]
-        try:
-            with open(filename, 'w') as f:
-                pass
-        except (PermissionError, FileNotFoundError):
-            self.filename = ''
-            self.state = Node.NOT_CONFIGURED
-            return
-        if filename:
-            self.auto = False
-            self.filename = filename
+        self.suffix = options[0]
+        self.in_source_folder = bool(int(options[1]))
+        self.dir_path = options[2]
+        self.double_name = bool(int(options[3]))
+        self.overwrite = bool(int(options[4]))
+
+        if not self.in_source_folder:
+            if not os.path.exists(self.dir_path):
+                self.in_source_folder = True
+                self.dir_path = ''
+                self.state = Node.NOT_CONFIGURED
 
     def _run_interpolate(self, selected_vars):
         self.progress_bar.setVisible(True)
@@ -1170,8 +1102,7 @@ class InterpolateAlongLinesNode(TwoInOneOutNode):
             line_interpolators.append((line_interpolator, distance))
 
         if nb_nonempty == 0:
-            self.fail('no polyline intersects the mesh continuously.')
-            return
+            return False, 'no polyline intersects the mesh continuously.'
 
         header = ['line', 'time', 'x', 'y', 'distance'] + selected_vars
         self.data = CSVData(self.in_data.filename, header)
@@ -1204,13 +1135,7 @@ class InterpolateAlongLinesNode(TwoInOneOutNode):
 
                     self.progress_bar.setValue(100 * (v+1+u*nb_frames) * inv_steps)
                     QApplication.processEvents()
-
-        with open(self.filename, 'w') as output_stream:
-            self.data.write(self.filename, output_stream, self.scene().csv_separator)
-
-        self.success('Output saved to %s\n{} line{} the mesh continuously.'.format(self.filename, nb_nonempty,
-                                                                                   's intersect' if nb_nonempty > 1
-                                                                                   else ' intersects'))
+        return True, '%s line%s the mesh continuously.' % (nb_nonempty, 's intersect' if nb_nonempty > 1 else ' intersects')
 
     def run(self):
         success = super().run_upward()
@@ -1227,17 +1152,35 @@ class InterpolateAlongLinesNode(TwoInOneOutNode):
         if not selected_vars:
             self.fail('no variable available.')
             return
-        if self.auto:  # use automatic naming
-            head, tail = os.path.splitext(self.in_data.filename)
-            self.filename = ''.join([head, '_interpolate_lines_', str(uuid.uuid4()), '.csv'])
+
+        input_name = os.path.split(self.in_data.filename)[1][:-4]
+        if self.double_name:
+            output_name = input_name + '_' + self.in_data.job_id + self.suffix + '.csv'
+        else:
+            output_name = input_name + self.suffix + '.csv'
+        if self.in_source_folder:
+            filename = os.path.join(os.path.split(self.in_data.filename)[0], output_name)
+        else:
+            filename = os.path.join(self.dir_path, output_name)
+
+        if not self.overwrite:
+            if os.path.exists(filename):
+                self.data = CSVData(self.in_data.filename, None, filename)
+                self.success('Reload existing file.')
+                return
         try:
-            with open(self.filename, 'w') as f:
+            with open(filename, 'w') as f:
                 pass
         except PermissionError:
             self.fail('Access denied.')
             return
-        self._run_interpolate(selected_vars)
-        self.auto = False
+
+        success, message = self._run_interpolate(selected_vars)
+        if success:
+            self.data.write(filename, self.scene().csv_separator)
+            self.success('Output saved to %s\n' % filename + message)
+        else:
+            self.fail(message)
 
 
 class ProjectLinesNode(TwoInOneOutNode):
@@ -1252,27 +1195,16 @@ class ProjectLinesNode(TwoInOneOutNode):
 
         self.reference_index = -1
         self.reference_box = None
-        self.auto_box = None
-        self.name_box = None
-        self.filename = ''
-        self.auto = True
-        self.new_options = tuple()
+        self.new_options = -1
+
+        self.suffix = '_projected'
+        self.in_source_folder = True
+        self.dir_path = ''
+        self.double_name = False
+        self.overwrite = False
+        self.output_panel = None
 
     def get_option_panel(self):
-        open_button = QPushButton(QWidget().style().standardIcon(QStyle.SP_DialogSaveButton),
-                                  'Save CSV')
-        open_button.setToolTip('<b>Save</b> a .csv file')
-        open_button.setFixedHeight(30)
-        if self.auto:
-            open_button.setEnabled(False)
-
-        self.auto_box = QCheckBox('Use automatic output naming')
-        self.auto_box.setChecked(self.auto)
-        self.auto_box.toggled.connect(lambda checked: open_button.setEnabled(not checked))
-        self.name_box = QLineEdit(self.filename)
-        self.name_box.setReadOnly(True)
-        self.name_box.setFixedHeight(30)
-
         option_panel = QWidget()
         layout = QVBoxLayout()
         hlayout = QHBoxLayout()
@@ -1280,41 +1212,27 @@ class ProjectLinesNode(TwoInOneOutNode):
         hlayout.addWidget(self.reference_box)
         layout.addLayout(hlayout)
         layout.addSpacerItem(QSpacerItem(10, 10))
-        layout.addWidget(self.auto_box, Qt.AlignLeft)
-        hlayout = QHBoxLayout()
-        hlayout.addWidget(open_button)
-        hlayout.addWidget(self.name_box)
-        layout.addLayout(hlayout)
-
+        layout.addWidget(self.output_panel)
         layout.setSpacing(15)
         option_panel.setLayout(layout)
-        open_button.clicked.connect(self._open)
         option_panel.destroyed.connect(self._select)
         return option_panel
 
     def _select(self):
-        self.new_options = (int(self.reference_box.currentText().split()[1]) - 1, self.auto_box.isChecked(),
-                           self.name_box.text())
-
-    def _open(self):
-        filename, _ = QFileDialog.getSaveFileName(None, 'Choose the output file name', '',
-                                                  'CSV Files (*.csv)',
-                                                  options=QFileDialog.Options() | QFileDialog.DontUseNativeDialog)
-        if filename:
-            if len(filename) < 5 or filename[-4:] != '.csv':
-                filename += '.csv'
-            self.name_box.setText(filename)
+        self.new_options = int(self.reference_box.currentText().split()[1]) - 1
 
     def _prepare_options(self, nb_lines):
         self.reference_box = QComboBox()
         self.reference_box.setFixedSize(400, 30)
         for i in range(1, nb_lines+1):
             self.reference_box.addItem('Line %d' % i)
+        if self.reference_index > -1:
+            self.reference_box.setCurrentIndex(self.reference_index)
 
     def add_link(self, link):
         self.links.add(link)
 
-    def configure(self):
+    def configure(self, check=None):
         if not self.first_in_port.has_mother() or not self.second_in_port.has_mother():
             QMessageBox.critical(None, 'Error', 'Connect and run the input before configure this node!',
                                  QMessageBox.Ok)
@@ -1359,12 +1277,15 @@ class ProjectLinesNode(TwoInOneOutNode):
                 QMessageBox.critical(None, 'Error', 'Configure and run the input before configure this node!',
                                      QMessageBox.Ok)
                 return
-        self._prepare_options(len(line_node.data))
 
-        if super().configure():
-            self.reference_index, self.auto, self.filename = self.new_options
-            if self.auto:
-                self.filename = ''
+        self._prepare_options(len(line_node.data))
+        old_options = (self.suffix, self.in_source_folder, self.dir_path, self.double_name, self.overwrite)
+        self.output_panel = OutputOptionPanel(old_options)
+
+        if super().configure(self.output_panel.check):
+            self.reference_index = self.new_options
+            self.suffix, self.in_source_folder, self.dir_path, \
+                         self.double_name, self.overwrite = self.output_panel.get_options()
             self.reconfigure_downward()
 
     def reconfigure(self):
@@ -1374,20 +1295,22 @@ class ProjectLinesNode(TwoInOneOutNode):
 
     def save(self):
         return '|'.join([self.category, self.name(), str(self.index()),
-                         str(self.pos().x()), str(self.pos().y()), self.filename])
+                         str(self.pos().x()), str(self.pos().y()), self.suffix,
+                         str(int(self.in_source_folder)), self.dir_path,
+                         str(int(self.double_name)), str(int(self.overwrite)), str(self.reference_index)])
 
     def load(self, options):
-        filename = options[0]
-        try:
-            with open(filename, 'w') as f:
-                pass
-        except (PermissionError, FileNotFoundError):
-            self.filename = ''
-            self.state = Node.NOT_CONFIGURED
-            return
-        if filename:
-            self.auto = False
-            self.filename = filename
+        self.suffix = options[0]
+        self.in_source_folder = bool(int(options[1]))
+        self.dir_path = options[2]
+        self.double_name = bool(int(options[3]))
+        self.overwrite = bool(int(options[4]))
+        self.reference_index = int(options[5])
+
+        if not self.in_source_folder:
+            if not os.path.exists(self.dir_path):
+                self.in_source_folder = True
+                self.dir_path = ''
 
     def run(self):
         success = super().run_upward()
@@ -1397,11 +1320,24 @@ class ProjectLinesNode(TwoInOneOutNode):
         input_data = self.first_in_port.mother.parentItem().data
         time_index = input_data.selected_time_indices[0]
         selected_vars = [var for var in input_data.header.var_IDs if var in input_data.selected_vars]
-        if self.auto:  # use automatic naming
-            head, tail = os.path.splitext(input_data.filename)
-            self.filename = ''.join([head, '_project_lines_', str(uuid.uuid4()), '.csv'])
+
+        input_name = os.path.split(input_data.filename)[1][:-4]
+        if self.double_name:
+            output_name = input_name + '_' + input_data.job_id + self.suffix + '.csv'
+        else:
+            output_name = input_name + self.suffix + '.csv'
+        if self.in_source_folder:
+            filename = os.path.join(os.path.split(input_data.filename)[0], output_name)
+        else:
+            filename = os.path.join(self.dir_path, output_name)
+
+        if not self.overwrite:
+            if os.path.exists(filename):
+                self.data = CSVData(input_data.filename, None, filename)
+                self.success('Reload existing file.')
+                return
         try:
-            with open(self.filename, 'w') as f:
+            with open(filename, 'w') as f:
                 pass
         except PermissionError:
             self.fail('Access denied.')
@@ -1410,9 +1346,7 @@ class ProjectLinesNode(TwoInOneOutNode):
         self.progress_bar.setVisible(True)
 
         lines = self.second_in_port.mother.parentItem().data.lines
-
         mesh = MeshInterpolator(input_data.header, False)
-
         if input_data.has_index:
             mesh.index = input_data.index
             mesh.triangles = input_data.triangles
@@ -1477,11 +1411,8 @@ class ProjectLinesNode(TwoInOneOutNode):
                 self.progress_bar.setValue(100 * (u+1) / nb_lines)
                 QApplication.processEvents()
 
-        with open(self.filename, 'w') as output_stream:
-            self.data.write(self.filename, output_stream, self.scene().csv_separator)
-
-        self.auto = False
-        self.success('Output saved to %s\n{} line{} the mesh continuously.'.format(self.filename, nb_nonempty,
+        self.data.write(filename, self.scene().csv_separator)
+        self.success('Output saved to %s\n{} line{} the mesh continuously.'.format(filename, nb_nonempty,
                                                                                    's intersect' if nb_nonempty > 1
                                                                                    else ' intersects'))
 

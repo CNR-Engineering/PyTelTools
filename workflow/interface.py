@@ -449,7 +449,7 @@ class MultiTreeWidget(QWidget):
                 next_nodes = self.scene.adj_list[node_id]
                 for next_node_id in next_nodes:
                     next_node = self.scene.nodes[next_node_id]
-                    next_node.get_auxiliary_data(data)
+                    next_node.set_auxiliary_data(data)
         return all_success
 
     def _prepare_input_tasks(self):
@@ -623,6 +623,7 @@ class ProjectWelcome(QWidget):
                                                   options=QFileDialog.Options() | QFileDialog.DontUseNativeDialog)
         if not filename:
             return
+        self.new = False
         self.filename = filename
         self.open_project()
 
@@ -631,10 +632,12 @@ class ProjectWelcome(QWidget):
             self.window.mono.scene.reinit()
             self.window.multi.scene.reinit()
             self.window.create_new(self.filename)
+            self.window.tab.setCurrentIndex(0)
             self.window.showMaximized()
             self.hide()
         else:
             if self.window.load(self.filename):
+                self.window.tab.setCurrentIndex(0)
                 self.window.showMaximized()
                 self.hide()
             else:

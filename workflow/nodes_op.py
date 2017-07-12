@@ -260,7 +260,7 @@ class SelectVariablesNode(OneInOneOutNode):
         self.reconfigure_downward()
         self.update()
 
-    def configure(self):
+    def configure(self, check=None):
         if not self.in_port.has_mother():
             QMessageBox.critical(None, 'Error', 'Connect and run the input before configure this node!',
                                  QMessageBox.Ok)
@@ -284,10 +284,10 @@ class SelectVariablesNode(OneInOneOutNode):
             self.selected_vars, self.selected_vars_names = self.new_options
             if not self.selected_vars:
                 self.state = Node.NOT_CONFIGURED
+            else:
+                self.reconfigure_downward()
         else:
             self.us_equation = None
-        if self.state != Node.SUCCESS:
-            self.reconfigure_downward()
         self.update()
 
     def save(self):
@@ -400,7 +400,7 @@ class AddRouseNode(OneInOneOutNode):
         self.reconfigure_downward()
         self.update()
 
-    def configure(self):
+    def configure(self, check=None):
         if not self.in_port.has_mother():
             QMessageBox.critical(None, 'Error', 'Connect and run the input before configure this node!',
                                  QMessageBox.Ok)
@@ -445,9 +445,8 @@ class AddRouseNode(OneInOneOutNode):
                     return
 
         if self._configure():
-            if self.state != Node.SUCCESS:
-                self.state = Node.READY
-                self.reconfigure_downward()
+            self.state = Node.READY
+            self.reconfigure_downward()
         else:
             self.state = Node.NOT_CONFIGURED
         self.update()
@@ -608,7 +607,7 @@ class SelectTimeNode(OneInOneOutNode):
         self.reconfigure_downward()
         self.update()
 
-    def configure(self):
+    def configure(self, check=None):
         if not self.in_port.has_mother():
             QMessageBox.critical(None, 'Error', 'Connect and run the input before configure this node!',
                                  QMessageBox.Ok)
@@ -633,7 +632,6 @@ class SelectTimeNode(OneInOneOutNode):
             self.start_index, self.end_index, self.sampling_frequency = self.new_options
             self.start_date, self.end_date = self.in_data.start_time + self.in_data.time_second[self.start_index], \
                                              self.in_data.start_time + self.in_data.time_second[self.end_index]
-        if self.state != Node.SUCCESS:
             self.reconfigure_downward()
 
     def save(self):
@@ -744,7 +742,7 @@ class SelectSingleFrameNode(OneInOneOutNode):
         self.reconfigure_downward()
         self.update()
 
-    def configure(self):
+    def configure(self, check=None):
         if not self.in_port.has_mother():
             QMessageBox.critical(None, 'Error', 'Connect and run the input before configure this node!',
                                  QMessageBox.Ok)
@@ -768,7 +766,6 @@ class SelectSingleFrameNode(OneInOneOutNode):
         if super().configure():
             self.selection = self.new_option
             self.date = self.in_data.start_time + self.in_data.time_second[self.selection]
-        if self.state != Node.SUCCESS:
             self.reconfigure_downward()
 
     def save(self):
@@ -816,11 +813,9 @@ class UnaryOperatorNode(OneInOneOutNode):
         self.state = Node.READY
         self.reconfigure_downward()
 
-    def configure(self):
+    def configure(self, check=None):
         if super().configure():
-            if self.state != Node.SUCCESS:
-                self.state = Node.READY
-                self.reconfigure_downward()
+            self.reconfigure_downward()
 
     def save(self):
         return '|'.join([self.category, self.name(), str(self.index()),
@@ -862,11 +857,9 @@ class BinaryOperatorNode(TwoInOneOutNode):
         self.state = Node.READY
         self.reconfigure_downward()
 
-    def configure(self):
+    def configure(self, check=None):
         if super().configure():
-            if self.state != Node.SUCCESS:
-                self.state = Node.READY
-                self.reconfigure_downward()
+            self.reconfigure_downward()
 
     def save(self):
         return '|'.join([self.category, self.name(), str(self.index()),

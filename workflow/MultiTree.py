@@ -7,10 +7,17 @@ from workflow.multinodes_calc import *
 
 
 NODES = {'Input/Output': {'Load Serafin': MultiLoadSerafinNode, 'Write Serafin': MultiWriteSerafinNode,
-                          'Load 2D Polygons': MultiLoadPolygon2DNode},
-         'Basic operations': {'Select Last Frame': MultiSelectLastFrameNode},
-         'Operators': {'Max': MultiComputeMaxNode, 'Min': MultiComputeMinNode},
-         'Calculations': {'Compute Volume': MultiComputeVolumeNode}}
+                          'Load 2D Polygons': MultiLoadPolygon2DNode,
+                          'Load 2D Open Polylines': MultiLoadOpenPolyline2DNode,
+                          'Load 2D Points': MultiLoadPoint2DNode},
+         'Basic operations': {'Convert to Single Precision': MultiConvertToSinglePrecisionNode,
+                              'Select First Frame': MultiSelectFirstFrameNode,
+                              'Select Last Frame': MultiSelectLastFrameNode},
+         'Operators': {'Max': MultiComputeMaxNode, 'Min': MultiComputeMinNode, 'Mean': MultiComputeMeanNode},
+         'Calculations': {'Compute Volume': MultiComputeVolumeNode, 'Compute Flux': MultiComputeFluxNode,
+                          'Interpolate on Points': MultiInterpolateOnPointsNode,
+                          'Interpolate along Lines': MultiInterpolateAlongLinesNode,
+                          'Project Lines': MultiProjectLinesNode}}
 
 
 def topological_ordering(graph):
@@ -99,7 +106,7 @@ class MultiTreeScene(QGraphicsScene):
         node.moveBy(x, y)
         self.adj_list[node.index()] = set()
         if node.category == 'Input/Output':
-            if node.name() == 'Load 2D Polygons':
+            if node.name() in ('Load 2D Polygons', 'Load 2D Open Polylines', 'Load 2D Points'):
                 self.auxiliary_input_nodes.append(node.index())
 
     def mouseDoubleClickEvent(self, event):
@@ -136,6 +143,9 @@ class MultiTreeScene(QGraphicsScene):
                 for i in range(nb_nodes):
                     line = f.readline().rstrip().split('|')
                     category, name, index, x, y = line[:5]
+                    if category == 'Visualization':  # ignore all visualization nodes
+                        continue
+
                     index = int(index)
                     node = NODES[category][name](index)
                     node.load(line[5:])
@@ -148,10 +158,14 @@ class MultiTreeScene(QGraphicsScene):
                 for i in range(nb_links):
                     from_node_index, from_port_index, \
                                      to_node_index, to_port_index = map(int, f.readline().rstrip().split('|'))
+
+                    if to_node_index not in self.nodes:  # visualization nodes
+                        continue
                     from_node = self.nodes[from_node_index]
                     to_node = self.nodes[to_node_index]
                     from_port = from_node.ports[from_port_index]
                     to_port = to_node.ports[to_port_index]
+
                     from_port.connect(to_port)
                     to_port.connect(from_port)
                     link = MultiLink(from_port, to_port)

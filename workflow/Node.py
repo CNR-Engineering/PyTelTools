@@ -641,7 +641,7 @@ class ConfigureDialog(QDialog):
             self.reject()
 
 
-class OutputDialogPanel(QWidget):
+class OutputOptionPanel(QWidget):
     def __init__(self, old_options):
         super().__init__()
         folder_box = QGroupBox('Select output folder')
@@ -767,34 +767,3 @@ class OutputDialogPanel(QWidget):
     def get_options(self):
         return self.suffix, self.in_source_folder, \
                self.dir_path, self.double_name, self.overwrite
-
-
-class OutputDialog(QDialog):
-    def __init__(self, old_options):
-        super().__init__()
-
-        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel,
-                                   Qt.Horizontal, self)
-        buttons.accepted.connect(self.check)
-        buttons.rejected.connect(self.reject)
-
-        self.panel = OutputDialogPanel(old_options)
-
-        vlayout = QVBoxLayout()
-        vlayout.addWidget(self.panel)
-        vlayout.addStretch()
-        vlayout.addWidget(buttons, Qt.AlignRight)
-        self.setLayout(vlayout)
-        self.setWindowTitle('Select output file')
-
-    def check(self):
-        value = self.panel.check()
-        if value == 0:
-            self.reject()
-        elif value == 1:
-            return
-        else:
-            self.accept()
-
-    def get_options(self):
-        return self.panel.get_options()

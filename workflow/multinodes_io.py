@@ -26,6 +26,18 @@ class MultiWriteSerafinNode(MultiOneInOneOutNode):
         self.category = 'Input/Output'
         self.label = 'Write\nSerafin'
 
+    def load(self, options):
+        suffix = options[0]
+        in_source_folder = bool(int(options[1]))
+        dir_path = options[2]
+        double_name = bool(int(options[3]))
+        overwrite = bool(int(options[4]))
+        if not in_source_folder:
+            if not os.path.exists(dir_path):
+                self.state = MultiNode.NOT_CONFIGURED
+                return
+        self.options = (suffix, in_source_folder, dir_path, double_name, overwrite)
+
 
 class MultiLoadPolygon2DNode(MultiSingleOutputNode):
     def __init__(self, index):
@@ -37,7 +49,33 @@ class MultiLoadPolygon2DNode(MultiSingleOutputNode):
         if not options[0]:
             self.state = MultiNode.NOT_CONFIGURED
         else:
-            super().load(options)
+            self.options = tuple(options)
+
+
+class MultiLoadOpenPolyline2DNode(MultiSingleOutputNode):
+    def __init__(self, index):
+        super().__init__(index)
+        self.category = 'Input/Output'
+        self.label = 'Load 2D\nOpen\nPolylines'
+
+    def load(self, options):
+        if not options[0]:
+            self.state = MultiNode.NOT_CONFIGURED
+        else:
+            self.options = tuple(options)
+
+
+class MultiLoadPoint2DNode(MultiSingleOutputNode):
+    def __init__(self, index):
+        super().__init__(index)
+        self.category = 'Input/Output'
+        self.label = 'Load 2D\nPoints'
+
+    def load(self, options):
+        if not options[0]:
+            self.state = MultiNode.NOT_CONFIGURED
+        else:
+            self.options = tuple(options)
 
 
 class MultiLoadSerafinDialog(QDialog):

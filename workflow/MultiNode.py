@@ -119,7 +119,7 @@ class MultiNode(QGraphicsItem):
         return ' '.join(self.label.split())
 
     def load(self, options):
-        self.options = tuple(options)
+        pass
 
     def update_input(self, nb_input):
         self.expected_input = (nb_input,)
@@ -292,15 +292,19 @@ class MultiOneInOneOutNode(MultiNode):
         self.expected_input = (0,)
 
 
-class MultiTwoInOneOutNode(MultiNode):
+class MultiDoubleInputNode(MultiNode):
     def __init__(self, index):
         super().__init__(index)
         self.first_in_port = MultiInputPort(0, -MultiPort.WIDTH, Box.HEIGHT/4-MultiPort.WIDTH/2)
         self.second_in_port = MultiInputPort(1, -MultiPort.WIDTH, 3*Box.HEIGHT/4-MultiPort.WIDTH/2)
-        self.out_port = MultiOutputPort(2, Box.WIDTH/2-MultiPort.WIDTH/2, Box.HEIGHT)
         self.add_port(self.first_in_port)
         self.add_port(self.second_in_port)
-        self.add_port(self.out_port)
         self.expected_input = (0, 0)
         self.double_input = True
+        self.auxiliary_data = None
 
+    def update_input(self, nb_input):
+        self.expected_input = (nb_input, 1)
+
+    def set_auxiliary_data(self, data):
+        self.auxiliary_data = data
