@@ -684,13 +684,19 @@ class LoadSerafinDialog(QDialog):
 
         if old_options[0]:
             self.dir_path, self.slf_name, self.job_id = old_options
-            self.file_box.addItem(self.slf_name)
             self.table.setRowCount(1)
             name = os.path.basename(self.dir_path)
             name_item, id_item = QTableWidgetItem(name), QTableWidgetItem(self.job_id)
             name_item.setFlags(Qt.NoItemFlags)
             self.table.setItem(0, 0, name_item)
             self.table.setItem(0, 1, id_item)
+
+            slfs = set()
+            for f in os.listdir(self.dir_path):
+                if os.path.isfile(os.path.join(self.dir_path, f)) and f[-4:] == '.slf':
+                    slfs.add(f)
+            for slf in slfs:
+                self.file_box.addItem(slf)
             self.success = True
 
         vlayout = QVBoxLayout()

@@ -116,7 +116,19 @@ class MultiLoadSerafinDialog(QDialog):
                 name_item.setFlags(Qt.NoItemFlags)
                 self.table.setItem(i, 0, name_item)
                 self.table.setItem(i, 1, id_item)
-                self.success = True
+            all_slfs = set()
+            for path in self.dir_paths:
+                slfs = set()
+                for f in os.listdir(path):
+                    if os.path.isfile(os.path.join(path, f)) and f[-4:] == '.slf':
+                        slfs.add(f)
+                if not all_slfs:
+                    all_slfs = slfs.copy()
+                else:
+                    all_slfs.intersection_update(slfs)
+            for slf in all_slfs:
+                self.file_box.addItem(slf)
+            self.success = True
 
         vlayout = QVBoxLayout()
         vlayout.setSpacing(10)

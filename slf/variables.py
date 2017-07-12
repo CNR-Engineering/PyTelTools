@@ -46,6 +46,7 @@ class Equation():
         self.output = output_variable
         self.operator = operator
 
+
 def build_variables():
     """!
     @brief Initialize the BASIC_VARIABLES constant
@@ -167,7 +168,7 @@ class RouseEquation():
     needed a pickle-able top-level equation object when computing Rouse in multi-process
     """
     def __init__(self, ws, ws_id):
-        var = Variable(ws_id, None, None, None, -1), US
+        var = Variable(ws_id, None, None, None, -1)
         self.input = (var, US)
         self.output = ROUSE
         self.ws = ws
