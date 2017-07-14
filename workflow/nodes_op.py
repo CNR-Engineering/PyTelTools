@@ -847,6 +847,7 @@ class SynchMaxNode(OneInOneOutNode):
 
     def get_option_panel(self):
         self.var_box = QComboBox()
+        self.var_box.setFixedHeight(30)
         available_vars = [var for var in self.in_data.selected_vars if var in self.in_data.header.var_IDs]
         for var in available_vars:
             self.var_box.addItem(var)
@@ -856,7 +857,10 @@ class SynchMaxNode(OneInOneOutNode):
         option_panel = QWidget()
         layout = QVBoxLayout()
         layout.addSpacerItem(QSpacerItem(10, 10))
-        layout.addWidget(self.var_box)
+        hlayout = QHBoxLayout()
+        hlayout.addWidget(QLabel('Select the reference variable'))
+        hlayout.addWidget(self.var_box)
+        layout.addLayout(hlayout)
         option_panel.setLayout(layout)
         option_panel.destroyed.connect(self._select)
         return option_panel

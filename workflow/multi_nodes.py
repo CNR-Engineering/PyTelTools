@@ -130,8 +130,10 @@ class MultiLoadSerafinDialog(QDialog):
                     all_slfs = slfs.copy()
                 else:
                     all_slfs.intersection_update(slfs)
+            all_slfs = list(all_slfs)
             for slf in all_slfs:
                 self.file_box.addItem(slf)
+            self.file_box.setCurrentIndex(all_slfs.index(self.slf_name))
             self.success = True
 
         vlayout = QVBoxLayout()
@@ -423,7 +425,7 @@ class MultiSynchMaxNode(MultiOneInOneOutNode):
         self.label = 'SynchMax'
 
     def load(self, options):
-        self.options = (operations[0],)
+        self.options = (options[0],)
 
 
 class MultiSelectFirstFrameNode(MultiOneInOneOutNode):

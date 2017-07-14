@@ -732,6 +732,10 @@ class LoadSerafinDialog(QDialog):
                     slfs.add(f)
             for slf in slfs:
                 self.file_box.addItem(slf)
+            slfs = list(slfs)
+            for slf in slfs:
+                self.file_box.addItem(slf)
+            self.file_box.setCurrentIndex(slfs.index(self.slf_name))
             self.success = True
 
         vlayout = QVBoxLayout()
