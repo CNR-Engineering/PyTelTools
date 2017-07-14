@@ -416,6 +416,16 @@ class MultiComputeMeanNode(MultiOneInOneOutNode):
         self.label = 'Mean'
 
 
+class MultiSynchMaxNode(MultiOneInOneOutNode):
+    def __init__(self, index):
+        super().__init__(index)
+        self.category = 'Operators'
+        self.label = 'SynchMax'
+
+    def load(self, options):
+        self.options = (operations[0],)
+
+
 class MultiSelectFirstFrameNode(MultiOneInOneOutNode):
     def __init__(self, index):
         super().__init__(index)

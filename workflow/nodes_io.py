@@ -1,9 +1,9 @@
-from PyQt5.QtWidgets import *
-from PyQt5.QtCore import *
-import numpy as np
-
 import os
 import struct
+import numpy as np
+from PyQt5.QtWidgets import *
+from PyQt5.QtCore import *
+
 from workflow.Node import Node, SingleOutputNode, OneInOneOutNode, OutputOptionPanel
 from slf import Serafin
 from slf.interpolation import MeshInterpolator
@@ -119,16 +119,16 @@ class WriteSerafinNode(OneInOneOutNode):
 
     def _run_simple(self, input_data):
         output_header = input_data.default_output_header()
-        with Serafin.Read(input_data.filename, input_data.language) as resin:
-            resin.header = input_data.header
-            resin.time = input_data.time
-            with Serafin.Write(self.filename, input_data.language, True) as resout:
-                resout.write_header(output_header)
+        with Serafin.Read(input_data.filename, input_data.language) as input_stream:
+            input_stream.header = input_data.header
+            input_stream.time = input_data.time
+            with Serafin.Write(self.filename, input_data.language, True) as output_stream:
+                output_stream.write_header(output_header)
                 for i, time_index in enumerate(input_data.selected_time_indices):
                     values = do_calculations_in_frame(input_data.equations, input_data.us_equation,
-                                                      resin, time_index, input_data.selected_vars,
+                                                      input_stream, time_index, input_data.selected_vars,
                                                       output_header.np_float_type)
-                    resout.write_entire_frame(output_header, input_data.time[time_index], values)
+                    output_stream.write_entire_frame(output_header, input_data.time[time_index], values)
 
                     self.progress_bar.setValue(100 * (i+1) / len(input_data.selected_time_indices))
                     QApplication.processEvents()
@@ -183,11 +183,44 @@ class WriteSerafinNode(OneInOneOutNode):
             else:
                 values = np.vstack((scalar_calculator.finishing_up(), vector_calculator.finishing_up()))
 
-            with Serafin.Write(self.filename, input_data.language, True) as resout:
-                resout.write_header(output_header)
-                resout.write_entire_frame(output_header, input_data.time[0], values)
+            with Serafin.Write(self.filename, input_data.language, True) as output_stream:
+                output_stream.write_header(output_header)
+                output_stream.write_entire_frame(output_header, input_data.time[0], values)
         self.success('Output saved to {}.'.format(self.filename))
         return True
+
+    def _run_synch_max(self, input_data):
+        selected_vars = [var for var in input_data.selected_vars if var in input_data.header.var_IDs]
+        output_header = input_data.header.copy()
+        output_header.nb_var = len(selected_vars)
+        output_header.var_IDs, output_header.var_names, output_header.var_units = [], [], []
+        for var_ID in selected_vars:
+            var_name, var_unit = input_data.selected_vars_names[var_ID]
+            output_header.var_IDs.append(var_ID)
+            output_header.var_names.append(var_name)
+            output_header.var_units.append(var_unit)
+        if input_data.to_single:
+            output_header.to_single_precision()
+
+        nb_frames = len(input_data.selected_time_indicies)
+        with Serafin.Read(input_data.filename, input_data.language) as input_stream:
+            input_stream.header = input_data.header
+            input_stream.time = input_data.time
+
+            calculator = operations.SynchMaxCalculator(input_stream, selected_vars, input_data.selected_time_indicies,
+                                                       input_data.metadata['var'])
+
+            for i, time_index in enumerate(input_data.selected_time_indicies[1:]):
+                calculator.synch_max_in_frame(time_index)
+
+                self.progress_bar.setValue(100 * (i+1) / nb_frames)
+                QApplication.processEvents()
+
+            values = calculator.finishing_up()
+            with Serafin.Write(self.filename, input_data.language, True) as output_stream:
+                output_stream.write_header(output_header)
+                output_stream.write_entire_frame(output_header, input_data.time[0], values)
+        self.success('Output saved to {}.'.format(self.filename))
 
     def _run_arrival_duration(self, input_data):
         conditions, table, time_unit = input_data.metadata['conditions'], \
@@ -236,9 +269,9 @@ class WriteSerafinNode(OneInOneOutNode):
                 values *= 100 / (input_data.time[input_data.selected_time_indices[-1]]
                                  - input_data.time[input_data.selected_time_indices[0]])
 
-            with Serafin.Write(self.filename, input_data.language, True) as resout:
-                resout.write_header(output_header)
-                resout.write_entire_frame(output_header, input_data.time[0], values)
+            with Serafin.Write(self.filename, input_data.language, True) as output_stream:
+                output_stream.write_header(output_header)
+                output_stream.write_entire_frame(output_header, input_data.time[0], values)
         self.success('Output saved to {}.'.format(self.filename))
         return True
 
@@ -372,6 +405,8 @@ class WriteSerafinNode(OneInOneOutNode):
         elif input_data.operator in (operations.PROJECT, operations.DIFF, operations.REV_DIFF,
                                      operations.MAX_BETWEEN, operations.MIN_BETWEEN):
             success = self._run_project_mesh(input_data)
+        elif input_data.operator == operations.SYNCH_MAX:
+            success = self._run_synch_max(input_data)
         else:
             success = self._run_arrival_duration(input_data)
 

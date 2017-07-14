@@ -1,8 +1,8 @@
+from copy import deepcopy
+import datetime
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
-from copy import deepcopy
-import datetime
 
 from workflow.Node import Node, OneInOneOutNode, TwoInOneOutNode
 from gui.util import TableWidgetDragRows, SimpleTimeDateSelection,\
@@ -581,12 +581,8 @@ class SelectTimeNode(OneInOneOutNode):
         self.new_options = (start_index, end_index, sampling_frequency)
 
     def _reset(self):
-        if self.start_date is not None:
-            has_old = True
-        else:
-            has_old = False
         self.in_data = self.in_port.mother.parentItem().data
-        if has_old:
+        if self.start_date is not None:
             new_time = list(map(lambda x: x + self.in_data.start_time, self.in_data.time_second))
             if self.start_date in new_time:
                 self.start_index = new_time.index(self.start_date)
@@ -594,14 +590,22 @@ class SelectTimeNode(OneInOneOutNode):
             else:
                 self.start_index = -1
                 self.start_date = None
+                self.end_index = -1
+                self.end_date = None
                 self.state = Node.NOT_CONFIGURED
+                self.reconfigure_downward()
+                return
             if self.end_date in new_time:
                 self.end_index = new_time.index(self.end_date)
                 self.state = Node.READY
             else:
+                self.start_index = -1
+                self.start_date = None
                 self.end_index = -1
                 self.end_date = None
                 self.state = Node.NOT_CONFIGURED
+                self.reconfigure_downward()
+                return
         self.reconfigure_downward()
         self.update()
 
@@ -731,12 +735,8 @@ class SelectSingleFrameNode(OneInOneOutNode):
         self.new_option = int(self.slider.index.text()) - 1
 
     def _reset(self):
-        if self.date is not None:
-            has_old = True
-        else:
-            has_old = False
         self.in_data = self.in_port.mother.parentItem().data
-        if has_old:
+        if self.date is not None:
             new_time = list(map(lambda x: x + self.in_data.start_time, self.in_data.time_second))
             if self.date in new_time:
                 self.selection = new_time.index(self.date)
@@ -828,6 +828,130 @@ class SelectSingleFrameNode(OneInOneOutNode):
 
         self.data = input_data.copy()
         self.data.selected_time_indices = [self.selection]
+        self.success()
+
+
+class SynchMaxNode(OneInOneOutNode):
+    def __init__(self, index):
+        super().__init__(index)
+        self.category = 'Operators'
+        self.label = 'SynchMax'
+        self.out_port.data_type = 'slf'
+        self.in_port.data_type = 'slf'
+        self.in_data = None
+        self.data = None
+
+        self.var = ''
+        self.var_box = None
+        self.new_option = ''
+
+    def get_option_panel(self):
+        self.var_box = QComboBox()
+        available_vars = [var for var in self.in_data.selected_vars if var in self.in_data.header.var_IDs]
+        for var in available_vars:
+            self.var_box.addItem(var)
+        if self.var:
+            self.var_box.setCurrentIndex(available_vars.index(self.var))
+
+        option_panel = QWidget()
+        layout = QVBoxLayout()
+        layout.addSpacerItem(QSpacerItem(10, 10))
+        layout.addWidget(self.var_box)
+        option_panel.setLayout(layout)
+        option_panel.destroyed.connect(self._select)
+        return option_panel
+
+    def _select(self):
+        self.new_option = self.var_box.currentText()
+
+    def _reset(self):
+        self.in_data = self.in_port.mother.parentItem().data
+        if self.var:
+            available_vars = [var for var in self.in_data.selected_vars if var in self.in_data.header.var_IDs]
+            if self.var in available_vars:
+                self.state = Node.READY
+            else:
+                self.var = ''
+                self.state = Node.NOT_CONFIGURED
+        self.reconfigure_downward()
+        self.update()
+
+    def add_link(self, link):
+        super().add_link(link)
+        if not self.in_port.has_mother():
+            return
+
+        parent_node = self.in_port.mother.parentItem()
+        if parent_node.state != Node.SUCCESS:
+            if parent_node.ready_to_run():
+                parent_node.run()
+            if parent_node.state != Node.SUCCESS:
+                return
+        self._reset()
+
+    def reconfigure(self):
+        super().reconfigure()
+        if self.in_port.has_mother():
+            parent_node = self.in_port.mother.parentItem()
+            if parent_node.ready_to_run():
+                parent_node.run()
+                if parent_node.state == Node.SUCCESS:
+                    self._reset()
+                    return
+        self.in_data = None
+        self.state = Node.NOT_CONFIGURED
+        self.reconfigure_downward()
+        self.update()
+
+    def configure(self, check=None):
+        if not self.in_port.has_mother():
+            QMessageBox.critical(None, 'Error', 'Connect and run the input before configure this node!',
+                                 QMessageBox.Ok)
+            return
+
+        parent_node = self.in_port.mother.parentItem()
+        if parent_node.state != Node.SUCCESS:
+            if parent_node.ready_to_run():
+                parent_node.run()
+            else:
+                QMessageBox.critical(None, 'Error', 'Configure and run the input before configure this node!',
+                                     QMessageBox.Ok)
+                return
+            if parent_node.state != Node.SUCCESS:
+                QMessageBox.critical(None, 'Error', 'Configure and run the input before configure this node!',
+                                     QMessageBox.Ok)
+                return
+        self.in_data = parent_node.data
+        if self.state != Node.SUCCESS:
+            self._reset()
+        if super().configure():
+            self.var = self.new_option
+            self.reconfigure_downward()
+
+    def save(self):
+        return '|'.join([self.category, self.name(), str(self.index()),
+                         str(self.pos().x()), str(self.pos().y()), self.var])
+
+    def load(self, options):
+        self.var = options[0]
+
+    def run(self):
+        success = super().run_upward()
+        if not success:
+            self.fail('input failed.')
+            return
+        input_data = self.in_port.mother.parentItem().data
+        if input_data.operator is not None:
+            if input_data.operator == operations.SYNCH_MAX:
+                self.fail('the input data is already the result of SynchMax.')
+                return
+            else:
+                self.fail('the input data is already the result of another computation.')
+                return
+
+        self.data = input_data.copy()
+        self.data.operator = operations.SYNCH_MAX
+        self.data.metadata = {'var': self.var}
         self.success()
 
 
