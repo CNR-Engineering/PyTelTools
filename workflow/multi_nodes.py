@@ -1,7 +1,11 @@
 import os
+from datetime import datetime
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
-from workflow.MultiNode import MultiNode, MultiOneInOneOutNode, MultiSingleOutputNode
+from PyQt5.QtGui import *
+from workflow.MultiNode import MultiNode, MultiOneInOneOutNode, MultiSingleOutputNode, MultiDoubleInputNode
+import slf.variables as variables
+import slf.misc as operations
 
 
 class MultiLoadSerafinNode(MultiSingleOutputNode):
@@ -241,3 +245,262 @@ class MultiLoadSerafinDialog(QDialog):
             self.table.setItem(i, 0, name_item)
             self.table.setItem(i, 1, id_item)
         self.success = True
+
+
+class MultiConvertToSinglePrecisionNode(MultiOneInOneOutNode):
+    def __init__(self, index):
+        super().__init__(index)
+        self.category = 'Basic operations'
+        self.label = 'Convert to\nSingle\nPrecision'
+
+
+class MultiComputeMaxNode(MultiOneInOneOutNode):
+    def __init__(self, index):
+        super().__init__(index)
+        self.category = 'Operators'
+        self.label = 'Max'
+
+
+class MultiArrivalDurationNode(MultiOneInOneOutNode):
+    def __init__(self, index):
+        super().__init__(index)
+        self.category = 'Calculations'
+        self.label = 'Compute\nArrival\nDuration'
+
+    def load(self, options):
+        table = []
+        conditions = []
+        str_conditions, str_table, time_unit = options
+        str_table = str_table.split(',')
+        for i in range(int(len(str_table)/3)):
+            line = []
+            for j in range(3):
+                line.append(str_table[3*i+j])
+            table.append(line)
+        str_conditions = str_conditions.split(',')
+        for i, condition in zip(range(len(table)), str_conditions):
+            literal = table[i][0]
+            condition = condition.split()
+            expression = condition[:-2]
+            comparator = condition[-2]
+            threshold = float(condition[-1])
+            conditions.append(operations.Condition(expression, literal, comparator, threshold))
+        self.options = (table, conditions, time_unit)
+
+
+class MultiComputeVolumeNode(MultiDoubleInputNode):
+    def __init__(self, index):
+        super().__init__(index)
+        self.category = 'Calculations'
+        self.label = 'Compute\nVolume'
+
+    def load(self, options):
+        first, second, sup = options[0:3]
+        suffix = options[3]
+        in_source_folder = bool(int(options[4]))
+        dir_path = options[5]
+        double_name = bool(int(options[6]))
+        overwrite = bool(int(options[7]))
+        if first:
+            first_var = first
+        else:
+            self.state = MultiNode.NOT_CONFIGURED
+            return
+        if second:
+            second_var = second
+        else:
+            second_var = None
+        sup_volume = bool(int(sup))
+        if not in_source_folder:
+            if not os.path.exists(dir_path):
+                self.state = MultiNode.NOT_CONFIGURED
+                return
+        self.options = (first_var, second_var, sup_volume, suffix, in_source_folder, dir_path, double_name, overwrite)
+
+
+class MultiComputeFluxNode(MultiDoubleInputNode):
+    def __init__(self, index):
+        super().__init__(index)
+        self.category = 'Calculations'
+        self.label = 'Compute\nFlux'
+
+    def load(self, options):
+        flux_options = options[0]
+        if not flux_options:
+            self.state = MultiNode.NOT_CONFIGURED
+            return
+        suffix = options[1]
+        in_source_folder = bool(int(options[2]))
+        dir_path = options[3]
+        double_name = bool(int(options[4]))
+        overwrite = bool(int(options[5]))
+        if not in_source_folder:
+            if not os.path.exists(dir_path):
+                self.state = MultiNode.NOT_CONFIGURED
+                return
+        self.options = (flux_options, suffix, in_source_folder, dir_path, double_name, overwrite)
+
+
+class MultiInterpolateOnPointsNode(MultiDoubleInputNode):
+    def __init__(self, index):
+        super().__init__(index)
+        self.category = 'Calculations'
+        self.label = 'Interpolate\non\nPoints'
+
+    def load(self, options):
+        suffix = options[0]
+        in_source_folder = bool(int(options[1]))
+        dir_path = options[2]
+        double_name = bool(int(options[3]))
+        overwrite = bool(int(options[4]))
+        if not in_source_folder:
+            if not os.path.exists(dir_path):
+                self.state = MultiNode.NOT_CONFIGURED
+                return
+        self.options = (suffix, in_source_folder, dir_path, double_name, overwrite)
+
+
+class MultiInterpolateAlongLinesNode(MultiDoubleInputNode):
+    def __init__(self, index):
+        super().__init__(index)
+        self.category = 'Calculations'
+        self.label = 'Interpolate\nalong\nLines'
+
+    def load(self, options):
+        suffix = options[0]
+        in_source_folder = bool(int(options[1]))
+        dir_path = options[2]
+        double_name = bool(int(options[3]))
+        overwrite = bool(int(options[4]))
+        if not in_source_folder:
+            if not os.path.exists(dir_path):
+                self.state = MultiNode.NOT_CONFIGURED
+                return
+        self.options = (suffix, in_source_folder, dir_path, double_name, overwrite)
+
+
+class MultiProjectLinesNode(MultiDoubleInputNode):
+    def __init__(self, index):
+        super().__init__(index)
+        self.category = 'Calculations'
+        self.label = 'Project\nLines'
+
+    def load(self, options):
+        suffix = options[0]
+        in_source_folder = bool(int(options[1]))
+        dir_path = options[2]
+        double_name = bool(int(options[3]))
+        overwrite = bool(int(options[4]))
+        if not in_source_folder:
+            if not os.path.exists(dir_path):
+                self.state = MultiNode.NOT_CONFIGURED
+                return
+        reference_index = int(options[5])
+        if reference_index == -1:
+            self.state = MultiNode.NOT_CONFIGURED
+            return
+        self.options = (suffix, in_source_folder, dir_path, double_name, overwrite, reference_index)
+
+
+class MultiComputeMinNode(MultiOneInOneOutNode):
+    def __init__(self, index):
+        super().__init__(index)
+        self.category = 'Operators'
+        self.label = 'Min'
+
+
+class MultiComputeMeanNode(MultiOneInOneOutNode):
+    def __init__(self, index):
+        super().__init__(index)
+        self.category = 'Operators'
+        self.label = 'Mean'
+
+
+class MultiSelectFirstFrameNode(MultiOneInOneOutNode):
+    def __init__(self, index):
+        super().__init__(index)
+        self.category = 'Basic operations'
+        self.label = 'Select\nFirst\nFrame'
+
+
+class MultiSelectLastFrameNode(MultiOneInOneOutNode):
+    def __init__(self, index):
+        super().__init__(index)
+        self.category = 'Basic operations'
+        self.label = 'Select\nLast\nFrame'
+
+
+class MultiSelectTimeNode(MultiOneInOneOutNode):
+    def __init__(self, index):
+        super().__init__(index)
+        self.category = 'Basic operations'
+        self.label = 'Select\nTime'
+
+    def load(self, options):
+        str_start_date, str_end_date = options[0:2]
+        if not str_start_date:
+            self.state = MultiNode.NOT_CONFIGURED
+            return
+        start_date = datetime.strptime(str_start_date, '%Y/%m/%d %H:%M:%S')
+        end_date = datetime.strptime(str_end_date, '%Y/%m/%d %H:%M:%S')
+        sampling_frequency = int(options[2])
+        self.options = (start_date, end_date, sampling_frequency)
+
+
+class MultiSelectSingleFrameNode(MultiOneInOneOutNode):
+    def __init__(self, index):
+        super().__init__(index)
+        self.category = 'Basic operations'
+        self.label = 'Select\nSingle\nFrame'
+
+    def load(self, options):
+        str_date = options[0]
+        if not str_date:
+            self.state = MultiNode.NOT_CONFIGURED
+            return
+        self.options = (datetime.strptime(str_date, '%Y/%m/%d %H:%M:%S'),)
+
+
+class MultiSelectVariablesNode(MultiOneInOneOutNode):
+    def __init__(self, index):
+        super().__init__(index)
+        self.category = 'Basic operations'
+        self.label = 'Select\nVariables'
+
+    def load(self, options):
+        friction_law, vars, names, units = options
+        friction_law = int(friction_law)
+        if friction_law > -1:
+            us_equation = variables.get_US_equation(friction_law)
+        else:
+            us_equation = None
+
+        if not vars:
+            self.state = MultiNode.NOT_CONFIGURED
+            return
+
+        selected_vars = []
+        selected_vars_names = {}
+        for var, name, unit in zip(vars.split(','), names.split(','), units.split(',')):
+            selected_vars.append(var)
+            selected_vars_names[var] = (bytes(name, 'utf-8').ljust(16), bytes(unit, 'utf-8').ljust(16))
+        self.options = (us_equation, selected_vars, selected_vars_names)
+
+
+class MultiAddRouseNode(MultiOneInOneOutNode):
+    def __init__(self, index):
+        super().__init__(index)
+        self.category = 'Basic operations'
+        self.label = 'Add\nRouse'
+
+    def load(self, options):
+        values, str_table = options
+        str_table = str_table.split(',')
+        table = []
+        if not values:
+            self.state = MultiNode.NOT_CONFIGURED
+            return
+        for i in range(0, len(str_table), 3):
+            table.append([str_table[i], str_table[i+1], str_table[i+2]])
+        self.options = (table,)
+
