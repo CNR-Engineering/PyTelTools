@@ -288,14 +288,11 @@ class VolumeCalculator:
         """!
         Separate the major part of the computation, allowing a GUI override
         """
-        self.construct_triangles()
-        self.construct_weights()
         result = []
-
         for time_index in self.time_indices:
             i_result = [str(self.input_stream.time[time_index])]
-
             values = self.read_values_in_frame(time_index)
+
             for j in range(len(self.polygons)):
                 weight = self.weights[j]
                 volume = self.volume_in_frame_in_polygon(weight, values, self.polygons[j])

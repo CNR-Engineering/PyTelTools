@@ -417,11 +417,10 @@ def write_max_min_mean(input_data, filename):
             vector_calculator = operations.VectorMaxMinMeanCalculator(input_data.operator, input_stream,
                                                                       vectors, input_data.selected_time_indices,
                                                                       additional_equations)
-        for i, time_index in enumerate(input_data.selected_time_indices):
-            if has_scalar:
-                scalar_calculator.max_min_mean_in_frame(time_index)
-            if has_vector:
-                vector_calculator.max_min_mean_in_frame(time_index)
+        if has_scalar:
+            scalar_calculator.run()
+        if has_vector:
+            vector_calculator.run()
 
         if has_scalar and not has_vector:
             values = scalar_calculator.finishing_up()
@@ -462,9 +461,8 @@ def write_arrival_duration(input_data, filename):
         for i, condition in enumerate(conditions):
             calculators.append(operations.ArrivalDurationCalculator(input_stream, input_data.selected_time_indices,
                                                                     condition))
-        for i, index in enumerate(input_data.selected_time_indices[1:]):
-            for calculator in calculators:
-                calculator.arrival_duration_in_frame(index)
+        for calculator in calculators:
+            calculator.run()
 
         values = np.empty((2*len(conditions), input_data.header.nb_nodes))
         for i, calculator in enumerate(calculators):
@@ -558,19 +556,9 @@ def compute_volume(node_id, fid, data, aux_data, options, csv_separator):
 
         csv_data = CSVData(data.filename, calculator.get_csv_header())
 
-        for i, time_index in enumerate(calculator.time_indices):
-            i_result = [str(calculator.input_stream.time[time_index])]
-            values = calculator.read_values_in_frame(time_index)
-
-            for j in range(len(calculator.polygons)):
-                weight = calculator.weights[j]
-                volume = calculator.volume_in_frame_in_polygon(weight, values, calculator.polygons[j])
-                if calculator.volume_type == VolumeCalculator.POSITIVE:
-                    for v in volume:
-                        i_result.append('%.6f' % v)
-                else:
-                    i_result.append('%.6f' % volume)
-            csv_data.add_row(i_result)
+        result = calculator.run()
+        for row in result:
+            csv_data.add_row(row)
 
     csv_data.write(filename, csv_separator)
     return True, node_id, fid, csv_data, success_message('Compute Volume', data.job_id)
@@ -643,17 +631,9 @@ def compute_flux(node_id, fid, data, aux_data, options, csv_separator):
         calculator.construct_intersections()
 
         csv_data = CSVData(data.filename, ['time'] + section_names)
-        for i, time_index in enumerate(calculator.time_indices):
-            i_result = [str(calculator.input_stream.time[time_index])]
-            values = []
-            for var_ID in calculator.var_IDs:
-                values.append(calculator.input_stream.read_var_in_frame(time_index, var_ID))
-
-            for j in range(len(calculator.sections)):
-                intersections = calculator.intersections[j]
-                flux = calculator.flux_in_frame(intersections, values)
-                i_result.append('%.6f' % flux)
-            csv_data.add_row(i_result)
+        result = calculator.run()
+        for row in result:
+            csv_data.add_row(row)
 
     csv_data.write(filename, csv_separator)
     return True, node_id, fid, csv_data, success_message('Compute Flux', data.job_id)

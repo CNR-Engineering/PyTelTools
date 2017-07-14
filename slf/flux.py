@@ -239,10 +239,7 @@ class FluxCalculator:
         """!
         Separate the major part of the computation, allowing a GUI override
         """
-        self.construct_triangles()
-        self.construct_intersections()
         result = []
-
         for time_index in self.time_indices:
             i_result = [str(self.input_stream.time[time_index])]
             values = []
@@ -261,7 +258,6 @@ class FluxCalculator:
         for name in self.section_names:
             output_stream.write(';')
             output_stream.write(name)
-
         output_stream.write('\n')
 
         for line in result:
