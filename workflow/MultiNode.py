@@ -91,6 +91,7 @@ class MultiNode(QGraphicsItem):
         self.nb_success = 0
         self.nb_fail = 0
         self.double_input = False
+        self.two_in_one_out = False
         self.ports = []
         self.options = tuple()
 
@@ -299,7 +300,7 @@ class MultiDoubleInputNode(MultiNode):
         self.second_in_port = MultiInputPort(1, -MultiPort.WIDTH, 3*Box.HEIGHT/4-MultiPort.WIDTH/2)
         self.add_port(self.first_in_port)
         self.add_port(self.second_in_port)
-        self.expected_input = (0, 0)
+        self.expected_input = (0, 1)
         self.double_input = True
         self.auxiliary_data = None
 
@@ -308,3 +309,24 @@ class MultiDoubleInputNode(MultiNode):
 
     def set_auxiliary_data(self, data):
         self.auxiliary_data = data
+
+
+class MultiTwoInOneOutNode(MultiNode):
+    def __init__(self, index):
+        super().__init__(index)
+        self.first_in_port = MultiInputPort(0, -MultiPort.WIDTH, Box.HEIGHT/4-MultiPort.WIDTH/2)
+        self.second_in_port = MultiInputPort(1, -MultiPort.WIDTH, 3*Box.HEIGHT/4-MultiPort.WIDTH/2)
+        self.out_port = MultiOutputPort(2, Box.WIDTH/2-MultiPort.WIDTH/2, Box.HEIGHT)
+        self.add_port(self.first_in_port)
+        self.add_port(self.second_in_port)
+        self.add_port(self.out_port)
+        self.expected_input = (0, 0)
+        self.two_in_one_out = True
+        self.first_ids = []  # information about coupled multi-input streams
+        self.second_ids = []
+
+    def update_input(self, nb_input):
+        self.expected_input = (nb_input, nb_input)
+
+
+

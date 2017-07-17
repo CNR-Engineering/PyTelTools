@@ -3,7 +3,8 @@ from datetime import datetime
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
-from workflow.MultiNode import MultiNode, MultiOneInOneOutNode, MultiSingleOutputNode, MultiDoubleInputNode
+from workflow.MultiNode import MultiNode, MultiOneInOneOutNode, \
+                               MultiSingleOutputNode, MultiDoubleInputNode, MultiTwoInOneOutNode
 import slf.variables as variables
 import slf.misc as operations
 
@@ -515,4 +516,39 @@ class MultiAddRouseNode(MultiOneInOneOutNode):
         for i in range(0, len(str_table), 3):
             table.append([str_table[i], str_table[i+1], str_table[i+2]])
         self.options = (table,)
+
+
+class MultiMinusNode(MultiTwoInOneOutNode):
+    def __init__(self, index):
+        super().__init__(index)
+        self.category = 'Operators'
+        self.label = 'A Minus B'
+
+
+class MultiReverseMinusNode(MultiTwoInOneOutNode):
+    def __init__(self, index):
+        super().__init__(index)
+        self.category = 'Operators'
+        self.label = 'B Minus A'
+
+
+class MultiProjectMeshNode(MultiTwoInOneOutNode):
+    def __init__(self, index):
+        super().__init__(index)
+        self.category = 'Operators'
+        self.label = 'Project B\non A'
+
+
+class MultiMaxBetweenNode(MultiTwoInOneOutNode):
+    def __init__(self, index):
+        super().__init__(index)
+        self.category = 'Operators'
+        self.label = 'Max(A,B)'
+
+
+class MultiMinBetweenNode(MultiTwoInOneOutNode):
+    def __init__(self, index):
+        super().__init__(index)
+        self.category = 'Operators'
+        self.label = 'Min(A,B)'
 

@@ -14,7 +14,9 @@ NODES = {'Input/Output': {'Load Serafin': MultiLoadSerafinNode, 'Write Serafin':
                               'Select Last Frame': MultiSelectLastFrameNode, 'Select Time': MultiSelectTimeNode,
                               'Select Single Frame': MultiSelectSingleFrameNode},
          'Operators': {'Max': MultiComputeMaxNode, 'Min': MultiComputeMinNode, 'Mean': MultiComputeMeanNode,
-                       'SynchMax': MultiSynchMaxNode},
+                       'Project B on A': MultiProjectMeshNode, 'A Minus B': MultiMinusNode,
+                       'B Minus A': MultiReverseMinusNode, 'Max(A,B)': MultiMaxBetweenNode,
+                       'Min(A,B)': MultiMinBetweenNode, 'SynchMax': MultiSynchMaxNode},
          'Calculations': {'Compute Arrival Duration': MultiArrivalDurationNode,
                           'Compute Volume': MultiComputeVolumeNode, 'Compute Flux': MultiComputeFluxNode,
                           'Interpolate on Points': MultiInterpolateOnPointsNode,
@@ -54,6 +56,7 @@ def topological_ordering(graph):
 def visit(graph, from_node):
     """!
     all reachable nodes from a given node in a graph (adjacency list including sink nodes)
+    in pre-order
     """
     stack = [from_node]
     visited = {node: False for node in graph.keys()}
@@ -61,9 +64,9 @@ def visit(graph, from_node):
         u = stack.pop()
         if not visited[u]:
             visited[u] = True
+            yield u
             for v in graph[u]:
                 stack.append(v)
-    return [u for u in graph.keys() if visited[u]]
 
 
 class MultiScene(QGraphicsScene):
@@ -192,12 +195,7 @@ class MultiScene(QGraphicsScene):
                         paths = split_line[3:3+nb_files]
                         job_ids = split_line[3+nb_files:]
                         self.inputs[node_index] = [paths, slf_name, job_ids]
-                        downstream_nodes = visit(self.adj_list, node_index)
-                        self.table.add_files(node_index, job_ids, downstream_nodes)
-                        self.nodes[node_index].state = MultiNode.READY
-                        for u in downstream_nodes:
-                            self.nodes[u].update_input(len(job_ids))
-
+                        self._handle_load_input(node_index)
                     self.update()
                     self.has_input = True
                     QApplication.processEvents()
@@ -208,28 +206,112 @@ class MultiScene(QGraphicsScene):
             self.table.reinit()
             return False
 
+    def _bifurcate(self, nodes):
+        for i in range(len(nodes)-1):
+            u_parent, u = nodes[i], nodes[i+1]
+            # catch the first two-in-one-out operator node u
+            if not self.nodes[u].two_in_one_out:
+                continue
+            # only bifurcate if the parent is the second-input of u
+            if self.nodes[u].first_in_port.mother.parentItem().index() == u_parent:
+                return u, []
+            # visit from u
+            downstream_nodes = [v for v in visit(self.adj_list, u)]
+            return u, downstream_nodes
+        return -1, []
+
     def _handle_add_input(self, node):
         success, options = node.configure(self.inputs[node.index()])
         if not success:
             return
 
+        self.has_input = False
+        old_options = self.inputs[node.index()]
         self.inputs[node.index()] = options
         job_ids = options[2]
-        downstream_nodes = visit(self.adj_list, node.index())
-        if node.index() not in self.table.input_columns:
-            self.table.add_files(node.index(), job_ids, downstream_nodes)
+        downstream_nodes = [u for u in visit(self.adj_list, node.index())]
+
+        # if the current input node is second-input to a two-in-one-out operator node
+        # all downstream nodes from that operator node do not receive input
+        bifurcation_point, nodes_to_ignore = self._bifurcate(downstream_nodes)
+        if nodes_to_ignore:
+            if self.nodes[bifurcation_point].expected_input[0] == 0:
+                QMessageBox.critical(None, 'Error', 'Configure the first input node first!', QMessageBox.Ok)
+                self.inputs[node.index()] = old_options
+                node.state = MultiNode.NOT_CONFIGURED
+                node.update()
+                return
+            if self.nodes[bifurcation_point].expected_input[0] != len(job_ids):
+                QMessageBox.critical(None, 'Error', 'The numbers of input files are not equal!', QMessageBox.Ok)
+                self.inputs[node.index()] = old_options
+                node.state = MultiNode.NOT_CONFIGURED
+                node.update()
+                return
+
+            # the actual downstream nodes are the one-in-one-out node between the input and the operator
+            downstream_nodes = [u for u in downstream_nodes if u not in nodes_to_ignore]
+
+            if node.index() not in self.table.input_columns:
+                self.table.add_files(node.index(), job_ids, downstream_nodes)
+            else:
+                self.table.update_files(node.index(), job_ids)
+            QApplication.processEvents()
+
+            self.nodes[bifurcation_point].second_ids = self.table.input_columns[node.index()]
+
+        elif bifurcation_point > -1:
+            if self.nodes[bifurcation_point].expected_input[1] != 0:
+                if len(job_ids) != self.nodes[bifurcation_point].expected_input[1]:
+                    QMessageBox.critical(None, 'Error', 'The numbers of input files are not equal!', QMessageBox.Ok)
+                    self.inputs[node.index()] = old_options
+                    node.state = MultiNode.NOT_CONFIGURED
+                    node.update()
+                    return
+
+            if node.index() not in self.table.input_columns:
+                self.table.add_files(node.index(), job_ids, downstream_nodes)
+            else:
+                self.table.update_files(node.index(), job_ids)
+            QApplication.processEvents()
+
+            self.nodes[bifurcation_point].first_ids = self.table.input_columns[node.index()]
+
         else:
-            self.table.update_files(node.index(), job_ids)
-        QApplication.processEvents()
+            if node.index() not in self.table.input_columns:
+                self.table.add_files(node.index(), job_ids, downstream_nodes)
+            else:
+                self.table.update_files(node.index(), job_ids)
+            QApplication.processEvents()
 
         for u in downstream_nodes:
-            u_node = self.nodes[u]
-            u_node.update_input(len(job_ids))
-            if u_node.state != MultiNode.NOT_CONFIGURED:
-                u_node.state = MultiNode.READY
+            self.nodes[u].update_input(len(job_ids))
 
         if all(self.inputs.values()):
             self.has_input = True
+            self.prepare_to_run()
+
+    def _handle_load_input(self, node_index):
+        options = self.inputs[node_index]
+        job_ids = options[2]
+        downstream_nodes = [u for u in visit(self.adj_list, node_index)]
+
+        bifurcation_point, nodes_to_ignore = self._bifurcate(downstream_nodes)
+        if nodes_to_ignore:
+            downstream_nodes = [u for u in downstream_nodes if u not in nodes_to_ignore]
+            self.table.add_files(node_index, job_ids, downstream_nodes)
+            self.nodes[bifurcation_point].second_ids = self.table.input_columns[node_index]
+
+        elif bifurcation_point > -1:
+            self.table.add_files(node_index, job_ids, downstream_nodes)
+            self.nodes[bifurcation_point].first_ids = self.table.input_columns[node_index]
+
+        else:
+            self.table.add_files(node_index, job_ids, downstream_nodes)
+        QApplication.processEvents()
+
+        for u in downstream_nodes:
+            self.nodes[u].update_input(len(job_ids))
+        self.nodes[node_index].state = MultiNode.READY
 
     def all_configured(self):
         for node in self.nodes.values():
@@ -242,6 +324,7 @@ class MultiScene(QGraphicsScene):
             node.state = MultiNode.READY
             node.nb_success = 0
             node.nb_fail = 0
+        self.table.reset()
         self.update()
 
 
@@ -283,6 +366,17 @@ class MultiTable(QTableWidget):
         self.setColumnCount(0)
         self.input_columns = {}
         self.yellow_nodes = {}
+
+    def reset(self):
+        for node_index, columns in self.input_columns.items():
+            yellow_nodes = self.yellow_nodes[node_index]
+            for j in columns:
+                for i in range(self.rowCount()):
+                    if self.row_to_node[i] in yellow_nodes:
+                        self.item(i, j).setBackground(self.yellow)
+                    else:
+                        self.item(i, j).setBackground(self.grey)
+        QApplication.processEvents()
 
     def update_rows(self, nodes, ordered_nodes):
         self.row_to_node = {i: ordered_nodes[i] for i in range(len(ordered_nodes))}
@@ -355,7 +449,7 @@ class MultiTable(QTableWidget):
                 else:
                     self.item(i, offset+j).setBackground(self.grey)
 
-    def get_result(self, success, node_id, fid):
+    def receive_result(self, success, node_id, fid):
         if success:
             self.item(self.node_to_row[node_id], fid).setBackground(self.green)
         else:
@@ -499,7 +593,7 @@ class MultiWidget(QWidget):
         nb_tasks -= 1
         self.message_box.appendPlainText(message)
         current_node = self.scene.nodes[node_id]
-        self.table.get_result(success, node_id, fid)
+        self.table.receive_result(success, node_id, fid)
 
         # enqueue tasks from child nodes
         if success:
