@@ -324,6 +324,7 @@ class MultiTwoInOneOutNode(MultiNode):
         self.two_in_one_out = True
         self.first_ids = []  # information about coupled multi-input streams
         self.second_ids = []
+        self.pending_data = {}
 
     def update_input(self, nb_input):
         self.expected_input = (nb_input, nb_input)

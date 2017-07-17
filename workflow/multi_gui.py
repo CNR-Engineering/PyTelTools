@@ -55,8 +55,8 @@ def topological_ordering(graph):
 
 def visit(graph, from_node):
     """!
-    all reachable nodes from a given node in a graph (adjacency list including sink nodes)
-    in pre-order
+    generates all reachable nodes in DFS pre-ordering
+    from a given node in a graph (adjacency list including orphan nodes)
     """
     stack = [from_node]
     visited = {node: False for node in graph.keys()}
@@ -324,6 +324,8 @@ class MultiScene(QGraphicsScene):
             node.state = MultiNode.READY
             node.nb_success = 0
             node.nb_fail = 0
+            if node.two_in_one_out:
+                node.pending_data = {}
         self.table.reset()
         self.update()
 
@@ -587,6 +589,28 @@ class MultiWidget(QWidget):
             self.worker.start()
         return len(slf_tasks)
 
+    def _get_double_input_task(self, fun, node, node_id, fid, data):
+        if fid in node.first_ids:
+            pair_index = node.first_ids.index(fid)
+            second_id = node.second_ids[pair_index]
+            if second_id in node.pending_data:
+                self.worker.task_queue.put((fun, (node_id, fid,
+                                                  data, node.pending_data[second_id], node.options)))
+                return True
+            else:
+                node.pending_data[fid] = data
+                return False
+        else:
+            pair_index = node.second_ids.index(fid)
+            first_id = node.first_ids[pair_index]
+            if first_id in node.pending_data:
+                self.worker.task_queue.put((fun, (node_id, first_id,
+                                                  node.pending_data[first_id], data, node.options)))
+                return True
+            else:
+                node.pending_data[fid] = data
+                return False
+
     def _listen(self, nb_tasks, csv_separator):
         # get one task result
         success, node_id, fid, data, message = self.worker.done_queue.get()
@@ -606,9 +630,14 @@ class MultiWidget(QWidget):
                 if next_node.double_input:
                     self.worker.task_queue.put((fun, (next_node_id, fid, data, next_node.auxiliary_data,
                                                       next_node.options, csv_separator)))
+                    nb_tasks += 1
+                elif next_node.two_in_one_out:
+                    new_task_available = self._get_double_input_task(fun, next_node, next_node_id, fid, data)
+                    if new_task_available:
+                        nb_tasks += 1
                 else:
                     self.worker.task_queue.put((fun, (next_node_id, fid, data, next_node.options)))
-                nb_tasks += 1
+                    nb_tasks += 1
         else:
             current_node.nb_fail += 1
 

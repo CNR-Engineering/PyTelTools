@@ -48,14 +48,17 @@ def worker(input_queue, output_queue):
         output_queue.put(result)
 
 
-def success_message(node_name, job_id, info=''):
-    return '== %s - SUCCESS == %s (%s)%s.' % (datetime.now().strftime('%Y-%m-%d %H:%M:%S'), node_name, job_id,
-                                              ': %s.' % info if info else '')
+def success_message(node_name, job_id, info='', second_job_id=''):
+    return '== %s - SUCCESS == %s (%s%s)%s' % (datetime.now().strftime('%Y-%m-%d %H:%M:%S'), node_name, job_id,
+                                               ' AND %s' % second_job_id if second_job_id else '',
+                                               ': %s.' % info if info else '')
 
 
-def fail_message(reason, node_name, job_id):
-    return '== %s - FAIL == %s (%s): %s.' % \
-          (datetime.now().strftime('%Y-%m-%d %H:%M:%S'), node_name, job_id, reason)
+def fail_message(reason, node_name, job_id, second_job_id=''):
+    return '== %s - FAIL == %s (%s%s): %s.' % \
+          (datetime.now().strftime('%Y-%m-%d %H:%M:%S'), node_name, job_id,
+           ' AND %s' % second_job_id if second_job_id else '',
+           reason)
 
 
 def read_slf(node_id, fid, filename, language, job_id):
@@ -381,9 +384,13 @@ def write_slf(node_id, fid, data, options):
     elif data.operator == operations.SYNCH_MAX:
         success, message = write_synch_max(data, filename)
     else:
-        success, message = True, success_message('Write Serafin', data.job_id)
+        success, message = write_project_mesh(data, filename)
 
-    return success, node_id, fid, data, message
+    new_data = None
+    if success:
+        new_data = SerafinData(data.job_id, filename, data.language)
+        new_data.read()
+    return success, node_id, fid, new_data, message
 
 
 def write_simple_slf(input_data, filename):
@@ -528,6 +535,89 @@ def write_arrival_duration(input_data, filename):
             resout.write_entire_frame(output_header, input_data.time[0], values)
 
     return True, success_message('Write Serafin', input_data.job_id)
+
+
+def write_project_mesh(first_input, filename):
+    operation_type = first_input.operator
+    second_input = first_input.metadata['operand']
+
+    if second_input.filename == filename:
+        return False, fail_message('cannot overwrite to the input file', 'Write Serafin',
+                                   first_input.job_id, second_input.job_id)
+
+    # common vars
+    first_vars = [var for var in first_input.header.var_IDs if var in first_input.selected_vars]
+    second_vars = [var for var in second_input.header.var_IDs if var in second_input.selected_vars]
+    common_vars = []
+    for var in first_vars:
+        if var in second_vars:
+            common_vars.append(var)
+    if not common_vars:
+        return False, fail_message('the two input files do not share common variables', 'Write Serafin',
+                                   first_input.job_id, second_input.job_id)
+
+    # common frames
+    first_frames = [first_input.start_time + first_input.time_second[i]
+                    for i in first_input.selected_time_indices]
+    second_frames = [second_input.start_time + second_input.time_second[i]
+                     for i in second_input.selected_time_indices]
+    common_frames = []
+    for first_index, first_frame in zip(first_input.selected_time_indices, first_frames):
+        for second_index, second_frame in zip(second_input.selected_time_indices, second_frames):
+            if first_frame == second_frame:
+                common_frames.append((first_index, second_index))
+    if not common_frames:
+        return False, fail_message('the two input files do not share common frames', 'Write Serafin',
+                                   first_input.job_id, second_input.job_id)
+
+    # construct output header
+    output_header = first_input.header.copy()
+    output_header.nb_var = len(common_vars)
+    output_header.var_IDs, output_header.var_names, output_header.var_units = [], [], []
+    for var in common_vars:
+        name, unit = first_input.selected_vars_names[var]
+        output_header.var_IDs.append(var)
+        output_header.var_names.append(name)
+        output_header.var_units.append(unit)
+    if first_input.to_single:
+        output_header.to_single_precision()
+
+    # map points of A onto mesh B
+    mesh = MeshInterpolator(second_input.header, False)
+
+    if second_input.has_index:
+        mesh.index = second_input.index
+        mesh.triangles = second_input.triangles
+    else:
+        construct_mesh(mesh)
+        second_input.has_index = True
+        second_input.index = mesh.index
+        second_input.triangles = mesh.triangles
+
+    is_inside, point_interpolators = mesh.get_point_interpolators(list(zip(first_input.header.x,
+                                                                           first_input.header.y)))
+    # run the calculator
+    with Serafin.Read(first_input.filename, first_input.language) as first_in:
+        first_in.header = first_input.header
+        first_in.time = first_input.time
+
+        with Serafin.Read(second_input.filename, second_input.language) as second_in:
+            second_in.header = second_input.header
+            second_in.time = second_input.time
+
+            calculator = operations.ProjectMeshCalculator(first_in, second_in, common_vars, is_inside,
+                                                          point_interpolators, common_frames, operation_type)
+
+            with Serafin.Write(filename, first_input.language, True) as out_stream:
+                out_stream.write_header(output_header)
+
+                calculator.run(out_stream, output_header)
+
+    message = success_message('Write Serafin', first_input.job_id,
+                              'The mesh A has {} / {} nodes inside the mesh B'.format(sum(is_inside),
+                                                                                      first_input.header.nb_nodes),
+                              second_input.job_id)
+    return True, message
 
 
 def construct_mesh(mesh):
@@ -956,6 +1046,56 @@ def project_lines(node_id, fid, data, aux_data, options, csv_separator):
                                                          's intersect' if nb_nonempty > 1 else ' intersects'))
 
 
+def project_mesh(node_id, fid, data, second_data, options):
+    if data.operator is not None:
+        return False, node_id, fid, None, fail_message('duplicated operator', 'Project B on A',
+                                                       data.job_id, second_job_id=second_data.job_id)
+    new_data = data.copy()
+    new_data.operator = operations.PROJECT
+    new_data.metadata = {'operand': second_data.copy()}
+    return True, node_id, fid, new_data, success_message('Project B on A', data.job_id, second_job_id=second_data.job_id)
+
+
+def minus(node_id, fid, data, second_data, options):
+    if data.operator is not None:
+        return False, node_id, fid, None, fail_message('duplicated operator', 'A Minus B',
+                                                       data.job_id, second_job_id=second_data.job_id)
+    new_data = data.copy()
+    new_data.operator = operations.DIFF
+    new_data.metadata = {'operand': second_data.copy()}
+    return True, node_id, fid, new_data, success_message('A Minus B', data.job_id, second_job_id=second_data.job_id)
+
+
+def reverse_minus(node_id, fid, data, second_data, options):
+    if data.operator is not None:
+        return False, node_id, fid, None, fail_message('duplicated operator', 'B Minus A',
+                                                       data.job_id, second_job_id=second_data.job_id)
+    new_data = data.copy()
+    new_data.operator = operations.REV_DIFF
+    new_data.metadata = {'operand': second_data.copy()}
+    return True, node_id, fid, new_data, success_message('B Minus A', data.job_id, second_job_id=second_data.job_id)
+
+
+def max_between(node_id, fid, data, second_data, options):
+    if data.operator is not None:
+        return False, node_id, fid, None, fail_message('duplicated operator', 'Max(A,B)',
+                                                       data.job_id, second_job_id=second_data.job_id)
+    new_data = data.copy()
+    new_data.operator = operations.MAX_BETWEEN
+    new_data.metadata = {'operand': second_data.copy()}
+    return True, node_id, fid, new_data, success_message('Max(A,B)', data.job_id, second_job_id=second_data.job_id)
+
+
+def min_between(node_id, fid, data, second_data, options):
+    if data.operator is not None:
+        return False, node_id, fid, None, fail_message('duplicated operator', 'Min(A,B)',
+                                                       data.job_id, second_job_id=second_data.job_id)
+    new_data = data.copy()
+    new_data.operator = operations.MIN_BETWEEN
+    new_data.metadata = {'operand': second_data.copy()}
+    return True, node_id, fid, new_data, success_message('Min(A,B)', data.job_id, second_job_id=second_data.job_id)
+
+
 FUNCTIONS = {'Select Variables': select_variables, 'Add Rouse': add_rouse, 'Select Time': select_time,
              'Select Single Frame': select_single_frame,
              'Select First Frame': select_first_frame, 'Select Last Frame': select_last_frame,
@@ -964,6 +1104,8 @@ FUNCTIONS = {'Select Variables': select_variables, 'Add Rouse': add_rouse, 'Sele
              'Load 2D Polygons': read_polygons, 'Load 2D Open Polylines': read_polylines, 'Load 2D Points': read_points,
              'Write Serafin': write_slf, 'Compute Volume': compute_volume, 'Compute Flux': compute_flux,
              'Interpolate on Points': interpolate_points, 'Interpolate along Lines': interpolate_lines,
-             'Project Lines': project_lines}
+             'Project Lines': project_lines, 'Project B on A': project_mesh, 'A Minus B': minus,
+             'B Minus A': reverse_minus, 'Max(A,B)': max_between,
+             'Min(A,B)': min_between}
 
 
