@@ -964,8 +964,8 @@ class ConditionDialog(QDialog):
             self.comparatorBox.addItem(comparator)
         self.comparatorBox.setFixedSize(50, 30)
 
-        self.threashold = QLineEdit()
-        self.threashold.setFixedSize(150, 30)
+        self.threshold = QLineEdit()
+        self.threshold.setFixedSize(150, 30)
 
         self.condition = ([], '', '', 0.0)
 
@@ -993,7 +993,7 @@ class ConditionDialog(QDialog):
         glayout.addWidget(QLabel('Threshold'), 1, 3, Qt.AlignHCenter)
         glayout.addWidget(self.expressionBox, 2, 1)
         glayout.addWidget(self.comparatorBox, 2, 2)
-        glayout.addWidget(self.threashold, 2, 3)
+        glayout.addWidget(self.threshold, 2, 3)
         glayout.setVerticalSpacing(12)
         glayout.setRowStretch(0, 1)
         mainLayout.addLayout(glayout)
@@ -1009,18 +1009,7 @@ class ConditionDialog(QDialog):
         return operations.infix_to_postfix(infix)
 
     def _validateExpression(self, expression):
-        for item in expression:
-            if item[0] == '[':  # variable ID
-                if item[1:-1] not in self.var_IDs:
-                    return False
-            elif item in operations.OPERATORS:
-                continue
-            else:  # is number
-                try:
-                    _ = float(item)
-                except ValueError:
-                    return False
-        return operations.is_valid_postfix(expression)
+        return operations.is_valid_expression(expression, self.var_IDs) and operations.is_valid_postfix(expression)
 
     def addButtonEvent(self):
         var_ID = self.varBox.currentText().split(' (')[0]
@@ -1032,20 +1021,18 @@ class ConditionDialog(QDialog):
     def checkCondition(self):
         literal_expression = self.expressionBox.toPlainText()
         comparator = self.comparatorBox.currentText()
-        threshold = self.threashold.text()
+        threshold = self.threshold.text()
         self.condition = ([], '', '', 0.0)
 
         try:
             threshold = float(threshold)
         except ValueError:
-            QMessageBox.critical(self, 'Error', 'The threshold is not a number!',
-                                 QMessageBox.Ok)
+            QMessageBox.critical(None, 'Error', 'The threshold is not a number!', QMessageBox.Ok)
             return
         expression = self._processExpression(literal_expression)
 
         if not self._validateExpression(expression):
-            QMessageBox.critical(self, 'Error', 'Invalid expression.',
-                                 QMessageBox.Ok)
+            QMessageBox.critical(None, 'Error', 'Invalid expression.', QMessageBox.Ok)
             return
         self.condition = operations.Condition(expression, literal_expression, comparator, threshold)
         self.accept()

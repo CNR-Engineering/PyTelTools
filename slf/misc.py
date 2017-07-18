@@ -16,8 +16,8 @@ OPERATORS = ['+', '-', '*', '/', '^', 'sqrt', 'sin', 'cos', 'atan']
 MAX, MIN, MEAN, ARRIVAL_DURATION, \
           PROJECT, DIFF, REV_DIFF, MAX_BETWEEN, MIN_BETWEEN, SYNCH_MAX = 0, 1, 2, 3, 4, 5, 6, 7, 8, 9
 
-_OPERATIONS = {'+': np.add, '-': np.subtract, '*': np.multiply, '/': np.divide, '^': np.power, 'sqrt': np.sqrt,
-               'sin': np.sin, 'cos': np.cos, 'atan': np.arctan}
+_OPERATIONS = {'+': np.add, '-': np.subtract, '*': np.multiply, '/': np.divide, '^': np.power,
+               'sqrt': np.sqrt, 'sin': np.sin, 'cos': np.cos, 'atan': np.arctan}
 _PRECEDENCE = {'(': 1, '-': 2, '+': 2, '*': 3, '/': 3, '^': 4, 'sqrt': 5, 'sin': 5, 'cos': 5, 'atan': 5}
 
 _VECTORS = {'U': ('V', 'M'), 'V': ('U', 'M'), 'QSX': ('QSY', 'QS'), 'QSY': ('QSX', 'QS'),
@@ -115,6 +115,21 @@ def infix_to_postfix(expression):
     return post
 
 
+def is_valid_expression(expression, var_IDs):
+    for item in expression:
+        if item[0] == '[':  # variable ID
+            if item[1:-1] not in var_IDs:
+                return False
+        elif item in OPERATORS:
+            continue
+        else:  # is number
+            try:
+                _ = float(item)
+            except ValueError:
+                return False
+    return True
+
+
 def is_valid_postfix(expression):
     """!
     Is my postfix expression valid?
@@ -149,7 +164,6 @@ def evaluate_expression(input_stream, time_index, expression):
     @param <list> expression: the expression to evaluate in postfix format
     @return <numpy.1D-array>: the value of the expression
     """
-    nb_nodes = input_stream.header.nb_nodes
     stack = []
 
     for symbol in expression:
@@ -165,7 +179,7 @@ def evaluate_expression(input_stream, time_index, expression):
             if symbol[0] == '[':  # variable ID
                 stack.append(input_stream.read_var_in_frame(time_index, symbol[1:-1]))
             else:  # constant
-                stack.append(np.ones((nb_nodes,)) * float(symbol))
+                stack.append(float(symbol))
 
     return stack.pop()
 
@@ -237,7 +251,6 @@ class ScalarMaxMinMeanCalculator:
     """!
     Compute max/min/mean of scalar variables from a .slf input stream
     """
-
     def __init__(self, max_min_type, input_stream, selected_scalars, time_indices, additional_equations=None):
         self.maxmin = max_min_type
         self.input_stream = input_stream
@@ -303,7 +316,6 @@ class VectorMaxMinMeanCalculator:
     """!
     Compute max/min/mean of vector variables from a .slf input stream
     """
-
     def __init__(self, max_min_type, input_stream, selected_vectors, time_indices, additional_equations):
         self.maxmin = max_min_type
         self.input_stream = input_stream
@@ -384,15 +396,7 @@ class ArrivalDurationCalculator:
         self.input_stream = input_stream
         self.time_indices = time_indices
         self.expression = condition.expression
-
-        if condition.comparator == '>':
-            self.test_condition = lambda value: value > condition.threshold
-        elif condition.comparator == '<':
-            self.test_condition = lambda value: value < condition.threshold
-        elif condition.comparator == '>=':
-            self.test_condition = lambda value: value >= condition.threshold
-        else:
-            self.test_condition = lambda value: value <= condition.threshold
+        self.test_condition = condition.test_condition
 
         # first
         self.previous_time = self.input_stream.time[self.time_indices[0]]
@@ -444,7 +448,16 @@ class Condition:
         self.literal_expression = literal_expression
         self.comparator = comparator
         self.threshold = threshold
-
+        
+        if self.comparator == '>':
+            self.test_condition = lambda value: value > self.threshold
+        elif self.comparator == '<':
+            self.test_condition = lambda value: value < self.threshold
+        elif self.comparator == '>=':
+            self.test_condition = lambda value: value >= self.threshold
+        else:
+            self.test_condition = lambda value: value <= self.threshold
+            
     def __repr__(self):
         return ' '.join(self.expression) + ' %s %s' % (self.comparator, str(self.threshold))
 
@@ -562,4 +575,184 @@ class SynchMaxCalculator:
     def run(self):
         for time_index in self.time_indices[1:]:
             self.synch_max_in_frame(time_index)
+
+
+class ComplexExpressionPool:
+    def __init__(self):
+        self.vars = []
+        self.var_names = []
+        self.id_pool = []
+        self.expressions = {}
+        self.nb_expressions = 0
+        self.condition_pool = ComplexConditionPool()
+        self.dependency_graph = {}
+
+    def clear(self):
+        self.expressions = {}
+        self.nb_expressions = 0
+
+    def init(self, variables, names):
+        self.clear()
+        self.condition_pool.clear()
+        self.vars = ['COORDX', 'COORDY'] + variables
+        self.var_names = ['X coordinate', 'Y coordinate'] + names
+        self.id_pool = self.vars[:]
+        self.dependency_graph = {var: set() for var in self.vars}  # a DAG
+
+    def add_simple_expression(self, literal_expression):
+        infix = to_infix(literal_expression)
+        postfix = infix_to_postfix(infix)
+        if not self.is_valid(postfix):
+            return False
+
+        self.nb_expressions += 1
+        new_expression = ComplexExpression(self.nb_expressions, postfix, literal_expression)
+        self.expressions[self.nb_expressions] = new_expression
+        new_id = new_expression.code()
+        self.id_pool.append(new_id)
+
+        self.dependency_graph[new_id] = set()
+        for item in postfix:
+            if item[0] == '[':
+                var_id = item[1:-1]
+                self.dependency_graph[new_id].add(var_id)
+        return True
+
+    def add_conditional_expression(self, condition, true_expression, false_expression):
+        self.nb_expressions += 1
+        new_expression = ConditionalExpression(self.nb_expressions, condition, true_expression, false_expression)
+        self.expressions[self.nb_expressions] = new_expression
+        new_id = new_expression.code()
+        self.id_pool.append(new_id)
+        self.dependency_graph[new_id] = {condition.code(), true_expression.code(), false_expression.code()}
+
+    def add_max_min_expression(self, first_expression, second_expression, is_max):
+        self.nb_expressions += 1
+        new_expression = MaxMinExpression(self.nb_expressions, first_expression, second_expression, is_max)
+        self.expressions[self.nb_expressions] = new_expression
+        new_id = new_expression.code()
+        self.id_pool.append(new_id)
+        self.dependency_graph[new_id] = {first_expression.code(), second_expression.code()}
+
+    def add_condition(self, expression, comparator, threshold):
+        new_condition = self.condition_pool.add_condition(expression, comparator, threshold)
+        new_id = new_condition.code()
+        self.dependency_graph[new_id] = {expression.code()}
+
+    def get_expression(self, str_expression):
+        index = int(str_expression.split(':')[0][1:])
+        return self.expressions[index]
+
+    def get_condition(self, str_condition):
+        index = int(str_condition.split(':')[0][1:])
+        return self.condition_pool.conditions[index]
+
+    def is_valid(self, postfix):
+        return is_valid_expression(postfix, self.id_pool) and is_valid_postfix(postfix)
+
+    def get_dependence(self, expression_code):
+        # BFS in a DAG
+        dependence = [expression_code]
+        queue = [expression_code]
+        while queue:
+            current_node = queue.pop(0)
+            parents = self.dependency_graph[current_node]
+            for p in parents:
+                if parents not in dependence:
+                    dependence.append(p)
+                    queue.append(p)
+        dependence.reverse()
+        return dependence
+
+
+class ComplexExpression:
+    """!
+    expression object in an expression pool
+    """
+    def __init__(self, index, postfix, literal_expression):
+        self.index = index
+        self.expression = postfix
+        self.tight_expression = tighten_expression(literal_expression)
+
+    def __str__(self):
+        return 'E%d: %s' % (self.index, self.tight_expression)
+
+    def code(self):
+        return 'E%d' % self.index
+
+
+class ConditionalExpression:
+    def __init__(self, index, condition, true_expression, false_expression):
+        self.index = index
+        self.condition = condition
+        self.true_expression = true_expression
+        self.false_expression = false_expression
+
+    def __str__(self):
+        return 'E%d: IF (%s) THEN (%s) ELSE (%s)' % (self.index, self.condition.text,
+                                                     self.true_expression.tight_expression,
+                                                     self.false_expression.tight_expression)
+
+    def code(self):
+        return 'E%d' % self.index
+
+
+class MaxMinExpression:
+    def __init__(self, index, first_expression, second_expression, is_max):
+        self.index = index
+        self.first_expression = first_expression
+        self.second_expression = second_expression
+        self.is_max = is_max
+
+    def __str__(self):
+        return 'E%d: %s(%s, %s)' % (self.index, 'MAX' if self.is_max else 'MIN',
+                                    self.first_expression.tight_expression, self.second_expression.tight_expression)
+
+    def code(self):
+        return 'E%d' % self.index
+
+
+class ComplexConditionPool:
+    """!
+    condition container
+    """
+    def __init__(self):
+        self.nb_conditions = 0
+        self.conditions = {}
+
+    def add_condition(self, expression, comparator, threshold):
+        self.nb_conditions += 1
+        new_condition = ComplexCondition(self.nb_conditions, expression, comparator, threshold)
+        self.conditions[self.nb_conditions] = new_condition
+        return new_condition
+
+    def clear(self):
+        self.nb_conditions = 0
+        self.conditions = {}
+
+
+class ComplexCondition:
+    """!
+    condition object enable conditional expressions
+    """
+    def __init__(self, index, expression, comparator, threshold):
+        self.index = index
+        self.expression = expression
+        self.str_ = 'C%d: %s %s %s' % (self.index, self.expression.tight_expression, comparator, str(threshold))
+        self.text = '%s %s %s' % (self.expression.tight_expression, comparator, str(threshold))
+
+        if comparator == '>':
+            self.evaluate = lambda value: value > threshold
+        elif comparator == '<':
+            self.evaluate = lambda value: value < threshold
+        elif comparator == '>=':
+            self.evaluate = lambda value: value >= threshold
+        else:
+            self.evaluate = lambda value: value <= threshold
+
+    def __str__(self):
+        return self.str_
+
+    def code(self):
+        return 'C%d' % self.index
 

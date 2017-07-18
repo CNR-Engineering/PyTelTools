@@ -14,6 +14,7 @@ from gui.ComputeFluxGUI import ComputeFluxGUI
 from gui.ProjectMeshGUI import ProjectMeshGUI
 from gui.ConfigTransformation import TransformationMap
 from gui.GeometryConverterGUI import FileConverterGUI
+from gui.CalculatorGUI import CalculatorGUI
 
 
 class MainPanel(QWidget):
@@ -31,6 +32,7 @@ class MainPanel(QWidget):
 
         trans = TransformationMap()
         conv = FileConverterGUI(parent)
+        calc = CalculatorGUI(parent)
 
         self.stackLayout = QStackedLayout()
         self.stackLayout.addWidget(QLabel('Hello! This is the start page (TODO)'))
@@ -45,6 +47,7 @@ class MainPanel(QWidget):
         self.stackLayout.addWidget(compare)
         self.stackLayout.addWidget(trans)
         self.stackLayout.addWidget(conv)
+        self.stackLayout.addWidget(calc)
         self.setLayout(self.stackLayout)
 
         self.stackLayout.currentChanged.connect(parent.autoResize)
@@ -61,7 +64,7 @@ class MyMainWindow(QWidget):
         for name in ['Start', 'Extract variables', 'Max/Min/Mean/Arrival/Duration', 'Interpolate on points',
                      'Interpolate along lines', 'Project along lines', 'Project mesh',
                      'Compute volume', 'Compute flux', 'Compare two results',
-                     'Transform coordinate systems', 'Convert geom file formats']:
+                     'Transform coordinate systems', 'Convert geom file formats', 'Variable Calculator']:
             pageList.addItem('\n' + name + '\n')
         pageList.setFlow(QListView.TopToBottom)
         pageList.currentRowChanged.connect(self.panel.layout().setCurrentIndex)
