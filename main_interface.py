@@ -2,6 +2,7 @@ import sys
 
 from PyQt5.QtWidgets import *
 from gui.MainWindow import MyMainWindow as GUIWindow
+from workflow.interface import ProjectWelcome
 
 
 class HelloWorld(QDialog):
@@ -9,7 +10,7 @@ class HelloWorld(QDialog):
         super().__init__()
         self.choice = None
         left_button = QPushButton('Classic\nInterface')
-        right_button = QPushButton('Workflow\nInterface\n(Not available)')
+        right_button = QPushButton('Workflow\nInterface')
         for bt in [left_button, right_button]:
             bt.setFixedSize(150, 200)
 
@@ -38,10 +39,10 @@ if __name__ == '__main__':
     if value == QDialog.Accepted:
         if dlg.choice == 1:
             widget = GUIWindow()
+            widget.showMaximized()
         else:
-            QMessageBox.critical(None, 'Error', 'Not available.', QMessageBox.Ok)
-            sys.exit(0)
-        widget.showMaximized()
+            widget = ProjectWelcome()
+            widget.show()
     else:
         sys.exit(0)
     app.exec_()
