@@ -3,6 +3,7 @@ import logging
 import datetime
 import numpy as np
 import pandas as pd
+import struct
 
 from PyQt5.QtWidgets import *
 from PyQt5.QtGui import *
@@ -332,7 +333,6 @@ class InputTab(QWidget):
             # record the time series
             resin.get_time()
 
-
             # record the mesh for future visualization and calculations
             self.parent.inDialog()
             meshLoader = LoadMeshDialog('flux', resin.header)
@@ -373,13 +373,12 @@ class InputTab(QWidget):
                 for poly in f.get_open_polylines():
                     self.polylines.append(poly)
         else:
-            shape_type = Shapefile.get_shape_type(filename)
-            if shape_type != 3:
-                QMessageBox.critical(self, 'Error', 'This shape format is not supported.',
-                                     QMessageBox.Ok)
+            try:
+                for poly in Shapefile.get_open_polylines(filename):
+                    self.polylines.append(poly)
+            except struct.error:
+                QMessageBox.critical(self, 'Error', 'Inconsistent bytes.', QMessageBox.Ok)
                 return
-            for poly in Shapefile.get_open_polylines(filename):
-                self.polylines.append(poly)
         if not self.polylines:
             QMessageBox.critical(self, 'Error', 'The file does not contain any open polyline.',
                                  QMessageBox.Ok)

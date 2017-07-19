@@ -5,6 +5,7 @@ from PyQt5.QtCore import *
 
 from slf import Serafin
 import slf.misc as op
+from geom import Shapefile
 from gui.util import testOpen, TelToolWidget
 
 
@@ -14,25 +15,40 @@ class VariableList(QListWidget):
         self.pool = pool
         for var, var_name in zip(pool.vars, pool.var_names):
             self.addItem('%s (%s)' % (var, var_name))
+        for i in range(1, pool.nb_masks+1):
+            self.addItem(pool.masks[i].code())
         for i in range(1, pool.nb_expressions+1):
-            self.addItem(str(pool.expressions[i]))
+            expr = pool.expressions[i]
+            if not expr.masked:
+                self.addItem(str(expr))
         self.setMaximumWidth(250)
         self.editor = editor
         self.old_format = self.editor.currentCharFormat()
         self.editor.cursorPositionChanged.connect(lambda: self.editor.setCurrentCharFormat(self.old_format))
 
+        self.blue = '#554DF7'
+        self.green = '#006400'
+        self.red = '#CC0066'
+
+    def colorful_text(self, text, color):
+        self.editor.insertHtml("<span style=\" font-size:8pt; font-weight:600; color:%s;\" "
+                               ">[%s]</span>" % (color, text))
+        self.editor.setCurrentCharFormat(self.old_format)
+
     def mouseDoubleClickEvent(self, *args, **kwargs):
         var = self.currentItem().text()
         if var:
-            if '(' in var:
+            if '(' in var and var.split(' (')[0] in self.pool.vars:  # variable
                 var = var.split(' (')[0]
-                self.editor.insertHtml("<span style=\" font-size:8pt; font-weight:600; color:#554DF7;\" "
-                                       ">[%s]</span>" % var)
-            else:
-                var = var.split(': ')[0]
-                self.editor.insertHtml("<span style=\" font-size:8pt; font-weight:600; color:#006400;\" "
-                                       ">[%s]</span>" % var)
-            self.editor.setCurrentCharFormat(self.old_format)
+                self.colorful_text(var, self.blue)
+            elif var[:4] == 'POLY':  # mask value
+                self.colorful_text(var, self.red)
+            else:  # expression
+                expr = self.pool.get_expression(var)
+                if expr.polygonal:
+                    self.colorful_text(expr.code(), self.red)
+                else:
+                    self.colorful_text(expr.code(), self.green)
             self.clearSelection()
 
 
@@ -45,6 +61,7 @@ class ExpressionDialog(QDialog):
         self.stack.addWidget(self.build_second_page())
         self.stack.addWidget(self.build_third_page())
         self.stack.addWidget(self.build_fourth_page())
+        self.stack.addWidget(self.build_fifth_page())
         self.setLayout(self.stack)
         self.setWindowTitle('Add expression')
 
@@ -56,15 +73,20 @@ class ExpressionDialog(QDialog):
         self.simple_button.setChecked(True)
         self.condition_button = QRadioButton('Conditional expression\nUse existing conditions and expressions'
                                              'to create a conditional expression. Example: IF (B > 0) THEN (B) ELSE (0)')
-        max_min_button = QRadioButton('Max/Min between two expressions\nUse two existing expressions and'
-                                      'MAX or MIN to create a new expression. Example: MAX(B, RB+0.5)')
+        self.max_min_button = QRadioButton('Max/Min between two expressions\nUse two existing expressions and'
+                                           'MAX or MIN to create a new expression. Example: MAX(B, RB+0.5)')
+        self.masked_button = QRadioButton('Masked expression\nUse an expression containing polygonal values '
+                                          'and a non-polygonal expression\nto create a masked expression. '
+                                          'Example: IF (POLY1) THEN (B+POLY1) ELSE (B)')
 
-        self.condition_button.setEnabled(self.pool.nb_expressions > 1 and self.pool.condition_pool.nb_conditions > 0)
-        max_min_button.setEnabled(self.pool.nb_expressions > 1)
+        self.condition_button.setEnabled(self.pool.ready_for_conditional_expression())
+        self.max_min_button.setEnabled(self.pool.ready_for_max_min_expression())
+        self.masked_button.setEnabled(self.pool.ready_for_masked_expression())
         vlayout = QVBoxLayout()
         vlayout.addWidget(self.simple_button)
         vlayout.addWidget(self.condition_button)
-        vlayout.addWidget(max_min_button)
+        vlayout.addWidget(self.max_min_button)
+        vlayout.addWidget(self.masked_button)
         expression_type_box.setLayout(vlayout)
         next_button = QPushButton('Next')
         cancel_button = QPushButton('Cancel')
@@ -126,6 +148,8 @@ class ExpressionDialog(QDialog):
 
     def build_third_page(self):
         third_page = QWidget()
+        if not self.condition_button.isEnabled():
+            return third_page
         self.condition_box = QComboBox()
         self.true_box = QComboBox()
         self.false_box = QComboBox()
@@ -138,9 +162,11 @@ class ExpressionDialog(QDialog):
             box.setFixedHeight(30)
             box.setMaximumWidth(250)
         for i in range(1, self.pool.nb_expressions+1):
-            expr = str(self.pool.expressions[i])
-            self.true_box.addItem(expr)
-            self.false_box.addItem(expr)
+            expr = self.pool.expressions[i]
+            if expr.masked:
+                continue
+            self.true_box.addItem(str(expr))
+            self.false_box.addItem(str(expr))
         for i in range(1, self.pool.condition_pool.nb_conditions+1):
             self.condition_box.addItem(str(self.pool.condition_pool.conditions[i]))
         vlayout = QVBoxLayout()
@@ -168,6 +194,8 @@ class ExpressionDialog(QDialog):
 
     def build_fourth_page(self):
         fourth_page = QWidget()
+        if not self.max_min_button.isEnabled():
+            return fourth_page
         self.max_min_box = QComboBox()
         self.max_min_box.addItem('MAX')
         self.max_min_box.addItem('MIN')
@@ -181,11 +209,13 @@ class ExpressionDialog(QDialog):
         for box in (self.first_box, self.second_box):
             box.setFixedHeight(30)
             box.setMaximumWidth(250)
-        self.max_min_box.setFixedSize(50, 30)
+        self.max_min_box.setFixedSize(100, 30)
         for i in range(1, self.pool.nb_expressions+1):
-            expr = str(self.pool.expressions[i])
-            self.first_box.addItem(expr)
-            self.second_box.addItem(expr)
+            expr = self.pool.expressions[i]
+            if expr.masked:
+                continue
+            self.first_box.addItem(str(expr))
+            self.second_box.addItem(str(expr))
         vlayout = QVBoxLayout()
         glayout = QGridLayout()
         glayout.addWidget(QLabel('Condition'), 1, 1, Qt.AlignHCenter)
@@ -209,38 +239,127 @@ class ExpressionDialog(QDialog):
         cancel_button.clicked.connect(self.reject)
         return fourth_page
 
+    def build_fifth_page(self):
+        fifth_page = QWidget()
+        if not self.masked_button.isEnabled():
+            return fifth_page
+        self.poly_box = QComboBox()
+        self.inside_box = QComboBox()
+        self.outside_box = QComboBox()
+        ok_button = QPushButton('OK')
+        cancel_button = QPushButton('Cancel')
+        for bt in (ok_button, cancel_button):
+            bt.setMaximumWidth(200)
+            bt.setFixedHeight(30)
+        for box in (self.poly_box, self.inside_box, self.outside_box):
+            box.setFixedHeight(30)
+            box.setMaximumWidth(250)
+        for i in range(1, self.pool.nb_masks+1):
+            mask = self.pool.masks[i]
+            if mask.nb_children > 0:
+                self.poly_box.addItem(mask.code())
+        for i in range(1, self.pool.nb_expressions+1):
+            expr = self.pool.expressions[i]
+            if not expr.polygonal:
+                self.outside_box.addItem(str(expr))
+        self.update_inside_mask(self.poly_box.currentText())
+        self.poly_box.currentTextChanged.connect(self.update_inside_mask)
+        vlayout = QVBoxLayout()
+        glayout = QGridLayout()
+        glayout.addWidget(QLabel('Mask'), 1, 1, Qt.AlignHCenter)
+        glayout.addWidget(QLabel('Inside'), 1, 2, Qt.AlignHCenter)
+        glayout.addWidget(QLabel('Outside'), 1, 3, Qt.AlignHCenter)
+        glayout.addWidget(self.poly_box, 2, 1)
+        glayout.addWidget(self.inside_box, 2, 2)
+        glayout.addWidget(self.outside_box, 2, 3)
+        glayout.setVerticalSpacing(12)
+        glayout.setRowStretch(0, 1)
+        vlayout.addLayout(glayout)
+        vlayout.addStretch()
+        hlayout = QHBoxLayout()
+        hlayout.addStretch()
+        hlayout.addWidget(ok_button)
+        hlayout.addWidget(cancel_button)
+        vlayout.addLayout(hlayout)
+        fifth_page.setLayout(vlayout)
+
+        ok_button.clicked.connect(self.check)
+        cancel_button.clicked.connect(self.reject)
+        return fifth_page
+
+    def update_inside_mask(self, current_mask):
+        mask = self.pool.get_mask(current_mask)
+        self.inside_box.clear()
+        for child_code in mask.children:
+            expr = self.pool.get_expression(child_code)
+            self.inside_box.addItem(str(expr))
+
     def turn_page(self):
         if self.simple_button.isChecked():
             self.stack.setCurrentIndex(1)
         elif self.condition_button.isChecked():
             self.stack.setCurrentIndex(2)
-        else:
+        elif self.max_min_button.isChecked():
             self.stack.setCurrentIndex(3)
+        else:
+            self.stack.setCurrentIndex(4)
+
+    def polygonal_success_message(self):
+        QMessageBox.information(None, 'Polygonal expression created',
+                                'You just created an expression containing polygon values.\n'
+                                'To use it, click "Add Expression" then choose "Masked expression"\n'
+                                '(You will also need at least one non-polygonal expression).',
+                                QMessageBox.Ok)
+
+    def polygonal_fail_message(self):
+        QMessageBox.critical(None, 'Error', 'One expression can only use only one polygonal mask!',
+                             QMessageBox.Ok)
 
     def check(self):
-        if self.stack.currentIndex() == 1:
+        current_page = self.stack.currentIndex()
+        if current_page == 1:
             literal_expression = self.expression_text.toPlainText()
-            success = self.pool.add_simple_expression(literal_expression)
-            if not success:
+            success_code = self.pool.add_simple_expression(literal_expression)
+            if success_code == -1:
                 QMessageBox.critical(None, 'Error', 'Invalid expression.', QMessageBox.Ok)
                 return
-        elif self.stack.currentIndex() == 2:
+            elif success_code == -2:
+                self.polygonal_fail_message()
+                return
+            elif success_code == 1:
+                self.polygonal_success_message()
+
+        elif current_page == 2:
             str_true, str_false = self.true_box.currentText(), self.false_box.currentText()
             if str_true == str_false:
                 QMessageBox.critical(None, 'Error', 'The True/False expressions cannot be identical!', QMessageBox.Ok)
                 return
             str_cond = self.condition_box.currentText()
-            self.pool.add_conditional_expression(self.pool.get_condition(str_cond),
-                                                 self.pool.get_expression(str_true),
-                                                 self.pool.get_expression(str_false))
-        else:
+            success_code = self.pool.add_conditional_expression(self.pool.get_condition(str_cond),
+                                                                self.pool.get_expression(str_true),
+                                                                self.pool.get_expression(str_false))
+            if success_code == -2:
+                self.polygonal_fail_message()
+                return
+            elif success_code == 1:
+                self.polygonal_success_message()
+        elif current_page == 3:
             is_max = self.max_min_box.currentText() == 'MAX'
             str_first, str_second = self.first_box.currentText(), self.second_box.currentText()
             if str_first == str_second:
                 QMessageBox.critical(None, 'Error', 'The two expressions cannot be identical!', QMessageBox.Ok)
                 return
-            self.pool.add_max_min_expression(self.pool.get_expression(str_first),
-                                             self.pool.get_expression(str_second), is_max)
+            success_code = self.pool.add_max_min_expression(self.pool.get_expression(str_first),
+                                                            self.pool.get_expression(str_second), is_max)
+            if success_code == -2:
+                self.polygonal_fail_message()
+                return
+            elif success_code == 1:
+                self.polygonal_success_message()
+        else:
+            str_inside, str_outside = self.inside_box.currentText(), self.outside_box.currentText()
+            self.pool.add_masked_expression(self.pool.get_expression(str_inside),
+                                            self.pool.get_expression(str_outside))
         self.accept()
 
 
@@ -259,7 +378,10 @@ class ConditionDialog(QDialog):
         self.expression_box.setMaximumWidth(250)
 
         for i in range(1, expr_pool.nb_expressions+1):
-            self.expression_box.addItem(str(expr_pool.expressions[i]))
+            expr = expr_pool.expressions[i]
+            if expr.masked:
+                continue
+            self.expression_box.addItem(str(expr))
 
         self.comparator_box = QComboBox()
         for comparator in ['>', '<', '>=', '<=']:
@@ -298,6 +420,29 @@ class ConditionDialog(QDialog):
         self.accept()
 
 
+class AttributeDialog(QDialog):
+    def __init__(self, items):
+        super().__init__()
+        self.attribute_box = QComboBox()
+        for item in items:
+            self.attribute_box.addItem(item)
+        self.attribute_box.setFixedHeight(30)
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel,
+                                   Qt.Horizontal, self)
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+
+        hlayout = QHBoxLayout()
+        hlayout.addWidget(QLabel('Attribute'))
+        hlayout.addWidget(self.attribute_box)
+        vlayout = QVBoxLayout()
+        vlayout.addLayout(hlayout)
+        vlayout.addStretch()
+        vlayout.addWidget(buttons)
+        self.setLayout(vlayout)
+        self.setWindowTitle('Select the attribute corresponding to the polygonal mask value')
+
+
 class InputTab(QWidget):
     def __init__(self, parent):
         super().__init__()
@@ -306,30 +451,24 @@ class InputTab(QWidget):
         self.filename = None
         self.language = None
 
-        # some attributes to store the input file info
         self.header = None
         self.time = []
 
         self._initWidgets()
         self._setLayout()
         self.btnOpen.clicked.connect(self.btnOpenEvent)
+        self.polygon_button.clicked.connect(self.polygon_event)
 
     def _initWidgets(self):
-        # create the button open
         self.btnOpen = QPushButton('Open', self, icon=self.style().standardIcon(QStyle.SP_DialogOpenButton))
         self.btnOpen.setToolTip('<b>Open</b> a .slf file')
         self.btnOpen.setFixedSize(105, 50)
-
-        # create some text fields displaying the IO files info
         self.inNameBox = QLineEdit()
         self.inNameBox.setReadOnly(True)
         self.inNameBox.setFixedHeight(30)
-
         self.summaryTextBox = QPlainTextEdit()
         self.summaryTextBox.setFixedHeight(50)
         self.summaryTextBox.setReadOnly(True)
-
-        # create a checkbox for language selection
         self.langBox = QGroupBox('Input language')
         hlayout = QHBoxLayout()
         self.frenchButton = QRadioButton('French')
@@ -338,6 +477,25 @@ class InputTab(QWidget):
         self.langBox.setLayout(hlayout)
         self.langBox.setMaximumHeight(80)
         self.frenchButton.setChecked(True)
+
+        self.polygon_box = QGroupBox('Add Polygonal Masks (optional)')
+        self.polygon_box.setStyleSheet('QGroupBox {font-size: 12px;font-weight: bold;}')
+        self.polygon_button = QPushButton('Open\npolygons', self, icon=self.style().standardIcon(QStyle.SP_DialogOpenButton))
+        self.polygon_button.setToolTip('<b>Open</b> a .shp file')
+        self.polygon_button.setFixedSize(105, 50)
+        self.polygon_table = QTableWidget()
+        self.polygon_table.setColumnCount(3)
+        self.polygon_table.setHorizontalHeaderLabels(['ID', 'Value', 'File'])
+        vh = self.polygon_table.verticalHeader()
+        vh.setSectionResizeMode(QHeaderView.Fixed)
+        vh.setDefaultSectionSize(25)
+        self.polygon_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.polygon_table.setMaximumHeight(400)
+        hlayout = QHBoxLayout()
+        hlayout.addWidget(self.polygon_button)
+        hlayout.addWidget(self.polygon_table)
+        self.polygon_box.setLayout(hlayout)
+        self.polygon_box.setEnabled(False)
 
     def _setLayout(self):
         mainLayout = QVBoxLayout()
@@ -360,6 +518,8 @@ class InputTab(QWidget):
         glayout.setAlignment(Qt.AlignLeft)
         glayout.setSpacing(10)
         mainLayout.addLayout(glayout)
+        mainLayout.addItem(QSpacerItem(10, 10))
+        mainLayout.addWidget(self.polygon_box)
         mainLayout.addStretch()
         self.setLayout(mainLayout)
 
@@ -371,6 +531,8 @@ class InputTab(QWidget):
             self.language = 'en'
         else:
             self.language = 'fr'
+        self.polygon_table.setRowCount(0)
+        self.polygon_box.setEnabled(False)
         self.parent.reset()
 
     def btnOpenEvent(self):
@@ -397,7 +559,46 @@ class InputTab(QWidget):
             resin.get_time()
             self.header = resin.header.copy()
             self.time = resin.time[:]
+        self.polygon_box.setEnabled(True)
         self.parent.get_input()
+
+    def polygon_event(self):
+        filename, _ = QFileDialog.getOpenFileName(self, 'Open a .shp file', '', 'Polygon file (*.shp)',
+                                                  options=QFileDialog.Options() | QFileDialog.DontUseNativeDialog)
+        if not filename:
+            return
+        if not testOpen(filename):
+            return
+
+        polygons = []
+        try:
+            for polygon in Shapefile.get_polygons(filename):
+                polygons.append(polygon)
+        except struct.error:
+            QMessageBox.critical(self, 'Error', 'Inconsistent bytes.', QMessageBox.Ok)
+            return
+        if not self.polygons:
+            QMessageBox.critical(self, 'Error', 'The file does not contain any polygon.',
+                                 QMessageBox.Ok)
+            return
+        items = ['%d - %s' % (index, name) for (index, name) in Shapefile.get_numeric_attribute_names(filename)]
+        if not items:
+            QMessageBox.critical(self, 'Error', 'The polygons do not have numeric attributes.',
+                                 QMessageBox.Ok)
+            return
+        dlg = AttributeDialog(items)
+        if dlg.exec_() != QDialog.Accepted:
+            return
+        attribute_index, attribute_name = dlg.attribute_box.currentText().split(' - ')
+        attribute_index = int(attribute_index)
+
+        row = self.polygon_table.rowCount()
+        self.polygon_table.insertRow(row)
+        self.polygon_table.setItem(row, 0, QTableWidgetItem('POLY%d' % (row+1)))
+        self.polygon_table.setItem(row, 1, QTableWidgetItem(attribute_name))
+        self.polygon_table.setItem(row, 2, QTableWidgetItem(filename))
+
+        self.parent.editor_tab.pool.add_polygonal_mask(polygons, attribute_index)
 
 
 class EditorTab(QWidget):
@@ -419,8 +620,9 @@ class EditorTab(QWidget):
 
         self.condition_list = QListWidget()
         self.condition_list.setMaximumWidth(400)
+        self.condition_list.setMinimumWidth(250)
         self.expression_list = QListWidget()
-        self.expression_list.setMaximumWidth(400)
+        self.expression_list.setMinimumWidth(250)
 
         hlayout = QHBoxLayout()
         vlayout = QVBoxLayout()
@@ -452,7 +654,8 @@ class EditorTab(QWidget):
 
     def get_input(self):
         self.pool.init(self.input.header.var_IDs,
-                       list(map(lambda x: x.decode('utf-8').strip(), self.input.header.var_names)))
+                       list(map(lambda x: x.decode('utf-8').strip(), self.input.header.var_names)),
+                       self.input.header.x, self.input.header.y)
 
     def add_expression(self):
         dlg = ExpressionDialog(self.pool)
@@ -497,7 +700,6 @@ class CalculatorGUI(TelToolWidget):
     def get_input(self):
         self.tab.setTabEnabled(1, True)
         self.editor_tab.get_input()
-
 
 
 def exception_hook(exctype, value, traceback):

@@ -1,6 +1,7 @@
 import sys
 import logging
 import datetime
+import struct
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 import pandas as pd
@@ -446,13 +447,12 @@ class InputTab(QWidget):
                 for poly in f.get_polygons():
                     self.polygons.append(poly)
         else:
-            shape_type = Shapefile.get_shape_type(filename)
-            if shape_type != 5:
-                QMessageBox.critical(self, 'Error', 'This shape format is not supported.',
-                                     QMessageBox.Ok)
+            try:
+                for polygon in Shapefile.get_polygons(filename):
+                    self.polygons.append(polygon)
+            except struct.error:
+                QMessageBox.critical(self, 'Error', 'Inconsistent bytes.', QMessageBox.Ok)
                 return
-            for polygon in Shapefile.get_polygons(filename):
-                self.polygons.append(polygon)
         if not self.polygons:
             QMessageBox.critical(self, 'Error', 'The file does not contain any polygon.',
                                  QMessageBox.Ok)

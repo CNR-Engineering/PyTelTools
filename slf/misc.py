@@ -6,6 +6,7 @@ import numpy as np
 import logging
 import re
 import shapefile
+from shapely.geometry import Point
 from slf import Serafin
 from slf.variables import get_available_variables, get_necessary_equations, do_calculation
 
@@ -584,29 +585,43 @@ class ComplexExpressionPool:
         self.id_pool = []
         self.expressions = {}
         self.nb_expressions = 0
+        self.nb_masks = 0
+        self.masks = {}
         self.condition_pool = ComplexConditionPool()
         self.dependency_graph = {}
+        self.x = None
+        self.y = None
 
     def clear(self):
         self.expressions = {}
         self.nb_expressions = 0
+        self.nb_masks = 0
+        self.masks = {}
+        self.x = None
+        self.y = None
 
-    def init(self, variables, names):
+    def init(self, variables, names, x, y):
         self.clear()
         self.condition_pool.clear()
+        self.x = x
+        self.y = y
         self.vars = ['COORDX', 'COORDY'] + variables
         self.var_names = ['X coordinate', 'Y coordinate'] + names
         self.id_pool = self.vars[:]
         self.dependency_graph = {var: set() for var in self.vars}  # a DAG
 
+    def points(self):
+        for i, (x, y) in enumerate(zip(self.x, self.y)):
+            yield i, Point(x, y)
+
     def add_simple_expression(self, literal_expression):
         infix = to_infix(literal_expression)
         postfix = infix_to_postfix(infix)
         if not self.is_valid(postfix):
-            return False
+            return -1
 
         self.nb_expressions += 1
-        new_expression = ComplexExpression(self.nb_expressions, postfix, literal_expression)
+        new_expression = SimpleExpression(self.nb_expressions, postfix, literal_expression)
         self.expressions[self.nb_expressions] = new_expression
         new_id = new_expression.code()
         self.id_pool.append(new_id)
@@ -615,29 +630,121 @@ class ComplexExpressionPool:
         for item in postfix:
             if item[0] == '[':
                 var_id = item[1:-1]
+                if var_id[:4] == 'POLY':
+                    if not new_expression.polygonal:
+                        new_expression.polygonal = True
+                        new_expression.mask_id = int(var_id[4:])
+                    elif int(var_id[4:]) != new_expression.mask_id:
+                        del self.dependency_graph[new_id]
+                        del self.expressions[self.nb_expressions]
+                        self.id_pool.pop()
+                        self.nb_expressions -= 1
+                        return -2
+                elif var_id not in self.vars:  # expression
+                    expr = self.expressions[int(var_id[1:])]
+                    if expr.polygonal:
+                        mask_id = expr.mask_id
+                        if not new_expression.polygonal:
+                            new_expression.polygonal = True
+                            new_expression.mask_id = mask_id
+                        elif mask_id != new_expression.mask_id:
+                            del self.dependency_graph[new_id]
+                            del self.expressions[self.nb_expressions]
+                            self.id_pool.pop()
+                            self.nb_expressions -= 1
+                            return -2
                 self.dependency_graph[new_id].add(var_id)
-        return True
+        if new_expression.polygonal:
+            self.masks[new_expression.mask_id].add_child(new_expression)
+            return 1
+        return 0
 
     def add_conditional_expression(self, condition, true_expression, false_expression):
+        polygonal, mask_id = False, 0
+        if condition.polygonal:
+            polygonal = True
+            mask_id = condition.mask_id
+        if true_expression.polygonal:
+            if polygonal:
+                if mask_id != true_expression.mask_id:
+                    return -2
+            else:
+                polygonal = True
+                mask_id = true_expression.mask_id
+        if false_expression.polygonal:
+            if polygonal:
+                if mask_id != false_expression.mask_id:
+                    return -2
+            else:
+                polygonal = True
+                mask_id = false_expression.mask_id
+
         self.nb_expressions += 1
         new_expression = ConditionalExpression(self.nb_expressions, condition, true_expression, false_expression)
         self.expressions[self.nb_expressions] = new_expression
         new_id = new_expression.code()
         self.id_pool.append(new_id)
         self.dependency_graph[new_id] = {condition.code(), true_expression.code(), false_expression.code()}
+        if polygonal:
+            new_expression.mask_id = mask_id
+            new_expression.polygonal = True
+            self.masks[mask_id].add_child(new_expression)
+            return 1
+        return 0
 
     def add_max_min_expression(self, first_expression, second_expression, is_max):
+        first_mask, second_mask, polygonal = 0, 0, False
+        if first_expression.polygonal:
+            first_mask = first_expression.mask_id
+        if second_expression.polygonal:
+            second_mask = second_expression.mask_id
+        if first_mask > 0 and second_mask > 0:
+            if first_mask != second_mask:
+                return -2
+        elif first_mask > 0 or second_mask > 0:
+            polygonal = True
+
         self.nb_expressions += 1
         new_expression = MaxMinExpression(self.nb_expressions, first_expression, second_expression, is_max)
         self.expressions[self.nb_expressions] = new_expression
         new_id = new_expression.code()
         self.id_pool.append(new_id)
         self.dependency_graph[new_id] = {first_expression.code(), second_expression.code()}
+        new_expression.polygonal = polygonal
+        if polygonal:
+            new_expression.mask_id = max(first_mask, second_mask)
+            self.masks[new_expression.mask_id].add_child(new_expression)
+            return 1
+        return 0
+
+    def add_masked_expression(self, inside_expression, outside_expression):
+        # masked expressions are not added as children of the mask!
+        self.nb_expressions += 1
+        new_expression = MaskedExpression(self.nb_expressions, inside_expression, outside_expression)
+        self.expressions[self.nb_expressions] = new_expression
+        new_id = new_expression.code()
+        self.id_pool.append(new_id)
+        self.dependency_graph[new_id] = {inside_expression.code(), outside_expression.code()}
 
     def add_condition(self, expression, comparator, threshold):
         new_condition = self.condition_pool.add_condition(expression, comparator, threshold)
         new_id = new_condition.code()
         self.dependency_graph[new_id] = {expression.code()}
+
+    def add_polygonal_mask(self, polygons, attribute_index):
+        self.nb_masks += 1
+        new_id = 'POLY%d' % self.nb_masks
+        self.id_pool.append(new_id)
+        self.dependency_graph[new_id] = set()
+        mask = np.zeros_like(self.x)
+        for index, poly in enumerate(polygons):
+            for i, point in self.points():
+                if poly.contains(point):
+                    mask[i] = index+1
+        values = {}
+        for index, poly in enumerate(polygons):
+            values[index+1] = poly.attributes()[attribute_index]
+        self.masks[self.nb_masks] = PolygonalMask(self.nb_masks, mask, values)
 
     def get_expression(self, str_expression):
         index = int(str_expression.split(':')[0][1:])
@@ -646,6 +753,85 @@ class ComplexExpressionPool:
     def get_condition(self, str_condition):
         index = int(str_condition.split(':')[0][1:])
         return self.condition_pool.conditions[index]
+
+    def get_mask(self, str_mask):
+        index = int(str_mask[4:])
+        return self.masks[index]
+
+    def ready_for_conditional_expression(self):
+        # one can add conditional expression if
+        # case 1: there are only polygonal conditions (then at least one polygonal expression)
+        #         at least polygonal expression for the same mask OR at least one non-polygonal expression
+        # case 2: there are only non-polygonal conditions
+        #         at least two non-polygonal expressions
+        # case 3: mixed case (then there are at least one polygonal expression and one non-polygonal expression)
+        if self.condition_pool.nb_conditions == 0:
+            return False
+        nb_polygonal, nb_non_polygonal = 0, 0
+        for condition in self.condition_pool.conditions.values():
+            if condition.polygonal:
+                nb_polygonal += 1
+            else:
+                nb_non_polygonal += 1
+        if nb_non_polygonal > 0 and nb_polygonal > 0:
+            return True
+        elif nb_polygonal > 0:
+            nb_non_polygonal = 0
+            for expr in self.expressions.values():
+                if not expr.polygonal:
+                    nb_non_polygonal += 1
+                    if nb_non_polygonal > 0:
+                        return True
+            for mask in self.masks.values():
+                if mask.nb_children > 1:
+                    return True
+            return False
+        else:
+            nb_non_polygonal = 0
+            for expr in self.expressions.values():
+                if not expr.polygonal:
+                    nb_non_polygonal += 1
+                    if nb_non_polygonal > 1:
+                        return True
+            return False
+
+    def ready_for_max_min_expression(self):
+        # one can add max min expression is there are
+        # (at least one polygonal and at least one non-polygonal expression) OR
+        # (at least two polygonal expressions with the same mask)
+        nb_non_polygonal = 0
+        for expr in self.expressions.values():
+            if not expr.polygonal:
+                nb_non_polygonal += 1
+                if nb_non_polygonal > 1:
+                    return True
+        if nb_non_polygonal == 0:
+            for mask in self.masks.values():
+                if mask.nb_children > 1:
+                    return True
+            return False
+        else:
+            for mask in self.masks.values():
+                if mask.nb_children > 0:
+                    return True
+            return False
+
+    def ready_for_masked_expression(self):
+        # one can add a masked expression if there are at least one polygonal expression
+        # and at least one non-polygonal expression
+        has_non_polygonal = False
+        for expr in self.expressions.values():
+            if not expr.polygonal:
+                has_non_polygonal = True
+                break
+        if not has_non_polygonal:
+            return False
+        has_polygonal = False
+        for mask in self.masks.values():
+            if mask.nb_children > 0:
+                has_polygonal = True
+                break
+        return has_polygonal
 
     def is_valid(self, postfix):
         return is_valid_expression(postfix, self.id_pool) and is_valid_postfix(postfix)
@@ -669,47 +855,88 @@ class ComplexExpression:
     """!
     expression object in an expression pool
     """
-    def __init__(self, index, postfix, literal_expression):
+    def __init__(self, index):
         self.index = index
-        self.expression = postfix
-        self.tight_expression = tighten_expression(literal_expression)
+        self.polygonal = False  # polygonal expression can only be evaluated inside a masked expression
+        self.masked = False  # masked expression cannot be composed to create new expression
+        self.mask_id = 0
+
+    def __repr__(self):
+        return ''
 
     def __str__(self):
-        return 'E%d: %s' % (self.index, self.tight_expression)
+        return 'E%d: %s' % (self.index, repr(self))
 
     def code(self):
         return 'E%d' % self.index
 
 
-class ConditionalExpression:
+class SimpleExpression(ComplexExpression):
+    """!
+    expression object in an expression pool
+    """
+    def __init__(self, index, postfix, literal_expression):
+        super().__init__(index)
+        self.expression = postfix
+        self.tight_expression = tighten_expression(literal_expression)
+
+    def __repr__(self):
+        return self.tight_expression
+
+
+class ConditionalExpression(ComplexExpression):
     def __init__(self, index, condition, true_expression, false_expression):
-        self.index = index
+        super().__init__(index)
         self.condition = condition
         self.true_expression = true_expression
         self.false_expression = false_expression
 
-    def __str__(self):
-        return 'E%d: IF (%s) THEN (%s) ELSE (%s)' % (self.index, self.condition.text,
-                                                     self.true_expression.tight_expression,
-                                                     self.false_expression.tight_expression)
-
-    def code(self):
-        return 'E%d' % self.index
+    def __repr__(self):
+        return 'IF (%s) THEN (%s) ELSE (%s)' % (self.condition.text, repr(self.true_expression),
+                                                repr(self.false_expression))
 
 
-class MaxMinExpression:
+class MaxMinExpression(ComplexExpression):
     def __init__(self, index, first_expression, second_expression, is_max):
-        self.index = index
+        super().__init__(index)
         self.first_expression = first_expression
         self.second_expression = second_expression
         self.is_max = is_max
 
-    def __str__(self):
-        return 'E%d: %s(%s, %s)' % (self.index, 'MAX' if self.is_max else 'MIN',
-                                    self.first_expression.tight_expression, self.second_expression.tight_expression)
+    def __repr__(self):
+        return '%s(%s, %s)' % ('MAX' if self.is_max else 'MIN',
+                               repr(self.first_expression), repr(self.second_expression))
+
+
+class PolygonalMask:
+    def __init__(self, index, mask, values):
+        self.index = index
+        self.masks = mask
+        self.values = values
+        self.children = []
+        self.nb_children = 0
 
     def code(self):
-        return 'E%d' % self.index
+        return 'POLY%d' % self.index
+
+    def add_child(self, child):
+        self.nb_children += 1
+        self.children.append(child.code())
+
+
+class MaskedExpression(ComplexExpression):
+    def __init__(self, index, inside_expression, outside_expression):
+        super().__init__(index)
+        self.inside_expression = inside_expression
+        self.outside_expression = outside_expression
+        self.masked = True
+        self.polygonal = True
+        self.mask_id = self.inside_expression.mask_id
+
+    def __repr__(self):
+        return 'IF (POLY%s) THEN (%s) ELSE (%s)' % (self.mask_id,
+                                                    repr(self.inside_expression),
+                                                    repr(self.outside_expression))
 
 
 class ComplexConditionPool:
@@ -738,8 +965,10 @@ class ComplexCondition:
     def __init__(self, index, expression, comparator, threshold):
         self.index = index
         self.expression = expression
-        self.str_ = 'C%d: %s %s %s' % (self.index, self.expression.tight_expression, comparator, str(threshold))
-        self.text = '%s %s %s' % (self.expression.tight_expression, comparator, str(threshold))
+        self.str_ = 'C%d: %s %s %s' % (self.index, repr(self.expression), comparator, str(threshold))
+        self.text = '%s %s %s' % (repr(self.expression), comparator, str(threshold))
+        self.polygonal = expression.polygonal
+        self.mask_id = expression.mask_id
 
         if comparator == '>':
             self.evaluate = lambda value: value > threshold
