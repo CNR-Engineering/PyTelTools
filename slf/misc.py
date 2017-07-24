@@ -663,7 +663,7 @@ class MaxMinExpression(ComplexExpression):
         if self.is_max:
             return np.maximum(values[self.first_expression.code()], values[self.second_expression.code()])
         else:
-            return np.miminm(values[self.first_expression.code()], values[self.second_expression.code()])
+            return np.minimum(values[self.first_expression.code()], values[self.second_expression.code()])
 
 
 class PolygonalMask:
@@ -701,17 +701,25 @@ class MaskedExpression(ComplexExpression):
 
 
 class ComplexCondition:
-    """!
-    condition object enable conditional expressions
-    """
-    def __init__(self, index, expression, comparator, threshold):
+    def __init__(self, index):
         self.index = index
+        self.text = ''
+        self.polygonal = False
+        self.masked = False  # placeholder
+        self.mask_id = 0
+
+    def __str__(self):
+        return 'C%d: %s' % (self.index, self.text)
+
+    def code(self):
+        return 'C%d' % self.index
+
+
+class SimpleCondition(ComplexCondition):
+    def __init__(self, index, expression, comparator, threshold):
+        super().__init__(index)
         self.expression = expression
-        self.str_ = 'C%d: %s %s %s' % (self.index, repr(self.expression), comparator, str(threshold))
         self.text = '%s %s %s' % (repr(self.expression), comparator, str(threshold))
-        self.polygonal = expression.polygonal
-        self.masked = False   # placeholder
-        self.mask_id = expression.mask_id
 
         if comparator == '>':
             self._evaluate = lambda value: value > threshold
@@ -722,14 +730,21 @@ class ComplexCondition:
         else:
             self._evaluate = lambda value: value <= threshold
 
-    def __str__(self):
-        return self.str_
-
-    def code(self):
-        return 'C%d' % self.index
-
     def evaluate(self, current_values):
         return self._evaluate(current_values[self.expression.code()])
+
+
+class AndOrCondition(ComplexCondition):
+    def __init__(self, index, first_condition, second_condition, is_and):
+        super().__init__(index)
+        self.first_condition = first_condition
+        self.second_condition = second_condition
+        self.text = '(%s) %s (%s)' % (self.first_condition.text, 'AND' if is_and else 'OR',
+                                      self.second_condition.text)
+        self.func = np.logical_and if is_and else np.logical_or
+
+    def evaluate(self, current_values):
+        return self.func(current_values[self.first_condition.code()], current_values[self.second_condition.code()])
 
 
 class ComplexExpressionPool:
@@ -859,7 +874,7 @@ class ComplexExpressionPool:
         if first_mask > 0 and second_mask > 0:
             if first_mask != second_mask:
                 return -2
-        elif first_mask > 0 or second_mask > 0:
+        if first_mask > 0 or second_mask > 0:
             polygonal = True
 
         self.nb_expressions += 1
@@ -876,7 +891,7 @@ class ComplexExpressionPool:
         return 0
 
     def add_masked_expression(self, inside_expression, outside_expression):
-        # masked expressions are not added as children of the mask!
+        # masked expressions are not added as children of the mask
         self.nb_expressions += 1
         new_expression = MaskedExpression(self.nb_expressions, inside_expression, outside_expression)
         self.expressions[self.nb_expressions] = new_expression
@@ -886,10 +901,34 @@ class ComplexExpressionPool:
 
     def add_condition(self, expression, comparator, threshold):
         self.nb_conditions += 1
-        new_condition = ComplexCondition(self.nb_conditions, expression, comparator, threshold)
+        new_condition = SimpleCondition(self.nb_conditions, expression, comparator, threshold)
         self.conditions[self.nb_conditions] = new_condition
         new_id = new_condition.code()
         self.dependency_graph[new_id] = {expression.code()}
+
+    def add_and_or_condition(self, first_condition, second_condition, is_and):
+        first_mask, second_mask, polygonal = 0, 0, False
+        if first_condition.polygonal:
+            first_mask = first_condition.mask_id
+        if second_condition.polygonal:
+            second_mask = second_condition.mask_id
+        if first_mask > 0 and second_mask > 0:
+            if first_mask != second_mask:
+                return -2
+        if first_mask > 0 or second_mask > 0:
+            polygonal = True
+
+        self.nb_conditions += 1
+        new_condition = AndOrCondition(self.nb_conditions, first_condition, second_condition, is_and)
+        self.conditions[self.nb_conditions] = new_condition
+        new_id = new_condition.code()
+        self.id_pool.append(new_id)
+        self.dependency_graph[new_id] = {first_condition.code(), second_condition.code()}
+        new_condition.polygonal = polygonal
+        if polygonal:
+            new_condition.mask_id = max(first_mask, second_mask)
+            return 1
+        return 0
 
     def add_polygonal_mask(self, polygons, attribute_index):
         self.nb_masks += 1

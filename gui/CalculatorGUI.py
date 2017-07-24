@@ -389,6 +389,47 @@ class ConditionDialog(QDialog):
     def __init__(self, expr_pool):
         super().__init__()
         self.expr_pool = expr_pool
+        self.stack = QStackedLayout()
+        self.stack.addWidget(self.build_first_page())
+        self.stack.addWidget(self.build_second_page())
+        self.stack.addWidget(self.build_third_page())
+        self.setLayout(self.stack)
+        self.setWindowTitle('Add condition')
+
+    def build_first_page(self):
+        first_page = QWidget()
+        expression_type_box = QGroupBox('Select condition type')
+        self.simple_button = QRadioButton('Simple condition\nUse an expression, a comparator and a threshold value'
+                                          'to create a new condition. Example: B > 0')
+        self.simple_button.setChecked(True)
+        self.and_or_button = QRadioButton('AND/OR condition\nUse two existing conditions and AND/OR operators'
+                                          'to create a new condition. Example: (B > 0) AND (B < 100)')
+        self.and_or_button.setEnabled(self.expr_pool.nb_conditions > 1)
+        vlayout = QVBoxLayout()
+        vlayout.addWidget(self.simple_button)
+        vlayout.addWidget(self.and_or_button)
+        expression_type_box.setLayout(vlayout)
+        next_button = QPushButton('Next')
+        cancel_button = QPushButton('Cancel')
+        for bt in (next_button, cancel_button):
+            bt.setMaximumWidth(200)
+            bt.setFixedHeight(30)
+        hlayout = QHBoxLayout()
+        hlayout.addStretch()
+        hlayout.addWidget(next_button)
+        hlayout.addWidget(cancel_button)
+        vlayout = QVBoxLayout()
+        vlayout.addWidget(expression_type_box)
+        vlayout.addStretch()
+        vlayout.addLayout(hlayout, Qt.AlignRight)
+        first_page.setLayout(vlayout)
+
+        next_button.clicked.connect(self.turn_page)
+        cancel_button.clicked.connect(self.reject)
+        return first_page
+
+    def build_second_page(self):
+        second_page = QWidget()
         buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel,
                                    Qt.Horizontal, self)
         buttons.accepted.connect(self.check)
@@ -399,8 +440,8 @@ class ConditionDialog(QDialog):
         self.expression_box.setMinimumWidth(150)
         self.expression_box.setMaximumWidth(250)
 
-        for i in range(1, expr_pool.nb_expressions+1):
-            expr = expr_pool.expressions[i]
+        for i in range(1, self.expr_pool.nb_expressions+1):
+            expr = self.expr_pool.expressions[i]
             if expr.masked:
                 continue
             self.expression_box.addItem(str(expr))
@@ -426,19 +467,84 @@ class ConditionDialog(QDialog):
         vlayout.addLayout(glayout)
         vlayout.addStretch()
         vlayout.addWidget(buttons)
-        self.setLayout(vlayout)
-        self.setWindowTitle('Add condition')
+        second_page.setLayout(vlayout)
+        return second_page
+
+    def build_third_page(self):
+        third_page = QWidget()
+        if not self.and_or_button.isEnabled():
+            return third_page
+        self.and_or_box = QComboBox()
+        self.and_or_box.addItem('AND')
+        self.and_or_box.addItem('OR')
+        self.first_box = QComboBox()
+        self.second_box = QComboBox()
+        ok_button = QPushButton('OK')
+        cancel_button = QPushButton('Cancel')
+        for bt in (ok_button, cancel_button):
+            bt.setMaximumWidth(200)
+            bt.setFixedHeight(30)
+        for box in (self.first_box, self.second_box):
+            box.setFixedHeight(30)
+            box.setMaximumWidth(250)
+        self.and_or_box.setFixedSize(100, 30)
+        for i in range(1, self.expr_pool.nb_conditions+1):
+            condition = str(self.expr_pool.conditions[i])
+            self.first_box.addItem(condition)
+            self.second_box.addItem(condition)
+        vlayout = QVBoxLayout()
+        glayout = QGridLayout()
+        glayout.addWidget(QLabel('Condition 1'), 1, 1, Qt.AlignHCenter)
+        glayout.addWidget(QLabel('Operator'), 1, 2, Qt.AlignHCenter)
+        glayout.addWidget(QLabel('Condition 2'), 1, 3, Qt.AlignHCenter)
+        glayout.addWidget(self.first_box, 2, 1)
+        glayout.addWidget(self.and_or_box, 2, 2)
+        glayout.addWidget(self.second_box, 2, 3)
+        glayout.setVerticalSpacing(12)
+        glayout.setRowStretch(0, 1)
+        vlayout.addLayout(glayout)
+        vlayout.addStretch()
+        hlayout = QHBoxLayout()
+        hlayout.addStretch()
+        hlayout.addWidget(ok_button)
+        hlayout.addWidget(cancel_button)
+        vlayout.addLayout(hlayout)
+        third_page.setLayout(vlayout)
+
+        ok_button.clicked.connect(self.check)
+        cancel_button.clicked.connect(self.reject)
+        return third_page
+
+    def turn_page(self):
+        if self.simple_button.isChecked():
+            self.stack.setCurrentIndex(1)
+        else:
+            self.stack.setCurrentIndex(2)
 
     def check(self):
-        threshold = self.threshold_box.text()
-        try:
-            threshold = float(threshold)
-        except ValueError:
-            QMessageBox.critical(None, 'Error', 'The threshold is not a number!', QMessageBox.Ok)
-            return
-        expr_text = self.expression_box.currentText()
-        self.expr_pool.add_condition(self.expr_pool.get_expression(expr_text),
-                                     self.comparator_box.currentText(), threshold)
+        current_page = self.stack.currentIndex()
+        if current_page == 1:
+            threshold = self.threshold_box.text()
+            try:
+                threshold = float(threshold)
+            except ValueError:
+                QMessageBox.critical(None, 'Error', 'The threshold is not a number!', QMessageBox.Ok)
+                return
+            expr_text = self.expression_box.currentText()
+            self.expr_pool.add_condition(self.expr_pool.get_expression(expr_text),
+                                         self.comparator_box.currentText(), threshold)
+        else:
+            is_and = self.and_or_box.currentText() == 'AND'
+            first_text, second_text = self.first_box.currentText(), self.second_box.currentText()
+            if first_text == second_text:
+                QMessageBox.critical(None, 'Error', 'The two conditions cannot be identical!', QMessageBox.Ok)
+                return
+            success_code = self.expr_pool.add_and_or_condition(self.expr_pool.get_condition(first_text),
+                                                               self.expr_pool.get_condition(second_text), is_and)
+            if success_code == -2:
+                QMessageBox.critical(None, 'Error', 'One condition can only use only one polygonal mask!',
+                                     QMessageBox.Ok)
+                return
         self.accept()
 
 
