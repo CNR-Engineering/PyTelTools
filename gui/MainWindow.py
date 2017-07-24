@@ -59,6 +59,11 @@ class GlobalConfigDialog(QDialog):
         self.new_options = (language, separator)
         self.accept()
 
+    def closeEvent(self, event):
+        separator = {0: ';', 1: ',', 2: '\t'}[self.csv_box.currentIndex()]
+        language = ['en', 'fr'][self.french_button.isChecked()]
+        self.new_options = (language, separator)
+
 
 class MainPanel(QWidget):
     def __init__(self, parent):
