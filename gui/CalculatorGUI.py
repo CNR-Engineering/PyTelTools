@@ -1,4 +1,5 @@
 import sys
+import struct
 from PyQt5.QtWidgets import *
 from PyQt5.QtGui import *
 from PyQt5.QtCore import *
@@ -6,7 +7,28 @@ from PyQt5.QtCore import *
 from slf import Serafin
 import slf.misc as op
 from geom import Shapefile
-from gui.util import testOpen, TelToolWidget
+from gui.util import testOpen, handleOverwrite, OutputProgressDialog, OutputThread, TelToolWidget
+
+
+class WriteVariableThread(OutputThread):
+    def __init__(self, input_stream, output_stream, output_header, pool, selected):
+        super().__init__()
+        self.input_stream = input_stream
+        self.output_stream = output_stream
+        self.output_header = output_header
+        self.pool = pool
+        self.selected = selected
+        self.nb_frames = len(self.input_stream.time)
+
+    def run(self):
+        i = 0
+        for time_value, value_array in self.pool.evaluate_expressions(self.input_stream, self.selected):
+            if self.canceled:
+                return
+            i += 1
+            self.output_stream.write_entire_frame(self.output_header, time_value, value_array)
+            self.tick.emit(100 * i / self.nb_frames)
+            QApplication.processEvents()
 
 
 class VariableList(QListWidget):
@@ -443,6 +465,48 @@ class AttributeDialog(QDialog):
         self.setWindowTitle('Select the attribute corresponding to the polygonal mask value')
 
 
+class OutputVariableDialog(QDialog):
+    def __init__(self, items, old_names):
+        super().__init__()
+        self.old_names = old_names
+        self.var_box = QComboBox()
+        for item in items:
+            self.var_box.addItem(item)
+        self.var_box.setFixedHeight(30)
+        self.name_box = QLineEdit()
+        self.name_box.setFixedHeight(35)
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel,
+                                   Qt.Horizontal, self)
+        buttons.accepted.connect(self.check)
+        buttons.rejected.connect(self.reject)
+
+        vlayout = QVBoxLayout()
+        hlayout = QHBoxLayout()
+        hlayout.addWidget(QLabel('Expressions'))
+        hlayout.addWidget(self.var_box)
+        vlayout.addLayout(hlayout)
+        vlayout.addItem(QSpacerItem(10, 10))
+        hlayout = QHBoxLayout()
+        hlayout.addWidget(QLabel('Output variable name'))
+        hlayout.addWidget(self.name_box)
+        vlayout.addLayout(hlayout)
+        vlayout.addStretch()
+        vlayout.addWidget(buttons)
+        self.setLayout(vlayout)
+        self.setWindowTitle('Select output expression')
+
+    def check(self):
+        name = self.name_box.text()
+        if len(name) < 2 or len(name) > 16:
+            QMessageBox.critical(None, 'Error', 'The variable names should be between 2 and 16 characters!',
+                                 QMessageBox.Ok)
+            return
+        if name in self.old_names:
+            QMessageBox.critical(None, 'Error', 'This name is already used!', QMessageBox.Ok)
+            return
+        self.accept()
+
+
 class InputTab(QWidget):
     def __init__(self, parent):
         super().__init__()
@@ -577,7 +641,7 @@ class InputTab(QWidget):
         except struct.error:
             QMessageBox.critical(self, 'Error', 'Inconsistent bytes.', QMessageBox.Ok)
             return
-        if not self.polygons:
+        if not polygons:
             QMessageBox.critical(self, 'Error', 'The file does not contain any polygon.',
                                  QMessageBox.Ok)
             return
@@ -674,19 +738,158 @@ class EditorTab(QWidget):
             self.condition_list.addItem(item)
 
 
+class SubmitTab(QWidget):
+    def __init__(self, parent, input_tab, editor_tab):
+        super().__init__()
+        self.parent = parent
+        self.input = input_tab
+        self.editor = editor_tab
+
+        self.table = QTableWidget()
+        self.table.setColumnCount(3)
+        self.table.setHorizontalHeaderLabels(['ID', 'Expression', 'Name'])
+        vh = self.table.verticalHeader()
+        vh.setSectionResizeMode(QHeaderView.Fixed)
+        vh.setDefaultSectionSize(25)
+        self.table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.table.setMaximumHeight(400)
+
+        self.add_button = QPushButton('Add')
+        self.add_button.setFixedSize(105, 50)
+        self.add_button.clicked.connect(self.add_event)
+        self.clear_button = QPushButton('Clear')
+        self.clear_button.setFixedSize(105, 50)
+        self.clear_button.clicked.connect(self.reset)
+
+        self.submit_button = QPushButton('Submit', self, icon=self.style().standardIcon(QStyle.SP_DialogSaveButton))
+        self.submit_button.setFixedSize(105, 50)
+        self.submit_button.setEnabled(False)
+        self.submit_button.clicked.connect(self.submit_event)
+
+        hlayout = QHBoxLayout()
+        vlayout = QVBoxLayout()
+        vlayout.setSpacing(10)
+        vlayout.addWidget(self.add_button)
+        vlayout.addWidget(self.clear_button)
+        vlayout.addStretch()
+        vlayout.addWidget(self.submit_button)
+        hlayout.addLayout(vlayout)
+        vlayout = QVBoxLayout()
+        vlayout.addItem(QSpacerItem(10, 15))
+        lb = QLabel('Output variables')
+        vlayout.addWidget(lb)
+        vlayout.setAlignment(lb, Qt.AlignHCenter)
+        vlayout.addWidget(self.table)
+        hlayout.addLayout(vlayout)
+        hlayout.setSpacing(10)
+        self.setLayout(hlayout)
+
+    def reset(self):
+        self.table.setRowCount(0)
+        self.submit_button.setEnabled(False)
+
+    def old_names(self):
+        names = self.editor.pool.var_names[:]
+        for row in range(self.table.rowCount()):
+            names.append(self.table.item(row, 2).text())
+        return names
+
+    def selected_expressions(self):
+        expressions = []
+        names = []
+        for row in range(self.table.rowCount()):
+            expressions.append(self.table.item(row, 0).text())
+            names.append(self.table.item(row, 2).text())
+        return expressions, names
+
+    def output_header(self, names):
+        output_header = self.input.header.copy()
+        output_header.nb_var = len(names)
+        output_header.var_IDs, output_header.var_names, output_header.var_units = [], [], []
+        for name in names:
+            output_header.var_IDs.append('DUMMY')
+            output_header.var_names.append(bytes(name, 'utf-8').ljust(16))
+            output_header.var_units.append(bytes('', 'utf-8').ljust(16))
+        return output_header
+
+    def add_event(self):
+        expressions = [(code, text) for code, text in self.editor.pool.evaluable_expressions()]
+        items = ['%s: %s' % (code, text) for code, text in expressions]
+        dlg = OutputVariableDialog(items, self.old_names())
+        if dlg.exec_() == QDialog.Accepted:
+            code, text = expressions[dlg.var_box.currentIndex()]
+            name = dlg.name_box.text()
+            row = self.table.rowCount()
+            self.table.insertRow(row)
+            self.table.setItem(row, 0, QTableWidgetItem(code))
+            self.table.setItem(row, 1, QTableWidgetItem(text))
+            self.table.setItem(row, 2, QTableWidgetItem(name))
+            self.submit_button.setEnabled(True)
+
+    def submit_event(self):
+        # create the save file dialog
+        options = QFileDialog.Options()
+        options |= QFileDialog.DontUseNativeDialog
+        options |= QFileDialog.DontConfirmOverwrite
+        filename, _ = QFileDialog.getSaveFileName(self, 'Choose the output file name', '',
+                                                  'Serafin Files (*.slf)', options=options)
+
+        # check the file name consistency
+        if not filename:
+            return
+        if len(filename) < 5 or filename[-4:] != '.slf':
+            filename += '.slf'
+
+        # overwrite to the input file is forbidden
+        if filename == self.input.filename:
+            QMessageBox.critical(self, 'Error', 'Cannot overwrite to the input file.',
+                                 QMessageBox.Ok)
+            return
+
+        # handle overwrite manually
+        overwrite = handleOverwrite(filename)
+        if overwrite is None:
+            return
+
+        selected, names = self.selected_expressions()
+        output_header = self.output_header(names)
+
+        self.parent.inDialog()
+        progress_bar = OutputProgressDialog()
+
+        with Serafin.Read(self.input.filename, self.input.language) as input_stream:
+            input_stream.header = self.input.header
+            input_stream.time = self.input.time
+
+            with Serafin.Write(filename, self.input.language, True) as output_stream:
+                output_stream.write_header(output_header)
+
+                process = WriteVariableThread(input_stream, output_stream, output_header, self.editor.pool, selected)
+                progress_bar.connectToThread(process)
+                process.run()
+
+                if not process.canceled:
+                    progress_bar.outputFinished()
+                progress_bar.exec_()
+                self.parent.outDialog()
+
+
 class CalculatorGUI(TelToolWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
 
         self.input_tab = InputTab(self)
         self.editor_tab = EditorTab(self.input_tab)
+        self.submit_tab = SubmitTab(self, self.input_tab, self.editor_tab)
         self.setWindowTitle('Variable Editor')
 
         self.tab = QTabWidget()
         self.tab.addTab(self.input_tab, 'Input')
         self.tab.addTab(self.editor_tab, 'Editor')
+        self.tab.addTab(self.submit_tab, 'Submit')
 
         self.tab.setTabEnabled(1, False)
+        self.tab.setTabEnabled(2, False)
         self.tab.setStyleSheet('QTabBar::tab { height: 40px; min-width: 200px; }')
 
         layout = QVBoxLayout()
@@ -696,9 +899,12 @@ class CalculatorGUI(TelToolWidget):
 
     def reset(self):
         self.tab.setTabEnabled(1, False)
+        self.tab.setTabEnabled(2, False)
+        self.submit_tab.reset()
 
     def get_input(self):
         self.tab.setTabEnabled(1, True)
+        self.tab.setTabEnabled(2, True)
         self.editor_tab.get_input()
 
 

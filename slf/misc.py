@@ -710,6 +710,7 @@ class ComplexCondition:
         self.str_ = 'C%d: %s %s %s' % (self.index, repr(self.expression), comparator, str(threshold))
         self.text = '%s %s %s' % (repr(self.expression), comparator, str(threshold))
         self.polygonal = expression.polygonal
+        self.masked = False   # placeholder
         self.mask_id = expression.mask_id
 
         if comparator == '>':
@@ -1010,6 +1011,12 @@ class ComplexExpressionPool:
         dependence.reverse()
         return dependence
 
+    def evaluable_expressions(self):
+        for i in range(1, self.nb_expressions+1):
+            expr = self.expressions[i]
+            if expr.masked or not expr.polygonal:
+                yield expr.code(), repr(expr)
+
     def evaluate_expressions(self, input_stream, selected_expressions):
         # build augmented path
         augmented_path = self.get_dependence(selected_expressions[0])
@@ -1020,9 +1027,14 @@ class ComplexExpressionPool:
                     augmented_path.append(node)
 
         # evaluate each node on the augmented path
+        nb_row = len(selected_expressions)
+        nb_col = input_stream.header.nb_nodes
         for time_index, time_value in enumerate(input_stream.time):
             values = self._evaluate_expressions(input_stream, time_index, augmented_path)
-            yield time_value, [values[expr] for expr in selected_expressions]
+            value_array = np.empty((nb_row, nb_col))
+            for i, expr in enumerate(selected_expressions):
+                value_array[i, :] = values[expr]
+            yield time_value, value_array
 
     def decode(self, input_stream, time_index, node_code):
         if node_code == 'COORDX':
@@ -1033,19 +1045,19 @@ class ComplexExpressionPool:
             return input_stream.read_var_in_frame(time_index, node_code), None
         elif node_code[:4] == 'POLY':
             index = int(node_code[4:])
-            return self.masks[index].values
+            return self.masks[index].values, None
         elif node_code[0] == 'C':
             index = int(node_code[1:])
-            return [], self.conditions[index]
+            return None, self.conditions[index]
         else:
             index = int(node_code[1:])
-            return [], self.expressions[index]
+            return None, self.expressions[index]
 
     def _evaluate_expressions(self, input_stream, time_index, path):
         values = {node: None for node in path}
         for node in path:
             node_values, node_object = self.decode(input_stream, time_index, node)
-            if not node_values:
+            if node_values is None:
                 if node_object.masked:
                     node_values = node_object.evaluate(values, self.masks[node_object.mask_id].mask)
                 else:
