@@ -190,6 +190,7 @@ class FileConverterInputTab(QWidget):
             self.converter = convert.BKLineConverter(filename)
             self.from_type = suffix[1:]
 
+        self.converter.set_csv_separator(self.parent.csv_separator)
         logging.info('Reading the input file...')
         QApplication.processEvents()
         try:

@@ -6,7 +6,6 @@ from PyQt5.QtWidgets import *
 from PyQt5.QtGui import *
 from PyQt5.QtCore import *
 import slf.misc as operations
-import numpy as np
 
 from gui.util import LoadMeshDialog, OutputProgressDialog, OutputThread, \
     TableWidgetDragRows, QPlainTextEditLogger, TelToolWidget, testOpen, handleOverwrite
@@ -67,11 +66,15 @@ class InputTab(QWidget):
         self.langBox = QGroupBox('Input language')
         hlayout = QHBoxLayout()
         self.frenchButton = QRadioButton('French')
+        englishButton = QRadioButton('English')
         hlayout.addWidget(self.frenchButton)
-        hlayout.addWidget(QRadioButton('English'))
+        hlayout.addWidget(englishButton)
         self.langBox.setLayout(hlayout)
         self.langBox.setMaximumHeight(80)
-        self.frenchButton.setChecked(True)
+        if self.parent.language == 'fr':
+            self.frenchButton.setChecked(True)
+        else:
+            englishButton.setChecked(True)
 
         # create the button open the reference file
         self.btnOpenFirst = QPushButton('Load\nFile A', self, icon=self.style().standardIcon(QStyle.SP_DialogOpenButton))
@@ -450,9 +453,9 @@ class SubmitTab(QWidget):
 
     def resetFirst(self):
         common_vars = [(var_ID, var_name, var_unit) for var_ID, var_name, var_unit
-                        in zip(self.input.first_header.var_IDs, self.input.first_header.var_names,
-                               self.input.first_header.var_units)
-                        if var_ID in self.input.second_header.var_IDs]
+                       in zip(self.input.first_header.var_IDs, self.input.first_header.var_names,
+                              self.input.first_header.var_units)
+                       if var_ID in self.input.second_header.var_IDs]
         if not common_vars:
             self.firstTable.setRowCount(0)
             self.secondTable.setRowCount(0)

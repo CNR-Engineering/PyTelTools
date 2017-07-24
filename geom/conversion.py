@@ -16,6 +16,10 @@ class GeomFileConverter:
         self.fields = []
         self.transformations = []
         self.shapes = []
+        self.csv_separator = ''
+
+    def set_csv_separator(self, separator):
+        self.csv_separator = separator
 
     def read(self):
         pass
@@ -102,11 +106,11 @@ class XYZConverter(PointFileConverter):
 
     def to_csv(self, new_shapes, to_file):
         with open(to_file, 'w') as f:
-            f.write(';'.join(['id point', 'x', 'y', 'z']))
+            f.write(self.csv_separator.join(['id point', 'x', 'y', 'z']))
             f.write('\n')
             for i, p in enumerate(new_shapes):
                 x, y, z = p
-                f.write(';'.join(map(str, [i+1, x, y, z])))
+                f.write(self.csv_separator.join(map(str, [i+1, x, y, z])))
                 f.write('\n')
 
     def to_shp(self, new_shapes, to_file, z_name):
@@ -196,13 +200,13 @@ class BKLineConverter(LineFileConverter):
     def to_csv(self, new_shapes, to_file):
         with open(to_file, 'w') as f:
             if self.is_2d:
-                f.write(';'.join(['id line', 'is closed', 'x', 'y', 'attribute']))
+                f.write(self.csv_separator.join(['id line', 'is closed', 'x', 'y', 'attribute']))
             else:
-                f.write(';'.join(['id line', 'is closed', 'x', 'y', 'z', 'attribute']))
+                f.write(self.csv_separator.join(['id line', 'is closed', 'x', 'y', 'z', 'attribute']))
             f.write('\n')
             for i, poly in enumerate(new_shapes):
                 for coord in poly.coords():
-                    f.write(';'.join(map(str, [i+1, poly.is_closed()] + list(coord) + [poly.attributes()[0]])))
+                    f.write(self.csv_separator.join(map(str, [i+1, poly.is_closed()] + list(coord) + [poly.attributes()[0]])))
                     f.write('\n')
 
     def to_shp(self, new_shapes, to_file, shape_type, attribute_name):
@@ -386,7 +390,7 @@ class ShpPointConverter(PointFileConverter):
             header.append(field_name)
 
         with open(to_file, 'w') as f:
-            f.write(';'.join(header))
+            f.write(self.csv_separator.join(header))
             f.write('\n')
             for i, (point, m, attribute) in enumerate(zip(new_shapes, self.m, self.attributes)):
                 x, y, z = point
@@ -401,7 +405,7 @@ class ShpPointConverter(PointFileConverter):
                         a = a.decode('latin-1')
                     line.append(a)
 
-                f.write(';'.join(map(str, line)))
+                f.write(self.csv_separator.join(map(str, line)))
                 f.write('\n')
 
 
@@ -630,7 +634,7 @@ class ShpLineConverter(LineFileConverter):
             header.append(field_name)
 
         with open(to_file, 'w') as f:
-            f.write(';'.join(header))
+            f.write(self.csv_separator.join(header))
             f.write('\n')
             for i, poly in enumerate(new_shapes):
                 attributes = []
@@ -648,7 +652,7 @@ class ShpLineConverter(LineFileConverter):
                         line.append(coord[2])
                         line.append(m)
                     line.extend(attributes)
-                    f.write(';'.join(map(str, line)))
+                    f.write(self.csv_separator.join(map(str, line)))
                     f.write('\n')
 
 
@@ -811,7 +815,7 @@ class ShpMultiPointConverter(GeomFileConverter):
             header.append(field_name)
 
         with open(to_file, 'w') as f:
-            f.write(';'.join(header))
+            f.write(self.csv_separator.join(header))
             f.write('\n')
             for i, (points, points_m, attributes) in enumerate(zip(new_shapes, self.m, self.attributes)):
                 decoded_attributes = []
@@ -828,7 +832,7 @@ class ShpMultiPointConverter(GeomFileConverter):
                         line.append(z)
                         line.append(m)
                     line.extend(decoded_attributes)
-                    f.write(';'.join(map(str, line)))
+                    f.write(self.csv_separator.join(map(str, line)))
                     f.write('\n')
 
 

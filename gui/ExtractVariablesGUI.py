@@ -211,11 +211,15 @@ class InputTab(QWidget):
         self.langBox = QGroupBox('Input language')
         hlayout = QHBoxLayout()
         self.frenchButton = QRadioButton('French')
+        englishButton = QRadioButton('English')
         hlayout.addWidget(self.frenchButton)
-        hlayout.addWidget(QRadioButton('English'))
+        hlayout.addWidget(englishButton)
         self.langBox.setLayout(hlayout)
         self.langBox.setMaximumHeight(80)
-        self.frenchButton.setChecked(True)
+        if self.parent.language == 'fr':
+            self.frenchButton.setChecked(True)
+        else:
+            englishButton.setChecked(True)
 
         # create two 3-column tables for variables selection
         self.firstTable = TableWidgetDragRows()

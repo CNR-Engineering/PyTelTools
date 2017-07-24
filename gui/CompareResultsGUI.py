@@ -120,10 +120,14 @@ class InputTab(QWidget):
         hlayout = QHBoxLayout()
         self.frenchButton = QRadioButton('French')
         hlayout.addWidget(self.frenchButton)
-        hlayout.addWidget(QRadioButton('English'))
+        englishButton = QRadioButton('English')
+        hlayout.addWidget(englishButton)
         self.langBox.setLayout(hlayout)
         self.langBox.setMaximumHeight(80)
-        self.frenchButton.setChecked(True)
+        if self.parent.language == 'fr':
+            self.frenchButton.setChecked(True)
+        else:
+            englishButton.setChecked(True)
 
         # create the button open the reference file
         self.btnOpenRef = QPushButton('Load\nReference', self, icon=self.style().standardIcon(QStyle.SP_DialogOpenButton))

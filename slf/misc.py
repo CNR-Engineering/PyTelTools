@@ -720,6 +720,8 @@ class SimpleCondition(ComplexCondition):
         super().__init__(index)
         self.expression = expression
         self.text = '%s %s %s' % (repr(self.expression), comparator, str(threshold))
+        self.polygonal = expression.polygonal
+        self.mask_id = expression.mask_id
 
         if comparator == '>':
             self._evaluate = lambda value: value > threshold
@@ -976,22 +978,22 @@ class ComplexExpressionPool:
         if nb_non_polygonal > 0 and nb_polygonal > 0:
             return True
         elif nb_polygonal > 0:
-            nb_non_polygonal = 0
+            expr_non_polygonal = 0
             for expr in self.expressions.values():
                 if not expr.polygonal:
-                    nb_non_polygonal += 1
-                    if nb_non_polygonal > 0:
+                    expr_non_polygonal += 1
+                    if expr_non_polygonal > 0:
                         return True
             for mask in self.masks.values():
                 if mask.nb_children > 1:
                     return True
             return False
         else:
-            nb_non_polygonal = 0
+            expr_non_polygonal = 0
             for expr in self.expressions.values():
                 if not expr.polygonal:
-                    nb_non_polygonal += 1
-                    if nb_non_polygonal > 1:
+                    expr_non_polygonal += 1
+                    if expr_non_polygonal > 1:
                         return True
             return False
 

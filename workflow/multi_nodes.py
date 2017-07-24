@@ -280,6 +280,9 @@ class MultiArrivalDurationNode(MultiOneInOneOutNode):
             for j in range(3):
                 line.append(str_table[3*i+j])
             table.append(line)
+        if not table:
+            self.state = MultiNode.NOT_CONFIGURED
+            return
         str_conditions = str_conditions.split(',')
         for i, condition in zip(range(len(table)), str_conditions):
             literal = table[i][0]

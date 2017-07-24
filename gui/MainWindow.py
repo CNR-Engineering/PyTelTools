@@ -16,6 +16,49 @@ from gui.ConfigTransformation import TransformationMap
 from gui.GeometryConverterGUI import FileConverterGUI
 from gui.CalculatorGUI import CalculatorGUI
 
+class GlobalConfigDialog(QDialog):
+    def __init__(self):
+        super().__init__()
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok, Qt.Horizontal, self)
+        buttons.accepted.connect(self._select)
+        self.new_options = tuple()
+
+        self.lang_box = QGroupBox('Input Serafin language')
+        hlayout = QHBoxLayout()
+        self.french_button = QRadioButton('French')
+        english_button = QRadioButton('English')
+        hlayout.addWidget(self.french_button)
+        hlayout.addWidget(english_button)
+        self.lang_box.setLayout(hlayout)
+        self.lang_box.setMaximumHeight(80)
+        self.french_button.setChecked(True)
+
+        self.csv_box = QComboBox()
+        self.csv_box.setFixedHeight(30)
+        for sep in ['Semicolon ;', 'Comma ,', 'Tab']:
+            self.csv_box.addItem(sep)
+        self.csv_box.setCurrentIndex(0)
+
+        layout = QVBoxLayout()
+        layout.addWidget(self.lang_box)
+        hlayout = QHBoxLayout()
+        hlayout.addWidget(QLabel('CSV separator'))
+        hlayout.addWidget(self.csv_box, Qt.AlignLeft)
+        layout.addLayout(hlayout)
+        layout.setSpacing(20)
+        layout.addStretch()
+        layout.addWidget(buttons)
+        self.setLayout(layout)
+
+        self.setWindowTitle('TelTools global configuration')
+        self.resize(300, 200)
+
+    def _select(self):
+        separator = {0: ';', 1: ',', 2: '\t'}[self.csv_box.currentIndex()]
+        language = ['en', 'fr'][self.french_button.isChecked()]
+        self.new_options = (language, separator)
+        self.accept()
+
 
 class MainPanel(QWidget):
     def __init__(self, parent):
@@ -56,6 +99,9 @@ class MainPanel(QWidget):
 class MyMainWindow(QWidget):
     def __init__(self):
         super().__init__()
+        dlg = GlobalConfigDialog()
+        dlg.exec_()
+        self.language, self.csv_separator = dlg.new_options
 
         self.panel = MainPanel(self)
 

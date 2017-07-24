@@ -13,14 +13,15 @@ from gui.util import MapViewer, LineMapCanvas, QPlainTextEditLogger, ColumnColor
 
 
 class WriteCSVProcess(OutputThread):
-    def __init__(self, mesh):
+    def __init__(self, separator, mesh):
         super().__init__()
+        self.separator = separator
         self.mesh = mesh
 
     def write_header(self, output_stream, selected_vars):
         output_stream.write('Line')
         for header in ['time', 'x', 'y', 'distance'] + selected_vars:
-            output_stream.write(';')
+            output_stream.write(self.separator)
             output_stream.write(header)
         output_stream.write('\n')
 
@@ -43,20 +44,20 @@ class WriteCSVProcess(OutputThread):
                     if self.canceled:
                         return
                     output_stream.write(str(id_line+1))
-                    output_stream.write(';')
+                    output_stream.write(self.separator)
                     output_stream.write(str(time))
 
-                    output_stream.write(';')
+                    output_stream.write(self.separator)
                     output_stream.write('%.6f' % x)
-                    output_stream.write(';')
+                    output_stream.write(self.separator)
                     output_stream.write('%.6f' % y)
-                    output_stream.write(';')
+                    output_stream.write(self.separator)
                     output_stream.write('%.6f' % distance)
 
                     for i_var, var in enumerate(selected_vars):
                         values = var_values[i_var]
 
-                        output_stream.write(';')
+                        output_stream.write(self.separator)
                         output_stream.write('%.6f' % interpolator.dot(values[[i, j, k]]))
                     output_stream.write('\n')
 
@@ -92,11 +93,15 @@ class InputTab(QWidget):
         self.langBox = QGroupBox('Input language')
         hlayout = QHBoxLayout()
         self.frenchButton = QRadioButton('French')
+        englishButton = QRadioButton('English')
         hlayout.addWidget(self.frenchButton)
-        hlayout.addWidget(QRadioButton('English'))
+        hlayout.addWidget(englishButton)
         self.langBox.setLayout(hlayout)
         self.langBox.setMaximumHeight(80)
-        self.frenchButton.setChecked(True)
+        if self.parent.language == 'fr':
+            self.frenchButton.setChecked(True)
+        else:
+            englishButton.setChecked(True)
 
         # create the button open Serafin
         self.btnOpenSerafin = QPushButton('Load\nSerafin', self, icon=self.style().standardIcon(QStyle.SP_DialogOpenButton))
@@ -279,7 +284,6 @@ class InputTab(QWidget):
             QMessageBox.critical(self, 'Error', 'Only .i2s and .shp file formats are currently supported.',
                                  QMessageBox.Ok)
             return
-
 
         self.lines = []
         self.line_interpolators = []
@@ -493,7 +497,7 @@ class CSVTab(QWidget):
         indices_nonempty = [i for i in range(len(self.input.lines)) if self.input.line_interpolators[i][0]]
 
         # initialize the progress bar
-        process = WriteCSVProcess(self.input.mesh)
+        process = WriteCSVProcess(self.parent.csv_separator, self.input.mesh)
         progressBar = OutputProgressDialog()
 
         with Serafin.Read(self.input.filename, self.input.language) as resin:
@@ -862,8 +866,8 @@ class MultiFrameImageTab(QWidget):
 
         # set up a custom plot viewer
         self.editFrameColorAct = QAction('Edit frame colors', self,
-                                        icon=self.style().standardIcon(QStyle.SP_FileDialogDetailedView),
-                                        triggered=self.editColor)
+                                         icon=self.style().standardIcon(QStyle.SP_FileDialogDetailedView),
+                                         triggered=self.editColor)
         self.plotViewer = PlotViewer()
         self.plotViewer.exitAct.setEnabled(False)
         self.plotViewer.menuBar.setVisible(False)

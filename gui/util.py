@@ -1840,6 +1840,12 @@ class TelToolWidget(QWidget):
     def __init__(self, parent):
         super().__init__()
         self.parent = parent
+        if parent is None:
+            self.language = 'fr'
+            self.csv_separator = ';'
+        else:
+            self.language = parent.language
+            self.csv_separator = parent.csv_separator
         self.setMinimumWidth(600)
         self.setWindowFlags(self.windowFlags() | Qt.CustomizeWindowHint)
 

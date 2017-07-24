@@ -17,19 +17,20 @@ from gui.util import MapViewer, LineMapCanvas, QPlainTextEditLogger, TelToolWidg
 
 
 class WriteCSVProcess(OutputThread):
-    def __init__(self, mesh):
+    def __init__(self, separator, mesh):
         super().__init__()
         self.mesh = mesh
+        self.separator = separator
 
     def write_header(self, output_stream, selected_vars):
         output_stream.write('Line')
         for header in ['x', 'y', 'distance'] + selected_vars:
-            output_stream.write(';')
+            output_stream.write(self.separator)
             output_stream.write(header)
         output_stream.write('\n')
 
     def write_csv(self, input_stream, selected_vars, output_stream, line_interpolators,
-                        indices_nonempty, reference, time_index):
+                  indices_nonempty, reference, time_index):
         self.write_header(output_stream, selected_vars)
 
         nb_lines = len(indices_nonempty)
@@ -52,16 +53,16 @@ class WriteCSVProcess(OutputThread):
                 if distance <= 0 or distance >= max_distance:
                     continue
                 output_stream.write(str(id_line+1))
-                output_stream.write(';')
+                output_stream.write(self.separator)
                 output_stream.write('%.6f' % x)
-                output_stream.write(';')
+                output_stream.write(self.separator)
                 output_stream.write('%.6f' % y)
-                output_stream.write(';')
+                output_stream.write(self.separator)
                 output_stream.write('%.6f' % distance)
 
                 for i_var, var in enumerate(selected_vars):
                     values = var_values[i_var]
-                    output_stream.write(';')
+                    output_stream.write(self.separator)
                     output_stream.write('%.6f' % interpolator.dot(values[[i, j, k]]))
                 output_stream.write('\n')
 
@@ -99,7 +100,7 @@ class LineStyleEditor(QDialog):
         row = 0
         for style in all_linestyles:
             self.available_linestyles.insertRow(row)
-            self.available_linestyles.setItem(row, 0,QTableWidgetItem(style))
+            self.available_linestyles.setItem(row, 0, QTableWidgetItem(style))
             row += 1
 
         buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel,
@@ -153,11 +154,15 @@ class InputTab(QWidget):
         self.langBox = QGroupBox('Input language')
         hlayout = QHBoxLayout()
         self.frenchButton = QRadioButton('French')
+        englishButton = QRadioButton('English')
         hlayout.addWidget(self.frenchButton)
-        hlayout.addWidget(QRadioButton('English'))
+        hlayout.addWidget(englishButton)
         self.langBox.setLayout(hlayout)
         self.langBox.setMaximumHeight(80)
-        self.frenchButton.setChecked(True)
+        if self.parent.language == 'fr':
+            self.frenchButton.setChecked(True)
+        else:
+            englishButton.setChecked(True)
 
         # create the button open Serafin
         self.btnOpenSerafin = QPushButton('Load\nSerafin', self, icon=self.style().standardIcon(QStyle.SP_DialogOpenButton))
@@ -585,7 +590,7 @@ class CSVTab(QWidget):
         time_index = int(self.timeSelection.index.text()) - 1
 
         # initialize the progress bar
-        process = WriteCSVProcess(self.input.mesh)
+        process = WriteCSVProcess(self.parent.csv_separator, self.input.mesh)
         progressBar = OutputProgressDialog()
 
         with Serafin.Read(self.input.filename, self.input.language) as resin:

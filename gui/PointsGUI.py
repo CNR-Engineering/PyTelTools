@@ -14,15 +14,16 @@ from gui.util import TemporalPlotViewer, MapViewer, MapCanvas, QPlainTextEditLog
 
 
 class WriteCSVProcess(OutputThread):
-    def __init__(self, mesh):
+    def __init__(self, separator, mesh):
         super().__init__()
         self.mesh = mesh
+        self.separator = separator
 
     def write_header(self, output_stream, selected_vars, points):
         output_stream.write('time')
         for x, y in points:
             for var in selected_vars:
-                output_stream.write(';')
+                output_stream.write(self.separator)
                 output_stream.write('%s (%.4f, %.4f)' % (var, x, y))
         output_stream.write('\n')
 
@@ -45,7 +46,7 @@ class WriteCSVProcess(OutputThread):
                 if self.canceled:
                     return
                 for index_var in range(nb_selected_vars):
-                    output_stream.write(';')
+                    output_stream.write(self.separator)
                     output_stream.write('%.6f' % interpolator.dot(var_values[index_var][[i, j, k]]))
 
             output_stream.write('\n')
@@ -84,11 +85,15 @@ class InputTab(QWidget):
         self.langBox = QGroupBox('Input language')
         hlayout = QHBoxLayout()
         self.frenchButton = QRadioButton('French')
+        englishButton = QRadioButton('English')
         hlayout.addWidget(self.frenchButton)
-        hlayout.addWidget(QRadioButton('English'))
+        hlayout.addWidget(englishButton)
         self.langBox.setLayout(hlayout)
         self.langBox.setMaximumHeight(80)
-        self.frenchButton.setChecked(True)
+        if self.parent.language == 'fr':
+            self.frenchButton.setChecked(True)
+        else:
+            englishButton.setChecked(True)
 
         # create the button open Serafin
         self.btnOpenSerafin = QPushButton('Load\nSerafin', self, icon=self.style().standardIcon(QStyle.SP_DialogOpenButton))
@@ -468,7 +473,7 @@ class InputTab(QWidget):
         indices_inside = [i for i in range(len(self.points)) if self.point_interpolators[i] is not None]
 
         # initialize the progress bar
-        process = WriteCSVProcess(self.mesh)
+        process = WriteCSVProcess(self.parent.csv_separator, self.mesh)
         progressBar = OutputProgressDialog()
 
         with Serafin.Read(self.filename, self.language) as resin:
@@ -497,9 +502,9 @@ class InputTab(QWidget):
 
 
 class ImageTab(TemporalPlotViewer):
-    def __init__(self, input):
+    def __init__(self, inputTab):
         super().__init__('point')
-        self.input = input
+        self.input = inputTab
 
         self.has_map = False
         canvas = MapCanvas()
@@ -591,7 +596,7 @@ class ImageTab(TemporalPlotViewer):
 
         # get the new data
         csv_file = self.input.csvNameBox.text()
-        self.data = pd.read_csv(csv_file, header=0, sep=';')
+        self.data = pd.read_csv(csv_file, header=0, sep=self.input.parent.csv_separator)
         self.data.sort_values('time', inplace=True)
 
         if self.input.header.date is not None:

@@ -253,13 +253,13 @@ class FluxCalculator:
             result.append(i_result)
         return result
 
-    def write_csv(self, result, output_stream):
+    def write_csv(self, result, output_stream, separator=';'):
         output_stream.write('time')
         for name in self.section_names:
-            output_stream.write(';')
+            output_stream.write(separator)
             output_stream.write(name)
         output_stream.write('\n')
 
         for line in result:
-            output_stream.write(';'.join(line))
+            output_stream.write(separator.join(line))
             output_stream.write('\n')

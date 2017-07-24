@@ -15,12 +15,13 @@ from gui.util import TemporalPlotViewer, QPlainTextEditLogger, MapViewer, Polygo
 
 class VolumeCalculatorThread(OutputThread):
     def __init__(self, volume_type, var_ID, second_var_ID, input_stream, polynames, polygons,
-                 time_sampling_frequency, mesh):
+                 time_sampling_frequency, mesh, separator):
         super().__init__()
 
         self.calculator = VolumeCalculator(volume_type, var_ID, second_var_ID, input_stream, polynames, polygons,
                                            time_sampling_frequency)
         self.mesh = mesh
+        self.separator = separator
 
     def run_calculator(self):
         self.tick.emit(6)
@@ -62,7 +63,7 @@ class VolumeCalculatorThread(OutputThread):
 
     def write_csv(self, output_stream):
         result = self.run_calculator()
-        self.calculator.write_csv(result, output_stream)
+        self.calculator.write_csv(result, output_stream, self.separator)
 
 
 class VolumePlotViewer(TemporalPlotViewer):
@@ -133,7 +134,7 @@ class VolumePlotViewer(TemporalPlotViewer):
     def getData(self):
         # get the new data
         csv_file = self.input.csvNameBox.text()
-        self.data = pd.read_csv(csv_file, header=0, sep=';')
+        self.data = pd.read_csv(csv_file, header=0, sep=self.input.parent.csv_separator)
         self.data.sort_values('time', inplace=True)
 
         self.var_ID = self.input.var_ID
@@ -203,11 +204,15 @@ class InputTab(QWidget):
         self.langBox = QGroupBox('Input language')
         hlayout = QHBoxLayout()
         self.frenchButton = QRadioButton('French')
+        englishButton = QRadioButton('English')
         hlayout.addWidget(self.frenchButton)
-        hlayout.addWidget(QRadioButton('English'))
+        hlayout.addWidget(englishButton)
         self.langBox.setLayout(hlayout)
         self.langBox.setMaximumHeight(80)
-        self.frenchButton.setChecked(True)
+        if self.parent.language == 'fr':
+            self.frenchButton.setChecked(True)
+        else:
+            englishButton.setChecked(True)
 
         # create the button open Serafin
         self.btnOpenSerafin = QPushButton('Load\nSerafin', self, icon=self.style().standardIcon(QStyle.SP_DialogOpenButton))
@@ -509,10 +514,12 @@ class InputTab(QWidget):
             resin.time = self.time
             if self.supVolumeBox.isChecked():
                 calculator = VolumeCalculatorThread(VolumeCalculator.POSITIVE, self.var_ID, self.second_var_ID,
-                                                    resin, names, self.polygons, sampling_frequency, self.mesh)
+                                                    resin, names, self.polygons, sampling_frequency,
+                                                    self.mesh, self.parent.csv_separator)
             else:
                 calculator = VolumeCalculatorThread(VolumeCalculator.NET, self.var_ID, self.second_var_ID,
-                                                    resin, names, self.polygons, sampling_frequency, self.mesh)
+                                                    resin, names, self.polygons, sampling_frequency,
+                                                    self.mesh, self.parent.csv_separator)
 
             progressBar.setValue(5)
             QApplication.processEvents()

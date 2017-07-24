@@ -316,12 +316,12 @@ class VolumeCalculator:
                 header.append(name)
         return header
 
-    def write_csv(self, result, output_stream):
-        output_stream.write(';'.join(self.get_csv_header()))
+    def write_csv(self, result, output_stream, separator=';'):
+        output_stream.write(separator.join(self.get_csv_header()))
         output_stream.write('\n')
 
         for line in result:
-            output_stream.write(';'.join(line))
+            output_stream.write(separator.join(line))
             output_stream.write('\n')
 
 

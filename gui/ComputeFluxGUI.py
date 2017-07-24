@@ -18,12 +18,13 @@ from gui.util import TemporalPlotViewer, QPlainTextEditLogger, LineMapCanvas, Ma
 
 class FluxCalculatorThread(OutputThread):
     def __init__(self, flux_type, var_IDs, input_stream, section_names, sections,
-                 time_sampling_frequency, mesh):
+                 time_sampling_frequency, mesh, separator):
         super().__init__()
 
         self.calculator = FluxCalculator(flux_type, var_IDs, input_stream,
                                          section_names, sections, time_sampling_frequency)
         self.mesh = mesh
+        self.separator = separator
 
     def run_calculator(self):
         self.tick.emit(6)
@@ -62,7 +63,7 @@ class FluxCalculatorThread(OutputThread):
 
     def write_csv(self, output_stream):
         result = self.run_calculator()
-        self.calculator.write_csv(result, output_stream)
+        self.calculator.write_csv(result, output_stream, self.separator)
 
 
 class InputTab(QWidget):
@@ -90,11 +91,15 @@ class InputTab(QWidget):
         self.langBox = QGroupBox('Input language')
         hlayout = QHBoxLayout()
         self.frenchButton = QRadioButton('French')
+        englishButton = QRadioButton('English')
         hlayout.addWidget(self.frenchButton)
-        hlayout.addWidget(QRadioButton('English'))
+        hlayout.addWidget(englishButton)
         self.langBox.setLayout(hlayout)
         self.langBox.setMaximumHeight(80)
-        self.frenchButton.setChecked(True)
+        if self.parent.language == 'fr':
+            self.frenchButton.setChecked(True)
+        else:
+            englishButton.setChecked(True)
 
         # create the button open Serafin
         self.btnOpenSerafin = QPushButton('Load\nSerafin', self, icon=self.style().standardIcon(QStyle.SP_DialogOpenButton))
@@ -428,7 +433,8 @@ class InputTab(QWidget):
             resin.header = self.header
             resin.time = self.time
             calculator = FluxCalculatorThread(flux_type, self.var_IDs,
-                                              resin, names, self.polylines, sampling_frequency, self.mesh)
+                                              resin, names, self.polylines, sampling_frequency,
+                                              self.mesh, self.parent.csv_separator)
             progressBar.setValue(5)
             QApplication.processEvents()
 
@@ -527,7 +533,7 @@ class FluxPlotViewer(TemporalPlotViewer):
 
         # get the new data
         csv_file = self.input.csvNameBox.text()
-        self.data = pd.read_csv(csv_file, header=0, sep=';')
+        self.data = pd.read_csv(csv_file, header=0, sep=self.input.parent.csv_separator)
         self.data.sort_values('time', inplace=True)
 
         self.var_IDs = self.input.var_IDs
@@ -615,6 +621,5 @@ if __name__ == '__main__':
     widget = ComputeFluxGUI()
     widget.show()
     app.exec_()
-
 
 
