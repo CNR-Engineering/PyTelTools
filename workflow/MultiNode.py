@@ -90,8 +90,10 @@ class MultiNode(QGraphicsItem):
         self.expected_input = (0,)
         self.nb_success = 0
         self.nb_fail = 0
+        self.input_index = set()
         self.double_input = False
         self.two_in_one_out = False
+        self.second_parent = False  # special properties for pre-bifurcation nodes
         self.ports = []
         self.options = tuple()
 
@@ -121,6 +123,9 @@ class MultiNode(QGraphicsItem):
 
     def load(self, options):
         pass
+
+    def mark(self, node_index):
+        self.input_index.add(node_index)
 
     def update_input(self, nb_input):
         self.expected_input = (nb_input,)

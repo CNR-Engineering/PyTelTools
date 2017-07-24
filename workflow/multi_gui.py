@@ -145,6 +145,8 @@ class MultiScene(QGraphicsScene):
             with open(filename, 'r') as f:
                 self.language, self.csv_separator = f.readline().rstrip().split('.')
                 nb_nodes, nb_links = map(int, f.readline().split())
+
+                # load nodes
                 for i in range(nb_nodes):
                     line = f.readline().rstrip().split('|')
                     category, name, index, x, y = line[:5]
@@ -160,6 +162,7 @@ class MultiScene(QGraphicsScene):
                         self.inputs[index] = []
                         self.ordered_input_indices.append(index)
 
+                # load edges
                 for i in range(nb_links):
                     from_node_index, from_port_index, \
                                      to_node_index, to_port_index = map(int, f.readline().rstrip().split('|'))
@@ -177,6 +180,12 @@ class MultiScene(QGraphicsScene):
                     link.setZValue(-1)
                     self.addItem(link)
                     self.adj_list[from_node_index].add(to_node_index)
+
+                # mark nodes with input
+                for input_index in self.inputs:
+                    downstream_nodes = visit(self.adj_list, input_index)
+                    for u in downstream_nodes:
+                        self.nodes[u].mark(input_index)
 
                 self.update()
                 ordered_nodes = topological_ordering(self.adj_list)
@@ -212,13 +221,16 @@ class MultiScene(QGraphicsScene):
             # catch the first two-in-one-out operator node u
             if not self.nodes[u].two_in_one_out:
                 continue
+            # do not bifurcate if the two parents are the same
+            if len(self.nodes[u].input_index) == 1:
+                return 2, u, []
             # only bifurcate if the parent is the second-input of u
             if self.nodes[u].first_in_port.mother.parentItem().index() == u_parent:
-                return u, []
+                return 1, u, []
             # visit from u
             downstream_nodes = [v for v in visit(self.adj_list, u)]
-            return u, downstream_nodes
-        return -1, []
+            return 0, u, downstream_nodes
+        return -2, []
 
     def _handle_add_input(self, node):
         success, options = node.configure(self.inputs[node.index()])
@@ -233,8 +245,8 @@ class MultiScene(QGraphicsScene):
 
         # if the current input node is second-input to a two-in-one-out operator node
         # all downstream nodes from that operator node do not receive input
-        bifurcation_point, nodes_to_ignore = self._bifurcate(downstream_nodes)
-        if nodes_to_ignore:
+        bifurcation_type, bifurcation_point, nodes_to_ignore = self._bifurcate(downstream_nodes)
+        if bifurcation_type == 0:
             if self.nodes[bifurcation_point].expected_input[0] == 0:
                 QMessageBox.critical(None, 'Error', 'Configure the first input node first!', QMessageBox.Ok)
                 self.inputs[node.index()] = old_options
@@ -259,7 +271,7 @@ class MultiScene(QGraphicsScene):
 
             self.nodes[bifurcation_point].second_ids = self.table.input_columns[node.index()]
 
-        elif bifurcation_point > -1:
+        elif bifurcation_type == 1:
             if self.nodes[bifurcation_point].expected_input[1] != 0:
                 if len(job_ids) != self.nodes[bifurcation_point].expected_input[1]:
                     QMessageBox.critical(None, 'Error', 'The numbers of input files are not equal!', QMessageBox.Ok)
@@ -275,6 +287,18 @@ class MultiScene(QGraphicsScene):
             QApplication.processEvents()
 
             self.nodes[bifurcation_point].first_ids = self.table.input_columns[node.index()]
+
+        elif bifurcation_type == 2:
+            u = self.nodes[bifurcation_point]
+            self.nodes[u.second_in_port.mother.parentItem().index()].second_parent = True
+
+            if node.index() not in self.table.input_columns:
+                self.table.add_files(node.index(), job_ids, downstream_nodes)
+            else:
+                self.table.update_files(node.index(), job_ids)
+            QApplication.processEvents()
+            u.first_ids = self.table.input_columns[node.index()]
+            u.second_ids = list(map(lambda x: x+1000, self.table.input_columns[node.index()]))
 
         else:
             if node.index() not in self.table.input_columns:
@@ -295,15 +319,22 @@ class MultiScene(QGraphicsScene):
         job_ids = options[2]
         downstream_nodes = [u for u in visit(self.adj_list, node_index)]
 
-        bifurcation_point, nodes_to_ignore = self._bifurcate(downstream_nodes)
-        if nodes_to_ignore:
+        bifurcation_type, bifurcation_point, nodes_to_ignore = self._bifurcate(downstream_nodes)
+        if bifurcation_type == 0:
             downstream_nodes = [u for u in downstream_nodes if u not in nodes_to_ignore]
             self.table.add_files(node_index, job_ids, downstream_nodes)
             self.nodes[bifurcation_point].second_ids = self.table.input_columns[node_index]
 
-        elif bifurcation_point > -1:
+        elif bifurcation_type == 1:
             self.table.add_files(node_index, job_ids, downstream_nodes)
             self.nodes[bifurcation_point].first_ids = self.table.input_columns[node_index]
+
+        elif bifurcation_type == 2:
+            u = self.nodes[bifurcation_point]
+            self.nodes[u.second_in_port.mother.parentItem().index()].second_parent = True
+            self.table.add_files(node_index, job_ids, downstream_nodes)
+            u.first_ids = self.table.input_columns[node_index]
+            u.second_ids = list(map(lambda x: x+1000, self.table.input_columns[node_index]))
 
         else:
             self.table.add_files(node_index, job_ids, downstream_nodes)
@@ -622,7 +653,6 @@ class MultiWidget(QWidget):
         # enqueue tasks from child nodes
         if success:
             current_node.nb_success += 1
-
             next_nodes = self.scene.adj_list[node_id]
             for next_node_id in next_nodes:
                 next_node = self.scene.nodes[next_node_id]
@@ -632,7 +662,10 @@ class MultiWidget(QWidget):
                                                       next_node.options, csv_separator)))
                     nb_tasks += 1
                 elif next_node.two_in_one_out:
-                    new_task_available = self._get_double_input_task(fun, next_node, next_node_id, fid, data)
+                    if current_node.second_parent:
+                        new_task_available = self._get_double_input_task(fun, next_node, next_node_id, 1000+fid, data)
+                    else:
+                        new_task_available = self._get_double_input_task(fun, next_node, next_node_id, fid, data)
                     if new_task_available:
                         nb_tasks += 1
                 else:

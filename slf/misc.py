@@ -578,6 +578,178 @@ class SynchMaxCalculator:
             self.synch_max_in_frame(time_index)
 
 
+class ComplexExpression:
+    """!
+    expression object in an expression pool
+    """
+    def __init__(self, index):
+        self.index = index
+        self.polygonal = False  # polygonal expression can only be evaluated inside a masked expression
+        self.masked = False  # masked expression cannot be composed to create new expression
+        self.mask_id = 0
+
+    def __repr__(self):
+        return ''
+
+    def __str__(self):
+        return 'E%d: %s' % (self.index, repr(self))
+
+    def code(self):
+        return 'E%d' % self.index
+
+    def evaluate(self, values, mask=None):
+        return []
+
+
+class SimpleExpression(ComplexExpression):
+    """!
+    expression object in an expression pool
+    """
+    def __init__(self, index, postfix, literal_expression):
+        super().__init__(index)
+        self.expression = postfix
+        self.tight_expression = tighten_expression(literal_expression)
+
+    def __repr__(self):
+        return self.tight_expression
+
+    def evaluate(self, values, mask=None):
+        stack = []
+        for symbol in self.expression:
+            if symbol in OPERATORS:
+                if symbol in ('sqrt', 'sin', 'cos', 'atan'):
+                    operand = stack.pop()
+                    stack.append(_OPERATIONS[symbol](operand))
+                else:
+                    first_operand = stack.pop()
+                    second_operand = stack.pop()
+                    stack.append(_OPERATIONS[symbol](first_operand, second_operand))
+            else:
+                if symbol[0] == '[':
+                    stack.append(values[symbol[1:-1]])
+                else:
+                    stack.append(float(symbol))
+        return stack.pop()
+
+
+class ConditionalExpression(ComplexExpression):
+    def __init__(self, index, condition, true_expression, false_expression):
+        super().__init__(index)
+        self.condition = condition
+        self.true_expression = true_expression
+        self.false_expression = false_expression
+
+    def __repr__(self):
+        return 'IF (%s) THEN (%s) ELSE (%s)' % (self.condition.text, repr(self.true_expression),
+                                                repr(self.false_expression))
+
+    def evaluate(self, values, mask=None):
+        condition = values[self.condition.code()]
+        return np.where(condition, values[self.true_expression.code()], values[self.false_expression.code()])
+
+
+class MaxMinExpression(ComplexExpression):
+    def __init__(self, index, first_expression, second_expression, is_max):
+        super().__init__(index)
+        self.first_expression = first_expression
+        self.second_expression = second_expression
+        self.is_max = is_max
+
+    def __repr__(self):
+        return '%s(%s, %s)' % ('MAX' if self.is_max else 'MIN',
+                               repr(self.first_expression), repr(self.second_expression))
+
+    def evaluate(self, values, mask=None):
+        if self.is_max:
+            return np.maximum(values[self.first_expression.code()], values[self.second_expression.code()])
+        else:
+            return np.miminm(values[self.first_expression.code()], values[self.second_expression.code()])
+
+
+class PolygonalMask:
+    def __init__(self, index, mask, values):
+        self.index = index
+        self.mask = mask
+        self.values = values
+        self.children = []
+        self.nb_children = 0
+
+    def code(self):
+        return 'POLY%d' % self.index
+
+    def add_child(self, child):
+        self.nb_children += 1
+        self.children.append(child.code())
+
+
+class MaskedExpression(ComplexExpression):
+    def __init__(self, index, inside_expression, outside_expression):
+        super().__init__(index)
+        self.inside_expression = inside_expression
+        self.outside_expression = outside_expression
+        self.masked = True
+        self.polygonal = True
+        self.mask_id = self.inside_expression.mask_id
+
+    def __repr__(self):
+        return 'IF (POLY%s) THEN (%s) ELSE (%s)' % (self.mask_id,
+                                                    repr(self.inside_expression),
+                                                    repr(self.outside_expression))
+
+    def evaluate(self, values, mask=None):
+        return np.where(mask, values[self.inside_expression.code()], values[self.outside_expression.code()])
+
+
+class ComplexConditionPool:
+    """!
+    condition container
+    """
+    def __init__(self):
+        self.nb_conditions = 0
+        self.conditions = {}
+
+    def add_condition(self, expression, comparator, threshold):
+        self.nb_conditions += 1
+        new_condition = ComplexCondition(self.nb_conditions, expression, comparator, threshold)
+        self.conditions[self.nb_conditions] = new_condition
+        return new_condition
+
+    def clear(self):
+        self.nb_conditions = 0
+        self.conditions = {}
+
+
+class ComplexCondition:
+    """!
+    condition object enable conditional expressions
+    """
+    def __init__(self, index, expression, comparator, threshold):
+        self.index = index
+        self.expression = expression
+        self.str_ = 'C%d: %s %s %s' % (self.index, repr(self.expression), comparator, str(threshold))
+        self.text = '%s %s %s' % (repr(self.expression), comparator, str(threshold))
+        self.polygonal = expression.polygonal
+        self.mask_id = expression.mask_id
+
+        if comparator == '>':
+            self._evaluate = lambda value: value > threshold
+        elif comparator == '<':
+            self._evaluate = lambda value: value < threshold
+        elif comparator == '>=':
+            self._evaluate = lambda value: value >= threshold
+        else:
+            self._evaluate = lambda value: value <= threshold
+
+    def __str__(self):
+        return self.str_
+
+    def code(self):
+        return 'C%d' % self.index
+
+    def evaluate(self, current_values):
+        return self._evaluate(current_values[self.expression.code()])
+
+
 class ComplexExpressionPool:
     def __init__(self):
         self.vars = []
@@ -741,10 +913,10 @@ class ComplexExpressionPool:
             for i, point in self.points():
                 if poly.contains(point):
                     mask[i] = index+1
-        values = {}
+        masked_values = np.zeros_like(self.x)
         for index, poly in enumerate(polygons):
-            values[index+1] = poly.attributes()[attribute_index]
-        self.masks[self.nb_masks] = PolygonalMask(self.nb_masks, mask, values)
+            masked_values[mask == index+1] = poly.attributes()[attribute_index]
+        self.masks[self.nb_masks] = PolygonalMask(self.nb_masks, mask > 0, masked_values)
 
     def get_expression(self, str_expression):
         index = int(str_expression.split(':')[0][1:])
@@ -850,138 +1022,51 @@ class ComplexExpressionPool:
         dependence.reverse()
         return dependence
 
+    def evaluate_expressions(self, input_stream, selected_expressions):
+        # build augmented path
+        augmented_path = self.get_dependence(selected_expressions[0])
+        for expr in selected_expressions[1:]:
+            path = self.get_dependence(expr)
+            for node in path:
+                if node not in augmented_path:
+                    augmented_path.append(node)
 
-class ComplexExpression:
-    """!
-    expression object in an expression pool
-    """
-    def __init__(self, index):
-        self.index = index
-        self.polygonal = False  # polygonal expression can only be evaluated inside a masked expression
-        self.masked = False  # masked expression cannot be composed to create new expression
-        self.mask_id = 0
+        # evaluate each node on the augmented path
+        for time_index, time_value in enumerate(input_stream.time):
+            self._evaluate_expressions(input_stream, time_index, augmented_path)
 
-    def __repr__(self):
-        return ''
-
-    def __str__(self):
-        return 'E%d: %s' % (self.index, repr(self))
-
-    def code(self):
-        return 'E%d' % self.index
-
-
-class SimpleExpression(ComplexExpression):
-    """!
-    expression object in an expression pool
-    """
-    def __init__(self, index, postfix, literal_expression):
-        super().__init__(index)
-        self.expression = postfix
-        self.tight_expression = tighten_expression(literal_expression)
-
-    def __repr__(self):
-        return self.tight_expression
-
-
-class ConditionalExpression(ComplexExpression):
-    def __init__(self, index, condition, true_expression, false_expression):
-        super().__init__(index)
-        self.condition = condition
-        self.true_expression = true_expression
-        self.false_expression = false_expression
-
-    def __repr__(self):
-        return 'IF (%s) THEN (%s) ELSE (%s)' % (self.condition.text, repr(self.true_expression),
-                                                repr(self.false_expression))
-
-
-class MaxMinExpression(ComplexExpression):
-    def __init__(self, index, first_expression, second_expression, is_max):
-        super().__init__(index)
-        self.first_expression = first_expression
-        self.second_expression = second_expression
-        self.is_max = is_max
-
-    def __repr__(self):
-        return '%s(%s, %s)' % ('MAX' if self.is_max else 'MIN',
-                               repr(self.first_expression), repr(self.second_expression))
-
-
-class PolygonalMask:
-    def __init__(self, index, mask, values):
-        self.index = index
-        self.masks = mask
-        self.values = values
-        self.children = []
-        self.nb_children = 0
-
-    def code(self):
-        return 'POLY%d' % self.index
-
-    def add_child(self, child):
-        self.nb_children += 1
-        self.children.append(child.code())
-
-
-class MaskedExpression(ComplexExpression):
-    def __init__(self, index, inside_expression, outside_expression):
-        super().__init__(index)
-        self.inside_expression = inside_expression
-        self.outside_expression = outside_expression
-        self.masked = True
-        self.polygonal = True
-        self.mask_id = self.inside_expression.mask_id
-
-    def __repr__(self):
-        return 'IF (POLY%s) THEN (%s) ELSE (%s)' % (self.mask_id,
-                                                    repr(self.inside_expression),
-                                                    repr(self.outside_expression))
-
-
-class ComplexConditionPool:
-    """!
-    condition container
-    """
-    def __init__(self):
-        self.nb_conditions = 0
-        self.conditions = {}
-
-    def add_condition(self, expression, comparator, threshold):
-        self.nb_conditions += 1
-        new_condition = ComplexCondition(self.nb_conditions, expression, comparator, threshold)
-        self.conditions[self.nb_conditions] = new_condition
-        return new_condition
-
-    def clear(self):
-        self.nb_conditions = 0
-        self.conditions = {}
-
-
-class ComplexCondition:
-    """!
-    condition object enable conditional expressions
-    """
-    def __init__(self, index, expression, comparator, threshold):
-        self.index = index
-        self.expression = expression
-        self.str_ = 'C%d: %s %s %s' % (self.index, repr(self.expression), comparator, str(threshold))
-        self.text = '%s %s %s' % (repr(self.expression), comparator, str(threshold))
-        self.polygonal = expression.polygonal
-        self.mask_id = expression.mask_id
-
-        if comparator == '>':
-            self.evaluate = lambda value: value > threshold
-        elif comparator == '<':
-            self.evaluate = lambda value: value < threshold
-        elif comparator == '>=':
-            self.evaluate = lambda value: value >= threshold
+    def decode(self, input_stream, time_index, node_code):
+        if node_code == 'COORDX':
+            return self.x, None
+        elif node_code == 'COORDY':
+            return self.y, None
+        elif node_code in self.vars:
+            return input_stream.read_var_in_frame(time_index, node_code), None
+        elif node_code[:4] == 'POLY':
+            index = int(node_code[4:])
+            return self.masks[index].values
+        elif node_code[0] == 'C':
+            index = int(node_code[1:])
+            return [], self.condition_pool.conditions[index]
         else:
-            self.evaluate = lambda value: value <= threshold
+            index = int(node_code[1:])
+            return [], self.expressions[index]
 
-    def __str__(self):
-        return self.str_
+    def _evaluate_expressions(self, input_stream, time_index, path):
+        values = {node: None for node in path}
+        for node in path:
+            node_values, node_object = self.decode(input_stream, time_index, node)
+            if not node_values:
+                if node_object.masked:
+                    node_values = node_object.evaluate(values, self.masks[node_object.mask_id].mask)
+                else:
+                    node_values = node_object.evaluate(values)
+                if type(node_values) == float:  # single constant expression
+                    node_values = np.ones_like(self.x) * node_values
+            values[node] = node_values
+        return values
 
-    def code(self):
-        return 'C%d' % self.index
+
+
+
 
