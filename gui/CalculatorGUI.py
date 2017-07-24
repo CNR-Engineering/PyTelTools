@@ -167,8 +167,8 @@ class ExpressionDialog(QDialog):
                 continue
             self.true_box.addItem(str(expr))
             self.false_box.addItem(str(expr))
-        for i in range(1, self.pool.condition_pool.nb_conditions+1):
-            self.condition_box.addItem(str(self.pool.condition_pool.conditions[i]))
+        for i in range(1, self.pool.nb_conditions+1):
+            self.condition_box.addItem(str(self.pool.conditions[i]))
         vlayout = QVBoxLayout()
         glayout = QGridLayout()
         glayout.addWidget(QLabel('Condition'), 1, 1, Qt.AlignHCenter)
@@ -669,7 +669,7 @@ class EditorTab(QWidget):
         dlg = ConditionDialog(self.pool)
         value = dlg.exec_()
         if value == QDialog.Accepted:
-            new_condition = str(self.pool.condition_pool.conditions[self.pool.condition_pool.nb_conditions])
+            new_condition = str(self.pool.conditions[self.pool.nb_conditions])
             item = QListWidgetItem(new_condition)
             self.condition_list.addItem(item)
 

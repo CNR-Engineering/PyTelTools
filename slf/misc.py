@@ -700,25 +700,6 @@ class MaskedExpression(ComplexExpression):
         return np.where(mask, values[self.inside_expression.code()], values[self.outside_expression.code()])
 
 
-class ComplexConditionPool:
-    """!
-    condition container
-    """
-    def __init__(self):
-        self.nb_conditions = 0
-        self.conditions = {}
-
-    def add_condition(self, expression, comparator, threshold):
-        self.nb_conditions += 1
-        new_condition = ComplexCondition(self.nb_conditions, expression, comparator, threshold)
-        self.conditions[self.nb_conditions] = new_condition
-        return new_condition
-
-    def clear(self):
-        self.nb_conditions = 0
-        self.conditions = {}
-
-
 class ComplexCondition:
     """!
     condition object enable conditional expressions
@@ -755,26 +736,30 @@ class ComplexExpressionPool:
         self.vars = []
         self.var_names = []
         self.id_pool = []
-        self.expressions = {}
+        self.x = []
+        self.y = []
+
         self.nb_expressions = 0
+        self.expressions = {}
+        self.nb_conditions = 0
+        self.conditions = {}
         self.nb_masks = 0
         self.masks = {}
-        self.condition_pool = ComplexConditionPool()
+
         self.dependency_graph = {}
-        self.x = None
-        self.y = None
 
     def clear(self):
-        self.expressions = {}
+        self.x = []
+        self.y = []
         self.nb_expressions = 0
+        self.expressions = {}
+        self.nb_conditions = 0
+        self.conditions = {}
         self.nb_masks = 0
         self.masks = {}
-        self.x = None
-        self.y = None
 
     def init(self, variables, names, x, y):
         self.clear()
-        self.condition_pool.clear()
         self.x = x
         self.y = y
         self.vars = ['COORDX', 'COORDY'] + variables
@@ -899,7 +884,9 @@ class ComplexExpressionPool:
         self.dependency_graph[new_id] = {inside_expression.code(), outside_expression.code()}
 
     def add_condition(self, expression, comparator, threshold):
-        new_condition = self.condition_pool.add_condition(expression, comparator, threshold)
+        self.nb_conditions += 1
+        new_condition = ComplexCondition(self.nb_conditions, expression, comparator, threshold)
+        self.conditions[self.nb_conditions] = new_condition
         new_id = new_condition.code()
         self.dependency_graph[new_id] = {expression.code()}
 
@@ -924,7 +911,7 @@ class ComplexExpressionPool:
 
     def get_condition(self, str_condition):
         index = int(str_condition.split(':')[0][1:])
-        return self.condition_pool.conditions[index]
+        return self.conditions[index]
 
     def get_mask(self, str_mask):
         index = int(str_mask[4:])
@@ -937,10 +924,11 @@ class ComplexExpressionPool:
         # case 2: there are only non-polygonal conditions
         #         at least two non-polygonal expressions
         # case 3: mixed case (then there are at least one polygonal expression and one non-polygonal expression)
-        if self.condition_pool.nb_conditions == 0:
+        #         always ready
+        if self.nb_conditions == 0:
             return False
         nb_polygonal, nb_non_polygonal = 0, 0
-        for condition in self.condition_pool.conditions.values():
+        for condition in self.conditions.values():
             if condition.polygonal:
                 nb_polygonal += 1
             else:
@@ -1033,7 +1021,8 @@ class ComplexExpressionPool:
 
         # evaluate each node on the augmented path
         for time_index, time_value in enumerate(input_stream.time):
-            self._evaluate_expressions(input_stream, time_index, augmented_path)
+            values = self._evaluate_expressions(input_stream, time_index, augmented_path)
+            yield time_value, [values[expr] for expr in selected_expressions]
 
     def decode(self, input_stream, time_index, node_code):
         if node_code == 'COORDX':
@@ -1047,7 +1036,7 @@ class ComplexExpressionPool:
             return self.masks[index].values
         elif node_code[0] == 'C':
             index = int(node_code[1:])
-            return [], self.condition_pool.conditions[index]
+            return [], self.conditions[index]
         else:
             index = int(node_code[1:])
             return [], self.expressions[index]
