@@ -29,9 +29,6 @@ class SerafinData:
     def read(self):
         with Serafin.Read(self.filename, self.language) as resin:
             resin.read_header()
-
-            if not resin.header.is_2d:
-                return False
             resin.get_time()
 
             self.header = resin.header.copy()
@@ -47,7 +44,7 @@ class SerafinData:
         self.selected_vars_names = {var_id: (var_name, var_unit) for (var_id, var_name, var_unit)
                                     in zip(self.header.var_IDs, self.header.var_names, self.header.var_units)}
         self.selected_time_indices = list(range(len(self.time)))
-        return True
+        return self.header.is_2d
 
     def copy(self):
         copy_data = SerafinData(self.job_id, self.filename, self.language)

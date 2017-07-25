@@ -16,7 +16,7 @@ class ShowMeshNode(SingleInputNode):
         super().__init__(index)
         self.category = 'Visualization'
         self.label = 'Show\nMesh'
-        self.in_port.data_type = 'slf'
+        self.in_port.data_type = ('slf',)
         self.state = Node.READY
 
         canvas = MapCanvas()
@@ -34,7 +34,7 @@ class ShowMeshNode(SingleInputNode):
         super().reconfigure()
         self.has_map = False
 
-    def configure(self):
+    def configure(self, check=None):
         if not self.in_port.has_mother():
             QMessageBox.critical(None, 'Error', 'Connect and run the input before configure this node!',
                                  QMessageBox.Ok)
@@ -52,7 +52,10 @@ class ShowMeshNode(SingleInputNode):
                 QMessageBox.critical(None, 'Error', 'Configure and run the input before configure this node!',
                                      QMessageBox.Ok)
                 return
-
+        if not parent_node.data.header.is_2d:
+            QMessageBox.critical(None, 'Error', 'The input file is not 2D.',
+                                 QMessageBox.Ok)
+            return
         if self.has_map:
             self.map.show()
         else:
@@ -69,6 +72,9 @@ class ShowMeshNode(SingleInputNode):
         if not success:
             self.fail('input failed.')
             return
+        if not self.in_port.mother.parentItem().data.header.is_2d:
+            self.fail('the input file is not 2D.')
+            return
         if not self.has_map:
             mesh = Mesh2D(self.in_port.mother.parentItem().data.header)
             self.map.canvas.initFigure(mesh)
@@ -83,8 +89,8 @@ class LocateOpenLinesNode(DoubleInputNode):
         super().__init__(index)
         self.category = 'Visualization'
         self.label = 'Locate\nOpen\nLines'
-        self.first_in_port.data_type = 'slf'
-        self.second_in_port.data_type = 'polyline 2d'
+        self.first_in_port.data_type = ('slf',)
+        self.second_in_port.data_type = ('polyline 2d',)
         self.state = Node.READY
 
         canvas = LineMapCanvas()
@@ -120,7 +126,10 @@ class LocateOpenLinesNode(DoubleInputNode):
                 QMessageBox.critical(None, 'Error', 'Configure and run the input before configure this node!',
                                      QMessageBox.Ok)
                 return
-
+        if not parent_node.data.header.is_2d:
+            QMessageBox.critical(None, 'Error', 'The input file is not 2D.',
+                                 QMessageBox.Ok)
+            return
         line_node = self.second_in_port.mother.parentItem()
         if line_node.state != Node.SUCCESS:
             if line_node.ready_to_run():
@@ -152,6 +161,9 @@ class LocateOpenLinesNode(DoubleInputNode):
         success = super().run_upward()
         if not success:
             self.fail('input failed.')
+            return
+        if not self.first_in_port.mother.parentItem().data.header.is_2d:
+            self.fail('the input file is not 2D.')
             return
         if not self.has_map:
             line_node = self.second_in_port.mother.parentItem()
@@ -171,8 +183,8 @@ class LocatePolygonsNode(DoubleInputNode):
         super().__init__(index)
         self.category = 'Visualization'
         self.label = 'Locate\nPolygons'
-        self.first_in_port.data_type = 'slf'
-        self.second_in_port.data_type = 'polygon 2d'
+        self.first_in_port.data_type = ('slf',)
+        self.second_in_port.data_type = ('polygon 2d',)
         self.state = Node.READY
 
         canvas = PolygonMapCanvas()
@@ -190,7 +202,7 @@ class LocatePolygonsNode(DoubleInputNode):
         super().reconfigure()
         self.has_map = False
 
-    def configure(self):
+    def configure(self, check=None):
         if not self.first_in_port.has_mother() or not self.second_in_port.has_mother():
             QMessageBox.critical(None, 'Error', 'Connect and run the input before configure this node!',
                                  QMessageBox.Ok)
@@ -208,7 +220,10 @@ class LocatePolygonsNode(DoubleInputNode):
                 QMessageBox.critical(None, 'Error', 'Configure and run the input before configure this node!',
                                      QMessageBox.Ok)
                 return
-
+        if not parent_node.data.header.is_2d:
+            QMessageBox.critical(None, 'Error', 'The input file is not 2D.',
+                                 QMessageBox.Ok)
+            return
         line_node = self.second_in_port.mother.parentItem()
         if line_node.state != Node.SUCCESS:
             if line_node.ready_to_run():
@@ -239,6 +254,9 @@ class LocatePolygonsNode(DoubleInputNode):
         if not success:
             self.fail('input failed.')
             return
+        if not self.first_in_port.mother.parentItem().data.header.is_2d:
+            self.fail('the input file is not 2D.')
+            return
         line_node = self.second_in_port.mother.parentItem()
         if not self.has_map:
             mesh = Mesh2D(self.first_in_port.mother.parentItem().data.header)
@@ -255,8 +273,8 @@ class LocatePointsNode(DoubleInputNode):
         super().__init__(index)
         self.category = 'Visualization'
         self.label = 'Locate\nPoints'
-        self.first_in_port.data_type = 'slf'
-        self.second_in_port.data_type = 'point 2d'
+        self.first_in_port.data_type = ('slf',)
+        self.second_in_port.data_type = ('point 2d',)
         self.state = Node.READY
 
         canvas = MapCanvas()
@@ -292,7 +310,10 @@ class LocatePointsNode(DoubleInputNode):
                 QMessageBox.critical(None, 'Error', 'Configure and run the input before configure this node!',
                                      QMessageBox.Ok)
                 return
-
+        if not parent_node.data.header.is_2d:
+            QMessageBox.critical(None, 'Error', 'The input file is not 2D.',
+                                 QMessageBox.Ok)
+            return
         point_node = self.second_in_port.mother.parentItem()
         if point_node.state != Node.SUCCESS:
             if point_node.ready_to_run():
@@ -332,6 +353,9 @@ class LocatePointsNode(DoubleInputNode):
         if not success:
             self.fail('input failed.')
             return
+        if not self.first_in_port.mother.parentItem().data.header.is_2d:
+            self.fail('the input file is not 2D.')
+            return
         if not self.has_map:
             mesh = Mesh2D(self.first_in_port.mother.parentItem().data.header)
             self.map.canvas.initFigure(mesh)
@@ -353,7 +377,7 @@ class VolumePlotNode(SingleInputNode):
         super().__init__(index)
         self.category = 'Visualization'
         self.label = 'Volume\nPlot'
-        self.in_port.data_type = 'volume csv'
+        self.in_port.data_type = ('volume csv',)
         self.state = Node.READY
         self.plot_viewer = VolumePlotViewer()
         self.has_plot = False
@@ -415,7 +439,7 @@ class FluxPlotNode(SingleInputNode):
         super().__init__(index)
         self.category = 'Visualization'
         self.label = 'Flux\nPlot'
-        self.in_port.data_type = 'flux csv'
+        self.in_port.data_type = ('flux csv',)
         self.state = Node.READY
         self.plot_viewer = FluxPlotViewer()
         self.has_plot = False
@@ -477,7 +501,7 @@ class PointPlotNode(SingleInputNode):
         super().__init__(index)
         self.category = 'Visualization'
         self.label = 'Point\nPlot'
-        self.in_port.data_type = 'point csv'
+        self.in_port.data_type = ('point csv',)
         self.state = Node.READY
         self.plot_viewer = PointPlotViewer()
         self.has_plot = False
@@ -495,7 +519,7 @@ class PointPlotNode(SingleInputNode):
         self.plot_viewer.reset()
         self.plot_viewer.current_columns = ('Point 1',)
 
-    def configure(self):
+    def configure(self, check=None):
         if not self.in_port.has_mother():
             QMessageBox.critical(None, 'Error', 'Connect and run the input before configure this node!',
                                  QMessageBox.Ok)
@@ -539,7 +563,7 @@ class PointAttributeTableNode(SingleInputNode):
         super().__init__(index)
         self.category = 'Visualization'
         self.label = 'Point\nAttribute\nTable'
-        self.in_port.data_type = 'point 2d'
+        self.in_port.data_type = ('point 2d',)
         self.state = Node.READY
         self.table = PointAttributeTable()
         self.has_table = False

@@ -198,7 +198,7 @@ class SerafinHeader:
 
         # Build ikle2d
         if not self.is_2d:
-            ikle = self.ikle.reshape(self.nb_nodes_per_elem, self.nb_elements)  # 3D: ikle has different shape thant 2D
+            ikle = self.ikle.reshape(self.nb_elements, self.nb_nodes_per_elem)
             self.ikle_2d = np.empty([self.nb_elements // (self.nb_planes - 1), 3], dtype=int)
             nb_lines = self.ikle_2d.shape[0]
             # test the integer division
@@ -206,7 +206,7 @@ class SerafinHeader:
                 module_logger.error('ERROR: (3D) The number of elements is not divisible by (number of planes - 1)')
                 raise SerafinValidationError('Something wrong with ikle 3D dimension')
             for i in range(nb_lines):
-                self.ikle_2d[i] = ikle[[0, 1, 2], i]   # first three rows = bottom frame
+                self.ikle_2d[i] = ikle[i, [0, 1, 2]]
         else:
             self.ikle_2d = self.ikle.reshape(self.nb_elements, self.nb_nodes_per_elem)
 

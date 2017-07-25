@@ -15,7 +15,7 @@ class Port(QGraphicsRectItem):
         super().__init__(x, y, Port.WIDTH, Port.WIDTH)
         self._index = index
         self.type = port_type
-        self.data_type = ''
+        self.data_type = tuple()
         self.setFlag(QGraphicsItem.ItemIsSelectable)
 
     def index(self):
@@ -442,7 +442,7 @@ class SingleInputNode(Node):
 
     def help(self):
         QMessageBox.information(None, 'Help',
-                                'Input type: %s' % self.in_port.data_type,
+                                'Input type: %s' % ', '.join(self.in_port.data_type),
                                 QMessageBox.Ok)
 
 
@@ -470,7 +470,7 @@ class SingleOutputNode(Node):
 
     def help(self):
         QMessageBox.information(None, 'Help',
-                                'Output type: %s' % self.out_port.data_type,
+                                'Output type: %s' % ', '.join(self.out_port.data_type),
                                 QMessageBox.Ok)
 
 
@@ -509,7 +509,8 @@ class OneInOneOutNode(Node):
     def help(self):
         QMessageBox.information(None, 'Help',
                                 'Input type: %s\n'
-                                'Output type: %s' % (self.in_port.data_type, self.out_port.data_type),
+                                'Output type: %s' % (', '.join(self.in_port.data_type),
+                                                     ', '.join(self.out_port.data_type)),
                                 QMessageBox.Ok)
 
 
@@ -559,9 +560,9 @@ class TwoInOneOutNode(Node):
         QMessageBox.information(None, 'Help',
                                 'First input type: %s\n'
                                 'Second input type: %s\n'
-                                'Output type: %s' % (self.first_in_port.data_type,
-                                                     self.second_in_port.data_type,
-                                                     self.out_port.data_type),
+                                'Output type: %s' % (', '.join(self.first_in_port.data_type),
+                                                     ', '.join(self.second_in_port.data_type),
+                                                     ', '.join(self.out_port.data_type)),
                                 QMessageBox.Ok)
 
 
@@ -600,8 +601,8 @@ class DoubleInputNode(Node):
     def help(self):
         QMessageBox.information(None, 'Help',
                                 'First input type: %s\n'
-                                'Second input type: %s' % (self.first_in_port.data_type,
-                                                           self.second_in_port.data_type),
+                                'Second input type: %s' % (', '.join(self.first_in_port.data_type),
+                                                           ', '.join(self.second_in_port.data_type)),
                                 QMessageBox.Ok)
 
 

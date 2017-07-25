@@ -5,7 +5,7 @@ from workflow.nodes_calc import *
 from workflow.nodes_vis import *
 
 
-NODES = {'Input/Output': {'Load Serafin': LoadSerafinNode,
+NODES = {'Input/Output': {'Load Serafin': LoadSerafinNode, 'Load Serafin 3D': LoadSerafin3DNode,
                           'Load 2D Polygons': LoadPolygon2DNode, 'Load 2D Open Polylines': LoadOpenPolyline2DNode,
                           'Load 2D Points': LoadPoint2DNode,
                           'Write Serafin': WriteSerafinNode},
@@ -33,9 +33,9 @@ def add_link(from_port, to_port):
         return False, 'already'
     if to_port.has_mother():
         return False, 'another'
-    if to_port.data_type != 'all' and from_port.data_type != 'all':
-        if to_port.data_type != from_port.data_type:
-            return False, 'type'
+    intersection = [u for u in from_port.data_type if u in to_port.data_type]
+    if not intersection:
+        return False, 'type'
     from_port.connect(to_port)
     to_port.connect(from_port)
     return True, ''

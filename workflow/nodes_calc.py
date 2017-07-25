@@ -18,8 +18,8 @@ class ArrivalDurationNode(OneInOneOutNode):
         super().__init__(index)
         self.category = 'Calculations'
         self.label = 'Compute\nArrival\nDuration'
-        self.out_port.data_type = 'slf'
-        self.in_port.data_type = 'slf'
+        self.out_port.data_type = ('slf',)
+        self.in_port.data_type = ('slf',)
         self.in_data = None
         self.data = None
 
@@ -178,6 +178,11 @@ class ArrivalDurationNode(OneInOneOutNode):
 
     def _reset(self):
         self.in_data = self.in_port.mother.parentItem().data
+        if not self.in_data.header.is_2d:
+            self.state = Node.NOT_CONFIGURED
+            self.reconfigure_downward()
+            self.update()
+            return
         if not self.conditions:
             self.state = Node.NOT_CONFIGURED
             self.reconfigure_downward()
@@ -247,6 +252,11 @@ class ArrivalDurationNode(OneInOneOutNode):
                 QMessageBox.critical(None, 'Error', 'The input data is already the result of another computation.',
                                      QMessageBox.Ok)
             return
+        self.in_data = self.in_port.mother.parentItem().data
+        if not self.in_data.header.is_2d:
+            QMessageBox.critical(None, 'Error', 'The input file is not 2D.',
+                                 QMessageBox.Ok)
+            return
         if self.state != Node.SUCCESS:
             self._reset()
         if super().configure():
@@ -297,9 +307,9 @@ class ComputeVolumeNode(TwoInOneOutNode):
         super().__init__(index)
         self.category = 'Calculations'
         self.label = 'Compute\nVolume'
-        self.out_port.data_type = 'volume csv'
-        self.first_in_port.data_type = 'slf'
-        self.second_in_port.data_type = 'polygon 2d'
+        self.out_port.data_type = ('volume csv',)
+        self.first_in_port.data_type = ('slf',)
+        self.second_in_port.data_type = ('polygon 2d',)
         self.in_data = None
         self.data = None
 
@@ -376,6 +386,11 @@ class ComputeVolumeNode(TwoInOneOutNode):
 
     def _reset(self):
         self.in_data = self.first_in_port.mother.parentItem().data
+        if not self.in_data.header.is_2d:
+            self.state = Node.NOT_CONFIGURED
+            self.reconfigure_downward()
+            self.update()
+            return
         if self.first_var is None:
             return
         available_vars = [var for var in self.in_data.selected_vars if var in self.in_data.header.var_IDs]
@@ -438,6 +453,11 @@ class ComputeVolumeNode(TwoInOneOutNode):
                 return
         if parent_node.data.operator is not None:
             QMessageBox.critical(None, 'Error', 'The input data is already the result of another computation.',
+                                 QMessageBox.Ok)
+            return
+        self.in_data = self.first_in_port.mother.parentItem().data
+        if not self.in_data.header.is_2d:
+            QMessageBox.critical(None, 'Error', 'The input file is not 2D.',
                                  QMessageBox.Ok)
             return
         if self.state != Node.SUCCESS:
@@ -576,9 +596,9 @@ class ComputeFluxNode(TwoInOneOutNode):
         super().__init__(index)
         self.category = 'Calculations'
         self.label = 'Compute\nFlux'
-        self.out_port.data_type = 'flux csv'
-        self.first_in_port.data_type = 'slf'
-        self.second_in_port.data_type = 'polyline 2d'
+        self.out_port.data_type = ('flux csv',)
+        self.first_in_port.data_type = ('slf',)
+        self.second_in_port.data_type = ('polyline 2d',)
         self.in_data = None
         self.data = None
 
@@ -654,6 +674,11 @@ class ComputeFluxNode(TwoInOneOutNode):
 
     def _reset(self):
         self.in_data = self.first_in_port.mother.parentItem().data
+        if not self.in_data.header.is_2d:
+            self.state = Node.NOT_CONFIGURED
+            self.reconfigure_downward()
+            self.update()
+            return
         if self.flux_options:
             for i in range(self.flux_type_box.count()):
                 text = self.flux_type_box.itemText(i)
@@ -727,6 +752,11 @@ class ComputeFluxNode(TwoInOneOutNode):
                 return
         if parent_node.data.operator is not None:
             QMessageBox.critical(None, 'Error', 'The input data is already the result of another computation.',
+                                 QMessageBox.Ok)
+            return
+        self.in_data = self.first_in_port.mother.parentItem().data
+        if not self.in_data.header.is_2d:
+            QMessageBox.critical(None, 'Error', 'The input file is not 2D.',
                                  QMessageBox.Ok)
             return
         available_vars = [var for var in parent_node.data.header.var_IDs if var in parent_node.data.selected_vars]
@@ -870,9 +900,9 @@ class InterpolateOnPointsNode(TwoInOneOutNode):
         super().__init__(index)
         self.category = 'Calculations'
         self.label = 'Interpolate\non\nPoints'
-        self.out_port.data_type = 'point csv'
-        self.first_in_port.data_type = 'slf'
-        self.second_in_port.data_type = 'point 2d'
+        self.out_port.data_type = ('point csv',)
+        self.first_in_port.data_type = ('slf',)
+        self.second_in_port.data_type = ('point 2d',)
         self.in_data = None
         self.data = None
         self.state = Node.READY
@@ -978,6 +1008,9 @@ class InterpolateOnPointsNode(TwoInOneOutNode):
             return
 
         self.in_data = self.first_in_port.mother.parentItem().data
+        if not self.in_data.header.is_2d:
+            self.fail('the input file is not 2D')
+            return
         if self.in_data.operator is not None:
             self.fail('the input data is already the result of another computation.')
             return
@@ -1029,9 +1062,9 @@ class InterpolateAlongLinesNode(TwoInOneOutNode):
         super().__init__(index)
         self.category = 'Calculations'
         self.label = 'Interpolate\nalong\nLines'
-        self.out_port.data_type = 'lines csv'
-        self.first_in_port.data_type = 'slf'
-        self.second_in_port.data_type = 'polyline 2d'
+        self.out_port.data_type = ('lines csv',)
+        self.first_in_port.data_type = ('slf',)
+        self.second_in_port.data_type = ('polyline 2d',)
         self.in_data = None
         self.data = None
         self.state = Node.READY
@@ -1144,6 +1177,9 @@ class InterpolateAlongLinesNode(TwoInOneOutNode):
             return
 
         self.in_data = self.first_in_port.mother.parentItem().data
+        if not self.in_data.header.is_2d:
+            self.fail('the input file is not 2D')
+            return
         if self.in_data.operator is not None:
             self.fail('the input data is already the result of another computation.')
             return
@@ -1188,9 +1224,9 @@ class ProjectLinesNode(TwoInOneOutNode):
         super().__init__(index)
         self.category = 'Calculations'
         self.label = 'Project\nLines'
-        self.out_port.data_type = 'proj lines csv'
-        self.first_in_port.data_type = 'slf'
-        self.second_in_port.data_type = 'polyline 2d'
+        self.out_port.data_type = ('proj lines csv',)
+        self.first_in_port.data_type = ('slf',)
+        self.second_in_port.data_type = ('polyline 2d',)
         self.data = None
 
         self.reference_index = -1
@@ -1256,6 +1292,10 @@ class ProjectLinesNode(TwoInOneOutNode):
             return
         if parent_node.data.operator is not None:
             QMessageBox.critical(None, 'Error', 'The input data is already the result of another computation.',
+                                 QMessageBox.Ok)
+            return
+        if not parent_node.data.header.is_2d:
+            QMessageBox.critical(None, 'Error', 'The input file is not 2D.',
                                  QMessageBox.Ok)
             return
 

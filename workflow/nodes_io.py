@@ -18,7 +18,7 @@ class LoadSerafinNode(SingleOutputNode):
         super().__init__(index)
         self.category = 'Input/Output'
         self.label = 'Load\nSerafin'
-        self.out_port.data_type = 'slf'
+        self.out_port.data_type = ('slf',)
 
         self.dir_path = ''
         self.slf_name = ''
@@ -63,7 +63,8 @@ class LoadSerafinNode(SingleOutputNode):
             self.fail('Access denied.')
             return
         data = SerafinData(self.job_id, os.path.join(self.dir_path, self.slf_name), self.scene().language)
-        if not data.read():
+        is_2d = data.read()
+        if not is_2d:
             self.data = None
             self.fail('the input file is not 2D.')
             return
@@ -74,8 +75,8 @@ class LoadSerafinNode(SingleOutputNode):
 class WriteSerafinNode(OneInOneOutNode):
     def __init__(self, index):
         super().__init__(index)
-        self.in_port.data_type = 'slf'
-        self.out_port.data_type = 'slf'
+        self.in_port.data_type = ('slf', 'slf 3d')
+        self.out_port.data_type = ('slf', 'slf 3d')
         self.category = 'Input/Output'
         self.label = 'Write\nSerafin'
         self.filename = ''
@@ -420,7 +421,7 @@ class LoadPolygon2DNode(SingleOutputNode):
         super().__init__(index)
         self.category = 'Input/Output'
         self.label = 'Load 2D\nPolygons'
-        self.out_port.data_type = 'polygon 2d'
+        self.out_port.data_type = ('polygon 2d',)
         self.name_box = None
         self.filename = ''
         self.data = None
@@ -515,7 +516,7 @@ class LoadOpenPolyline2DNode(SingleOutputNode):
         super().__init__(index)
         self.category = 'Input/Output'
         self.label = 'Load 2D\nOpen\nPolylines'
-        self.out_port.data_type = 'polyline 2d'
+        self.out_port.data_type = ('polyline 2d',)
         self.name_box = None
         self.filename = ''
         self.data = None
@@ -610,7 +611,7 @@ class LoadPoint2DNode(SingleOutputNode):
         super().__init__(index)
         self.category = 'Input/Output'
         self.label = 'Load 2D\nPoints'
-        self.out_port.data_type = 'point 2d'
+        self.out_port.data_type = ('point 2d',)
         self.name_box = None
         self.filename = ''
         self.data = None
@@ -691,6 +692,65 @@ class LoadPoint2DNode(SingleOutputNode):
                                                             's' if len(self.data) > 1 else ''))
 
 
+class LoadSerafin3DNode(SingleOutputNode):
+    def __init__(self, index):
+        super().__init__(index)
+        self.category = 'Input/Output'
+        self.label = 'Load\nSerafin 3D'
+        self.out_port.data_type = ('slf 3d',)
+
+        self.dir_path = ''
+        self.slf_name = ''
+        self.job_id = ''
+        self.data = None
+
+    def configure(self, check=None):
+        old_options = (self.dir_path, self.slf_name, self.job_id)
+        dlg = LoadSerafinDialog(old_options)
+        if dlg.exec_() == QDialog.Accepted:
+            self.state = Node.READY
+            self.dir_path, self.slf_name, self.job_id = dlg.dir_path, dlg.slf_name, dlg.job_id
+            self.update()
+            self.reconfigure_downward()
+
+    def save(self):
+        return '|'.join([self.category, self.name(), str(self.index()),
+                         str(self.pos().x()), str(self.pos().y()), self.dir_path, self.slf_name, self.job_id])
+
+    def load(self, options):
+        self.dir_path, self.slf_name, self.job_id = options
+        if not self.dir_path:
+            return
+        try:
+            with open(os.path.join(self.dir_path, self.slf_name)) as f:
+                pass
+        except FileNotFoundError:
+            self.state = Node.NOT_CONFIGURED
+            self.dir_path = ''
+            self.slf_name = ''
+            self.job_id = ''
+            return
+        self.state = Node.READY
+
+    def run(self):
+        if self.state == Node.SUCCESS:
+            return
+        try:
+            with open(os.path.join(self.dir_path, self.slf_name)) as f:
+                pass
+        except PermissionError:
+            self.fail('Access denied.')
+            return
+        data = SerafinData(self.job_id, os.path.join(self.dir_path, self.slf_name), self.scene().language)
+        is_2d = data.read()
+        if is_2d:
+            self.data = None
+            self.fail('the input file is not 3D.')
+            return
+        self.data = data
+        self.success()
+
+
 class LoadSerafinDialog(QDialog):
     def __init__(self, old_options):
         super().__init__()
@@ -730,8 +790,7 @@ class LoadSerafinDialog(QDialog):
             for f in os.listdir(self.dir_path):
                 if os.path.isfile(os.path.join(self.dir_path, f)) and f[-4:] == '.slf':
                     slfs.add(f)
-            for slf in slfs:
-                self.file_box.addItem(slf)
+
             slfs = list(slfs)
             for slf in slfs:
                 self.file_box.addItem(slf)

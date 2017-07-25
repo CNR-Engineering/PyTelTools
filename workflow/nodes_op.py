@@ -16,8 +16,8 @@ class SelectVariablesNode(OneInOneOutNode):
         super().__init__(index)
         self.category = 'Basic operations'
         self.label = 'Select\nVariables'
-        self.out_port.data_type = 'slf'
-        self.in_port.data_type = 'slf'
+        self.out_port.data_type = ('slf', 'slf 3d')
+        self.in_port.data_type = ('slf', 'slf 3d')
         self.in_data = None
         self.data = None
         self.selected_vars = []
@@ -67,71 +67,6 @@ class SelectVariablesNode(OneInOneOutNode):
                 self.first_table.setItem(row, 1, name_item)
                 self.first_table.setItem(row, 2, unit_item)
 
-        computable_vars = get_available_variables(self.in_data.selected_vars)
-        for var in computable_vars:
-            if var.ID() not in self.selected_vars:
-                row = self.first_table.rowCount()
-                self.first_table.insertRow(self.first_table.rowCount())
-                id_item = QTableWidgetItem(var.ID())
-                name_item = QTableWidgetItem(var.name(self.in_data.language))
-                unit_item = QTableWidgetItem(var.unit())
-                self.first_table.setItem(row, 0, id_item)
-                self.first_table.setItem(row, 1, name_item)
-                self.first_table.setItem(row, 2, unit_item)
-                self.first_table.item(row, 0).setBackground(self.YELLOW)  # set new variables colors to yellow
-                self.first_table.item(row, 1).setBackground(self.YELLOW)
-                self.first_table.item(row, 2).setBackground(self.YELLOW)
-            else:
-                row = self.second_table.rowCount()
-                self.second_table.insertRow(self.second_table.rowCount())
-                id_item = QTableWidgetItem(var.ID())
-                name_item = QTableWidgetItem(var.name(self.in_data.language))
-                unit_item = QTableWidgetItem(var.unit())
-                self.second_table.setItem(row, 0, id_item)
-                self.second_table.setItem(row, 1, name_item)
-                self.second_table.setItem(row, 2, unit_item)
-                self.second_table.item(row, 0).setBackground(self.YELLOW)
-                self.second_table.item(row, 1).setBackground(self.YELLOW)
-                self.second_table.item(row, 2).setBackground(self.YELLOW)
-
-        self.us_button = QPushButton('Add US from friction law')
-        self.us_button.setToolTip('Compute <b>US</b> based on a friction law')
-        self.us_button.setEnabled(False)
-        self.us_button.setFixedWidth(200)
-
-        if 'US' not in self.in_data.selected_vars and 'W' in self.in_data.selected_vars and self.us_equation is None:
-            available_var_IDs = list(map(lambda x: x.ID(), computable_vars))
-            available_var_IDs.extend(self.in_data.selected_vars)
-            if 'H' in available_var_IDs and 'M' in available_var_IDs:
-                self.us_button.setEnabled(True)
-
-        if 'US' not in self.in_data.selected_vars and self.us_equation is not None:
-            new_vars = []
-            add_US(new_vars, self.in_data.selected_vars)
-            for i, var in enumerate(new_vars):
-                if var.ID() not in self.selected_vars:
-                    row = self.first_table.rowCount()
-                    self.first_table.insertRow(row)
-                    id_item = QTableWidgetItem(var.ID().strip())
-                    name_item = QTableWidgetItem(var.name(self.scene().language))
-                    unit_item = QTableWidgetItem(var.unit())
-                    self.first_table.setItem(row, 0, id_item)
-                    self.first_table.setItem(row, 1, name_item)
-                    self.first_table.setItem(row, 2, unit_item)
-                    for j in range(3):
-                        self.first_table.item(row, j).setBackground(self.GREEN)
-                else:
-                    row = self.second_table.rowCount()
-                    self.second_table.insertRow(row)
-                    id_item = QTableWidgetItem(var.ID().strip())
-                    name_item = QTableWidgetItem(var.name(self.scene().language))
-                    unit_item = QTableWidgetItem(var.unit())
-                    self.second_table.setItem(row, 0, id_item)
-                    self.second_table.setItem(row, 1, name_item)
-                    self.second_table.setItem(row, 2, unit_item)
-                    for j in range(3):
-                        self.second_table.item(row, j).setBackground(self.GREEN)
-
         hlayout = QHBoxLayout()
         vlayout = QVBoxLayout()
         vlayout.setAlignment(Qt.AlignHCenter)
@@ -139,13 +74,83 @@ class SelectVariablesNode(OneInOneOutNode):
         vlayout.addWidget(lb)
         vlayout.setAlignment(lb, Qt.AlignHCenter)
         vlayout.addWidget(self.first_table)
-        vlayout.addItem(QSpacerItem(1, 5))
-        hlayout2 = QHBoxLayout()
-        hlayout2.addItem(QSpacerItem(30, 1))
-        hlayout2.addWidget(self.us_button)
-        hlayout2.addItem(QSpacerItem(30, 1))
-        vlayout.addLayout(hlayout2)
-        vlayout.addItem(QSpacerItem(1, 5))
+
+        if self.in_data.header.is_2d:
+            computable_vars = get_available_variables(self.in_data.selected_vars)
+            for var in computable_vars:
+                if var.ID() not in self.selected_vars:
+                    row = self.first_table.rowCount()
+                    self.first_table.insertRow(self.first_table.rowCount())
+                    id_item = QTableWidgetItem(var.ID())
+                    name_item = QTableWidgetItem(var.name(self.in_data.language))
+                    unit_item = QTableWidgetItem(var.unit())
+                    self.first_table.setItem(row, 0, id_item)
+                    self.first_table.setItem(row, 1, name_item)
+                    self.first_table.setItem(row, 2, unit_item)
+                    self.first_table.item(row, 0).setBackground(self.YELLOW)  # set new variables colors to yellow
+                    self.first_table.item(row, 1).setBackground(self.YELLOW)
+                    self.first_table.item(row, 2).setBackground(self.YELLOW)
+                else:
+                    row = self.second_table.rowCount()
+                    self.second_table.insertRow(self.second_table.rowCount())
+                    id_item = QTableWidgetItem(var.ID())
+                    name_item = QTableWidgetItem(var.name(self.in_data.language))
+                    unit_item = QTableWidgetItem(var.unit())
+                    self.second_table.setItem(row, 0, id_item)
+                    self.second_table.setItem(row, 1, name_item)
+                    self.second_table.setItem(row, 2, unit_item)
+                    self.second_table.item(row, 0).setBackground(self.YELLOW)
+                    self.second_table.item(row, 1).setBackground(self.YELLOW)
+                    self.second_table.item(row, 2).setBackground(self.YELLOW)
+
+            self.us_button = QPushButton('Add US from friction law')
+            self.us_button.setToolTip('Compute <b>US</b> based on a friction law')
+            self.us_button.setEnabled(False)
+            self.us_button.setFixedWidth(200)
+
+            if 'US' not in self.in_data.selected_vars and 'W' in self.in_data.selected_vars and self.us_equation is None:
+                available_var_IDs = list(map(lambda x: x.ID(), computable_vars))
+                available_var_IDs.extend(self.in_data.selected_vars)
+                if 'H' in available_var_IDs and 'M' in available_var_IDs:
+                    self.us_button.setEnabled(True)
+
+            if 'US' not in self.in_data.selected_vars and self.us_equation is not None:
+                new_vars = []
+                add_US(new_vars, self.in_data.selected_vars)
+                for i, var in enumerate(new_vars):
+                    if var.ID() not in self.selected_vars:
+                        row = self.first_table.rowCount()
+                        self.first_table.insertRow(row)
+                        id_item = QTableWidgetItem(var.ID().strip())
+                        name_item = QTableWidgetItem(var.name(self.scene().language))
+                        unit_item = QTableWidgetItem(var.unit())
+                        self.first_table.setItem(row, 0, id_item)
+                        self.first_table.setItem(row, 1, name_item)
+                        self.first_table.setItem(row, 2, unit_item)
+                        for j in range(3):
+                            self.first_table.item(row, j).setBackground(self.GREEN)
+                    else:
+                        row = self.second_table.rowCount()
+                        self.second_table.insertRow(row)
+                        id_item = QTableWidgetItem(var.ID().strip())
+                        name_item = QTableWidgetItem(var.name(self.scene().language))
+                        unit_item = QTableWidgetItem(var.unit())
+                        self.second_table.setItem(row, 0, id_item)
+                        self.second_table.setItem(row, 1, name_item)
+                        self.second_table.setItem(row, 2, unit_item)
+                        for j in range(3):
+                            self.second_table.item(row, j).setBackground(self.GREEN)
+
+            self.us_button.clicked.connect(self._add_us)
+
+            vlayout.addItem(QSpacerItem(1, 5))
+            hlayout2 = QHBoxLayout()
+            hlayout2.addItem(QSpacerItem(30, 1))
+            hlayout2.addWidget(self.us_button)
+            hlayout2.addItem(QSpacerItem(30, 1))
+            vlayout.addLayout(hlayout2)
+            vlayout.addItem(QSpacerItem(1, 5))
+
         vlayout.setAlignment(Qt.AlignLeft)
         hlayout.addLayout(vlayout)
         hlayout.addItem(QSpacerItem(15, 1))
@@ -157,7 +162,6 @@ class SelectVariablesNode(OneInOneOutNode):
         hlayout.addLayout(vlayout)
         option_panel.setLayout(hlayout)
 
-        self.us_button.clicked.connect(self._add_us)
         option_panel.destroyed.connect(self._select)
 
         return option_panel
@@ -200,6 +204,11 @@ class SelectVariablesNode(OneInOneOutNode):
 
     def _reset(self):
         self.in_data = self.in_port.mother.parentItem().data
+        if self.in_data.operator is not None:
+            self.state = Node.NOT_CONFIGURED
+            self.reconfigure_downward()
+            self.update()
+            return
         if self.selected_vars:
             known_vars = [var for var in self.in_data.header.var_IDs if var in self.in_data.selected_vars]
             new_vars = known_vars[:]
@@ -284,6 +293,11 @@ class SelectVariablesNode(OneInOneOutNode):
                 QMessageBox.critical(None, 'Error', 'Configure and run the input before configure this node!',
                                      QMessageBox.Ok)
                 return
+        self.in_data = self.in_port.mother.parentItem().data
+        if self.in_data.operator is not None:
+            QMessageBox.critical(None, 'Error', 'Cannot select variables after computation!',
+                                 QMessageBox.Ok)
+            return
         if self.state != Node.SUCCESS:
             self._reset()
 
@@ -322,9 +336,6 @@ class SelectVariablesNode(OneInOneOutNode):
             self.fail('input failed.')
             return
         input_data = self.in_port.mother.parentItem().data
-        if input_data.operator is not None:
-            self.fail('cannot select variables after computation.')
-            return
         self.data = input_data.copy()
         self.data.us_equation = self.us_equation
         self.data.equations = get_necessary_equations(self.in_data.header.var_IDs, self.selected_vars,
@@ -341,8 +352,8 @@ class AddRouseNode(OneInOneOutNode):
         super().__init__(index)
         self.category = 'Basic operations'
         self.label = 'Add\nRouse'
-        self.out_port.data_type = 'slf'
-        self.in_port.data_type = 'slf'
+        self.out_port.data_type = ('slf',)
+        self.in_port.data_type = ('slf',)
         self.in_data = None
         self.data = None
         self.table = []
@@ -381,6 +392,9 @@ class AddRouseNode(OneInOneOutNode):
         if 'US' not in self.in_data.selected_vars:
             self.state = Node.NOT_CONFIGURED
             self.in_data = None
+        if self.in_data.operator is not None:
+            self.state = Node.NOT_CONFIGURED
+            self.in_data = None
         elif self.fall_velocities:
             old_rouse = [self.table[i][0] for i in range(len(self.table))]
             old_names = [self.table[i][1] for i in range(len(self.table))]
@@ -392,6 +406,7 @@ class AddRouseNode(OneInOneOutNode):
                     self.fall_velocities = []
                     self.table = []
                     self.in_data = None
+                    self.reconfigure_downward()
                     self.update()
                     return
             for name in old_names:
@@ -400,10 +415,11 @@ class AddRouseNode(OneInOneOutNode):
                     self.fall_velocities = []
                     self.table = []
                     self.in_data = None
+                    self.reconfigure_downward()
                     self.update()
                     return
             self.state = Node.READY
-            self.reconfigure_downward()
+        self.reconfigure_downward()
         self.update()
 
     def add_link(self, link):
@@ -452,6 +468,10 @@ class AddRouseNode(OneInOneOutNode):
                     QMessageBox.critical(None, 'Error', 'US not found.',
                                          QMessageBox.Ok)
                     return
+                if self.in_data.operator is not None:
+                    QMessageBox.critical(None, 'Error', 'Cannot add Rouse after computation..',
+                                         QMessageBox.Ok)
+                    return
             else:
                 QMessageBox.critical(None, 'Error', 'Configure and run the input before configure this node!',
                                      QMessageBox.Ok)
@@ -461,6 +481,10 @@ class AddRouseNode(OneInOneOutNode):
             self.in_data = parent_node.data
             if 'US' not in self.in_data.selected_vars:
                 QMessageBox.critical(None, 'Error', 'US not found.',
+                                     QMessageBox.Ok)
+                return
+            if self.in_data.operator is not None:
+                QMessageBox.critical(None, 'Error', 'Cannot add Rouse after computation..',
                                      QMessageBox.Ok)
                 return
             self._reset()
@@ -498,9 +522,6 @@ class AddRouseNode(OneInOneOutNode):
             self.fail('input failed.')
             return
         input_data = self.in_port.mother.parentItem().data
-        if input_data.operator is not None:
-            self.fail('cannot add Rouse after computation.')
-            return
         self.data = input_data.copy()
         self.data.selected_vars.extend([self.table[i][0] for i in range(len(self.table))])
         for i in range(len(self.table)):
@@ -516,8 +537,8 @@ class SelectTimeNode(OneInOneOutNode):
         super().__init__(index)
         self.category = 'Basic operations'
         self.label = 'Select\nTime'
-        self.out_port.data_type = 'slf'
-        self.in_port.data_type = 'slf'
+        self.out_port.data_type = ('slf', 'slf 3d')
+        self.in_port.data_type = ('slf', 'slf 3d')
         self.in_data = None
         self.data = None
         self.selection = None
@@ -582,7 +603,11 @@ class SelectTimeNode(OneInOneOutNode):
 
     def _reset(self):
         self.in_data = self.in_port.mother.parentItem().data
-        if self.start_date is not None:
+        if self.in_data.operator is not None:
+            self.state = Node.NOT_CONFIGURED
+        elif len(self.in_data.selected_time_indices) != len(self.in_data.time):
+            self.state = Node.NOT_CONFIGURED
+        elif self.start_date is not None:
             new_time = list(map(lambda x: x + self.in_data.start_time, self.in_data.time_second))
             if self.start_date in new_time:
                 self.start_index = new_time.index(self.start_date)
@@ -654,6 +679,14 @@ class SelectTimeNode(OneInOneOutNode):
                                      QMessageBox.Ok)
                 return
         self.in_data = parent_node.data
+        if self.in_data.operator is not None:
+            QMessageBox.critical(None, 'Error', 'Cannot select time after computation.',
+                                 QMessageBox.Ok)
+            return
+        if len(self.in_data.selected_time_indices) != len(self.in_data.time):
+            QMessageBox.critical(None, 'Error', 'Cannot re-select time.',
+                                 QMessageBox.Ok)
+            return
         if self.state != Node.SUCCESS:
             self._reset()
         if super().configure():
@@ -687,13 +720,6 @@ class SelectTimeNode(OneInOneOutNode):
             self.fail('input failed.')
             return
         input_data = self.in_port.mother.parentItem().data
-        if input_data.operator is not None:
-            self.fail('cannot select time after computation.')
-            return
-        if len(input_data.selected_time_indices) != len(input_data.time):
-            self.fail('cannot re-select time.')
-            return
-
         self.data = input_data.copy()
         self.data.selected_time_indices = list(range(self.start_index, self.end_index+1, self.sampling_frequency))
         self.success('You selected %d frames.' % len(self.data.selected_time_indices))
@@ -704,8 +730,8 @@ class SelectSingleFrameNode(OneInOneOutNode):
         super().__init__(index)
         self.category = 'Basic operations'
         self.label = 'Select\nSingle\nFrame'
-        self.out_port.data_type = 'slf'
-        self.in_port.data_type = 'slf'
+        self.out_port.data_type = ('slf', 'slf 3d')
+        self.in_port.data_type = ('slf', 'slf 3d')
         self.in_data = None
         self.data = None
 
@@ -736,7 +762,11 @@ class SelectSingleFrameNode(OneInOneOutNode):
 
     def _reset(self):
         self.in_data = self.in_port.mother.parentItem().data
-        if self.date is not None:
+        if self.in_data.operator is not None:
+            self.state = Node.NOT_CONFIGURED
+        elif len(self.in_data.selected_time_indices) != len(self.in_data.time):
+            self.state = Node.NOT_CONFIGURED
+        elif self.date is not None:
             new_time = list(map(lambda x: x + self.in_data.start_time, self.in_data.time_second))
             if self.date in new_time:
                 self.selection = new_time.index(self.date)
@@ -794,6 +824,14 @@ class SelectSingleFrameNode(OneInOneOutNode):
                                      QMessageBox.Ok)
                 return
         self.in_data = parent_node.data
+        if self.in_data.operator is not None:
+            QMessageBox.critical(None, 'Error', 'Cannot select time after computation.',
+                                 QMessageBox.Ok)
+            return
+        if len(self.in_data.selected_time_indices) != len(self.in_data.time):
+            QMessageBox.critical(None, 'Error', 'Cannot re-select time.',
+                                 QMessageBox.Ok)
+            return
         if self.state != Node.SUCCESS:
             self._reset()
         if super().configure():
@@ -819,13 +857,6 @@ class SelectSingleFrameNode(OneInOneOutNode):
             self.fail('input failed.')
             return
         input_data = self.in_port.mother.parentItem().data
-        if input_data.operator is not None:
-            self.fail('cannot select time after computation.')
-            return
-        if len(input_data.selected_time_indices) != len(input_data.time):
-            self.fail('cannot re-select time.')
-            return
-
         self.data = input_data.copy()
         self.data.selected_time_indices = [self.selection]
         self.success()
@@ -836,8 +867,8 @@ class SynchMaxNode(OneInOneOutNode):
         super().__init__(index)
         self.category = 'Operators'
         self.label = 'SynchMax'
-        self.out_port.data_type = 'slf'
-        self.in_port.data_type = 'slf'
+        self.out_port.data_type = ('slf',)
+        self.in_port.data_type = ('slf',)
         self.in_data = None
         self.data = None
 
@@ -870,7 +901,11 @@ class SynchMaxNode(OneInOneOutNode):
 
     def _reset(self):
         self.in_data = self.in_port.mother.parentItem().data
-        if self.var:
+        if not self.in_data.header.is_2d:
+            self.state = Node.NOT_CONFIGURED
+        elif self.in_data.operator is not None:
+            self.state = Node.NOT_CONFIGURED
+        elif self.var:
             available_vars = [var for var in self.in_data.selected_vars if var in self.in_data.header.var_IDs]
             if self.var in available_vars:
                 self.state = Node.READY
@@ -926,6 +961,18 @@ class SynchMaxNode(OneInOneOutNode):
                                      QMessageBox.Ok)
                 return
         self.in_data = parent_node.data
+        if not self.in_data.header.is_2d:
+            QMessageBox.critical(None, 'Error', 'The input file is not 2D.', QMessageBox.Ok)
+            return
+        if self.in_data.operator is not None:
+            if self.in_data.operator == operations.SYNCH_MAX:
+                QMessageBox.critical(None, 'Error', 'The input data is already the result of SynchMax!',
+                                     QMessageBox.Ok)
+                return
+            else:
+                QMessageBox.critical(None, 'Error', 'The input data is already the result of another computation!',
+                                     QMessageBox.Ok)
+                return
         if self.state != Node.SUCCESS:
             self._reset()
         if super().configure():
@@ -945,14 +992,6 @@ class SynchMaxNode(OneInOneOutNode):
             self.fail('input failed.')
             return
         input_data = self.in_port.mother.parentItem().data
-        if input_data.operator is not None:
-            if input_data.operator == operations.SYNCH_MAX:
-                self.fail('the input data is already the result of SynchMax.')
-                return
-            else:
-                self.fail('the input data is already the result of another computation.')
-                return
-
         self.data = input_data.copy()
         self.data.operator = operations.SYNCH_MAX
         self.data.metadata = {'var': self.var}
@@ -966,6 +1005,8 @@ class UnaryOperatorNode(OneInOneOutNode):
         self.state = Node.READY
         self.data = None
         self.message = 'Nothing to configure.'
+        self.out_port.data_type = ('slf',)
+        self.in_port.data_type = ('slf',)
 
     def reconfigure(self):
         super().reconfigure()
@@ -989,6 +1030,9 @@ class UnaryOperatorNode(OneInOneOutNode):
             self.fail('input failed.')
             return
         input_data = self.in_port.mother.parentItem().data
+        if not input_data.header.is_2d:
+            self.fail('the input file is not 2D')
+            return
 
         if input_data.operator is not None:
             if input_data.operator == self.operator:
@@ -1010,6 +1054,9 @@ class BinaryOperatorNode(TwoInOneOutNode):
         self.state = Node.READY
         self.data = None
         self.message = 'Nothing to configure.'
+        self.out_port.data_type = ('slf',)
+        self.first_in_port.data_type = ('slf',)
+        self.second_in_port.data_type = ('slf',)
 
     def reconfigure(self):
         super().reconfigure()
@@ -1056,8 +1103,8 @@ class ConvertToSinglePrecisionNode(UnaryOperatorNode):
         super().__init__(index, None)
         self.category = 'Basic operations'
         self.label = 'Convert to\nSingle\nPrecision'
-        self.out_port.data_type = 'slf'
-        self.in_port.data_type = 'slf'
+        self.out_port.data_type = ('slf', 'slf 3d')
+        self.in_port.data_type = ('slf', 'slf 3d')
 
     def run(self):
         success = super().run_upward()
@@ -1082,8 +1129,8 @@ class SelectFirstFrameNode(UnaryOperatorNode):
         super().__init__(index, None)
         self.category = 'Basic operations'
         self.label = 'Select\nFirst\nFrame'
-        self.out_port.data_type = 'slf'
-        self.in_port.data_type = 'slf'
+        self.out_port.data_type = ('slf', 'slf 3d')
+        self.in_port.data_type = ('slf', 'slf 3d')
 
     def run(self):
         success = super().run_upward()
@@ -1108,8 +1155,8 @@ class SelectLastFrameNode(UnaryOperatorNode):
         super().__init__(index, None)
         self.category = 'Basic operations'
         self.label = 'Select\nLast\nFrame'
-        self.out_port.data_type = 'slf'
-        self.in_port.data_type = 'slf'
+        self.out_port.data_type = ('slf', 'slf 3d')
+        self.in_port.data_type = ('slf', 'slf 3d')
 
     def run(self):
         success = super().run_upward()
@@ -1134,8 +1181,6 @@ class ComputeMaxNode(UnaryOperatorNode):
         super().__init__(index, operations.MAX)
         self.category = 'Operators'
         self.label = 'Max'
-        self.out_port.data_type = 'slf'
-        self.in_port.data_type = 'slf'
 
 
 class ComputeMinNode(UnaryOperatorNode):
@@ -1143,8 +1188,6 @@ class ComputeMinNode(UnaryOperatorNode):
         super().__init__(index, operations.MIN)
         self.category = 'Operators'
         self.label = 'Min'
-        self.out_port.data_type = 'slf'
-        self.in_port.data_type = 'slf'
 
 
 class ComputeMeanNode(UnaryOperatorNode):
@@ -1152,8 +1195,6 @@ class ComputeMeanNode(UnaryOperatorNode):
         super().__init__(index, operations.MEAN)
         self.category = 'Operators'
         self.label = 'Mean'
-        self.out_port.data_type = 'slf'
-        self.in_port.data_type = 'slf'
 
 
 class MinusNode(BinaryOperatorNode):
@@ -1161,9 +1202,6 @@ class MinusNode(BinaryOperatorNode):
         super().__init__(index, operations.DIFF)
         self.category = 'Operators'
         self.label = 'A Minus B'
-        self.out_port.data_type = 'slf'
-        self.first_in_port.data_type = 'slf'
-        self.second_in_port.data_type = 'slf'
 
 
 class ReverseMinusNode(BinaryOperatorNode):
@@ -1171,9 +1209,6 @@ class ReverseMinusNode(BinaryOperatorNode):
         super().__init__(index, operations.REV_DIFF)
         self.category = 'Operators'
         self.label = 'B Minus A'
-        self.out_port.data_type = 'slf'
-        self.first_in_port.data_type = 'slf'
-        self.second_in_port.data_type = 'slf'
 
 
 class ProjectMeshNode(BinaryOperatorNode):
@@ -1181,9 +1216,6 @@ class ProjectMeshNode(BinaryOperatorNode):
         super().__init__(index, operations.PROJECT)
         self.category = 'Operators'
         self.label = 'Project B\non A'
-        self.out_port.data_type = 'slf'
-        self.first_in_port.data_type = 'slf'
-        self.second_in_port.data_type = 'slf'
 
 
 class MaxBetweenNode(BinaryOperatorNode):
@@ -1191,9 +1223,6 @@ class MaxBetweenNode(BinaryOperatorNode):
         super().__init__(index, operations.MAX_BETWEEN)
         self.category = 'Operators'
         self.label = 'Max(A,B)'
-        self.out_port.data_type = 'slf'
-        self.first_in_port.data_type = 'slf'
-        self.second_in_port.data_type = 'slf'
 
 
 class MinBetweenNode(BinaryOperatorNode):
@@ -1201,6 +1230,3 @@ class MinBetweenNode(BinaryOperatorNode):
         super().__init__(index, operations.MIN_BETWEEN)
         self.category = 'Operators'
         self.label = 'Min(A,B)'
-        self.out_port.data_type = 'slf'
-        self.first_in_port.data_type = 'slf'
-        self.second_in_port.data_type = 'slf'

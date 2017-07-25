@@ -4,7 +4,8 @@ from workflow.MultiNode import Box, MultiLink
 from workflow.multi_nodes import *
 
 
-NODES = {'Input/Output': {'Load Serafin': MultiLoadSerafinNode, 'Write Serafin': MultiWriteSerafinNode,
+NODES = {'Input/Output': {'Load Serafin': MultiLoadSerafinNode, 'Load Serafin 3D': MultiLoadSerafin3DNode,
+                          'Write Serafin': MultiWriteSerafinNode,
                           'Load 2D Polygons': MultiLoadPolygon2DNode,
                           'Load 2D Open Polylines': MultiLoadOpenPolyline2DNode,
                           'Load 2D Points': MultiLoadPoint2DNode},
@@ -119,7 +120,7 @@ class MultiScene(QGraphicsScene):
         target_item = self.itemAt(event.scenePos(), self.transform)
         if isinstance(target_item, Box):
             node = target_item.parentItem()
-            if node.category == 'Input/Output' and node.name() == 'Load Serafin':
+            if node.category == 'Input/Output' and node.name() in ('Load Serafin', 'Load Serafin 3D'):
                 self._handle_add_input(node)
 
     def save(self):
@@ -158,7 +159,7 @@ class MultiScene(QGraphicsScene):
                     node.load(line[5:])
                     self.add_node(node, float(x), float(y))
 
-                    if category == 'Input/Output' and name == 'Load Serafin':
+                    if category == 'Input/Output' and name in ('Load Serafin', 'Load Serafin 3D'):
                         self.inputs[index] = []
                         self.ordered_input_indices.append(index)
 
@@ -230,7 +231,7 @@ class MultiScene(QGraphicsScene):
             # visit from u
             downstream_nodes = [v for v in visit(self.adj_list, u)]
             return 0, u, downstream_nodes
-        return -2, []
+        return -2, -1, []
 
     def _handle_add_input(self, node):
         success, options = node.configure(self.inputs[node.index()])
@@ -611,10 +612,11 @@ class MultiWidget(QWidget):
     def _prepare_input_tasks(self):
         slf_tasks = []
         for node_id in self.scene.ordered_input_indices:
+            fun = worker.FUNCTIONS[self.scene.nodes[node_id].name()]
             paths, name, job_ids = self.view.scene().inputs[node_id]
             for path, job_id, fid in zip(paths, job_ids, self.table.input_columns[node_id]):
-                slf_tasks.append((worker.read_slf, (node_id, fid, os.path.join(path, name),
-                                                    self.scene.language, job_id)))
+                slf_tasks.append((fun, (node_id, fid, os.path.join(path, name),
+                                        self.scene.language, job_id)))
         self.worker.add_tasks(slf_tasks)
         if not self.worker.started:
             self.worker.start()

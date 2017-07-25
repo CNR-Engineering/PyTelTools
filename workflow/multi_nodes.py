@@ -25,6 +25,22 @@ class MultiLoadSerafinNode(MultiSingleOutputNode):
         return False, []
 
 
+class MultiLoadSerafin3DNode(MultiSingleOutputNode):
+    def __init__(self, index):
+        super().__init__(index)
+        self.category = 'Input/Output'
+        self.label = 'Load\nSerafin 3D'
+        self.state = MultiNode.NOT_CONFIGURED
+
+    def configure(self, old_options):
+        dlg = MultiLoadSerafinDialog(old_options)
+        if dlg.exec_() == QDialog.Accepted:
+            if dlg.success:
+                self.state = MultiNode.READY
+                return True, [dlg.dir_paths, dlg.slf_name, dlg.job_ids]
+        return False, []
+
+
 class MultiWriteSerafinNode(MultiOneInOneOutNode):
     def __init__(self, index):
         super().__init__(index)
