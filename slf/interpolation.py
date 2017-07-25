@@ -58,7 +58,7 @@ class MeshInterpolator(Mesh2D):
 
         return is_inside, point_interpolators
 
-    def get_line_interpolators(self, line):
+    def _get_line_interpolators(self, line):
         intersections = []
         internal_points = []  # line interpolators without intersections
 
@@ -145,4 +145,66 @@ class MeshInterpolator(Mesh2D):
             distances_internal.append(distance)
 
         return intersections, distances, internal_points, distances_internal
+
+    def get_line_interpolators(self, lines):
+        nb_nonempty = 0
+        indices_nonempty = []
+        line_interpolators = []
+        line_interpolators_internal = []
+
+        for i, line in enumerate(lines):
+            line_interpolator, distance, line_interpolator_internal, distance_internal = self._get_line_interpolators(line)
+
+            if line_interpolator:
+                nb_nonempty += 1
+                indices_nonempty.append(i)
+
+            line_interpolators.append((line_interpolator, distance))
+            line_interpolators_internal.append((line_interpolator_internal, distance_internal))
+
+        return nb_nonempty, indices_nonempty, line_interpolators, line_interpolators_internal
+
+    @staticmethod
+    def interpolate_along_lines(input_stream, selected_vars, selected_time_indices, indices_nonempty,
+                                line_interpolators):
+        for u, id_line in enumerate(indices_nonempty):
+            line_interpolator, distances = line_interpolators[id_line]
+
+            for v, time_index in enumerate(selected_time_indices):
+                time_value = input_stream.time[time_index]
+                var_values = []
+                for var in selected_vars:
+                    var_values.append(input_stream.read_var_in_frame(time_index, var))
+
+                for (x, y, (i, j, k), interpolator), distance in zip(line_interpolator, distances):
+                    row = [str(id_line+1), str(time_value), '%.6f' % x, '%.6f' % y, '%.6f' % distance]
+
+                    for i_var, var in enumerate(selected_vars):
+                        values = var_values[i_var]
+                        row.append('%.6f' % interpolator.dot(values[[i, j, k]]))
+                    yield u, v, row
+
+
+    @staticmethod
+    def project_lines(input_stream, selected_vars, time_index, indices_nonempty, max_distance,
+                      reference, line_interpolators):
+        var_values = []
+        for var in selected_vars:
+            var_values.append(input_stream.read_var_in_frame(time_index, var))
+
+        for u, id_line in enumerate(indices_nonempty):
+            line_interpolator, _ = line_interpolators[id_line]
+            distances = []
+            for x, y, _, __ in line_interpolator:
+                distances.append(reference.project(x, y))
+
+            for (x, y, (i, j, k), interpolator), distance in zip(line_interpolator, distances):
+                if distance <= 0 or distance >= max_distance:
+                    continue
+                row = [str(id_line+1), '%.6f' % x, '%.6f' % y, '%.6f' % distance]
+                for i_var, var in enumerate(selected_vars):
+                    values = var_values[i_var]
+                    row.append('%.6f' % interpolator.dot(values[[i, j, k]]))
+                yield u, row
+
 

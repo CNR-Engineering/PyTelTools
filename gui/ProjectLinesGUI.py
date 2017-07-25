@@ -291,35 +291,22 @@ class InputTab(QWidget):
             return
 
         self.lines = []
-        self.line_interpolators = []
-        self.line_interpolators_internal = []
-
-        nb_nonempty = 0
-
         if is_i2s:
             with BlueKenue.Read(filename) as f:
                 f.read_header()
                 for poly in f.get_open_polylines():
-                    line_interpolators, distances, \
-                        line_interpolators_internal, distances_internal = self.mesh.get_line_interpolators(poly)
-                    if line_interpolators:
-                        nb_nonempty += 1
                     self.lines.append(poly)
-                    self.line_interpolators.append((line_interpolators, distances))
-                    self.line_interpolators_internal.append((line_interpolators_internal, distances_internal))
         else:
             for poly in Shapefile.get_open_polylines(filename):
-                line_interpolators, distances, \
-                    line_interpolators_internal, distances_internal = self.mesh.get_line_interpolators(poly)
-                if line_interpolators:
-                    nb_nonempty += 1
                 self.lines.append(poly)
-                self.line_interpolators.append((line_interpolators, distances))
-                self.line_interpolators_internal.append((line_interpolators_internal, distances_internal))
         if not self.lines:
             QMessageBox.critical(self, 'Error', 'The file does not contain any open polyline.',
                                  QMessageBox.Ok)
             return
+
+        nb_nonempty, indices_nonempty, \
+            self.line_interpolators, self.line_interpolators_internal = self.mesh.get_line_interpolators(self.lines)
+
         if nb_nonempty == 0:
             QMessageBox.critical(self, 'Error', 'No line intersects the mesh continuously.',
                                  QMessageBox.Ok)

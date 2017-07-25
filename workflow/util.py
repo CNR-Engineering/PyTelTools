@@ -188,7 +188,6 @@ class MultiSaveDialog(QDialog):
 
     def check(self):
         success_code = self.panel.check()
-        print(success_code)
         if success_code == 2:
             self.accept()
             return

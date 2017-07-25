@@ -1120,20 +1120,7 @@ class InterpolateAlongLinesNode(TwoInOneOutNode):
             self.in_data.triangles = mesh.triangles
             
         lines = self.second_in_port.mother.parentItem().data.lines
-
-        nb_nonempty = 0
-        indices_nonempty = []
-        line_interpolators = []
-
-        for i, line in enumerate(lines):
-            line_interpolator, distance, _, _ = mesh.get_line_interpolators(line)
-
-            if line_interpolator:
-                nb_nonempty += 1
-                indices_nonempty.append(i)
-
-            line_interpolators.append((line_interpolator, distance))
-
+        nb_nonempty, indices_nonempty, line_interpolators, _ = mesh.get_line_interpolators(lines)
         if nb_nonempty == 0:
             return False, 'no polyline intersects the mesh continuously.'
 
@@ -1147,27 +1134,12 @@ class InterpolateAlongLinesNode(TwoInOneOutNode):
             input_stream.header = self.in_data.header
             input_stream.time = self.in_data.time
 
-            for u, id_line in enumerate(indices_nonempty):
-                line_interpolator, distances = line_interpolators[id_line]
-
-                for v, time_index in enumerate(self.in_data.selected_time_indices):
-                    time_value = self.in_data.time[time_index]
-
-                    var_values = []
-                    for var in selected_vars:
-                        var_values.append(input_stream.read_var_in_frame(time_index, var))
-
-                    for (x, y, (i, j, k), interpolator), distance in zip(line_interpolator, distances):
-                        row = [str(id_line+1), str(time_value), '%.6f' % x, '%.6f' % y, '%.6f' % distance]
-
-                        for i_var, var in enumerate(selected_vars):
-                            values = var_values[i_var]
-                            row.append('%.6f' % interpolator.dot(values[[i, j, k]]))
-
-                        self.data.add_row(row)
-
-                    self.progress_bar.setValue(100 * (v+1+u*nb_frames) * inv_steps)
-                    QApplication.processEvents()
+            for u, v, row in MeshInterpolator.interpolate_along_lines(input_stream, selected_vars,
+                                                                      self.in_data.selected_time_indices, indices_nonempty,
+                                                                      line_interpolators):
+                self.data.add_row(row)
+                self.progress_bar.setValue(100 * (v+1+u*nb_frames) * inv_steps)
+                QApplication.processEvents()
         return True, '%s line%s the mesh continuously.' % (nb_nonempty, 's intersect' if nb_nonempty > 1 else ' intersects')
 
     def run(self):
@@ -1396,19 +1368,7 @@ class ProjectLinesNode(TwoInOneOutNode):
             input_data.index = mesh.index
             input_data.triangles = mesh.triangles
 
-        nb_nonempty = 0
-        indices_nonempty = []
-        line_interpolators = []
-
-        for i, line in enumerate(lines):
-            line_interpolator, distance, _, _ = mesh.get_line_interpolators(line)
-
-            if line_interpolator:
-                nb_nonempty += 1
-                indices_nonempty.append(i)
-
-            line_interpolators.append((line_interpolator, distance))
-
+        nb_nonempty, indices_nonempty, line_interpolators, _ = mesh.get_line_interpolators(lines)
         if nb_nonempty == 0:
             self.fail('no polyline intersects the mesh continuously.')
             return
@@ -1427,29 +1387,12 @@ class ProjectLinesNode(TwoInOneOutNode):
             input_stream.header = input_data.header
             input_stream.time = input_data.time
 
-            var_values = []
-            for var in selected_vars:
-                var_values.append(input_stream.read_var_in_frame(time_index, var))
+            for u, row in MeshInterpolator.project_lines(input_stream, selected_vars, time_index, indices_nonempty,
+                                                         max_distance, reference, line_interpolators):
+                self.data.add_row(row)
 
-            for u, id_line in enumerate(indices_nonempty):
-                line_interpolator, _ = line_interpolators[id_line]
-                distances = []
-                for x, y, _, __ in line_interpolator:
-                    distances.append(reference.project(x, y))
-
-                for (x, y, (i, j, k), interpolator), distance in zip(line_interpolator, distances):
-                    if distance <= 0 or distance >= max_distance:
-                        continue
-                    row = [str(id_line+1), '%.6f' % x, '%.6f' % y, '%.6f' % distance]
-
-                    for i_var, var in enumerate(selected_vars):
-                        values = var_values[i_var]
-                        row.append('%.6f' % interpolator.dot(values[[i, j, k]]))
-
-                    self.data.add_row(row)
-
-                self.progress_bar.setValue(100 * (u+1) / nb_lines)
-                QApplication.processEvents()
+            self.progress_bar.setValue(100 * (u+1) / nb_lines)
+            QApplication.processEvents()
 
         self.data.write(filename, self.scene().csv_separator)
         self.success('Output saved to %s\n{} line{} the mesh continuously.'.format(filename, nb_nonempty,

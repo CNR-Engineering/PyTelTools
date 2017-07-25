@@ -411,25 +411,10 @@ class ProjectLinesNode(DoubleInputNode):
             input_data.triangles = mesh.triangles
 
         lines = self.second_in_port.mother.parentItem().data.lines
-        nb_nonempty = 0
-        indices_nonempty = []
-        line_interpolators = []
-        line_interpolators_internal = []
-
-        for i, line in enumerate(lines):
-            line_interpolator, distance, \
-            line_interpolator_internal, distance_internal = mesh.get_line_interpolators(line)
-
-            if line_interpolator:
-                nb_nonempty += 1
-                indices_nonempty.append(i)
-
-            line_interpolators.append((line_interpolator, distance))
-            line_interpolators_internal.append((line_interpolator_internal, distance_internal))
-
+        nb_nonempty, indices_nonempty, \
+                     line_interpolators, line_interpolators_internal = mesh.get_line_interpolators(lines)
         if nb_nonempty == 0:
             return False
-
         self.plot_viewer.getInput(input_data.filename, input_data.header, input_data.time,
                                   lines, line_interpolators,
                                   line_interpolators_internal)
@@ -469,33 +454,22 @@ class ProjectLinesNode(DoubleInputNode):
     def interpolate(self, input_data):
         mesh = MeshInterpolator(input_data.header, True)
         lines = self.plot_viewer.lines
-        nb_nonempty = 0
-        indices_nonempty = []
-        line_interpolators = []
-        line_interpolators_internal = []
+        nb_nonempty, indices_nonempty, \
+        line_interpolators, line_interpolators_internal = mesh.get_line_interpolators(lines)
 
-        for i, line in enumerate(lines):
-            line_interpolator, distance, \
-            line_interpolator_internal, distance_internal = mesh.get_line_interpolators(line)
-
-            if line_interpolator:
-                nb_nonempty += 1
-                indices_nonempty.append(i)
-
-            line_interpolators.append((line_interpolator, distance))
-            line_interpolators_internal.append((line_interpolator_internal, distance_internal))
         if nb_nonempty == 0:
-            return False
-        return True
+            return False, [], []
+        return True, line_interpolators, line_interpolators_internal
 
-    def compute(self, reference, max_distance, time_index, input_data):
+    def compute(self, reference, max_distance, time_index, input_data,
+                all_line_interpolators, all_line_interpolators_internal):
         line_interpolators = {}
         line_interpolators_internal = {}
         for line_id in self.plot_viewer.current_vars:
-            line_interpolator, _ = self.plot_viewer.line_interpolators[line_id]
+            line_interpolator, _ = all_line_interpolators[line_id]
             line_interpolators[line_id] = line_interpolator
 
-            line_interpolator_internal, _ = self.plot_viewer.line_interpolators_internal[line_id]
+            line_interpolator_internal, _ = all_line_interpolators_internal[line_id]
             line_interpolators_internal[line_id] = line_interpolator_internal
 
         distances, values, distances_internal, values_internal = {}, {}, {}, {}
@@ -534,6 +508,7 @@ class ProjectLinesNode(DoubleInputNode):
                         all_values = input_stream.read_var_in_frame(time_index, var)
                         values_internal[line_id][var].append(interpolator.dot(all_values[[i, j, k]]))
                 distances_internal[line_id] = np.array(distances_internal[line_id])
+
         return distances, values, distances_internal, values_internal
 
     def plot(self, values, distances, values_internal, distances_internal, png_name):
@@ -595,7 +570,6 @@ class ProjectLinesNode(DoubleInputNode):
         dlg.panel.no_button.setEnabled(False)
         if dlg.exec_() == QDialog.Accepted:
             output_options = dlg.panel.get_options()
-            print(output_options)
         else:
             return
 
@@ -682,7 +656,7 @@ class MultiSaveProjectLinesDialog(QDialog):
             self.table.item(i, 1).setBackground(green)
             QApplication.processEvents()
 
-            success = self.parent.interpolate(input_data)
+            success, all_lines, all_lines_internal = self.parent.interpolate(input_data)
             if not success:
                 self.table.item(i, 2).setBackground(red)
                 QApplication.processEvents()
@@ -691,7 +665,8 @@ class MultiSaveProjectLinesDialog(QDialog):
             QApplication.processEvents()
 
             distances, values, distances_internal, values_internal = self.parent.compute(reference, max_distance,
-                                                                                         time_index, input_data)
+                                                                                         time_index, input_data,
+                                                                                         all_lines, all_lines_internal)
             self.parent.plot(values, distances, values_internal, distances_internal, png_name)
             self.table.item(i, 3).setBackground(green)
             QApplication.processEvents()
@@ -1371,7 +1346,7 @@ class PointPlotViewer(TemporalPlotViewer):
         dlg.exec_()
 
 
-class MultiSavePlotDialog(QDialog):
+class MultiSaveTemporalPlotDialog(QDialog):
     def __init__(self, name, separator, current_columns, column_labels, column_colors,
                  xlabel, ylabel, title, time_format, start_time):
         super().__init__()
@@ -1547,7 +1522,7 @@ class MultiSavePlotDialog(QDialog):
         pass
 
 
-class MultiSaveVolumeDialog(MultiSavePlotDialog):
+class MultiSaveVolumeDialog(MultiSaveTemporalPlotDialog):
     def __init__(self, separator, current_columns, column_labels, column_colors,
                  xlabel, ylabel, title, time_format, start_time):
         super().__init__('Compute Volume', separator, current_columns, column_labels, column_colors,
@@ -1576,7 +1551,7 @@ class MultiSaveVolumeDialog(MultiSavePlotDialog):
             fig.savefig(png_name, dpi=100)
 
 
-class MultiSaveFluxDialog(MultiSavePlotDialog):
+class MultiSaveFluxDialog(MultiSaveTemporalPlotDialog):
     def __init__(self, separator, current_columns, column_labels, column_colors,
                  xlabel, ylabel, title, time_format, start_time, cumulative):
         super().__init__('Compute Flux', separator, current_columns, column_labels, column_colors,
@@ -1610,7 +1585,7 @@ class MultiSaveFluxDialog(MultiSavePlotDialog):
             fig.savefig(png_name, dpi=100)
 
 
-class MultiSavePointDialog(MultiSavePlotDialog):
+class MultiSavePointDialog(MultiSaveTemporalPlotDialog):
     def __init__(self, separator, current_columns, column_labels, column_colors,
                  xlabel, ylabel, title, time_format, start_time, columns):
         super().__init__('Interpolate on Points', separator, columns, column_labels, column_colors,

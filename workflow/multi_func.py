@@ -938,18 +938,7 @@ def interpolate_lines(node_id, fid, data, aux_data, options, csv_separator):
 
     # process the line
     lines = aux_data.lines
-    nb_nonempty = 0
-    indices_nonempty = []
-    line_interpolators = []
-
-    for i, line in enumerate(lines):
-        line_interpolator, distance, _, _ = mesh.get_line_interpolators(line)
-        if line_interpolator:
-            nb_nonempty += 1
-            indices_nonempty.append(i)
-
-        line_interpolators.append((line_interpolator, distance))
-
+    nb_nonempty, indices_nonempty, line_interpolators, _ = mesh.get_line_interpolators(lines)
     if nb_nonempty == 0:
         return False, node_id, fid, None, fail_message('no polyline intersects the mesh continuously', 
                                                        'Interpolate along Lines', data.job_id)
@@ -961,21 +950,10 @@ def interpolate_lines(node_id, fid, data, aux_data, options, csv_separator):
         input_stream.header = data.header
         input_stream.time = data.time
 
-        for u, id_line in enumerate(indices_nonempty):
-            line_interpolator, distances = line_interpolators[id_line]
-
-            for v, time_index in enumerate(data.selected_time_indices):
-                time_value = data.time[time_index]
-                var_values = []
-                for var in selected_vars:
-                    var_values.append(input_stream.read_var_in_frame(time_index, var))
-
-                for (x, y, (i, j, k), interpolator), distance in zip(line_interpolator, distances):
-                    row = [str(id_line+1), str(time_value), '%.6f' % x, '%.6f' % y, '%.6f' % distance]
-                    for i_var, var in enumerate(selected_vars):
-                        values = var_values[i_var]
-                        row.append('%.6f' % interpolator.dot(values[[i, j, k]]))
-                    csv_data.add_row(row)
+        for _, _, row in MeshInterpolator.interpolate_along_lines(input_stream, selected_vars,
+                                                                  data.selected_time_indices, indices_nonempty,
+                                                                  line_interpolators):
+            csv_data.add_row(row)
 
     csv_data.write(filename, csv_separator)
     return True, node_id, fid, csv_data, \
@@ -1034,17 +1012,7 @@ def project_lines(node_id, fid, data, aux_data, options, csv_separator):
         data.triangles = mesh.triangles
 
     # process the line
-    nb_nonempty = 0
-    indices_nonempty = []
-    line_interpolators = []
-
-    for i, line in enumerate(lines):
-        line_interpolator, distance, _, _ = mesh.get_line_interpolators(line)
-        if line_interpolator:
-            nb_nonempty += 1
-            indices_nonempty.append(i)
-        line_interpolators.append((line_interpolator, distance))
-
+    nb_nonempty, indices_nonempty, line_interpolators, _ = mesh.get_line_interpolators(lines)
     if nb_nonempty == 0:
         return False, node_id, fid, None, fail_message('no polyline intersects the mesh continuously',
                                                        'Project Lines', data.job_id)
@@ -1063,25 +1031,9 @@ def project_lines(node_id, fid, data, aux_data, options, csv_separator):
         input_stream.header = data.header
         input_stream.time = data.time
 
-        var_values = []
-        for var in selected_vars:
-            var_values.append(input_stream.read_var_in_frame(time_index, var))
-
-        for u, id_line in enumerate(indices_nonempty):
-            line_interpolator, _ = line_interpolators[id_line]
-            distances = []
-            for x, y, _, __ in line_interpolator:
-                distances.append(reference.project(x, y))
-
-            for (x, y, (i, j, k), interpolator), distance in zip(line_interpolator, distances):
-                if distance <= 0 or distance >= max_distance:
-                    continue
-                row = [str(id_line+1), '%.6f' % x, '%.6f' % y, '%.6f' % distance]
-                for i_var, var in enumerate(selected_vars):
-                    values = var_values[i_var]
-                    row.append('%.6f' % interpolator.dot(values[[i, j, k]]))
-
-                csv_data.add_row(row)
+        for _, row in MeshInterpolator.project_lines(input_stream, selected_vars, time_index, indices_nonempty,
+                                                     max_distance, reference, line_interpolators):
+            csv_data.add_row(row)
 
     csv_data.write(filename, csv_separator)
     return True, node_id, fid, csv_data, \
