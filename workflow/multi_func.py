@@ -1180,6 +1180,6 @@ FUNCTIONS = {'Select Variables': select_variables, 'Add Rouse': add_rouse, 'Sele
              'Interpolate on Points': interpolate_points, 'Interpolate along Lines': interpolate_lines,
              'Project Lines': project_lines, 'Project B on A': project_mesh, 'A Minus B': minus,
              'B Minus A': reverse_minus, 'Max(A,B)': max_between,
-             'Min(A,B)': min_between, 'Load Serafin 3D': read_slf_3d}
+             'Min(A,B)': min_between, 'Load Serafin': read_slf, 'Load Serafin 3D': read_slf_3d}
 
 
