@@ -346,21 +346,22 @@ class InputTab(QWidget):
             self.firstTable.setItem(i, 2, unit_item)
         offset = self.firstTable.rowCount()
 
-        # find new computable variables (stored as slf.variables.Variable objects)
-        self.available_vars = get_available_variables(self.header.var_IDs)
+        if self.header.is_2d:
+            # find new computable variables (stored as slf.variables.Variable objects)
+            self.available_vars = get_available_variables(self.header.var_IDs)
 
-        # add new variables to the table
-        for i, var in enumerate(self.available_vars):
-            self.firstTable.insertRow(self.firstTable.rowCount())
-            id_item = QTableWidgetItem(var.ID())
-            name_item = QTableWidgetItem(var.name(self.language))
-            unit_item = QTableWidgetItem(var.unit())
-            self.firstTable.setItem(offset+i, 0, id_item)
-            self.firstTable.setItem(offset+i, 1, name_item)
-            self.firstTable.setItem(offset+i, 2, unit_item)
-            self.firstTable.item(offset+i, 0).setBackground(self.YELLOW)  # set new variables colors to yellow
-            self.firstTable.item(offset+i, 1).setBackground(self.YELLOW)
-            self.firstTable.item(offset+i, 2).setBackground(self.YELLOW)
+            # add new variables to the table
+            for i, var in enumerate(self.available_vars):
+                self.firstTable.insertRow(self.firstTable.rowCount())
+                id_item = QTableWidgetItem(var.ID())
+                name_item = QTableWidgetItem(var.name(self.language))
+                unit_item = QTableWidgetItem(var.unit())
+                self.firstTable.setItem(offset+i, 0, id_item)
+                self.firstTable.setItem(offset+i, 1, name_item)
+                self.firstTable.setItem(offset+i, 2, unit_item)
+                self.firstTable.item(offset+i, 0).setBackground(self.YELLOW)  # set new variables colors to yellow
+                self.firstTable.item(offset+i, 1).setBackground(self.YELLOW)
+                self.firstTable.item(offset+i, 2).setBackground(self.YELLOW)
 
     def _reinitInput(self):
         """!
@@ -460,12 +461,6 @@ class InputTab(QWidget):
         with Serafin.Read(self.filename, self.language) as resin:
             resin.read_header()
 
-            # check if the file is 2D
-            if not resin.header.is_2d:
-                QMessageBox.critical(self, 'Error', 'The file type (TELEMAC 3D) is currently not supported.',
-                                     QMessageBox.Ok)
-                return
-
             # update the file summary
             self.summaryTextBox.appendPlainText(resin.get_summary())
 
@@ -481,17 +476,17 @@ class InputTab(QWidget):
         # displaying the available variables
         self._initVarTables()
 
-        # unlock add US button
-        if 'US' not in self.header.var_IDs and 'W' in self.header.var_IDs:
-            available_var_IDs = list(map(lambda x: x.ID(), self.available_vars))
-            available_var_IDs.extend(self.header.var_IDs)
-            if 'H' in available_var_IDs and 'M' in available_var_IDs:
-                self.btnAddUS.setEnabled(True)
+        if self.header.is_2d:
+            # unlock add US button
+            if 'US' not in self.header.var_IDs and 'W' in self.header.var_IDs:
+                available_var_IDs = list(map(lambda x: x.ID(), self.available_vars))
+                available_var_IDs.extend(self.header.var_IDs)
+                if 'H' in available_var_IDs and 'M' in available_var_IDs:
+                    self.btnAddUS.setEnabled(True)
 
-        # unlock add Ws button
-        if 'US' in self.header.var_IDs:
-            self.btnAddWs.setEnabled(True)
-
+            # unlock add Ws button
+            if 'US' in self.header.var_IDs:
+                self.btnAddWs.setEnabled(True)
         self.parent.getInput()
 
 
