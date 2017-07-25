@@ -86,21 +86,21 @@ class CSVData:
         self.filename = filename
         self.out_name = ''
         self.metadata = {}
+        self.separator = ''
 
         if header is None:  # read existing file
-            separator = ''
             with open(out_name, 'r') as f:
                 line = f.readline().rstrip()
                 for sep in (';', ',', '\t'):
                     if len(line.split(sep)) > 1:
-                        separator = sep
+                        self.separator = sep
                         break
 
             self.table = []
             self.out_name = out_name
             with open(out_name, 'r') as f:
                 for line in f.readlines():
-                    self.table.append(line.rstrip().split(separator))
+                    self.table.append(line.rstrip().split(self.separator))
         else:
             self.table = [header]
 
@@ -113,6 +113,7 @@ class CSVData:
                 output_stream.write(separator.join(line))
                 output_stream.write('\n')
         self.out_name = filename
+        self.separator = separator
 
 
 class PolylineData:

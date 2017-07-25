@@ -1,9 +1,9 @@
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 import os
-import uuid
 
-from workflow.Node import Node, OneInOneOutNode, TwoInOneOutNode, OutputOptionPanel
+from workflow.Node import Node, OneInOneOutNode, TwoInOneOutNode
+from workflow.util import OutputOptionPanel
 from workflow.datatypes import CSVData
 from slf import Serafin
 from slf.volume import TruncatedTriangularPrisms, VolumeCalculator

@@ -1,4 +1,7 @@
 from copy import deepcopy
+from PyQt5.QtWidgets import *
+from PyQt5.QtCore import *
+from PyQt5.QtGui import *
 import workflow.multi_func as worker
 from workflow.MultiNode import Box, MultiLink
 from workflow.multi_nodes import *

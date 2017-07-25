@@ -1,12 +1,16 @@
-from PyQt5.QtWidgets import *
-from PyQt5.QtCore import *
 from itertools import islice, cycle
 import datetime
+import os
+import pandas
 import numpy as np
+import matplotlib.pyplot as plt
+from PyQt5.QtWidgets import *
+from PyQt5.QtCore import *
 
 from slf.mesh2D import Mesh2D
 from slf.volume import VolumeCalculator
 from workflow.Node import Node, SingleInputNode, DoubleInputNode
+from workflow.util import MultiLoadCSVDialog, OutputOptionPanel
 from gui.util import MapCanvas, PolygonMapCanvas, LineMapCanvas, MapViewer, TemporalPlotViewer, \
     PointAttributeTable, PointLabelEditor
 
@@ -623,9 +627,12 @@ class PointAttributeTableNode(SingleInputNode):
 class VolumePlotViewer(TemporalPlotViewer):
     def __init__(self):
         super().__init__('polygon')
+        self.csv_separator = ''
         self.var_ID = None
         self.second_var_ID = None
         self.language = 'fr'
+        self.multi_save_act = QAction('Multi-Save', self, triggered=self.multi_save,
+                                      icon=self.style().standardIcon(QStyle.SP_DialogSaveButton))
 
         self.current_columns = ('Polygon 1',)
         self.toolBar.addAction(self.selectColumnsAct)
@@ -634,13 +641,18 @@ class VolumePlotViewer(TemporalPlotViewer):
         self.toolBar.addSeparator()
         self.toolBar.addAction(self.convertTimeAct)
         self.toolBar.addAction(self.changeDateAct)
+        self.toolBar.addSeparator()
+        self.toolBar.addAction(self.multi_save_act)
 
         self.poly_menu = QMenu('&Polygons', self)
         self.poly_menu.addAction(self.selectColumnsAct)
         self.poly_menu.addAction(self.editColumnNamesAct)
         self.poly_menu.addAction(self.editColumColorAct)
-
         self.menuBar.addMenu(self.poly_menu)
+
+        self.multi_menu = QMenu('&Multi', self)
+        self.multi_menu.addAction(self.multi_save_act)
+        self.menuBar.addMenu(self.multi_menu)
 
     def _defaultYLabel(self):
         word = {'fr': 'de', 'en': 'of'}[self.language]
@@ -668,6 +680,7 @@ class VolumePlotViewer(TemporalPlotViewer):
         self.canvas.draw()
 
     def get_data(self, csv_data):
+        self.csv_separator = csv_data.separator
         self.data = {}
         header = csv_data.table[0]
         for item in header:
@@ -703,15 +716,23 @@ class VolumePlotViewer(TemporalPlotViewer):
         self.current_title = ''
         self.replot()
 
+    def multi_save(self):
+        dlg = MultiSaveVolumeDialog(self.csv_separator, self.current_columns, self.column_labels, self.column_colors,
+                                    self.current_xlabel, self.current_ylabel, self.current_title, self.timeFormat,
+                                    self.start_time)
+        dlg.exec_()
+
 
 class FluxPlotViewer(TemporalPlotViewer):
     def __init__(self):
         super().__init__('section')
+        self.csv_separator = ''
         self.language = 'fr'
         self.flux_title = ''
         self.var_IDs = []
         self.cumulative = False
-
+        self.multi_save_act = QAction('Multi-Save', self, triggered=self.multi_save,
+                                      icon=self.style().standardIcon(QStyle.SP_DialogSaveButton))
         self.cumulative_flux_act = QAction('Show\ncumulative flux', self, checkable=True,
                                            icon=self.style().standardIcon(QStyle.SP_DialogApplyButton))
         self.cumulative_flux_act.toggled.connect(self.changeFluxType)
@@ -725,13 +746,17 @@ class FluxPlotViewer(TemporalPlotViewer):
         self.toolBar.addAction(self.changeDateAct)
         self.toolBar.addSeparator()
         self.toolBar.addAction(self.cumulative_flux_act)
+        self.toolBar.addSeparator()
+        self.toolBar.addAction(self.multi_save_act)
 
         self.poly_menu = QMenu('&Sections', self)
         self.poly_menu.addAction(self.selectColumnsAct)
         self.poly_menu.addAction(self.editColumnNamesAct)
         self.poly_menu.addAction(self.editColumColorAct)
-
         self.menuBar.addMenu(self.poly_menu)
+        self.multi_menu = QMenu('&Multi', self)
+        self.multi_menu.addAction(self.multi_save_act)
+        self.menuBar.addMenu(self.multi_menu)
 
     def changeFluxType(self):
         self.cumulative = not self.cumulative
@@ -763,6 +788,7 @@ class FluxPlotViewer(TemporalPlotViewer):
         self.canvas.draw()
 
     def get_data(self, csv_data):
+        self.csv_separator = csv_data.separator
         self.data = {}
         header = csv_data.table[0]
         for item in header:
@@ -798,16 +824,24 @@ class FluxPlotViewer(TemporalPlotViewer):
         self.current_title = ''
         self.replot()
 
+    def multi_save(self):
+        dlg = MultiSaveFluxDialog(self.csv_separator, self.current_columns, self.column_labels, self.column_colors,
+                                  self.current_xlabel, self.current_ylabel, self.current_title, self.timeFormat,
+                                  self.start_time, self.cumulative)
+        dlg.exec_()
+
 
 class PointPlotViewer(TemporalPlotViewer):
     def __init__(self):
         super().__init__('point')
+        self.csv_separator = ''
         self.language = 'fr'
         self.var_IDs = []
         self.current_var = ''
         self.points = None
         self.indices = []
-
+        self.multi_save_act = QAction('Multi-Save', self, triggered=self.multi_save,
+                                      icon=self.style().standardIcon(QStyle.SP_DialogSaveButton))
         self.select_variable = QAction('Select\nvariable', self, triggered=self.selectVariableEvent,
                                        icon=self.style().standardIcon(QStyle.SP_FileDialogDetailedView))
         self.current_columns = ('Point 1',)
@@ -817,6 +851,8 @@ class PointPlotViewer(TemporalPlotViewer):
         self.toolBar.addSeparator()
         self.toolBar.addAction(self.convertTimeAct)
         self.toolBar.addAction(self.changeDateAct)
+        self.toolBar.addSeparator()
+        self.toolBar.addAction(self.multi_save_act)
 
         self.point_menu = QMenu('&Data', self)
         self.point_menu.addAction(self.select_variable)
@@ -826,6 +862,10 @@ class PointPlotViewer(TemporalPlotViewer):
         self.point_menu.addAction(self.editColumColorAct)
 
         self.menuBar.addMenu(self.point_menu)
+
+        self.multi_menu = QMenu('&Multi', self)
+        self.multi_menu.addAction(self.multi_save_act)
+        self.menuBar.addMenu(self.multi_menu)
 
     def _to_column(self, point):
         point_index = int(point.split()[1]) - 1
@@ -887,6 +927,7 @@ class PointPlotViewer(TemporalPlotViewer):
         self.canvas.draw()
 
     def get_data(self, csv_data):
+        self.csv_separator = csv_data.separator
         self.data = {}
         header = csv_data.table[0]
         for item in header:
@@ -923,3 +964,279 @@ class PointPlotViewer(TemporalPlotViewer):
         self.current_ylabel = self._defaultYLabel()
         self.current_title = ''
         self.replot()
+
+    def multi_save(self):
+        dlg = MultiSavePointDialog(self.csv_separator, self.current_columns, self.column_labels, self.column_colors,
+                                   self.current_xlabel, self.current_ylabel, self.current_title, self.timeFormat,
+                                   self.start_time, [self._to_column(p) for p in self.current_columns])
+        dlg.exec_()
+
+
+class MultiSaveDialog(QDialog):
+    def __init__(self, name, separator, current_columns, column_labels, column_colors,
+                 xlabel, ylabel, title, time_format, start_time):
+        super().__init__()
+        self.name = name
+        self.separator = separator
+        self.filenames = []
+        self.dir_paths = []
+        self.csv_name = ''
+        self.job_ids = []
+        self.data = []
+        self.out_names = []
+
+        self.current_columns = current_columns
+        self.column_labels = column_labels
+        self.column_colors = column_colors
+        self.xlabel = xlabel
+        self.ylabel = ylabel
+        self.title = title
+        self.time_format = time_format
+        self.start_time = start_time
+
+        self.stack = QStackedLayout()
+        self.stack.addWidget(self.build_first_page())
+        self.stack.addWidget(self.build_second_page())
+        self.stack.addWidget(self.build_third_page())
+        self.setLayout(self.stack)
+        self.setWindowTitle('Save figures for multiple CSV results of %s' % self.name)
+
+    def build_first_page(self):
+        first_page = QWidget()
+        source_box = QGroupBox('Where are the CSV results of %s' % self.name)
+        self.same_button = QRadioButton('In the same folder')
+        self.different_button = QRadioButton('In different folder under the same name')
+        self.different_button.setChecked(True)
+        vlayout = QVBoxLayout()
+        vlayout.addWidget(self.same_button)
+        vlayout.addWidget(self.different_button)
+        source_box.setLayout(vlayout)
+        next_button = QPushButton('Next')
+        cancel_button = QPushButton('Cancel')
+        for bt in (next_button, cancel_button):
+            bt.setMaximumWidth(200)
+            bt.setFixedHeight(30)
+        hlayout = QHBoxLayout()
+        hlayout.addStretch()
+        hlayout.addWidget(next_button)
+        hlayout.addWidget(cancel_button)
+        vlayout = QVBoxLayout()
+        vlayout.addWidget(source_box)
+        vlayout.addStretch()
+        vlayout.addLayout(hlayout, Qt.AlignRight)
+        first_page.setLayout(vlayout)
+
+        next_button.clicked.connect(self.turn_page)
+        cancel_button.clicked.connect(self.reject)
+        return first_page
+
+    def build_second_page(self):
+        second_page = QWidget()
+        back_button = QPushButton('Back')
+        ok_button = QPushButton('OK')
+        for bt in (back_button, ok_button):
+            bt.setMaximumWidth(200)
+            bt.setFixedHeight(30)
+        hlayout = QHBoxLayout()
+        hlayout.addStretch()
+        hlayout.addWidget(ok_button)
+        hlayout.addWidget(back_button)
+        vlayout = QVBoxLayout()
+        vlayout.addWidget(QLabel('All figures will have the same names as the CSV files'))
+        vlayout.addStretch()
+        vlayout.addLayout(hlayout, Qt.AlignRight)
+        second_page.setLayout(vlayout)
+
+        back_button.clicked.connect(self.back)
+        ok_button.clicked.connect(self.run)
+        return second_page
+
+    def build_third_page(self):
+        third_page = QWidget()
+        self.output_panel = OutputOptionPanel(['_plot', True, '', '', True])
+        self.output_panel.no_button.setEnabled(False)
+        back_button = QPushButton('Back')
+        ok_button = QPushButton('OK')
+        for bt in (back_button, ok_button):
+            bt.setMaximumWidth(200)
+            bt.setFixedHeight(30)
+        hlayout = QHBoxLayout()
+        hlayout.addStretch()
+        hlayout.addWidget(ok_button)
+        hlayout.addWidget(back_button)
+        vlayout = QVBoxLayout()
+        vlayout.addWidget(self.output_panel)
+        vlayout.addStretch()
+        vlayout.addLayout(hlayout, Qt.AlignRight)
+        third_page.setLayout(vlayout)
+
+        back_button.clicked.connect(self.back)
+        ok_button.clicked.connect(self.run)
+        return third_page
+
+    def back(self):
+        self.stack.setCurrentIndex(0)
+
+    def turn_page(self):
+        if self.same_button.isChecked():
+            filenames, _ = QFileDialog.getOpenFileNames(None, 'Open CSV files', '', 'CSV Files (*.csv)',
+                                                        options=QFileDialog.Options() | QFileDialog.DontUseNativeDialog)
+            if not filenames:
+                self.reject()
+            self.filenames = filenames
+            for csv_name in self.filenames:
+                success, data = self.read(csv_name)
+                if not success:
+                    QMessageBox.critical(None, 'Error', 'The file %s is not valid.' % os.path.split(csv_name)[1],
+                                         QMessageBox.Ok)
+                    return
+                self.data.append(data)
+                self.out_names.append(csv_name[:-4] + '.png')
+            self.stack.setCurrentIndex(1)
+        else:
+            dlg = MultiLoadCSVDialog([])
+            if dlg.exec_() == QDialog.Accepted:
+                self.dir_paths, self.csv_name, self.job_ids = dlg.dir_paths, dlg.slf_name, dlg.job_ids
+            else:
+                self.reject()
+            for path in self.dir_paths:
+                success, data = self.read(os.path.join(path, self.csv_name))
+                if not success:
+                    QMessageBox.critical(None, 'Error', 'The file in %s is not valid.' % os.path.basename(path),
+                                         QMessageBox.Ok)
+                    return
+                self.data.append(data)
+            self.stack.setCurrentIndex(2)
+
+    def run(self):
+        if not self.out_names:
+            suffix, in_source_folder, dir_path, double_name, _ = self.output_panel.get_options()
+
+            for path, job_id in zip(self.dir_paths, self.job_ids):
+                if double_name:
+                    output_name = self.csv_name[:-4] + '_' + job_id + suffix + '.png'
+                else:
+                    output_name = self.csv_name[:-4] + suffix + '.png'
+                if in_source_folder:
+                    filename = os.path.join(path, output_name)
+                else:
+                    filename = os.path.join(dir_path, output_name)
+                self.out_names.append(filename)
+
+        self.plot()
+        QMessageBox.information(None, 'Success', 'Figures saved successfully',
+                                QMessageBox.Ok)
+        self.accept()
+
+    def read(self, csv_file):
+        try:
+            data = pandas.read_csv(csv_file, header=0, sep=self.separator)
+            if 'time' not in list(data):
+                return False, []
+            if not all(p in list(data) for p in self.current_columns):
+                return False, []
+            value_datetime = list(map(lambda x: self.start_time + datetime.timedelta(seconds=x), data['time']))
+            str_datetime = list(map(lambda x: x.strftime('%Y/%m/%d\n%H:%M'), value_datetime))
+            str_datetime_bis = list(map(lambda x: x.strftime('%d/%m/%y\n%H:%M'), value_datetime))
+            time = [data['time'], data['time'], data['time'],
+                    data['time'] / 60, data['time'] / 3600, data['time'] / 86400]
+            return True, [data, time, str_datetime, str_datetime_bis]
+        except:
+            return False, []
+
+    def plot(self):
+        pass
+
+
+class MultiSaveVolumeDialog(MultiSaveDialog):
+    def __init__(self, separator, current_columns, column_labels, column_colors,
+                 xlabel, ylabel, title, time_format, start_time):
+        super().__init__('Compute Volume', separator, current_columns, column_labels, column_colors,
+                         xlabel, ylabel, title, time_format, start_time)
+
+    def plot(self):
+        fig, axes = plt.subplots(1)
+        fig.set_size_inches(8, 6)
+
+        for (data, time, str_datetime, str_datetime_bis), png_name in zip(self.data, self.out_names):
+            axes.clear()
+            for column in self.current_columns:
+                axes.plot(time[self.time_format], data[column], '-', color=self.column_colors[column],
+                          linewidth=2, label=self.column_labels[column])
+            axes.legend()
+            axes.grid(linestyle='dotted')
+            axes.set_xlabel(self.xlabel)
+            axes.set_ylabel(self.ylabel)
+            axes.set_title(self.title)
+            if self.time_format in [1, 2]:
+                axes.set_xticklabels(str_datetime if self.time_format == 1 else str_datetime_bis)
+                for label in axes.get_xticklabels():
+                    label.set_rotation(45)
+                    label.set_fontsize(8)
+            fig.canvas.draw()
+            fig.savefig(png_name, dpi=100)
+
+
+class MultiSaveFluxDialog(MultiSaveDialog):
+    def __init__(self, separator, current_columns, column_labels, column_colors,
+                 xlabel, ylabel, title, time_format, start_time, cumulative):
+        super().__init__('Compute Flux', separator, current_columns, column_labels, column_colors,
+                         xlabel, ylabel, title, time_format, start_time)
+        self.cumulative = cumulative
+
+    def plot(self):
+        fig, axes = plt.subplots(1)
+        fig.set_size_inches(8, 6)
+
+        for (data, time, str_datetime, str_datetime_bis), png_name in zip(self.data, self.out_names):
+            axes.clear()
+            for column in self.current_columns:
+                if not self.cumulative:
+                    axes.plot(time[self.time_format], data[column], '-',
+                              color=self.column_colors[column], linewidth=2, label=self.column_labels[column])
+                else:
+                    axes.plot(time[self.time_format], np.cumsum(data[column]), '-',
+                              color=self.column_colors[column], linewidth=2, label=self.column_labels[column])
+            axes.legend()
+            axes.grid(linestyle='dotted')
+            axes.set_xlabel(self.xlabel)
+            axes.set_ylabel(self.ylabel)
+            axes.set_title(self.title)
+            if self.time_format in [1, 2]:
+                axes.set_xticklabels(str_datetime if self.time_format == 1 else str_datetime_bis)
+                for label in axes.get_xticklabels():
+                    label.set_rotation(45)
+                    label.set_fontsize(8)
+            fig.canvas.draw()
+            fig.savefig(png_name, dpi=100)
+
+
+class MultiSavePointDialog(MultiSaveDialog):
+    def __init__(self, separator, current_columns, column_labels, column_colors,
+                 xlabel, ylabel, title, time_format, start_time, columns):
+        super().__init__('Interpolate on Points', separator, columns, column_labels, column_colors,
+                         xlabel, ylabel, title, time_format, start_time)
+        self.current_points = current_columns
+
+    def plot(self):
+        fig, axes = plt.subplots(1)
+        fig.set_size_inches(8, 6)
+
+        for (data, time, str_datetime, str_datetime_bis), png_name in zip(self.data, self.out_names):
+            axes.clear()
+            for point, column in zip(self.current_points, self.current_columns):
+                axes.plot(time[self.time_format], data[column], '-',
+                          color=self.column_colors[point], linewidth=2, label=self.column_labels[point])
+            axes.legend()
+            axes.grid(linestyle='dotted')
+            axes.set_xlabel(self.xlabel)
+            axes.set_ylabel(self.ylabel)
+            axes.set_title(self.title)
+            if self.time_format in [1, 2]:
+                axes.set_xticklabels(str_datetime if self.time_format == 1 else str_datetime_bis)
+                for label in axes.get_xticklabels():
+                    label.set_rotation(45)
+                    label.set_fontsize(8)
+            fig.canvas.draw()
+            fig.savefig(png_name, dpi=100)
+

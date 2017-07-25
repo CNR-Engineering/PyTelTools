@@ -4,13 +4,15 @@ import numpy as np
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 
-from workflow.Node import Node, SingleOutputNode, OneInOneOutNode, OutputOptionPanel
+from workflow.Node import Node, SingleOutputNode, OneInOneOutNode
+from workflow.util import OutputOptionPanel
 from slf import Serafin
 from slf.interpolation import MeshInterpolator
 from slf.variables import do_calculations_in_frame
 import slf.misc as operations
 from geom import BlueKenue, Shapefile
 from workflow.datatypes import SerafinData, PointData, PolylineData
+from workflow.util import LoadSerafinDialog
 
 
 class LoadSerafinNode(SingleOutputNode):
@@ -749,141 +751,4 @@ class LoadSerafin3DNode(SingleOutputNode):
             return
         self.data = data
         self.success()
-
-
-class LoadSerafinDialog(QDialog):
-    def __init__(self, old_options):
-        super().__init__()
-        self.dir_path = ''
-        self.slf_name = ''
-        self.job_id = ''
-
-        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel,
-                                   Qt.Horizontal, self)
-        buttons.accepted.connect(self.check)
-        buttons.rejected.connect(self.reject)
-
-        self.file_box = QComboBox()
-        self.file_box.setFixedHeight(30)
-
-        self.table = QTableWidget()
-        self.table.setColumnCount(2)
-        self.table.horizontalHeader().setDefaultSectionSize(100)
-        self.table.setHorizontalHeaderLabels(['Folder', 'Job ID'])
-
-        self.open_button = QPushButton('Open', None, icon=QWidget().style().standardIcon(QStyle.SP_DialogOpenButton))
-        self.open_button.setFixedSize(100, 50)
-        self.open_button.clicked.connect(self._open)
-
-        self.success = False
-
-        if old_options[0]:
-            self.dir_path, self.slf_name, self.job_id = old_options
-            self.table.setRowCount(1)
-            name = os.path.basename(self.dir_path)
-            name_item, id_item = QTableWidgetItem(name), QTableWidgetItem(self.job_id)
-            name_item.setFlags(Qt.NoItemFlags)
-            self.table.setItem(0, 0, name_item)
-            self.table.setItem(0, 1, id_item)
-
-            slfs = set()
-            for f in os.listdir(self.dir_path):
-                if os.path.isfile(os.path.join(self.dir_path, f)) and f[-4:] == '.slf':
-                    slfs.add(f)
-
-            slfs = list(slfs)
-            for slf in slfs:
-                self.file_box.addItem(slf)
-            self.file_box.setCurrentIndex(slfs.index(self.slf_name))
-            self.success = True
-
-        vlayout = QVBoxLayout()
-        vlayout.setSpacing(10)
-        hlayout = QHBoxLayout()
-        hlayout.addWidget(self.open_button)
-        vlayout.addLayout(hlayout)
-        hlayout = QHBoxLayout()
-        hlayout.addWidget(QLabel('Select .slf file name'))
-        hlayout.addWidget(self.file_box, Qt.AlignRight)
-        vlayout.addLayout(hlayout)
-        vlayout.addWidget(self.table)
-        vlayout.addWidget(QLabel('Click on the cells to modify Job ID.'), Qt.AlignRight)
-        vlayout.addStretch()
-        vlayout.addWidget(buttons)
-        self.setLayout(vlayout)
-        self.setWindowTitle('Select input file')
-
-    def check(self):
-        if not self.success:
-            self.reject()
-            return
-        self.slf_name = self.file_box.currentText()
-        job_id = self.table.item(0, 1).text()
-        if not job_id:
-            QMessageBox.critical(None, 'Error', 'Job ID cannot be empty.',
-                                 QMessageBox.Ok)
-            return
-        if not all(c.isalnum() or c == '_' for c in job_id):
-            QMessageBox.critical(None, 'Error', 'Job ID should only contain letters, numbers and underscores.',
-                                 QMessageBox.Ok)
-            return
-        self.job_id = job_id
-        self.accept()
-
-    def _open(self):
-        if self.dir_path:
-            msg = QMessageBox.warning(None, 'Confirm load',
-                                      'Do you want to re-open source folder?\n(Your current selection will be cleared)',
-                                      QMessageBox.Ok | QMessageBox.Cancel,
-                                      QMessageBox.Ok)
-            if msg == QMessageBox.Cancel:
-                return
-        self.success = False
-        w = QFileDialog()
-        w.setWindowTitle('Choose one or more folders')
-        w.setFileMode(QFileDialog.DirectoryOnly)
-        w.setOption(QFileDialog.DontUseNativeDialog, True)
-        tree = w.findChild(QTreeView)
-        if tree:
-            tree.setSelectionBehavior(QAbstractItemView.SelectRows)
-
-        if w.exec_() != QDialog.Accepted:
-            return
-        current_dir = w.directory().path()
-        dir_name = ''
-        for index in tree.selectionModel().selectedRows():
-            name = tree.model().data(index)
-            dir_name = name
-            if os.path.exists(os.path.join(current_dir, name)):
-                self.dir_path = os.path.join(current_dir, name)
-            else:
-                self.dir_path = current_dir
-            break
-        if not self.dir_path:
-            QMessageBox.critical(None, 'Error', 'Choose a folder !',
-                                 QMessageBox.Ok)
-            self.dir_path = ''
-            return
-
-        slfs = set()
-        for f in os.listdir(self.dir_path):
-            if os.path.isfile(os.path.join(self.dir_path, f)) and f[-4:] == '.slf':
-                slfs.add(f)
-        if not slfs:
-            QMessageBox.critical(None, 'Error', "The folder %s doesn't have any .slf file!" % name,
-                                 QMessageBox.Ok)
-            self.dir_path = ''
-            return
-
-        self.file_box.clear()
-        for slf in slfs:
-            self.file_box.addItem(slf)
-
-        self.table.setRowCount(1)
-        filtered_name = ''.join(c for c in dir_name if c.isalnum() or c == '_')
-        name_item, id_item = QTableWidgetItem(dir_name), QTableWidgetItem(filtered_name)
-        name_item.setFlags(Qt.NoItemFlags)
-        self.table.setItem(0, 0, name_item)
-        self.table.setItem(0, 1, id_item)
-        self.success = True
 
