@@ -184,7 +184,6 @@ class MeshInterpolator(Mesh2D):
                         row.append('%.6f' % interpolator.dot(values[[i, j, k]]))
                     yield u, v, row
 
-
     @staticmethod
     def project_lines(input_stream, selected_vars, time_index, indices_nonempty, max_distance,
                       reference, line_interpolators):

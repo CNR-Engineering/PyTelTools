@@ -1230,3 +1230,4 @@ class MinBetweenNode(BinaryOperatorNode):
         super().__init__(index, operations.MIN_BETWEEN)
         self.category = 'Operators'
         self.label = 'Min(A,B)'
+
