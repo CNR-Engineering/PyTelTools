@@ -168,6 +168,35 @@ class OutputOptionPanel(QWidget):
                self.dir_path, self.double_name, self.overwrite
 
 
+class MultiSaveDialog(QDialog):
+    def __init__(self, old_options):
+        super().__init__()
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel,
+                                   Qt.Horizontal, self)
+        self.panel = OutputOptionPanel(old_options)
+        buttons.accepted.connect(self.check)
+        buttons.rejected.connect(self.reject)
+
+        layout = QVBoxLayout()
+        layout.addWidget(self.panel)
+        layout.addStretch()
+        layout.addWidget(buttons)
+        self.setLayout(layout)
+
+        self.setWindowTitle('Save multiple files')
+        self.resize(500, 400)
+
+    def check(self):
+        success_code = self.panel.check()
+        print(success_code)
+        if success_code == 2:
+            self.accept()
+            return
+        elif success_code == 1:
+            return
+        self.reject()
+
+
 class MultiLoadDialog(QDialog):
     def __init__(self, extension, old_options):
         super().__init__()
@@ -481,3 +510,11 @@ class LoadSerafinDialog(QDialog):
         self.table.setItem(0, 0, name_item)
         self.table.setItem(0, 1, id_item)
         self.success = True
+
+
+class VerticalProfilePlotViewer():
+    def __init__(self):
+        pass
+
+    def get_data(self, data, points):
+        pass

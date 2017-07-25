@@ -23,6 +23,7 @@ import matplotlib.lines as mlines
 from matplotlib.colors import Normalize, colorConverter
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
+from slf import Serafin
 from slf.volume import TruncatedTriangularPrisms
 from slf.flux import TriangularVectorField
 from slf.comparison import ReferenceMesh
@@ -1834,6 +1835,418 @@ class PointLabelEditor(QDialog):
             column = self.table.item(row, 0).text()
             label = self.table.item(row, 1).text()
             old_labels[column] = label
+
+
+class LineStyleEditor(QDialog):
+    def __init__(self, all_linestyles, current_linestyles):
+        super().__init__()
+        self.table = TableWidgetDropRows()
+        self.table.setColumnCount(2)
+        self.table.setHorizontalHeaderLabels(['Variable', 'Line style'])
+        self.table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+
+        self.table.setFixedHeight(300)
+        self.table.setMaximumWidth(300)
+        row = 0
+        for var, style in current_linestyles.items():
+            self.table.insertRow(row)
+            self.table.setItem(row, 0, QTableWidgetItem(var))
+            self.table.setItem(row, 1, QTableWidgetItem(style))
+            row += 1
+
+        self.available_linestyles = TableWidgetDragRows()
+        self.available_linestyles.setSelectionMode(QAbstractItemView.SingleSelection)
+        self.available_linestyles.setColumnCount(1)
+        self.available_linestyles.setHorizontalHeaderLabels(['Available styles'])
+        self.available_linestyles.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.available_linestyles.setAcceptDrops(False)
+        self.available_linestyles.setFixedHeight(300)
+        self.available_linestyles.setMinimumWidth(150)
+        self.available_linestyles.setMaximumWidth(300)
+        self.available_linestyles.horizontalHeader().setDefaultSectionSize(150)
+        row = 0
+        for style in all_linestyles:
+            self.available_linestyles.insertRow(row)
+            self.available_linestyles.setItem(row, 0, QTableWidgetItem(style))
+            row += 1
+
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel,
+                                   Qt.Horizontal, self)
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        vlayout = QVBoxLayout()
+        vlayout.addWidget(QLabel('Drag and drop line styles on the %s variables'))
+        hlayout = QHBoxLayout()
+        hlayout.addWidget(self.available_linestyles)
+        hlayout.addWidget(self.table)
+        vlayout.addLayout(hlayout)
+        vlayout.addWidget(buttons)
+        self.setLayout(vlayout)
+
+        self.setFixedSize(500, 400)
+        self.setWindowTitle('Change variable line styles')
+
+    def getLineStyles(self, old_linestyles):
+        for row in range(self.table.rowCount()):
+            label = self.table.item(row, 0).text()
+            style = self.table.item(row, 1).text()
+            old_linestyles[label] = style
+
+
+class ProjectLinesImageControlPanel(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.timeSelection = SimpleTimeDateSelection()
+
+        # create widgets plot options
+        self.lineBox = QComboBox()
+        self.lineBox.setFixedHeight(30)
+        self.lineBox.setMaximumWidth(200)
+        self.intersection = QCheckBox()
+        self.intersection.setChecked(True)
+        self.addInternal = QCheckBox()
+
+        # create line-var table
+        self.unitBox = QComboBox()
+        self.unitBox.setFixedHeight(30)
+        self.unitBox.setMaximumWidth(200)
+
+        self.varTable = QTableWidget()
+        vh = self.varTable.verticalHeader()
+        vh.setSectionResizeMode(QHeaderView.Fixed)
+        vh.setDefaultSectionSize(20)
+        hh = self.varTable.horizontalHeader()
+        hh.setDefaultSectionSize(30)
+        self.varTable.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.varTable.setSelectionMode(QAbstractItemView.NoSelection)
+        self.varTable.setMinimumHeight(300)
+        self.varTable.setMaximumWidth(400)
+
+        # create the compute button
+        self.btnCompute = QPushButton('Compute', icon=self.style().standardIcon(QStyle.SP_DialogApplyButton))
+        self.btnCompute.setFixedSize(105, 50)
+
+        # set layout
+        vlayout = QVBoxLayout()
+        vlayout.addItem(QSpacerItem(10, 10))
+        vlayout.addWidget(self.timeSelection)
+        vlayout.addItem(QSpacerItem(10, 10))
+        hlayout = QHBoxLayout()
+        hlayout.addWidget(QLabel('   Reference line'))
+        hlayout.addWidget(self.lineBox)
+        hlayout.setAlignment(self.lineBox, Qt.AlignLeft)
+        hlayout.addStretch()
+        vlayout.addLayout(hlayout)
+        vlayout.addItem(QSpacerItem(10, 10))
+
+        vlayout.addItem(QSpacerItem(10, 10))
+        hlayout = QHBoxLayout()
+        hlayout.addItem(QSpacerItem(10, 10))
+        hlayout.addWidget(self.intersection)
+        lb = QLabel('Add intersection points')
+        hlayout.addWidget(lb)
+        hlayout.setAlignment(lb, Qt.AlignLeft)
+        hlayout.addStretch()
+        vlayout.addLayout(hlayout)
+        vlayout.addItem(QSpacerItem(10, 10))
+
+        hlayout = QHBoxLayout()
+        hlayout.addItem(QSpacerItem(10, 10))
+        hlayout.addWidget(self.addInternal)
+        lb = QLabel('Mark original points in plot')
+        hlayout.addWidget(lb)
+        hlayout.setAlignment(lb, Qt.AlignLeft)
+        hlayout.addStretch()
+        vlayout.addLayout(hlayout)
+        vlayout.addItem(QSpacerItem(10, 15))
+
+        hlayout = QHBoxLayout()
+        vlayout2 = QVBoxLayout()
+        vlayout2.addWidget(self.unitBox)
+        vlayout2.addWidget(self.varTable)
+        vlayout2.setSpacing(10)
+        hlayout.addLayout(vlayout2)
+        hlayout.addWidget(self.btnCompute)
+        hlayout.setAlignment(self.btnCompute, Qt.AlignRight | Qt.AlignTop)
+        hlayout.setSpacing(10)
+        vlayout.addItem(hlayout)
+
+        self.setLayout(vlayout)
+
+
+class ProjectLinesPlotViewer(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.filename = ''
+        self.language = 'fr'
+        self.header = None
+        self.time = []
+        self.lines = []
+        self.line_interpolators = []
+
+        self.var_table = {}
+        self.current_vars = {}
+        self.line_colors = {}
+        self.current_linestyles = {}
+
+        self.lineStyles = ['solid', 'dashed', 'dashdot', 'dotted']
+
+        # set up a custom plot viewer
+        self.editLineColorAct = QAction('Edit line colors', self,
+                                        icon=self.style().standardIcon(QStyle.SP_FileDialogDetailedView),
+                                        triggered=self.editColor)
+        self.editLineStyleAct = QAction('Edit line type', self,
+                                        icon=self.style().standardIcon(QStyle.SP_FileDialogDetailedView),
+                                        triggered=self.editLineStyle)
+        self.plotViewer = PlotViewer()
+        self.plotViewer.exitAct.setEnabled(False)
+        self.plotViewer.menuBar.setVisible(False)
+        self.plotViewer.toolBar.addAction(self.editLineColorAct)
+        self.plotViewer.toolBar.addAction(self.editLineStyleAct)
+        self.plotViewer.toolBar.addSeparator()
+        self.plotViewer.toolBar.addAction(self.plotViewer.xLabelAct)
+        self.plotViewer.toolBar.addAction(self.plotViewer.yLabelAct)
+        self.plotViewer.toolBar.addSeparator()
+        self.plotViewer.toolBar.addAction(self.plotViewer.titleAct)
+        self.plotViewer.canvas.figure.canvas.mpl_connect('motion_notify_event', self.plotViewer.mouseMove)
+
+        # put it in a group box to get a nice border
+        self.gb = QGroupBox()
+        ly = QHBoxLayout()
+        ly.addWidget(self.plotViewer)
+        self.gb.setLayout(ly)
+        self.gb.setStyleSheet('QGroupBox {border: 8px solid rgb(108, 122, 137); border-radius: 6px }')
+        self.gb.setMinimumWidth(600)
+
+        self.control = ProjectLinesImageControlPanel()
+        self.control.btnCompute.clicked.connect(self.btnComputeEvent)
+        self.control.unitBox.currentTextChanged.connect(self._updateTable)
+
+        self.splitter = QSplitter()
+        self.splitter.addWidget(self.control)
+        self.splitter.addWidget(self.gb)
+
+        mainLayout = QHBoxLayout()
+        mainLayout.addWidget(self.splitter)
+        self.setLayout(mainLayout)
+        self.setWindowTitle('Project Lines')
+
+    def editColor(self):
+        line_labels = {i: 'Line %d' % (i+1) for i in self.line_colors}
+        msg = ColumnColorEditor('Line', list(self._getSelection().keys()),
+                                line_labels, self.line_colors,
+                                self.plotViewer.defaultColors, self.plotViewer.colorToName)
+        value = msg.exec_()
+        if value == QDialog.Rejected:
+            return
+        msg.getColors(self.line_colors, line_labels, self.plotViewer.nameToColor)
+        self.btnComputeEvent()
+
+    def editLineStyle(self):
+        msg = LineStyleEditor(self.lineStyles, self.current_linestyles)
+        value = msg.exec_()
+        if value == QDialog.Rejected:
+            return
+        msg.getLineStyles(self.current_linestyles)
+        self.btnComputeEvent()
+
+    def getSelection(self):
+        self.current_vars = {}
+        unit = self.control.unitBox.currentText().split(': ')[1]
+        unit = '' if unit == 'None' else unit
+        vars = self.var_table[unit]
+        for row in range(self.control.varTable.rowCount()):
+            for j in range(len(vars)):
+                if self.control.varTable.item(row, j+1).checkState() == Qt.Checked:
+                    line_id = int(self.control.varTable.item(row, 0).text()) - 1
+                    if line_id not in self.current_vars:
+                        self.current_vars[line_id] = [vars[j]]
+                    else:
+                        self.current_vars[line_id].append(vars[j])
+        return self.current_vars
+
+    def _updateTable(self, text):
+        self.current_linestyles = {}
+        self.control.varTable.setRowCount(0)
+        unit = text.split(': ')[1]
+        unit = '' if unit == 'None' else unit
+        vars = self.var_table[unit]
+
+        # initialize default linestyles
+        j = 0
+        for var in vars:
+            j %= len(self.lineStyles)
+            self.current_linestyles[var] = self.lineStyles[j]
+            j += 1
+
+        nb_vars = len(vars)
+        self.control.varTable.setColumnCount(nb_vars + 1)
+        self.control.varTable.setHorizontalHeaderLabels(['Line'] + vars)
+
+        for i in range(len(self.lines)):
+            id_line = str(i+1)
+            if self.line_interpolators[i][0]:
+                offset = self.control.varTable.rowCount()
+                self.control.varTable.insertRow(offset)
+                self.control.varTable.setItem(offset, 0, QTableWidgetItem(id_line))
+                for j, var in enumerate(vars):
+                    var_item = QTableWidgetItem('')
+                    var_item.setCheckState(Qt.Unchecked)
+                    self.control.varTable.setItem(offset, j+1, var_item)
+
+    def _compute(self, time_index, line_interpolators, reference, max_distance):
+        distances = {}
+        values = {}
+        with Serafin.Read(self.filename, self.language) as input_stream:
+            input_stream.header = self.header
+            input_stream.time = self.time
+            for line_id in self.current_vars:
+                distances[line_id] = []
+                values[line_id] = {}
+
+                for var in self.current_vars[line_id]:
+                    values[line_id][var] = []
+
+                for x, y, (i, j, k), interpolator in line_interpolators[line_id]:
+                    d = reference.project(x, y)
+                    if d <= 0 or d >= max_distance:
+                        continue
+                    distances[line_id].append(d)
+
+                    for var in self.current_vars[line_id]:
+                        all_values = input_stream.read_var_in_frame(time_index, var)
+                        values[line_id][var].append(interpolator.dot(all_values[[i, j, k]]))
+                distances[line_id] = np.array(distances[line_id])
+        return distances, values
+
+    def btnComputeEvent(self):
+        self.current_vars = self.getSelection()
+        if not self.current_vars:
+            QMessageBox.critical(self, 'Error', 'Select at least one variable to plot.',
+                                 QMessageBox.Ok)
+            return
+        ref_id = int(self.control.lineBox.currentText().split()[1]) - 1
+        self.plotViewer.current_title = 'Values of variables along line %d' \
+                                        % (ref_id+1)
+        self.plotViewer.current_ylabel = 'Value (%s)' \
+                                         % (self.control.unitBox.currentText().split(': ')[1])
+
+        line_interpolators = {}
+        if self.control.intersection.isChecked():
+            for line_id in self.current_vars:
+                line_interpolator, distances = self.line_interpolators[line_id]
+                line_interpolators[line_id] = line_interpolator
+        else:
+            for line_id in self.current_vars:
+                line_interpolator, distances = self.line_interpolators_internal[line_id]
+                line_interpolators[line_id] = line_interpolator
+
+        reference = self.lines[ref_id]
+        max_distance = reference.length()
+        time_index = int(self.control.timeSelection.index.text()) - 1
+        distances, values = self._compute(time_index, line_interpolators, reference, max_distance)
+
+        self.plotViewer.canvas.axes.clear()
+
+        if self.control.addInternal.isChecked():
+            if self.control.intersection.isChecked():
+                line_interpolators_internal = {}
+                for line_id in self.current_vars:
+                    line_interpolator, _ = self.line_interpolators_internal[line_id]
+                    line_interpolators_internal[line_id] = line_interpolator
+                distances_internal, values_internal = self._compute(time_index,
+                                                                    line_interpolators_internal,
+                                                                    reference, max_distance)
+                for line_id, vars in self.current_vars.items():
+                    for var in vars:
+                        self.plotViewer.canvas.axes.plot(distances[line_id], values[line_id][var],
+                                                         linestyle=self.current_linestyles[var],
+                                                         color=self.line_colors[line_id],
+                                                         linewidth=2, label='%s$_%d$' % (var, line_id+1))
+
+                        self.plotViewer.canvas.axes.plot(distances_internal[line_id],
+                                                         values_internal[line_id][var], 'o',
+                                                         color=self.line_colors[line_id])
+            else:
+                for line_id, vars in self.current_vars.items():
+                    for var in vars:
+                        self.plotViewer.canvas.axes.plot(distances[line_id], values[line_id][var],
+                                                         marker='o', linestyle=self.current_linestyles[var],
+                                                         color=self.line_colors[line_id], linewidth=2,
+                                                         label='%s$_%d$' % (var, line_id+1))
+
+        else:
+            for line_id, vars in self.current_vars.items():
+                for var in vars:
+                    self.plotViewer.canvas.axes.plot(distances[line_id], values[line_id][var],
+                                                     linestyle=self.current_linestyles[var],
+                                                     color=self.line_colors[line_id], linewidth=2,
+                                                     label='%s$_%d$' % (var, line_id+1))
+
+        self.plotViewer.canvas.axes.legend()
+        self.plotViewer.canvas.axes.grid(linestyle='dotted')
+        self.plotViewer.canvas.axes.set_xlabel(self.plotViewer.current_xlabel)
+        self.plotViewer.canvas.axes.set_ylabel(self.plotViewer.current_ylabel)
+        self.plotViewer.canvas.axes.set_title(self.plotViewer.current_title)
+        self.plotViewer.canvas.draw()
+
+    def reset(self):
+        self.control.intersection.setChecked(True)
+        self.control.addInternal.setChecked(False)
+        self.control.lineBox.clear()
+        self.control.varTable.setRowCount(0)
+        self.current_vars = {}
+        self.line_colors = {}
+        self.current_linestyles = {}
+        self.plotViewer.defaultPlot()
+        self.plotViewer.current_title = ''
+        self.plotViewer.current_xlabel = 'Cumulative distance (M)'
+        self.plotViewer.current_ylabel = ''
+        self.control.timeSelection.clearText()
+
+    def getInput(self, filename, input_header, time, lines, line_interpolators, line_interpolators_internal):
+        self.header = input_header
+        self.language = input_header.language
+        self.time = time
+        self.filename = filename
+        self.lines = lines
+        self.line_interpolators = line_interpolators
+        self.line_interpolators_internal = line_interpolators_internal
+
+        if input_header.date is not None:
+            year, month, day, hour, minute, second = input_header.date
+            start_time = datetime.datetime(year, month, day, hour, minute, second)
+        else:
+            start_time = datetime.datetime(1900, 1, 1, 0, 0, 0)
+        frames = list(map(lambda x: start_time + datetime.timedelta(seconds=x), time))
+        self.control.timeSelection.initTime(time, frames)
+
+        self.var_table = {}
+        for var_ID, var_name, var_unit in zip(input_header.var_IDs, input_header.var_names,
+                                              input_header.var_units):
+            var_unit = var_unit.decode('utf-8').strip()
+            if var_unit in self.var_table:
+                self.var_table[var_unit].append(var_ID)
+            else:
+                self.var_table[var_unit] = [var_ID]
+
+        for var_unit in self.var_table:
+            if not var_unit:
+                self.control.unitBox.addItem('Unit: None')
+            else:
+                self.control.unitBox.addItem('Unit: %s' % var_unit)
+        if 'M' in self.var_table:
+            self.control.unitBox.setCurrentIndex(list(self.var_table.keys()).index('M'))
+        self._updateTable(self.control.unitBox.currentText())
+
+        j = 0
+        for i in range(len(self.lines)):
+            id_line = str(i+1)
+            if self.line_interpolators[i][0]:
+                j %= len(self.plotViewer.defaultColors)
+                self.control.lineBox.addItem('Line %s' % id_line)
+                self.line_colors[i] = self.plotViewer.defaultColors[j]   # initialize default line colors
+                j += 1
 
 
 class TelToolWidget(QWidget):
