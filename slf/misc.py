@@ -213,7 +213,7 @@ def vectors_to_shp(slf_name, slf_header, shp_name, vector_couple):
     w.save(shp_name)
 
 
-def scalar_to_xml(slf_name, slf_header, xml_name, scalar):
+def scalar_to_xml(slf_name, slf_header, xml_name, scalar, time_index):
     """!
     @brief Write LandXML file from a scalar variable of a .slf file (and its first frame)
     @param <str> slf_name: path to the input .slf file
@@ -225,7 +225,7 @@ def scalar_to_xml(slf_name, slf_header, xml_name, scalar):
         slf.header = slf_header
 
         # fetch scalar variable values
-        scalar_values = slf.read_var_in_frame(0, scalar)
+        scalar_values = slf.read_var_in_frame(time_index, scalar)
 
     # write shp
     with open(xml_name, 'w') as xml:

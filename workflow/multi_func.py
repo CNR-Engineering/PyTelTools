@@ -1153,6 +1153,43 @@ def add_transform(node_id, fid, data, options):
     return True, node_id, fid, new_data, success_message('Add Transformation', data.job_id)
 
 
+def write_landxml(node_id, fid, data, options):
+    if not data.header.is_2d:
+        return False, node_id, fid, None, fail_message('the input file is not 2D', 'Write LandXML',
+                                                       data.job_id)
+    if len(data.selected_time_indices) != 1:
+        return False, node_id, fid, None, fail_message('the input data has more than one frame', 'Write LandXML',
+                                                       data.job_id)
+    available_var = [var for var in data.selected_vars if var in data.header.var_IDs]
+    if len(available_var) == 0:
+        return False, node_id, fid, None, fail_message('no variable available', 'Write LandXML',
+                                                       data.job_id)
+    elif len(available_var) > 1:
+        return False, node_id, fid, None, fail_message('the input data has more than one variable', 'Write LandXML',
+                                                       data.job_id)
+    selected_frame = data.selected_time_indices[0]
+    selected_var = available_var[0]
+
+    suffix, double_name, overwrite = options
+    input_name = os.path.split(data.filename)[1][:-4]
+    if double_name:
+        output_name = input_name + '_' + data.job_id + suffix + '.xml'
+    else:
+        output_name = input_name + suffix + '.xml'
+
+    path = os.path.join(os.path.split(data.filename)[0], 'gis')
+    if not os.path.exists(path):
+        os.mkdir(path)
+
+    filename = os.path.join(path, output_name)
+    if not overwrite:
+        if os.path.exists(filename):
+            return True, node_id, fid, None, success_message('Write LandXML', data.job_id, 'use existing file')
+    operations.scalar_to_xml(data.filename, data.header, filename, selected_var, selected_frame)
+
+    return True, node_id, fid, None, success_message('Write LandXML', data.job_id)
+
+
 FUNCTIONS = {'Select Variables': select_variables, 'Add Rouse': add_rouse, 'Select Time': select_time,
              'Select Single Frame': select_single_frame,
              'Select First Frame': select_first_frame, 'Select Last Frame': select_last_frame,
@@ -1163,7 +1200,7 @@ FUNCTIONS = {'Select Variables': select_variables, 'Add Rouse': add_rouse, 'Sele
              'Interpolate on Points': interpolate_points, 'Interpolate along Lines': interpolate_lines,
              'Project Lines': project_lines, 'Project B on A': project_mesh, 'A Minus B': minus,
              'B Minus A': reverse_minus, 'Max(A,B)': max_between,
-             'Min(A,B)': min_between, 'Add Transformation': add_transform,
+             'Min(A,B)': min_between, 'Add Transformation': add_transform, 'Write LandXML': write_landxml,
              'Load Serafin': read_slf, 'Load Serafin 3D': read_slf_3d, 'Load Reference Serafin': read_slf_reference}
 
 

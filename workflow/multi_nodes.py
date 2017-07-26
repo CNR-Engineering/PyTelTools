@@ -1,7 +1,7 @@
 import os
 from datetime import datetime
 from PyQt5.QtWidgets import *
-from workflow.MultiNode import MultiNode, MultiOneInOneOutNode, \
+from workflow.MultiNode import MultiNode, MultiOneInOneOutNode, MultiSingleInputNode, \
                                MultiSingleOutputNode, MultiDoubleInputNode, MultiTwoInOneOutNode
 from workflow.util import MultiLoadSerafinDialog
 import slf.variables as variables
@@ -138,6 +138,19 @@ class MultiLoadReferenceSerafinNode(MultiSingleOutputNode):
             self.state = MultiNode.NOT_CONFIGURED
             return
         self.options = (filename,)
+
+
+class MultiWriteLandXMLNode(MultiSingleInputNode):
+    def __init__(self, index):
+        super().__init__(index)
+        self.category = 'Input/Output'
+        self.label = 'Write\nLandXML'
+
+    def load(self, options):
+        suffix = options[0]
+        double_name = bool(int(options[1]))
+        overwrite = bool(int(options[2]))
+        self.options = (suffix, double_name, overwrite)
 
 
 class MultiAddTransformationNode(MultiOneInOneOutNode):

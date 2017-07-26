@@ -17,7 +17,7 @@ class SelectVariablesNode(OneInOneOutNode):
         super().__init__(index)
         self.category = 'Basic operations'
         self.label = 'Select\nVariables'
-        self.out_port.data_type = ('slf', 'slf 3d')
+        self.out_port.data_type = ('slf', 'slf 3d', 'slf geom')
         self.in_port.data_type = ('slf', 'slf 3d')
         self.in_data = None
         self.data = None
@@ -731,7 +731,7 @@ class SelectSingleFrameNode(OneInOneOutNode):
         super().__init__(index)
         self.category = 'Basic operations'
         self.label = 'Select\nSingle\nFrame'
-        self.out_port.data_type = ('slf', 'slf 3d')
+        self.out_port.data_type = ('slf', 'slf 3d', 'slf geom')
         self.in_port.data_type = ('slf', 'slf 3d')
         self.in_data = None
         self.data = None
@@ -1130,7 +1130,7 @@ class SelectFirstFrameNode(UnaryOperatorNode):
         super().__init__(index, None)
         self.category = 'Basic operations'
         self.label = 'Select\nFirst\nFrame'
-        self.out_port.data_type = ('slf', 'slf 3d')
+        self.out_port.data_type = ('slf', 'slf 3d', 'slf geom')
         self.in_port.data_type = ('slf', 'slf 3d')
 
     def run(self):
@@ -1156,7 +1156,7 @@ class SelectLastFrameNode(UnaryOperatorNode):
         super().__init__(index, None)
         self.category = 'Basic operations'
         self.label = 'Select\nLast\nFrame'
-        self.out_port.data_type = ('slf', 'slf 3d')
+        self.out_port.data_type = ('slf', 'slf 3d', 'slf geom')
         self.in_port.data_type = ('slf', 'slf 3d')
 
     def run(self):
