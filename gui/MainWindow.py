@@ -16,8 +16,9 @@ from gui.ConfigTransformation import TransformationMap
 from gui.GeometryConverterGUI import FileConverterGUI
 from gui.CalculatorGUI import CalculatorGUI
 
+
 class GlobalConfigDialog(QDialog):
-    def __init__(self):
+    def __init__(self, language, csv_separator):
         super().__init__()
         buttons = QDialogButtonBox(QDialogButtonBox.Ok, Qt.Horizontal, self)
         buttons.accepted.connect(self._select)
@@ -31,13 +32,21 @@ class GlobalConfigDialog(QDialog):
         hlayout.addWidget(english_button)
         self.lang_box.setLayout(hlayout)
         self.lang_box.setMaximumHeight(80)
-        self.french_button.setChecked(True)
+        if language == 'fr':
+            self.french_button.setChecked(True)
+        else:
+            english_button.setChecked(True)
 
         self.csv_box = QComboBox()
         self.csv_box.setFixedHeight(30)
         for sep in ['Semicolon ;', 'Comma ,', 'Tab']:
             self.csv_box.addItem(sep)
-        self.csv_box.setCurrentIndex(0)
+        if csv_separator == ';':
+            self.csv_box.setCurrentIndex(0)
+        elif csv_separator == ',':
+            self.csv_box.setCurrentIndex(1)
+        else:
+            self.csv_box.setCurrentIndex(2)
 
         layout = QVBoxLayout()
         layout.addWidget(self.lang_box)
@@ -68,50 +77,58 @@ class GlobalConfigDialog(QDialog):
 class MainPanel(QWidget):
     def __init__(self, parent):
         super().__init__()
-        extract = ExtractVariablesGUI(parent)
-        maxmin = MaxMinMeanGUI(parent)
-        points = PointsGUI(parent)
-        lines = LinesGUI(parent)
-        project = ProjectLinesGUI(parent)
-        mesh = ProjectMeshGUI(parent)
-        volume = ComputeVolumeGUI(parent)
-        compare = CompareResultsGUI(parent)
-        flux = ComputeFluxGUI(parent)
+        self.extract = ExtractVariablesGUI(parent)
+        self.maxmin = MaxMinMeanGUI(parent)
+        self.points = PointsGUI(parent)
+        self.lines = LinesGUI(parent)
+        self.project = ProjectLinesGUI(parent)
+        self.mesh = ProjectMeshGUI(parent)
+        self.volume = ComputeVolumeGUI(parent)
+        self.compare = CompareResultsGUI(parent)
+        self.flux = ComputeFluxGUI(parent)
 
         trans = TransformationMap()
-        conv = FileConverterGUI(parent)
-        calc = CalculatorGUI(parent)
+        self.conv = FileConverterGUI(parent)
+        self.calc = CalculatorGUI(parent)
 
         self.stackLayout = QStackedLayout()
         self.stackLayout.addWidget(QLabel('Hello! This is the start page (TODO)'))
-        self.stackLayout.addWidget(extract)
-        self.stackLayout.addWidget(maxmin)
-        self.stackLayout.addWidget(points)
-        self.stackLayout.addWidget(lines)
-        self.stackLayout.addWidget(project)
-        self.stackLayout.addWidget(mesh)
-        self.stackLayout.addWidget(volume)
-        self.stackLayout.addWidget(flux)
-        self.stackLayout.addWidget(compare)
+        self.stackLayout.addWidget(self.extract)
+        self.stackLayout.addWidget(self.maxmin)
+        self.stackLayout.addWidget(self.points)
+        self.stackLayout.addWidget(self.lines)
+        self.stackLayout.addWidget(self.project)
+        self.stackLayout.addWidget(self.mesh)
+        self.stackLayout.addWidget(self.volume)
+        self.stackLayout.addWidget(self.flux)
+        self.stackLayout.addWidget(self.compare)
         self.stackLayout.addWidget(trans)
-        self.stackLayout.addWidget(conv)
-        self.stackLayout.addWidget(calc)
+        self.stackLayout.addWidget(self.conv)
+        self.stackLayout.addWidget(self.calc)
         self.setLayout(self.stackLayout)
 
         self.stackLayout.currentChanged.connect(parent.autoResize)
+
+    def switch_language(self, language):
+        for widget in [self.extract, self.maxmin, self.points, self.lines, self.project, self.mesh,
+                       self.volume, self.compare, self.flux, self.conv, self.calc]:
+            widget.switch_language(language)
 
 
 class MyMainWindow(QWidget):
     def __init__(self):
         super().__init__()
-        dlg = GlobalConfigDialog()
-        dlg.exec_()
-        self.language, self.csv_separator = dlg.new_options
-
+        self.language = 'fr'
+        self.csv_separator = ';'
         self.panel = MainPanel(self)
 
+        config_button = QPushButton('Global\nConfiguration')
+        config_button.setMinimumHeight(40)
+        # config_button.setMaximumWidth(250)
+        config_button.clicked.connect(self.global_config)
+
         pageList = QListWidget()
-        pageList.setMaximumWidth(200)
+        # pageList.setMaximumWidth(200)
         for name in ['Start', 'Extract variables', 'Max/Min/Mean/Arrival/Duration', 'Interpolate on points',
                      'Interpolate along lines', 'Project along lines', 'Project mesh',
                      'Compute volume', 'Compute flux', 'Compare two results',
@@ -123,20 +140,43 @@ class MyMainWindow(QWidget):
         pageList.setCurrentRow(0)
 
         splitter = QSplitter()
-        splitter.addWidget(pageList)
+        left_widget = QWidget()
+        vlayout = QVBoxLayout()
+        vlayout.addWidget(config_button)
+        vlayout.addWidget(pageList)
+        left_widget.setLayout(vlayout)
+        splitter.addWidget(left_widget)
         splitter.addWidget(self.panel)
-        splitter.setHandleWidth(10)
+        splitter.setHandleWidth(5)
         splitter.setCollapsible(0, False)
+        splitter.setCollapsible(1, False)
+
+        handle = splitter.handle(1)
+        layout = QVBoxLayout()
+        layout.setSpacing(0)
+        layout.setContentsMargins(0, 0, 0, 0)
+        line = QFrame()
+        line.setFrameShape(QFrame.VLine)
+        line.setFrameShadow(QFrame.Sunken)
+        layout.addWidget(line)
+        handle.setLayout(layout)
 
         mainLayout = QHBoxLayout()
         mainLayout.addWidget(splitter)
+        mainLayout.setContentsMargins(0, 0, 0, 0)
         self.setLayout(mainLayout)
 
         self.setWindowTitle('Main window')
-        self.resize(800, 600)
         self.setWindowFlags(self.windowFlags() | Qt.CustomizeWindowHint)
         self.frameGeom = self.frameGeometry()
         self.move(self.frameGeom.center())
+
+    def global_config(self):
+        dlg = GlobalConfigDialog(self.language, self.csv_separator)
+        value = dlg.exec_()
+        if value == QDialog.Accepted:
+            self.language, self.csv_separator = dlg.new_options
+            self.panel.switch_language(self.language)
 
     def autoResize(self, index):
         if not self.isMaximized():

@@ -1136,22 +1136,21 @@ class MultiSavePointDialog(MultiSaveTemporalPlotDialog):
             fig.savefig(png_name, dpi=100)
 
 
-class MultiSaveProjectLinesDialog(QDialog):
-    def __init__(self, parent, input_options, output_options, compute_options):
+class MultiPlotDialog(QDialog):
+    def __init__(self, parent, name, tasks, input_options, output_options, compute_options):
         super().__init__()
-
         self.parent = parent
-        self.input_options = input_options
-        self.output_options = output_options
         self.compute_options = compute_options
 
         self.table = QTableWidget()
         self.table.setRowCount(len(input_options[0]))
-        self.table.setColumnCount(4)
+        self.table.setColumnCount(len(tasks)+1)
         self.table.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.table.horizontalHeader().setDefaultSectionSize(100)
-        self.table.setHorizontalHeaderLabels(['Job', 'Load Serafin', 'Interpolation', 'Export PNG'])
+        self.table.setHorizontalHeaderLabels(['Job'] + tasks)
 
+        self.red = QColor(255, 160, 160, 255)
+        self.green = QColor(180, 250, 165, 255)
         yellow = QColor(245, 255, 207, 255)
 
         for i, path in enumerate(input_options[0]):
@@ -1173,65 +1172,197 @@ class MultiSaveProjectLinesDialog(QDialog):
         vlayout.addWidget(self.btnClose, Qt.AlignRight)
         self.setLayout(vlayout)
         self.resize(500, 300)
-        self.setWindowTitle('Multi-Save Project Lines')
+        self.setWindowTitle('Multi-Save %s' % name)
         self.show()
         QApplication.processEvents()
-        self.success = self._run()
         self.btnClose.setEnabled(True)
 
-    def _run(self):
-        red = QColor(255, 160, 160, 255)
-        green = QColor(180, 250, 165, 255)
-
-        dir_paths, slf_name, job_ids = self.input_options
-        suffix, in_source_folder, dir_path, double_name, overwrite = self.output_options
-        reference, max_distance, time_index = self.compute_options
-        png_names = []
-        for path, job_id in zip(dir_paths, job_ids):
-            if double_name:
-                output_name = slf_name[:-4] + '_' + job_id + suffix + '.png'
+        # process IO options
+        self.dir_paths, self.slf_name, self.job_ids = input_options
+        self.suffix, self.in_source_folder, self.dir_path, self.double_name, self.overwrite = output_options
+        self.png_names = []
+        for path, job_id in zip(self.dir_paths, self.job_ids):
+            if self.double_name:
+                output_name = self.slf_name[:-4] + '_' + job_id + self.suffix + '.png'
             else:
-                output_name = slf_name[:-4] + suffix + '.png'
-            if in_source_folder:
+                output_name = self.slf_name[:-4] + self.suffix + '.png'
+            if self.in_source_folder:
                 filename = os.path.join(path, output_name)
             else:
-                filename = os.path.join(dir_path, output_name)
-            png_names.append(filename)
-        nb_success = 0
-        for i, (dir_path, job_id, png_name) in enumerate(zip(dir_paths, job_ids, png_names)):
-            input_name = os.path.join(dir_path, slf_name)
+                filename = os.path.join(self.dir_path, output_name)
+            self.png_names.append(filename)
 
+    def fail(self, i, j):
+        self.table.item(i, j).setBackground(self.red)
+        QApplication.processEvents()
+
+    def success(self, i, j):
+        self.table.item(i, j).setBackground(self.green)
+        QApplication.processEvents()
+
+
+class MultiSaveMultiVarLinePlotDialog(MultiPlotDialog):
+    def __init__(self, parent, input_options, output_options, compute_options):
+        super().__init__(parent, 'MultiVar Line Plot', ['Load Serafin', 'Interpolation', 'Export PNG'],
+                         input_options, output_options, compute_options)
+
+    def run(self):
+        line_id, time_index, current_vars = self.compute_options
+        nb_success = 0
+        for i, (dir_path, job_id, png_name) in enumerate(zip(self.dir_paths, self.job_ids, self.png_names)):
+            # Load Serafin
+            input_name = os.path.join(dir_path, self.slf_name)
             input_data = self.parent.open(job_id, input_name)
             if input_data is None:
-                self.table.item(i, 1).setBackground(red)
-                QApplication.processEvents()
+                self.fail(i, 1)
                 continue
-            self.table.item(i, 1).setBackground(green)
-            QApplication.processEvents()
+            # check time
+            if time_index >= len(input_data.time):
+                self.fail(i, 1)
+                continue
+            # check variables
+            failed = False
+            for var in current_vars:
+                if var not in input_data.header.var_IDs:
+                    self.fail(i, 1)
+                    failed = True
+            if failed:
+                continue
+            self.success(i, 1)
 
-            success, all_lines, all_lines_internal = self.parent.interpolate(input_data)
+            # Interpolation
+            success, line_interpolators, line_interpolators_internal = self.parent.interpolate(input_data)
             if not success:
-                self.table.item(i, 2).setBackground(red)
-                QApplication.processEvents()
+                self.fail(i, 2)
                 continue
-            self.table.item(i, 2).setBackground(green)
-            QApplication.processEvents()
+            self.success(i, 2)
 
-            distances, values, distances_internal, values_internal = self.parent.compute(reference, max_distance,
-                                                                                         time_index, input_data,
-                                                                                         all_lines, all_lines_internal)
-            self.parent.plot(values, distances, values_internal, distances_internal, png_name)
-            self.table.item(i, 3).setBackground(green)
-            QApplication.processEvents()
+            # Export PNG
+            line_interpolator, distances = line_interpolators[line_id]
+            line_interpolator_internal, distances_internal = line_interpolators_internal[line_id]
+
+            values, values_internal = self.parent.compute(time_index, input_data,
+                                                          line_interpolator, line_interpolator_internal, current_vars)
+            self.parent.plot(values, distances, values_internal, distances_internal, current_vars, png_name)
+            self.success(i, 3)
             nb_success += 1
 
-        if nb_success == len(dir_paths):
+        if nb_success == len(self.dir_paths):
             QMessageBox.information(None, 'Success', 'Figures saved successfully',
                                     QMessageBox.Ok)
         else:
             QMessageBox.information(None, 'Failed', 'Failed to produce all figures.',
                                     QMessageBox.Ok)
+        self.btnClose.setEnabled(True)
 
+
+class MultiSaveMultiFrameLinePlotDialog(MultiPlotDialog):
+    def __init__(self, parent, input_options, output_options, compute_options):
+        super().__init__(parent, 'MultiVar Frame Plot', ['Load Serafin', 'Interpolation', 'Export PNG'],
+                         input_options, output_options, compute_options)
+
+    def run(self):
+        line_id, current_var, time_indices = self.compute_options
+        nb_success = 0
+        for i, (dir_path, job_id, png_name) in enumerate(zip(self.dir_paths, self.job_ids, self.png_names)):
+            # Load Serafin
+            input_name = os.path.join(dir_path, self.slf_name)
+            input_data = self.parent.open(job_id, input_name)
+            if input_data is None:
+                self.fail(i, 1)
+                continue
+            # check variable
+            if current_var not in input_data.header.var_IDs:
+                self.fail(i, 1)
+                continue
+            # check time
+            failed = False
+            for time_index in time_indices:
+                if time_index not in input_data.selected_time_indices:
+                    self.fail(i, 1)
+                    failed = True
+            if failed:
+                continue
+            self.success(i, 1)
+
+            # Interpolation
+            success, line_interpolators, line_interpolators_internal = self.parent.interpolate(input_data)
+            if not success:
+                self.fail(i, 2)
+                continue
+            self.success(i, 2)
+
+            # Export PNG
+            line_interpolator, distances = line_interpolators[line_id]
+            line_interpolator_internal, distances_internal = line_interpolators_internal[line_id]
+
+            values, values_internal = self.parent.compute(input_data, line_interpolator, line_interpolator_internal,
+                                                          current_var, time_indices)
+            self.parent.plot(values, distances, values_internal, distances_internal, time_indices, png_name)
+            self.success(i, 3)
+            nb_success += 1
+
+        if nb_success == len(self.dir_paths):
+            QMessageBox.information(None, 'Success', 'Figures saved successfully',
+                                    QMessageBox.Ok)
+        else:
+            QMessageBox.information(None, 'Failed', 'Failed to produce all figures.',
+                                    QMessageBox.Ok)
+        self.btnClose.setEnabled(True)
+
+
+class MultiSaveProjectLinesDialog(MultiPlotDialog):
+    def __init__(self, parent, input_options, output_options, compute_options):
+        super().__init__(parent, 'Project Lines', ['Load Serafin', 'Interpolation', 'Export PNG'],
+                         input_options, output_options, compute_options)
+
+    def run(self):
+        reference, max_distance, time_index, current_vars = self.compute_options
+        nb_success = 0
+        for i, (dir_path, job_id, png_name) in enumerate(zip(self.dir_paths, self.job_ids, self.png_names)):
+            # Load Serafin
+            input_name = os.path.join(dir_path, self.slf_name)
+
+            input_data = self.parent.open(job_id, input_name)
+            if input_data is None:
+                self.fail(i, 1)
+                continue
+             # check time
+            if time_index >= len(input_data.time):
+                self.fail(i, 1)
+                continue
+            # check variables
+            failed = False
+            for line_id, variables in current_vars.items():
+                for var in variables:
+                    if var not in input_data.header.var_IDs:
+                        self.fail(i, 1)
+                        failed = True
+            if failed:
+                continue
+            self.success(i, 1)
+
+            # Interpolation
+            success, all_lines, all_lines_internal = self.parent.interpolate(input_data)
+            if not success:
+                self.fail(i, 2)
+                continue
+            self.success(i, 2)
+
+            # Export PNG
+            distances, values, distances_internal, values_internal = self.parent.compute(reference, max_distance,
+                                                                                         time_index, input_data,
+                                                                                         all_lines, all_lines_internal)
+            self.parent.plot(values, distances, values_internal, distances_internal, current_vars, png_name)
+            self.success(i, 3)
+            nb_success += 1
+
+        if nb_success == len(self.dir_paths):
+            QMessageBox.information(None, 'Success', 'Figures saved successfully',
+                                    QMessageBox.Ok)
+        else:
+            QMessageBox.information(None, 'Failed', 'Failed to produce all figures.',
+                                    QMessageBox.Ok)
         self.btnClose.setEnabled(True)
 
 

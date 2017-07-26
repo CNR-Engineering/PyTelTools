@@ -18,6 +18,11 @@ class FileConverterInputTab(QWidget):
         self.converter = None
         self.from_type = None
 
+        self.frenchButton = QCheckBox()
+        self.englishButton = QCheckBox()
+        for button in (self.frenchButton, self.englishButton):
+            button.setVisible(False)
+
         self._initWidgets()
         self._setLayout()
         self._bindEvents()

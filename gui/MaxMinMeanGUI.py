@@ -208,14 +208,14 @@ class InputTab(QWidget):
         hlayout = QHBoxLayout()
         self.frenchButton = QRadioButton('French')
         hlayout.addWidget(self.frenchButton)
-        englishButton = QRadioButton('English')
-        hlayout.addWidget(englishButton)
+        self.englishButton = QRadioButton('English')
+        hlayout.addWidget(self.englishButton)
         self.langBox.setLayout(hlayout)
         self.langBox.setMaximumHeight(80)
         if self.parent.language == 'fr':
             self.frenchButton.setChecked(True)
         else:
-            englishButton.setChecked(True)
+            self.englishButton.setChecked(True)
 
         # create the widget displaying message logs
         self.logTextBox = QPlainTextEditLogger(self)

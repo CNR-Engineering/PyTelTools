@@ -91,15 +91,15 @@ class InputTab(QWidget):
         self.langBox = QGroupBox('Input language')
         hlayout = QHBoxLayout()
         self.frenchButton = QRadioButton('French')
-        englishButton = QRadioButton('English')
+        self.englishButton = QRadioButton('English')
         hlayout.addWidget(self.frenchButton)
-        hlayout.addWidget(englishButton)
+        hlayout.addWidget(self.englishButton)
         self.langBox.setLayout(hlayout)
         self.langBox.setMaximumHeight(80)
         if self.parent.language == 'fr':
             self.frenchButton.setChecked(True)
         else:
-            englishButton.setChecked(True)
+            self.englishButton.setChecked(True)
 
         # create the button open Serafin
         self.btnOpenSerafin = QPushButton('Load\nSerafin', self, icon=self.style().standardIcon(QStyle.SP_DialogOpenButton))

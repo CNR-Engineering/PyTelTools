@@ -1999,6 +1999,15 @@ class MultiVarLinePlotViewer(QWidget):
         self.splitter = QSplitter()
         self.splitter.addWidget(self.control)
         self.splitter.addWidget(self.gb)
+        handle = self.splitter.handle(1)
+        layout = QVBoxLayout()
+        layout.setSpacing(0)
+        layout.setContentsMargins(0, 0, 0, 0)
+        line = QFrame()
+        line.setFrameShape(QFrame.VLine)
+        line.setFrameShadow(QFrame.Sunken)
+        layout.addWidget(line)
+        handle.setLayout(layout)
 
         mainLayout = QHBoxLayout()
         mainLayout.addWidget(self.splitter)
@@ -2270,9 +2279,17 @@ class MultiFrameLinePlotViewer(QWidget):
 
         self.control = MultiFrameControlPanel()
         self.splitter = QSplitter()
-
         self.splitter.addWidget(self.control)
         self.splitter.addWidget(self.gb)
+        handle = self.splitter.handle(1)
+        layout = QVBoxLayout()
+        layout.setSpacing(0)
+        layout.setContentsMargins(0, 0, 0, 0)
+        line = QFrame()
+        line.setFrameShape(QFrame.VLine)
+        line.setFrameShadow(QFrame.Sunken)
+        layout.addWidget(line)
+        handle.setLayout(layout)
 
         mainLayout = QHBoxLayout()
 
@@ -2548,6 +2565,15 @@ class ProjectLinesPlotViewer(QWidget):
         self.splitter = QSplitter()
         self.splitter.addWidget(self.control)
         self.splitter.addWidget(self.gb)
+        handle = self.splitter.handle(1)
+        layout = QVBoxLayout()
+        layout.setSpacing(0)
+        layout.setContentsMargins(0, 0, 0, 0)
+        line = QFrame()
+        line.setFrameShape(QFrame.VLine)
+        line.setFrameShadow(QFrame.Sunken)
+        layout.addWidget(line)
+        handle.setLayout(layout)
 
         mainLayout = QHBoxLayout()
         mainLayout.addWidget(self.splitter)
@@ -2577,15 +2603,15 @@ class ProjectLinesPlotViewer(QWidget):
         self.current_vars = {}
         unit = self.control.unitBox.currentText().split(': ')[1]
         unit = '' if unit == 'None' else unit
-        vars = self.var_table[unit]
+        variables = self.var_table[unit]
         for row in range(self.control.varTable.rowCount()):
-            for j in range(len(vars)):
+            for j in range(len(variables)):
                 if self.control.varTable.item(row, j+1).checkState() == Qt.Checked:
                     line_id = int(self.control.varTable.item(row, 0).text()) - 1
                     if line_id not in self.current_vars:
-                        self.current_vars[line_id] = [vars[j]]
+                        self.current_vars[line_id] = [variables[j]]
                     else:
-                        self.current_vars[line_id].append(vars[j])
+                        self.current_vars[line_id].append(variables[j])
         return self.current_vars
 
     def _updateTable(self, text):
@@ -2680,8 +2706,8 @@ class ProjectLinesPlotViewer(QWidget):
                 distances_internal, values_internal = self._compute(time_index,
                                                                     line_interpolators_internal,
                                                                     reference, max_distance)
-                for line_id, vars in self.current_vars.items():
-                    for var in vars:
+                for line_id, variables in self.current_vars.items():
+                    for var in variables:
                         self.plotViewer.canvas.axes.plot(distances[line_id], values[line_id][var],
                                                          linestyle=self.current_linestyles[var],
                                                          color=self.line_colors[line_id],
@@ -2691,16 +2717,16 @@ class ProjectLinesPlotViewer(QWidget):
                                                          values_internal[line_id][var], 'o',
                                                          color=self.line_colors[line_id])
             else:
-                for line_id, vars in self.current_vars.items():
-                    for var in vars:
+                for line_id, variables in self.current_vars.items():
+                    for var in variables:
                         self.plotViewer.canvas.axes.plot(distances[line_id], values[line_id][var],
                                                          marker='o', linestyle=self.current_linestyles[var],
                                                          color=self.line_colors[line_id], linewidth=2,
                                                          label='%s$_%d$' % (var, line_id+1))
 
         else:
-            for line_id, vars in self.current_vars.items():
-                for var in vars:
+            for line_id, variables in self.current_vars.items():
+                for var in variables:
                     self.plotViewer.canvas.axes.plot(distances[line_id], values[line_id][var],
                                                      linestyle=self.current_linestyles[var],
                                                      color=self.line_colors[line_id], linewidth=2,
@@ -2776,6 +2802,7 @@ class TelToolWidget(QWidget):
     def __init__(self, parent):
         super().__init__()
         self.parent = parent
+        self.input = None
         if parent is None:
             self.language = 'fr'
             self.csv_separator = ';'
@@ -2784,6 +2811,7 @@ class TelToolWidget(QWidget):
             self.csv_separator = parent.csv_separator
         self.setMinimumWidth(600)
         self.setWindowFlags(self.windowFlags() | Qt.CustomizeWindowHint)
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
 
     def inDialog(self):
         if self.parent is not None:
@@ -2800,6 +2828,12 @@ class TelToolWidget(QWidget):
             self.setWindowFlags(self.windowFlags() | Qt.WindowCloseButtonHint)
             self.setEnabled(True)
             self.show()
+
+    def switch_language(self, language):
+        if language == 'fr':
+            self.input.frenchButton.setChecked(True)
+        else:
+            self.input.englishButton.setChecked(True)
 
 
 def testOpen(filename):

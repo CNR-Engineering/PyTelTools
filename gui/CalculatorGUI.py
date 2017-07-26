@@ -642,15 +642,15 @@ class InputTab(QWidget):
         self.langBox = QGroupBox('Input language')
         hlayout = QHBoxLayout()
         self.frenchButton = QRadioButton('French')
-        englishButton = QRadioButton('English')
+        self.englishButton = QRadioButton('English')
         hlayout.addWidget(self.frenchButton)
-        hlayout.addWidget(englishButton)
+        hlayout.addWidget(self.englishButton)
         self.langBox.setLayout(hlayout)
         self.langBox.setMaximumHeight(80)
         if self.parent.language == 'fr':
             self.frenchButton.setChecked(True)
         else:
-            englishButton.setChecked(True)
+            self.englishButton.setChecked(True)
 
         self.polygon_box = QGroupBox('Add Polygonal Masks (optional)')
         self.polygon_box.setStyleSheet('QGroupBox {font-size: 12px;font-weight: bold;}')
@@ -988,13 +988,13 @@ class CalculatorGUI(TelToolWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
 
-        self.input_tab = InputTab(self)
-        self.editor_tab = EditorTab(self.input_tab)
-        self.submit_tab = SubmitTab(self, self.input_tab, self.editor_tab)
+        self.input = InputTab(self)
+        self.editor_tab = EditorTab(self.input)
+        self.submit_tab = SubmitTab(self, self.input, self.editor_tab)
         self.setWindowTitle('Variable Editor')
 
         self.tab = QTabWidget()
-        self.tab.addTab(self.input_tab, 'Input')
+        self.tab.addTab(self.input, 'Input')
         self.tab.addTab(self.editor_tab, 'Editor')
         self.tab.addTab(self.submit_tab, 'Submit')
 
