@@ -898,7 +898,7 @@ def interpolate_points(node_id, fid, data, aux_data, options, csv_separator):
 
             var_values = []
             for var in selected_vars:
-                var_values.append(input_stream.read_var_in_frame(index, var))
+                var_values.append(input_stream.read_var_in_frame(index_time, var))
 
             for (i, j, k), interpolator in point_interpolators:
                 for index_var in range(nb_selected_vars):
