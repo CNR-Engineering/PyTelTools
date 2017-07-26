@@ -71,6 +71,7 @@ class ProjectWindow(QWidget):
 
     def multi_to_mono(self):
         self.save()
+        self.load(self.filename)
 
     def closeEvent(self, event):
         if not self.save():
