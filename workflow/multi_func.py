@@ -81,6 +81,18 @@ def read_slf_3d(node_id, fid, filename, language, job_id):
     return success, node_id, fid, data, message
 
 
+def read_slf_reference(node_id, filename, language):
+    data = SerafinData('Ref', filename, language)
+    is_2d = data.read()
+    if not is_2d:
+        success, message = False, fail_message('file is not 2D', 'Load Reference Serafin', 'all')
+    elif len(data.time) != 1:
+        success, message = False, fail_message('the file has more than one frame', 'Load Reference Serafin', 'all')
+    else:
+        success, message = True, success_message('Load Reference Serafin', 'all')
+    return success, node_id, data, message
+
+
 def read_polygons(node_id, filename):
     try:
         with open(filename) as f:
@@ -568,6 +580,7 @@ def write_arrival_duration(input_data, filename):
 def write_project_mesh(first_input, filename):
     operation_type = first_input.operator
     second_input = first_input.metadata['operand']
+    use_reference = first_input.metadata['reference']
 
     if second_input.filename == filename:
         return False, fail_message('cannot overwrite to the input file', 'Write Serafin',
@@ -585,18 +598,22 @@ def write_project_mesh(first_input, filename):
                                    first_input.job_id, second_input.job_id)
 
     # common frames
-    first_frames = [first_input.start_time + first_input.time_second[i]
-                    for i in first_input.selected_time_indices]
-    second_frames = [second_input.start_time + second_input.time_second[i]
-                     for i in second_input.selected_time_indices]
-    common_frames = []
-    for first_index, first_frame in zip(first_input.selected_time_indices, first_frames):
-        for second_index, second_frame in zip(second_input.selected_time_indices, second_frames):
-            if first_frame == second_frame:
-                common_frames.append((first_index, second_index))
-    if not common_frames:
-        return False, fail_message('the two input files do not share common frames', 'Write Serafin',
-                                   first_input.job_id, second_input.job_id)
+    if use_reference:
+        common_frames = [(0, i) for i in second_input.selected_time_indices]
+
+    else:
+        first_frames = [first_input.start_time + first_input.time_second[i]
+                        for i in first_input.selected_time_indices]
+        second_frames = [second_input.start_time + second_input.time_second[i]
+                         for i in second_input.selected_time_indices]
+        common_frames = []
+        for first_index, first_frame in zip(first_input.selected_time_indices, first_frames):
+            for second_index, second_frame in zip(second_input.selected_time_indices, second_frames):
+                if first_frame == second_frame:
+                    common_frames.append((first_index, second_index))
+        if not common_frames:
+            return False, fail_message('the two input files do not share common frames', 'Write Serafin',
+                                       first_input.job_id, second_input.job_id)
 
     # construct output header
     output_header = first_input.header.copy()
@@ -609,6 +626,9 @@ def write_project_mesh(first_input, filename):
         output_header.var_units.append(unit)
     if first_input.to_single:
         output_header.to_single_precision()
+
+    if use_reference:
+        output_header.date = second_input.header.date
 
     # map points of A onto mesh B
     mesh = MeshInterpolator(second_input.header, False)
@@ -634,11 +654,11 @@ def write_project_mesh(first_input, filename):
             second_in.time = second_input.time
 
             calculator = operations.ProjectMeshCalculator(first_in, second_in, common_vars, is_inside,
-                                                          point_interpolators, common_frames, operation_type)
+                                                          point_interpolators, common_frames, operation_type,
+                                                          use_reference)
 
             with Serafin.Write(filename, first_input.language, True) as out_stream:
                 out_stream.write_header(output_header)
-
                 calculator.run(out_stream, output_header)
 
     message = success_message('Write Serafin', first_input.job_id,
@@ -1041,7 +1061,7 @@ def project_lines(node_id, fid, data, aux_data, options, csv_separator):
                                                          's intersect' if nb_nonempty > 1 else ' intersects'))
 
 
-def project_mesh(node_id, fid, data, second_data, options):
+def project_mesh(node_id, fid, data, second_data, use_reference):
     if not data.header.is_2d:
         return False, node_id, fid, None, fail_message('the input file is not 2d', 'Project B on A',
                                                        data.job_id)
@@ -1053,12 +1073,12 @@ def project_mesh(node_id, fid, data, second_data, options):
                                                        data.job_id, second_job_id=second_data.job_id)
     new_data = data.copy()
     new_data.operator = operations.PROJECT
-    new_data.metadata = {'operand': second_data.copy()}
+    new_data.metadata = {'operand': second_data.copy(), 'reference': use_reference}
     return True, node_id, fid, new_data, success_message('Project B on A', data.job_id,
                                                          second_job_id=second_data.job_id)
 
 
-def minus(node_id, fid, data, second_data, options):
+def minus(node_id, fid, data, second_data, use_reference):
     if not data.header.is_2d:
         return False, node_id, fid, None, fail_message('the input file is not 2d', 'A Minus B',
                                                        data.job_id)
@@ -1070,11 +1090,11 @@ def minus(node_id, fid, data, second_data, options):
                                                        data.job_id, second_job_id=second_data.job_id)
     new_data = data.copy()
     new_data.operator = operations.DIFF
-    new_data.metadata = {'operand': second_data.copy()}
+    new_data.metadata = {'operand': second_data.copy(), 'reference': use_reference}
     return True, node_id, fid, new_data, success_message('A Minus B', data.job_id, second_job_id=second_data.job_id)
 
 
-def reverse_minus(node_id, fid, data, second_data, options):
+def reverse_minus(node_id, fid, data, second_data, use_reference):
     if not data.header.is_2d:
         return False, node_id, fid, None, fail_message('the input file is not 2d', 'B Minus A',
                                                        data.job_id)
@@ -1086,11 +1106,11 @@ def reverse_minus(node_id, fid, data, second_data, options):
                                                        data.job_id, second_job_id=second_data.job_id)
     new_data = data.copy()
     new_data.operator = operations.REV_DIFF
-    new_data.metadata = {'operand': second_data.copy()}
+    new_data.metadata = {'operand': second_data.copy(), 'reference': use_reference}
     return True, node_id, fid, new_data, success_message('B Minus A', data.job_id, second_job_id=second_data.job_id)
 
 
-def max_between(node_id, fid, data, second_data, options):
+def max_between(node_id, fid, data, second_data, use_reference):
     if not data.header.is_2d:
         return False, node_id, fid, None, fail_message('the input file is not 2d', 'Max(A,B)',
                                                        data.job_id)
@@ -1102,11 +1122,11 @@ def max_between(node_id, fid, data, second_data, options):
                                                        data.job_id, second_job_id=second_data.job_id)
     new_data = data.copy()
     new_data.operator = operations.MAX_BETWEEN
-    new_data.metadata = {'operand': second_data.copy()}
+    new_data.metadata = {'operand': second_data.copy(), 'reference': use_reference}
     return True, node_id, fid, new_data, success_message('Max(A,B)', data.job_id, second_job_id=second_data.job_id)
 
 
-def min_between(node_id, fid, data, second_data, options):
+def min_between(node_id, fid, data, second_data, use_reference):
     if not data.header.is_2d:
         return False, node_id, fid, None, fail_message('the input file is not 2d', 'Min(A,B)',
                                                        data.job_id)
@@ -1118,7 +1138,7 @@ def min_between(node_id, fid, data, second_data, options):
                                                        data.job_id, second_job_id=second_data.job_id)
     new_data = data.copy()
     new_data.operator = operations.MIN_BETWEEN
-    new_data.metadata = {'operand': second_data.copy()}
+    new_data.metadata = {'operand': second_data.copy(), 'reference': use_reference}
     return True, node_id, fid, new_data, success_message('Min(A,B)', data.job_id, second_job_id=second_data.job_id)
 
 
@@ -1132,6 +1152,7 @@ FUNCTIONS = {'Select Variables': select_variables, 'Add Rouse': add_rouse, 'Sele
              'Interpolate on Points': interpolate_points, 'Interpolate along Lines': interpolate_lines,
              'Project Lines': project_lines, 'Project B on A': project_mesh, 'A Minus B': minus,
              'B Minus A': reverse_minus, 'Max(A,B)': max_between,
-             'Min(A,B)': min_between, 'Load Serafin': read_slf, 'Load Serafin 3D': read_slf_3d}
+             'Min(A,B)': min_between,
+             'Load Serafin': read_slf, 'Load Serafin 3D': read_slf_3d, 'Load Reference Serafin': read_slf_reference}
 
 

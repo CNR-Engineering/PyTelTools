@@ -66,10 +66,17 @@ class MultiLoadPolygon2DNode(MultiSingleOutputNode):
         self.label = 'Load 2D\nPolygons'
 
     def load(self, options):
-        if not options[0]:
+        filename = options[0]
+        if not filename:
             self.state = MultiNode.NOT_CONFIGURED
-        else:
-            self.options = tuple(options)
+            return
+        try:
+            with open(filename) as f:
+                pass
+        except FileNotFoundError:
+            self.state = MultiNode.NOT_CONFIGURED
+            return
+        self.options = (filename,)
 
 
 class MultiLoadOpenPolyline2DNode(MultiSingleOutputNode):
@@ -79,10 +86,17 @@ class MultiLoadOpenPolyline2DNode(MultiSingleOutputNode):
         self.label = 'Load 2D\nOpen\nPolylines'
 
     def load(self, options):
-        if not options[0]:
+        filename = options[0]
+        if not filename:
             self.state = MultiNode.NOT_CONFIGURED
-        else:
-            self.options = tuple(options)
+            return
+        try:
+            with open(filename) as f:
+                pass
+        except FileNotFoundError:
+            self.state = MultiNode.NOT_CONFIGURED
+            return
+        self.options = (filename,)
 
 
 class MultiLoadPoint2DNode(MultiSingleOutputNode):
@@ -92,10 +106,37 @@ class MultiLoadPoint2DNode(MultiSingleOutputNode):
         self.label = 'Load 2D\nPoints'
 
     def load(self, options):
-        if not options[0]:
+        filename = options[0]
+        if not filename:
             self.state = MultiNode.NOT_CONFIGURED
-        else:
-            self.options = tuple(options)
+            return
+        try:
+            with open(filename) as f:
+                pass
+        except FileNotFoundError:
+            self.state = MultiNode.NOT_CONFIGURED
+            return
+        self.options = (filename,)
+
+
+class MultiLoadReferenceSerafinNode(MultiSingleOutputNode):
+    def __init__(self, index):
+        super().__init__(index)
+        self.category = 'Input/Output'
+        self.label = 'Load\nReference\nSerafin'
+
+    def load(self, options):
+        filename = options[0]
+        if not filename:
+            self.state = MultiNode.NOT_CONFIGURED
+            return
+        try:
+            with open(filename) as f:
+                pass
+        except FileNotFoundError:
+            self.state = MultiNode.NOT_CONFIGURED
+            return
+        self.options = (filename,)
 
 
 class MultiConvertToSinglePrecisionNode(MultiOneInOneOutNode):

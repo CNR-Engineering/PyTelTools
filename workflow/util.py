@@ -349,7 +349,8 @@ class MultiLoadDialog(QDialog):
             else:
                 all_slfs.intersection_update(slfs)
             if not all_slfs:
-                QMessageBox.critical(None, 'Error', 'These folder do not share identical %s file names!' % self.extension,
+                QMessageBox.critical(None, 'Error',
+                                     'These folder do not share identical %s file names!' % self.extension,
                                      QMessageBox.Ok)
                 self.dir_paths = []
                 return
@@ -729,7 +730,7 @@ class PointPlotViewer(TemporalPlotViewer):
     def __init__(self):
         super().__init__('point')
         self.csv_separator = ''
-        self.language = 'fr'
+        self.language = 'en'
         self.var_IDs = []
         self.current_var = ''
         self.points = None
@@ -739,6 +740,7 @@ class PointPlotViewer(TemporalPlotViewer):
         self.select_variable = QAction('Select\nvariable', self, triggered=self.selectVariableEvent,
                                        icon=self.style().standardIcon(QStyle.SP_FileDialogDetailedView))
         self.current_columns = ('Point 1',)
+        self.toolBar.addAction(self.select_variable)
         self.toolBar.addAction(self.selectColumnsAct)
         self.toolBar.addAction(self.editColumnNamesAct)
         self.toolBar.addAction(self.editColumColorAct)
@@ -748,14 +750,13 @@ class PointPlotViewer(TemporalPlotViewer):
         self.toolBar.addSeparator()
         self.toolBar.addAction(self.multi_save_act)
 
-        self.point_menu = QMenu('&Data', self)
-        self.point_menu.addAction(self.select_variable)
-        self.point_menu.addSeparator()
-        self.point_menu.addAction(self.selectColumnsAct)
-        self.point_menu.addAction(self.editColumnNamesAct)
-        self.point_menu.addAction(self.editColumColorAct)
-
-        self.menuBar.addMenu(self.point_menu)
+        self.data_menu = QMenu('&Data', self)
+        self.data_menu.addAction(self.select_variable)
+        self.data_menu.addSeparator()
+        self.data_menu.addAction(self.selectColumnsAct)
+        self.data_menu.addAction(self.editColumnNamesAct)
+        self.data_menu.addAction(self.editColumColorAct)
+        self.menuBar.addMenu(self.data_menu)
 
         self.multi_menu = QMenu('&Multi', self)
         self.multi_menu.addAction(self.multi_save_act)
@@ -799,7 +800,7 @@ class PointPlotViewer(TemporalPlotViewer):
         msg.resize(300, 150)
         msg.exec_()
         self.current_var = combo.currentText()
-        self.current_ylabel = self._defaultYLabel(self.input.language)
+        self.current_ylabel = self._defaultYLabel()
         self.replot()
 
     def replot(self):
@@ -1234,8 +1235,66 @@ class MultiSaveProjectLinesDialog(QDialog):
         self.btnClose.setEnabled(True)
 
 
-class VerticalProfilePlotViewer():
+class VerticalProfilePlotViewer(TemporalPlotViewer):
     def __init__(self):
+        super().__init__('point')
+        self.data = None
+        self.current_var = ''
+        self.points = []
+
+        self.multi_save_act = QAction('Multi-Save', self, triggered=self.multi_save,
+                                      icon=self.style().standardIcon(QStyle.SP_DialogSaveButton))
+        self.select_variable = QAction('Select\nvariable', self, triggered=self.selectVariableEvent,
+                                       icon=self.style().standardIcon(QStyle.SP_FileDialogDetailedView))
+        self.current_columns = ('Point 1',)
+        self.toolBar.addAction(self.select_variable)
+        self.toolBar.addAction(self.selectColumnsAct)
+        self.toolBar.addSeparator()
+        self.toolBar.addAction(self.convertTimeAct)
+        self.toolBar.addAction(self.changeDateAct)
+        self.toolBar.addSeparator()
+        self.toolBar.addAction(self.multi_save_act)
+
+        self.data_menu = QMenu('&Data', self)
+        self.data_menu.addAction(self.select_variable)
+        self.data_menu.addAction(self.selectColumnsAct)
+        self.menuBar.addMenu(self.data_menu)
+
+        self.multi_menu = QMenu('&Multi', self)
+        self.multi_menu.addAction(self.multi_save_act)
+        self.menuBar.addMenu(self.multi_menu)
+
+    def _defaultTitle(self):
+        word = {'fr': 'de', 'en': 'of'}[self.data.header.language]
+        return 'Values %s %s' % (word, self.current_var)
+
+    def _defaultYLabel(self):
+        return {'fr': 'Cote Z', 'en': 'Elevation Z'}[self.data.header.language]
+
+    def selectVariableEvent(self):
+        msg = QDialog()
+        combo = QComboBox()
+        for var in self.data.header.var_IDs:
+            combo.addItem(var)
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel,
+                                   Qt.Horizontal, msg)
+        buttons.accepted.connect(msg.accept)
+        buttons.rejected.connect(msg.reject)
+        vlayout = QVBoxLayout()
+        vlayout.addWidget(combo)
+        vlayout.addWidget(buttons)
+        msg.setLayout(vlayout)
+        msg.setWindowTitle('Select a variable to plot')
+        msg.resize(300, 150)
+        msg.exec_()
+        self.current_var = combo.currentText()
+        self.current_ylabel = self._defaultYLabel()
+        self.replot()
+
+    def replot(self):
+        pass
+
+    def multi_save(self):
         pass
 
     def get_data(self, data, points):

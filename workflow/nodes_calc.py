@@ -1135,7 +1135,8 @@ class InterpolateAlongLinesNode(TwoInOneOutNode):
             input_stream.time = self.in_data.time
 
             for u, v, row in MeshInterpolator.interpolate_along_lines(input_stream, selected_vars,
-                                                                      self.in_data.selected_time_indices, indices_nonempty,
+                                                                      self.in_data.selected_time_indices,
+                                                                      indices_nonempty,
                                                                       line_interpolators):
                 self.data.add_row(row)
                 self.progress_bar.setValue(100 * (v+1+u*nb_frames) * inv_steps)

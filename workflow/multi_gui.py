@@ -11,7 +11,8 @@ NODES = {'Input/Output': {'Load Serafin': MultiLoadSerafinNode, 'Load Serafin 3D
                           'Write Serafin': MultiWriteSerafinNode,
                           'Load 2D Polygons': MultiLoadPolygon2DNode,
                           'Load 2D Open Polylines': MultiLoadOpenPolyline2DNode,
-                          'Load 2D Points': MultiLoadPoint2DNode},
+                          'Load 2D Points': MultiLoadPoint2DNode,
+                          'Load Reference Serafin': MultiLoadReferenceSerafinNode},
          'Basic operations': {'Select Variables': MultiSelectVariablesNode, 'Add Rouse': MultiAddRouseNode,
                               'Convert to Single Precision': MultiConvertToSinglePrecisionNode,
                               'Select First Frame': MultiSelectFirstFrameNode,
@@ -81,7 +82,7 @@ class MultiScene(QGraphicsScene):
         self.language = 'fr'
         self.csv_separator = ';'
 
-        self.setSceneRect(QRectF(0, 0, 800, 600))
+        self.setSceneRect(QRectF(0, 0, 2400, 1000))
         self.transform = QTransform()
 
         self.nodes = {0: MultiLoadSerafinNode(0)}
@@ -115,8 +116,12 @@ class MultiScene(QGraphicsScene):
         node.moveBy(x, y)
         self.adj_list[node.index()] = set()
         if node.category == 'Input/Output':
-            if node.name() in ('Load 2D Polygons', 'Load 2D Open Polylines', 'Load 2D Points'):
+            if node.name() in ('Load 2D Polygons', 'Load 2D Open Polylines',
+                               'Load 2D Points', 'Load Reference Serafin'):
                 self.auxiliary_input_nodes.append(node.index())
+            elif node.name() in ('Load Serafin', 'Load Serafin 3D'):
+                self.inputs[node.index()] = []
+                self.ordered_input_indices.append(node.index())
 
     def mouseDoubleClickEvent(self, event):
         super().mouseDoubleClickEvent(event)
@@ -162,10 +167,6 @@ class MultiScene(QGraphicsScene):
                     node.load(line[5:])
                     self.add_node(node, float(x), float(y))
 
-                    if category == 'Input/Output' and name in ('Load Serafin', 'Load Serafin 3D'):
-                        self.inputs[index] = []
-                        self.ordered_input_indices.append(index)
-
                 # load edges
                 for i in range(nb_links):
                     from_node_index, from_port_index, \
@@ -191,11 +192,23 @@ class MultiScene(QGraphicsScene):
                     for u in downstream_nodes:
                         self.nodes[u].mark(input_index)
 
+                # remove orphan auxiliary nodes
+                to_remove = []
+                for u in self.auxiliary_input_nodes:
+                    if not self.adj_list[u]:
+                        to_remove.append(u)
+                        del self.adj_list[u]
+                        self.removeItem(self.nodes[u])
+                        del self.nodes[u]
+                self.auxiliary_input_nodes = [u for u in self.auxiliary_input_nodes if u not in to_remove]
                 self.update()
+
+                # update status table
                 ordered_nodes = topological_ordering(self.adj_list)
                 self.table.update_rows(self.nodes, [u for u in ordered_nodes if u not in self.auxiliary_input_nodes])
                 QApplication.processEvents()
 
+                # load input information
                 next_line = f.readline()
                 if next_line:
                     nb_inputs = int(next_line)
@@ -225,6 +238,9 @@ class MultiScene(QGraphicsScene):
             # catch the first two-in-one-out operator node u
             if not self.nodes[u].two_in_one_out:
                 continue
+            # do no bifurcate if the first parent is reference
+            if self.nodes[u].first_in_port.mother.parentItem().index() in self.auxiliary_input_nodes:
+                return -2, -1, []
             # do not bifurcate if the two parents are the same
             if len(self.nodes[u].input_index) == 1:
                 return 2, u, []
@@ -372,10 +388,8 @@ class MultiView(QGraphicsView):
         self.setAlignment(Qt.AlignTop | Qt.AlignLeft)
         self.setAcceptDrops(True)
         self.current_node = None
-
-    def resizeEvent(self, event):
-        self.scene().setSceneRect(QRectF(0, 0, self.width()-10, self.height()-10))
-
+        self.centerOn(QPoint(400, 300))
+        
 
 class MultiTable(QTableWidget):
     def __init__(self):
@@ -560,6 +574,7 @@ class MultiWidget(QWidget):
             return
 
         self.scene.prepare_to_run()
+        self.parent.save()
         self.setEnabled(False)
         csv_separator = self.scene.csv_separator
 
@@ -589,7 +604,10 @@ class MultiWidget(QWidget):
         aux_tasks = []
         for node_id in self.scene.auxiliary_input_nodes:
             fun = worker.FUNCTIONS[self.scene.nodes[node_id].name()]
-            aux_tasks.append((fun, (node_id, self.scene.nodes[node_id].options[0])))
+            if self.scene.nodes[node_id].name() == 'Load Reference Serafin':
+                aux_tasks.append((fun, (node_id, self.scene.nodes[node_id].options[0], self.scene.language)))
+            else:
+                aux_tasks.append((fun, (node_id, self.scene.nodes[node_id].options[0])))
 
         all_success = True
         if aux_tasks:
@@ -610,6 +628,7 @@ class MultiWidget(QWidget):
                 for next_node_id in next_nodes:
                     next_node = self.scene.nodes[next_node_id]
                     next_node.set_auxiliary_data(data)
+
         return all_success
 
     def _prepare_input_tasks(self):
@@ -626,12 +645,15 @@ class MultiWidget(QWidget):
         return len(slf_tasks)
 
     def _get_double_input_task(self, fun, node, node_id, fid, data):
+        if node.has_auxiliary:
+            self.worker.task_queue.put((fun, (node_id, fid, node.auxiliary_data, data, True)))
+            return True
         if fid in node.first_ids:
             pair_index = node.first_ids.index(fid)
             second_id = node.second_ids[pair_index]
             if second_id in node.pending_data:
                 self.worker.task_queue.put((fun, (node_id, fid,
-                                                  data, node.pending_data[second_id], node.options)))
+                                                  data, node.pending_data[second_id], False)))
                 return True
             else:
                 node.pending_data[fid] = data
@@ -641,7 +663,7 @@ class MultiWidget(QWidget):
             first_id = node.first_ids[pair_index]
             if first_id in node.pending_data:
                 self.worker.task_queue.put((fun, (node_id, first_id,
-                                                  node.pending_data[first_id], data, node.options)))
+                                                  node.pending_data[first_id], data, False)))
                 return True
             else:
                 node.pending_data[fid] = data

@@ -336,32 +336,38 @@ class InputTab(QWidget):
         """
 
         # add original variables to the table
-        for i, (var_ID, var_name, var_unit) in enumerate(zip(self.header.var_IDs, self.header.var_names, self.header.var_units)):
-            self.firstTable.insertRow(self.firstTable.rowCount())
+        for var_ID, var_name, var_unit in zip(self.header.var_IDs, self.header.var_names, self.header.var_units):
+            if var_ID == 'Z':
+                self.secondTable.insertRow(self.secondTable.rowCount())
+                id_item = QTableWidgetItem(var_ID.strip())
+                name_item = QTableWidgetItem(var_name.decode('utf-8').strip())
+                unit_item = QTableWidgetItem(var_unit.decode('utf-8').strip())
+                for j, item in enumerate([id_item, name_item, unit_item]):
+                    item.setFlags(Qt.NoItemFlags)
+                    self.secondTable.setItem(0, j, item)
+                continue
+            row = self.firstTable.rowCount()
+            self.firstTable.insertRow(row)
             id_item = QTableWidgetItem(var_ID.strip())
             name_item = QTableWidgetItem(var_name.decode('utf-8').strip())
             unit_item = QTableWidgetItem(var_unit.decode('utf-8').strip())
-            self.firstTable.setItem(i, 0, id_item)
-            self.firstTable.setItem(i, 1, name_item)
-            self.firstTable.setItem(i, 2, unit_item)
-        offset = self.firstTable.rowCount()
+            for j, item in enumerate([id_item, name_item, unit_item]):
+                self.firstTable.setItem(row, j, item)
 
         if self.header.is_2d:
             # find new computable variables (stored as slf.variables.Variable objects)
             self.available_vars = get_available_variables(self.header.var_IDs)
 
             # add new variables to the table
-            for i, var in enumerate(self.available_vars):
-                self.firstTable.insertRow(self.firstTable.rowCount())
+            for var in self.available_vars:
+                row = self.firstTable.rowCount()
+                self.firstTable.insertRow(row)
                 id_item = QTableWidgetItem(var.ID())
                 name_item = QTableWidgetItem(var.name(self.language))
                 unit_item = QTableWidgetItem(var.unit())
-                self.firstTable.setItem(offset+i, 0, id_item)
-                self.firstTable.setItem(offset+i, 1, name_item)
-                self.firstTable.setItem(offset+i, 2, unit_item)
-                self.firstTable.item(offset+i, 0).setBackground(self.YELLOW)  # set new variables colors to yellow
-                self.firstTable.item(offset+i, 1).setBackground(self.YELLOW)
-                self.firstTable.item(offset+i, 2).setBackground(self.YELLOW)
+                for j, item in enumerate([id_item, name_item, unit_item]):
+                    self.firstTable.setItem(row, j, item)
+                    self.firstTable.item(row, j).setBackground(self.YELLOW)  # set new variables colors to yellow
 
     def _reinitInput(self):
         """!

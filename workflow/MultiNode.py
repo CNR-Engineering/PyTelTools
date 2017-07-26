@@ -331,6 +331,13 @@ class MultiTwoInOneOutNode(MultiNode):
         self.second_ids = []
         self.pending_data = {}
 
+        self.has_auxiliary = False
+        self.auxiliary_data = None
+
+    def set_auxiliary_data(self, data):
+        self.has_auxiliary = True
+        self.auxiliary_data = data
+
     def update_input(self, nb_input):
         self.expected_input = (nb_input, nb_input)
 

@@ -471,15 +471,21 @@ class ProjectMeshCalculator:
     Projection and operations between two different meshes
     """
     def __init__(self, first_in, second_in, selected_vars, is_inside, point_interpolators,
-                 time_indices, operation_type):
+                 time_indices, operation_type, use_reference=False):
         self.first_in = first_in
         self.second_in = second_in
         self.is_inside = is_inside
         self.point_interpolators = point_interpolators
         self.time_indices = time_indices
         self.operation_type = operation_type
-
         self.selected_vars = selected_vars
+
+        self.use_reference = use_reference
+        if self.use_reference:
+            self.first_values = self.read_values_in_frame(0, False)
+        else:
+            self.first_values = []
+
         self.nb_var = len(self.selected_vars)
         self.nb_nodes = self.first_in.header.nb_nodes
 
@@ -507,7 +513,10 @@ class ProjectMeshCalculator:
             second_values = self.read_values_in_frame(second_time_index, True)
             return np.array([self.interpolate(second_values[i]) for i in range(self.nb_var)])
 
-        first_values = np.array(self.read_values_in_frame(first_time_index, False))
+        if self.use_reference:
+            first_values = self.first_values
+        else:
+            first_values = np.array(self.read_values_in_frame(first_time_index, False))
         second_values = self.read_values_in_frame(second_time_index, True)
 
         if self.operation_type == DIFF:
@@ -526,8 +535,12 @@ class ProjectMeshCalculator:
     def run(self, out_stream, out_header):
         for i, (first_time_index, second_time_index) in enumerate(self.time_indices):
             values = self.operation_in_frame(first_time_index, second_time_index)
-            out_stream.write_entire_frame(out_header,
-                                          self.first_in.time[first_time_index], values)
+            if self.use_reference:
+                out_stream.write_entire_frame(out_header,
+                                              self.second_in.time[second_time_index], values)
+            else:
+                out_stream.write_entire_frame(out_header,
+                                              self.first_in.time[first_time_index], values)
 
 
 class SynchMaxCalculator:

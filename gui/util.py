@@ -1420,10 +1420,6 @@ class PlotViewer(QWidget):
         self.colorToName = {c: n for c, n in zip(self.defaultColors, name)}
         self.nameToColor = {n: c for c, n in zip(self.defaultColors, name)}
 
-        self._initWidgets()
-        self._setLayout()
-
-    def _initWidgets(self):
         self.canvas = PlotCanvas(self)
         self.current_xlabel = 'X'
         self.current_ylabel = 'Y'
@@ -1447,7 +1443,6 @@ class PlotViewer(QWidget):
         self.createMenus()
         self.createTools()
 
-    def _setLayout(self):
         vlayout = QVBoxLayout()
         vlayout.addWidget(self.menuBar)
         vlayout.addWidget(self.toolBar)

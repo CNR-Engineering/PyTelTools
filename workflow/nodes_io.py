@@ -456,8 +456,7 @@ class LoadPolygon2DNode(SingleOutputNode):
 
     def _open(self):
         filename, _ = QFileDialog.getOpenFileName(None, 'Open a polygon file', '',
-                                                  'Polygon file (*.i2s *.shp)',
-                                                  QDir.currentPath(),
+                                                  'Polygon file (*.i2s *.shp)', QDir.currentPath(),
                                                   options=QFileDialog.Options() | QFileDialog.DontUseNativeDialog)
         if filename:
             self.filename = filename
@@ -543,8 +542,7 @@ class LoadOpenPolyline2DNode(SingleOutputNode):
 
     def _open(self):
         filename, _ = QFileDialog.getOpenFileName(None, 'Open a 2D open polyline file', '',
-                                                  'Polyline file (*.i2s *.shp)',
-                                                  QDir.currentPath(),
+                                                  'Polyline file (*.i2s *.shp)', QDir.currentPath(),
                                                   options=QFileDialog.Options() | QFileDialog.DontUseNativeDialog)
         if filename:
             self.filename = filename
@@ -638,8 +636,7 @@ class LoadPoint2DNode(SingleOutputNode):
 
     def _open(self):
         filename, _ = QFileDialog.getOpenFileName(None, 'Open a point file', '',
-                                                  'Shapefile (*.shp)',
-                                                  QDir.currentPath(),
+                                                  'Shapefile (*.shp)', QDir.currentPath(),
                                                   options=QFileDialog.Options() | QFileDialog.DontUseNativeDialog)
         if filename:
             self.filename = filename
@@ -692,6 +689,87 @@ class LoadPoint2DNode(SingleOutputNode):
             return
         self.success('The file contains {} point{}.'.format(len(self.data),
                                                             's' if len(self.data) > 1 else ''))
+
+
+class LoadReferenceSerafinNode(SingleOutputNode):
+    def __init__(self, index):
+        super().__init__(index)
+        self.category = 'Input/Output'
+        self.label = 'Load\nReference\nSerafin'
+        self.out_port.data_type = ('slf reference',)
+        self.name_box = None
+        self.filename = ''
+        self.data = None
+
+    def get_option_panel(self):
+        open_button = QPushButton(QWidget().style().standardIcon(QStyle.SP_DialogOpenButton),
+                                  'Load Single Frame Serafin')
+        open_button.setToolTip('<b>Open</b> a .slf file')
+        open_button.setFixedHeight(30)
+
+        option_panel = QWidget()
+        layout = QHBoxLayout()
+        layout.addWidget(open_button)
+        self.name_box = QLineEdit(self.filename)
+        self.name_box.setReadOnly(True)
+        self.name_box.setFixedHeight(30)
+        layout.addWidget(self.name_box)
+        option_panel.setLayout(layout)
+
+        open_button.clicked.connect(self._open)
+        return option_panel
+
+    def _open(self):
+        filename, _ = QFileDialog.getOpenFileName(None, 'Open a .slf ile', '',
+                                                  'Serafin file (*.slf)', QDir.currentPath(),
+                                                  options=QFileDialog.Options() | QFileDialog.DontUseNativeDialog)
+        if filename:
+            self.filename = filename
+            self.name_box.setText(filename)
+
+    def configure(self, check=None):
+        if super().configure():
+            if not self.filename:
+                self.state = Node.NOT_CONFIGURED
+                self.update()
+            else:
+                self.reconfigure_downward()
+
+    def save(self):
+        return '|'.join([self.category, self.name(), str(self.index()),
+                         str(self.pos().x()), str(self.pos().y()), self.filename])
+
+    def load(self, options):
+        self.filename = options[0]
+        if self.filename:
+            try:
+                with open(self.filename) as f:
+                    pass
+            except FileNotFoundError:
+                self.state = Node.NOT_CONFIGURED
+                self.filename = ''
+                return
+            self.state = Node.READY
+
+    def run(self):
+        if self.state == Node.SUCCESS:
+            return
+        try:
+            with open(self.filename) as f:
+                pass
+        except PermissionError:
+            self.fail('Access denied.')
+            return
+        data = SerafinData('', self.filename, self.scene().language)
+        is_2d = data.read()
+        if not is_2d:
+            self.fail('the input file is not 2D.')
+            return
+        if len(data.time) != 1:
+            self.fail('the input file has more than one frame.')
+            return
+        self.data = data
+        self.success()
 
 
 class LoadSerafin3DNode(SingleOutputNode):

@@ -54,18 +54,18 @@ class SelectVariablesNode(OneInOneOutNode):
                 id_item = QTableWidgetItem(var_id.strip())
                 name_item = QTableWidgetItem(var_name.decode('utf-8').strip())
                 unit_item = QTableWidgetItem(var_unit.decode('utf-8').strip())
-                self.second_table.setItem(row, 0, id_item)
-                self.second_table.setItem(row, 1, name_item)
-                self.second_table.setItem(row, 2, unit_item)
+                for j, item in enumerate([id_item, name_item, unit_item]):
+                    if var_id == 'Z':
+                        item.setFlags(Qt.NoItemFlags)
+                    self.second_table.setItem(row, j, item)
             else:
                 row = self.first_table.rowCount()
                 self.first_table.insertRow(row)
                 id_item = QTableWidgetItem(var_id.strip())
                 name_item = QTableWidgetItem(var_name.decode('utf-8').strip())
                 unit_item = QTableWidgetItem(var_unit.decode('utf-8').strip())
-                self.first_table.setItem(row, 0, id_item)
-                self.first_table.setItem(row, 1, name_item)
-                self.first_table.setItem(row, 2, unit_item)
+                for j, item in enumerate([id_item, name_item, unit_item]):
+                    self.first_table.setItem(row, j, item)
 
         hlayout = QHBoxLayout()
         vlayout = QVBoxLayout()
@@ -1055,7 +1055,7 @@ class BinaryOperatorNode(TwoInOneOutNode):
         self.data = None
         self.message = 'Nothing to configure.'
         self.out_port.data_type = ('slf',)
-        self.first_in_port.data_type = ('slf',)
+        self.first_in_port.data_type = ('slf', 'slf reference')
         self.second_in_port.data_type = ('slf',)
 
     def reconfigure(self):

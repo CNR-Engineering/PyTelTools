@@ -399,6 +399,7 @@ class ProjectLinesNode(DoubleInputNode):
             mesh.index = input_data.index
             mesh.triangles = input_data.triangles
         else:
+            self.progress_bar.setVisible(True)
             self.construct_mesh(mesh)
             input_data.has_index = True
             input_data.index = mesh.index
@@ -624,25 +625,33 @@ class VerticalTemporalProfileNode(DoubleInputNode):
                 QMessageBox.critical(None, 'Error', 'Configure and run the input before configure this node!',
                                      QMessageBox.Ok)
                 return
-        # if self.has_plot:
-        #     self.plot_viewer.show()
-        # else:
-        #     self.plot_viewer.get_data(self.first_in_port.mother.parentItem().data,
-        #                               self.second_in_port.mother.parentItem().data.points)
-        #     self.has_plot = True
-        #     self.plot_viewer.show()
-        #     self.success()
+        if not self.has_plot:
+            self._prepare()
+        self.plot_viewer.showMaximized()
+        self.success()
+
+    def _prepare(self):
+        input_data = self.first_in_port.mother.parentItem().data
+        mesh = MeshInterpolator(input_data.header, False)
+        if input_data.has_index:
+            mesh.index = input_data.index
+            mesh.triangles = input_data.triangles
+        else:
+            self.progress_bar.setVisible(True)
+            self.construct_mesh(mesh)
+            input_data.has_index = True
+            input_data.index = mesh.index
+            input_data.triangles = mesh.triangles
 
     def run(self):
         success = super().run_upward()
         if not success:
             self.fail('input failed.')
             return
-        # if not self.has_plot:
-        #     self.plot_viewer.get_data(self.first_in_port.mother.parentItem().data,
-        #                               self.second_in_port.mother.parentItem().points)
-        #     self.has_plot = True
-        # self.success()
+        if not self.has_plot:
+            self._prepare()
+        self.plot_viewer.showMaximized()
+        self.success()
 
 
 class VolumePlotNode(SingleInputNode):

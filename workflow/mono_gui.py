@@ -7,7 +7,7 @@ from workflow.nodes_vis import *
 
 NODES = {'Input/Output': {'Load Serafin': LoadSerafinNode, 'Load Serafin 3D': LoadSerafin3DNode,
                           'Load 2D Polygons': LoadPolygon2DNode, 'Load 2D Open Polylines': LoadOpenPolyline2DNode,
-                          'Load 2D Points': LoadPoint2DNode,
+                          'Load 2D Points': LoadPoint2DNode, 'Load Reference Serafin': LoadReferenceSerafinNode,
                           'Write Serafin': WriteSerafinNode},
          'Basic operations': {'Select Variables': SelectVariablesNode,
                               'Select Time': SelectTimeNode, 'Select Single Frame': SelectSingleFrameNode,
@@ -71,7 +71,7 @@ class MonoScene(QGraphicsScene):
         self.language = 'fr'
         self.csv_separator = ';'
 
-        self.setSceneRect(QRectF(0, 0, 800, 600))
+        self.setSceneRect(QRectF(0, 0, 2400, 1000))
         self.transform = QTransform()
         self.selectionChanged.connect(self.selection_changed)
 
@@ -423,9 +423,7 @@ class MonoView(QGraphicsView):
         self.setAlignment(Qt.AlignTop | Qt.AlignLeft)
         self.setAcceptDrops(True)
         self.current_node = None
-
-    def resizeEvent(self, event):
-        self.scene().setSceneRect(QRectF(0, 0, self.width()-10, self.height()-10))
+        self.centerOn(QPoint(400, 300))
 
     def dropEvent(self, event):
         if event.mimeData().hasText():
