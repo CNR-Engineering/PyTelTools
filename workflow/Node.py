@@ -213,6 +213,7 @@ class Node(QGraphicsItem):
         self.message = ''
         if self.state != Node.NOT_CONFIGURED:
             self.state = Node.READY
+            self.update()
 
     def reconfigure_downward(self):
         for port in self.ports:

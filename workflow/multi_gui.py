@@ -9,7 +9,7 @@ from workflow.multi_nodes import *
 
 NODES = {'Input/Output': {'Load Serafin': MultiLoadSerafinNode, 'Load Serafin 3D': MultiLoadSerafin3DNode,
                           'Write Serafin': MultiWriteSerafinNode, 'Write LandXML': MultiWriteLandXMLNode,
-                          'Load 2D Polygons': MultiLoadPolygon2DNode,
+                          'Load 2D Polygons': MultiLoadPolygon2DNode, 'Write shp': MultiWriteShpNode,
                           'Load 2D Open Polylines': MultiLoadOpenPolyline2DNode,
                           'Load 2D Points': MultiLoadPoint2DNode,
                           'Load Reference Serafin': MultiLoadReferenceSerafinNode},

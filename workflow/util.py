@@ -50,6 +50,27 @@ class ConfigureDialog(QDialog):
 class OutputOptionPanel(QWidget):
     def __init__(self, old_options):
         super().__init__()
+        vlayout = QVBoxLayout()
+        vlayout.addWidget(self.get_folder_box())
+        vlayout.addWidget(self.get_name_box())
+        vlayout.addWidget(self.get_overwrite_box())
+        vlayout.addStretch()
+        self.setLayout(vlayout)
+
+        self.success = True
+        self.suffix, self.in_source_folder, self.dir_path, self.double_name, self.overwrite = old_options
+        self.suffix_box.setText(self.suffix)
+        self.folder_text.setText(self.dir_path)
+        if not self.in_source_folder:
+            self.another_folder_button.setChecked(True)
+        else:
+            self.source_folder_button.setChecked(True)
+        if self.double_name:
+            self.double_name_button.setChecked(True)
+        if self.overwrite:
+            self.overwrite_button.setChecked(True)
+
+    def get_folder_box(self):
         folder_box = QGroupBox('Select output folder')
         self.source_folder_button = QRadioButton('Input folder')
         self.another_folder_button = QRadioButton('Another folder')
@@ -71,7 +92,9 @@ class OutputOptionPanel(QWidget):
         folder_box.setLayout(vlayout)
         self.source_folder_button.toggled.connect(self._toggle_folder)
         self.open_button.clicked.connect(self._open)
+        return folder_box
 
+    def get_name_box(self):
         name_box = QGroupBox('Select output name')
         self.suffix_box = QLineEdit()
         self.simple_name_button = QRadioButton('input_name + suffix')
@@ -87,7 +110,9 @@ class OutputOptionPanel(QWidget):
         hlayout.addWidget(self.double_name_button)
         vlayout.addLayout(hlayout)
         name_box.setLayout(vlayout)
+        return name_box
 
+    def get_overwrite_box(self):
         overwrite_box = QGroupBox('Overwrite if file already exists')
         self.overwrite_button = QRadioButton('Yes')
         self.no_button = QRadioButton('No')
@@ -96,26 +121,7 @@ class OutputOptionPanel(QWidget):
         hlayout.addWidget(self.overwrite_button)
         hlayout.addWidget(self.no_button)
         overwrite_box.setLayout(hlayout)
-
-        vlayout = QVBoxLayout()
-        vlayout.addWidget(folder_box)
-        vlayout.addWidget(name_box)
-        vlayout.addWidget(overwrite_box)
-        vlayout.addStretch()
-        self.setLayout(vlayout)
-
-        self.success = True
-        self.suffix, self.in_source_folder, self.dir_path, self.double_name, self.overwrite = old_options
-        self.suffix_box.setText(self.suffix)
-        self.folder_text.setText(self.dir_path)
-        if not self.in_source_folder:
-            self.another_folder_button.setChecked(True)
-        else:
-            self.source_folder_button.setChecked(True)
-        if self.double_name:
-            self.double_name_button.setChecked(True)
-        if self.overwrite:
-            self.overwrite_button.setChecked(True)
+        return overwrite_box
 
     def _toggle_folder(self, source_folder):
         if not source_folder:
@@ -173,6 +179,13 @@ class OutputOptionPanel(QWidget):
     def get_options(self):
         return self.suffix, self.in_source_folder, \
                self.dir_path, self.double_name, self.overwrite
+
+
+class GeomOutputOptionPanel(OutputOptionPanel):
+    def __init__(self, old_options):
+        super().__init__(old_options)
+        self.source_folder_button.setText('Input_folder/gis')
+        self.source_folder_button.setEnabled(True)
 
 
 class MultiSaveDialog(QDialog):
@@ -306,7 +319,6 @@ class MultiLoadDialog(QDialog):
                                       QMessageBox.Ok)
             if msg == QMessageBox.Cancel:
                 return
-        self.success = False
         w = QFileDialog()
         w.setWindowTitle('Choose one or more folders')
         w.setFileMode(QFileDialog.DirectoryOnly)
@@ -318,6 +330,8 @@ class MultiLoadDialog(QDialog):
 
         if w.exec_() != QDialog.Accepted:
             return
+        self.success = False
+
         current_dir = w.directory().path()
         dir_names = []
         self.dir_paths = []

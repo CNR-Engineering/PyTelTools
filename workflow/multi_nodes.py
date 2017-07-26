@@ -148,9 +148,34 @@ class MultiWriteLandXMLNode(MultiSingleInputNode):
 
     def load(self, options):
         suffix = options[0]
-        double_name = bool(int(options[1]))
-        overwrite = bool(int(options[2]))
-        self.options = (suffix, double_name, overwrite)
+        in_source_folder = bool(int(options[1]))
+        dir_path = options[2]
+        double_name = bool(int(options[3]))
+        overwrite = bool(int(options[4]))
+        if not in_source_folder:
+            if not os.path.exists(dir_path):
+                self.state = MultiNode.NOT_CONFIGURED
+                return
+        self.options = (suffix, in_source_folder, dir_path, double_name, overwrite)
+
+
+class MultiWriteShpNode(MultiSingleInputNode):
+    def __init__(self, index):
+        super().__init__(index)
+        self.category = 'Input/Output'
+        self.label = 'Write shp'
+
+    def load(self, options):
+        suffix = options[0]
+        in_source_folder = bool(int(options[1]))
+        dir_path = options[2]
+        double_name = bool(int(options[3]))
+        overwrite = bool(int(options[4]))
+        if not in_source_folder:
+            if not os.path.exists(dir_path):
+                self.state = MultiNode.NOT_CONFIGURED
+                return
+        self.options = (suffix, in_source_folder, dir_path, double_name, overwrite)
 
 
 class MultiAddTransformationNode(MultiOneInOneOutNode):

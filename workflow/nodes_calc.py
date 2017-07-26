@@ -964,6 +964,7 @@ class InterpolateOnPointsNode(TwoInOneOutNode):
             self.in_data.triangles = mesh.triangles
 
         is_inside, point_interpolators = mesh.get_point_interpolators(points)
+        points = [p for i, p in enumerate(points) if is_inside[i]]
         point_interpolators = [p for i, p in enumerate(point_interpolators) if is_inside[i]]
         nb_inside = sum(map(int, is_inside))
         return points, point_interpolators, is_inside, nb_inside

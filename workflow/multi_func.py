@@ -875,6 +875,7 @@ def interpolate_points(node_id, fid, data, aux_data, options, csv_separator):
     # process the points
     points = aux_data.points
     is_inside, point_interpolators = mesh.get_point_interpolators(points)
+    points = [p for i, p in enumerate(points) if is_inside[i]]
     point_interpolators = [p for i, p in enumerate(point_interpolators) if is_inside[i]]
     nb_inside = sum(map(int, is_inside))
     if nb_inside == 0:
@@ -1170,24 +1171,79 @@ def write_landxml(node_id, fid, data, options):
     selected_frame = data.selected_time_indices[0]
     selected_var = available_var[0]
 
-    suffix, double_name, overwrite = options
+    suffix, in_source_folder, dir_path, double_name, overwrite = options
     input_name = os.path.split(data.filename)[1][:-4]
     if double_name:
         output_name = input_name + '_' + data.job_id + suffix + '.xml'
     else:
         output_name = input_name + suffix + '.xml'
 
-    path = os.path.join(os.path.split(data.filename)[0], 'gis')
-    if not os.path.exists(path):
-        os.mkdir(path)
+    if in_source_folder:
+        path = os.path.join(os.path.split(data.filename)[0], 'gis')
+        if not os.path.exists(path):
+            os.mkdir(path)
+        filename = os.path.join(os.path.split(data.filename)[0], output_name)
+    else:
+        filename = os.path.join(dir_path, output_name)
 
-    filename = os.path.join(path, output_name)
     if not overwrite:
         if os.path.exists(filename):
             return True, node_id, fid, None, success_message('Write LandXML', data.job_id, 'use existing file')
+    try:
+        with open(filename, 'w') as f:
+            pass
+    except PermissionError:
+        return False, node_id, fid, None, fail_message('access denied', 'Write LandXM', data.job_id)
+
     operations.scalar_to_xml(data.filename, data.header, filename, selected_var, selected_frame)
 
     return True, node_id, fid, None, success_message('Write LandXML', data.job_id)
+
+
+def write_shp(node_id, fid, data, options):
+    if not data.header.is_2d:
+        return False, node_id, fid, None, fail_message('the input file is not 2D', 'Write Vector shp',
+                                                       data.job_id)
+    if len(data.selected_time_indices) != 1:
+        return False, node_id, fid, None, fail_message('the input data has more than one frame', 'Write Vector shp',
+                                                       data.job_id)
+    available_var = [var for var in data.selected_vars if var in data.header.var_IDs]
+    if len(available_var) == 0:
+        return False, node_id, fid, None, fail_message('no variable available', 'Write Vector shp',
+                                                       data.job_id)
+    elif len(available_var) > 1:
+        return False, node_id, fid, None, fail_message('the input data has more than one variable', 'Write Vector shp',
+                                                       data.job_id)
+    selected_frame = data.selected_time_indices[0]
+    selected_var = available_var[0]
+
+    suffix, in_source_folder, dir_path, double_name, overwrite = options
+    input_name = os.path.split(data.filename)[1][:-4]
+    if double_name:
+        output_name = input_name + '_' + data.job_id + suffix + '.shp'
+    else:
+        output_name = input_name + suffix + '.shp'
+
+    if in_source_folder:
+        path = os.path.join(os.path.split(data.filename)[0], 'gis')
+        if not os.path.exists(path):
+            os.mkdir(path)
+        filename = os.path.join(os.path.split(data.filename)[0], output_name)
+    else:
+        filename = os.path.join(dir_path, output_name)
+
+    if not overwrite:
+        if os.path.exists(filename):
+            return True, node_id, fid, None, success_message('Write shp', data.job_id, 'use existing file')
+    try:
+        with open(filename, 'w') as f:
+            pass
+    except PermissionError:
+        return False, node_id, fid, None, fail_message('access denied', 'Write shp', data.job_id)
+
+    operations.scalar_to_xml(data.filename, data.header, filename, selected_var, selected_frame)
+
+    return True, node_id, fid, None, success_message('Write Vector shp', data.job_id)
 
 
 FUNCTIONS = {'Select Variables': select_variables, 'Add Rouse': add_rouse, 'Select Time': select_time,
@@ -1201,6 +1257,7 @@ FUNCTIONS = {'Select Variables': select_variables, 'Add Rouse': add_rouse, 'Sele
              'Project Lines': project_lines, 'Project B on A': project_mesh, 'A Minus B': minus,
              'B Minus A': reverse_minus, 'Max(A,B)': max_between,
              'Min(A,B)': min_between, 'Add Transformation': add_transform, 'Write LandXML': write_landxml,
+             'Write shp': write_shp,
              'Load Serafin': read_slf, 'Load Serafin 3D': read_slf_3d, 'Load Reference Serafin': read_slf_reference}
 
 

@@ -5,7 +5,7 @@ from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 
 from workflow.Node import Node, SingleInputNode, SingleOutputNode, OneInOneOutNode
-from workflow.util import OutputOptionPanel
+from workflow.util import OutputOptionPanel, GeomOutputOptionPanel
 from slf import Serafin
 from slf.interpolation import MeshInterpolator
 from slf.variables import do_calculations_in_frame
@@ -105,6 +105,10 @@ class WriteSerafinNode(OneInOneOutNode):
                          str(self.pos().x()), str(self.pos().y()), self.suffix,
                          str(int(self.in_source_folder)), self.dir_path,
                          str(int(self.double_name)), str(int(self.overwrite))])
+
+    def reconfigure(self):
+        super().reconfigure()
+        self.reconfigure_downward()
 
     def load(self, options):
         self.suffix = options[0]
@@ -843,6 +847,93 @@ class WriteLandXMLNode(SingleInputNode):
         self.suffix = '_scalar_layer'
         self.double_name = False
         self.overwrite = False
+        self.in_source_folder = True
+        self.dir_path = ''
+
+    def get_option_panel(self):
+        return self.panel
+
+    def configure(self, check=None):
+        old_options = (self.suffix, self.in_source_folder, self.dir_path, self.double_name, self.overwrite)
+        self.panel = GeomOutputOptionPanel(old_options)
+        if super().configure(self.panel.check):
+            self.suffix, self.in_source_folder, self.dir_path, \
+                         self.double_name, self.overwrite = self.panel.get_options()
+
+    def save(self):
+        return '|'.join([self.category, self.name(), str(self.index()),
+                         str(self.pos().x()), str(self.pos().y()), self.suffix,
+                         str(int(self.in_source_folder)), self.dir_path,
+                         str(int(self.double_name)), str(int(self.overwrite))])
+
+    def load(self, options):
+        self.suffix = options[0]
+        self.in_source_folder = bool(int(options[1]))
+        self.dir_path = options[2]
+        self.double_name = bool(int(options[3]))
+        self.overwrite = bool(int(options[4]))
+        if not self.in_source_folder:
+            if not os.path.exists(self.dir_path):
+                self.in_source_folder = True
+                self.dir_path = ''
+                self.state = Node.NOT_CONFIGURED
+
+    def run(self):
+        success = super().run_upward()
+        if not success:
+            self.fail('input failed.')
+            return
+
+        input_data = self.in_port.mother.parentItem().data
+        if not input_data.header.is_2d:
+            self.fail('the input file is not 2D')
+            return
+        if len(input_data.selected_time_indices) != 1:
+            self.fail('the input data has more than one frame')
+            return
+        available_var = [var for var in input_data.selected_vars if var in input_data.header.var_IDs]
+        if len(available_var) == 0:
+            self.fail('no variable available')
+            return
+        elif len(available_var) > 1:
+            self.fail('the input data has more than one variable')
+            return
+        selected_frame = input_data.selected_time_indices[0]
+        selected_var = available_var[0]
+
+        input_name = os.path.split(input_data.filename)[1][:-4]
+        if self.double_name:
+            output_name = input_name + '_' + input_data.job_id + self.suffix + '.xml'
+        else:
+            output_name = input_name + self.suffix + '.xml'
+
+        path = os.path.join(os.path.split(input_data.filename)[0], 'gis')
+        if not os.path.exists(path):
+            os.mkdir(path)
+
+        filename = os.path.join(path, output_name)
+        if not self.overwrite:
+            if os.path.exists(filename):
+                self.success('Use existing file.')
+                return
+
+        operations.scalar_to_xml(input_data.filename, input_data.header, filename, selected_var,
+                                 selected_frame)
+        self.success()
+
+
+class WriteShpNode(SingleInputNode):
+    def __init__(self, index):
+        super().__init__(index)
+        self.in_port.data_type = ('slf geom',)
+        self.category = 'Input/Output'
+        self.label = 'Write shp'
+        self.state = Node.READY
+
+        self.panel = None
+        self.suffix = '_vector_layer'
+        self.double_name = False
+        self.overwrite = False
 
     def get_option_panel(self):
         return self.panel
@@ -908,5 +999,3 @@ class WriteLandXMLNode(SingleInputNode):
         operations.scalar_to_xml(input_data.filename, input_data.header, filename, selected_var,
                                  selected_frame)
         self.success()
-
-
