@@ -25,10 +25,8 @@ _VECTORS = {'U': ('V', 'M'), 'V': ('U', 'M'), 'QSX': ('QSY', 'QS'), 'QSY': ('QSX
             'QSBLX': ('QSBLY', 'QSBL'), 'QSBLY': ('QSBLX', 'QSBL'),
             'QSSUSPX': ('QSSUSPY', 'QSSUSP'), 'QSSUSPY': ('QSSUSPX', 'QSSUSP'),
             'I': ('J', 'Q'), 'J': ('I', 'Q')}
-
-_VECTOR_COUPLES = {'U': 'V', 'I': 'J', 'X': 'Y', 'QSX': 'QSY', 'QSBLX': 'QSBLY', 'QSSUSPX': 'QSSUSPY'}
-_VECTORS_MOTHER = {('U', 'V'): 'M', ('I', 'J'): 'Q', ('X', 'Y'): '.', ('QSX', 'QSY'): 'QS',
-                   ('QSBLX', 'QSBLY'): 'QSBL', ('QSSUSPX', 'QSSUSPY'): 'QSSUSP'}
+_VECTORS_BROTHERS = {('U', 'V'): 'M', ('I', 'J'): 'Q', ('X', 'Y'): '.', ('QSX', 'QSY'): 'QS',
+                     ('QSBLX', 'QSBLY'): 'QSBL', ('QSSUSPX', 'QSSUSPY'): 'QSSUSP'}
 
 
 def scalars_vectors(known_vars, selected_vars, us_equation=None):
@@ -185,31 +183,65 @@ def evaluate_expression(input_stream, time_index, expression):
     return stack.pop()
 
 
-def vectors_to_shp(slf_name, slf_header, shp_name, vector_couple):
+def detect_vector_couples(variables, available_variables):
+    coupled, non_coupled, mothers, angles = [], [], [], []
+    for var in variables:
+        if var in coupled:
+            continue
+        if var in _VECTORS:
+            brother, mother = _VECTORS[var]
+            if brother in variables:
+                coupled.append(var)
+                coupled.append(brother)
+
+                if (var, brother) not in _VECTORS_BROTHERS:
+                    angles.append((brother, var))
+                else:
+                    angles.append((var, brother))
+
+                if mother in available_variables:
+                    coupled.append(mother)
+                else:
+                    mothers.append((mother, var, brother))
+            else:
+                non_coupled.append(var)
+        else:
+            non_coupled.append(var)
+    return coupled, non_coupled, mothers, angles
+
+
+def slf_to_shp(slf_name, slf_header, shp_name, variables, time_index):
+    coupled, non_coupled, mothers, angles = detect_vector_couples(variables, slf_header.var_IDs)
+
+    values = {}
     with Serafin.Read(slf_name, slf_header.language) as slf:
         slf.header = slf_header
+        for var in variables:
+            values[var] = slf.read_var_in_frame(time_index, var)
 
-        # fetch vector variable values
-        first_values = slf.read_var_in_frame(0, vector_couple[0])
-        second_values = slf.read_var_in_frame(0, vector_couple[1])
-        mother = _VECTORS_MOTHER[vector_couple]
-        if mother not in slf_header.var_IDs:
-            mother_values = np.sqrt(np.square(first_values) + np.square(second_values))
-        else:
-            mother_values = slf.read_var_in_frame(0, mother)
-        angle_values = np.degrees(second_values, first_values)
+    # compute mother not in file
+    for mother, brother, sister in mothers:
+        values[mother] = np.sqrt(np.square(values[brother]) + np.square(values[sister]))
+
+    # compute angles
+    for brother, sister in angles:
+        values['Angle(%s,%s)' % (brother, sister)] = np.degrees(np.arctan2(values[sister], values[brother]))
 
     # write shp
-    w = shapefile.Writer(shapefile.POINT)
-    w.field(vector_couple[0], 'N', decimal=4)
-    w.field(vector_couple[1], 'N', decimal=4)
-    w.field(mother, 'N', decimal=4)
-    w.field('Angle', 'N', decimal=4)
+    key_order = coupled + non_coupled + [mother for mother, _, _ in mothers] \
+                        + ['Angle(%s,%s)' % (brother, sister) for brother, sister in angles]
 
-    for x, y, u, v, m, angle in zip(slf_header.x, slf_header.y,
-                                    first_values, second_values, mother_values, angle_values):
+    w = shapefile.Writer(shapefile.POINT)
+    for name in key_order:
+        w.field(name, 'N', decimal=4)
+
+    for i, (x, y) in enumerate(zip(slf_header.x, slf_header.y)):
         w.point(x, y, shapeType=shapefile.POINT)
-        w.record(u, v, m, angle)
+
+        val = []
+        for var in key_order:
+            val.append(values[var][i])
+        w.record(*val)
     w.save(shp_name)
 
 

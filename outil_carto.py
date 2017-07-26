@@ -9,9 +9,7 @@ from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 
-from slf import Serafin
 import slf.misc as convert
-from geom.transformation import load_transformation_map
 
 
 class LandXMLtoTinDialog(QDialog):
@@ -315,26 +313,9 @@ class FirstStep(QWidget):
         self._bindEvents()
 
     def _initWidgets(self):
-        """!
-        @brief (Used in __init__) Create widgets
-        """
-        # create the group box for coordinate transformation
-        self.confBox = QGroupBox('Apply coordinate transformation (optional)')
-        self.confBox.setStyleSheet('QGroupBox {font-size: 12px;font-weight: bold;}')
-        self.btnConfig = QPushButton('Load\nTransformation', self)
-        self.btnConfig.setToolTip('<b>Open</b> a transformation config file')
-        self.btnConfig.setFixedSize(105, 50)
-        self.confNameBox = QLineEdit()
-        self.confNameBox.setReadOnly(True)
-        self.confNameBox.setFixedHeight(30)
-        self.fromBox = QComboBox()
-        self.fromBox.setFixedWidth(150)
-        self.toBox = QComboBox()
-        self.toBox.setFixedWidth(150)
-
         # create the open button
         self.btnOpen = QPushButton('Ouvrir', self, icon=self.style().standardIcon(QStyle.SP_DialogOpenButton))
-        self.btnOpen.setToolTip('<b>Ouvrir</b> des fichiers .slf')
+        self.btnOpen.setToolTip('<b>Ouvrir</b> des fichiers .xml')
         self.btnOpen.setFixedSize(105, 50)
 
         # create a combo box for input file name
@@ -351,34 +332,16 @@ class FirstStep(QWidget):
         mainLayout.addItem(QSpacerItem(10, 10))
         mainLayout.setSpacing(15)
 
-        vlayout = QVBoxLayout()
-        hlayout = QHBoxLayout()
-        hlayout.addWidget(self.btnConfig)
-        hlayout.addWidget(self.confNameBox)
-        vlayout.addLayout(hlayout)
-
-        hlayout = QHBoxLayout()
-        hlayout.addWidget(QLabel('    Transform from'))
-        hlayout.addWidget(self.fromBox)
-        hlayout.addWidget(QLabel('to'))
-        hlayout.addWidget(self.toBox)
-        hlayout.setAlignment(Qt.AlignLeft)
-        vlayout.addLayout(hlayout)
-        vlayout.setSpacing(15)
-        self.confBox.setLayout(vlayout)
-        mainLayout.addWidget(self.confBox)
-
-        mainLayout.addItem(QSpacerItem(10, 15))
         hlayout = QHBoxLayout()
         hlayout.addWidget(self.btnOpen)
         hlayout.addWidget(self.btnNext)
         mainLayout.addLayout(hlayout)
         mainLayout.addItem(QSpacerItem(10, 10))
         mainLayout.addWidget(QLabel('<p style="font-size:10pt">'
-                                    '<b>Étape 1</b>: Choisir un ou plusieurs dossiers.<br>'
-                                    'Chaque dossier doit contenir un fichier .slf avec le même nom.<br>'))
+                                    '<b>Étape 1</b>: Choisir un ou plusieurs dossiers contenant un sous-dossier nommé gis.<br>'
+                                    'Chaque dossier gis doit contenir un fichier .xml avec le même nom.<br>'))
         hlayout = QHBoxLayout()
-        hlayout.addWidget(QLabel('   Choisir le fichier .slf  '))
+        hlayout.addWidget(QLabel('   Choisir les fichiers .xml  '))
         hlayout.addWidget(self.fileBox, Qt.AlignLeft)
         hlayout.addStretch()
         mainLayout.addLayout(hlayout)
@@ -387,33 +350,12 @@ class FirstStep(QWidget):
 
     def _bindEvents(self):
         self.btnOpen.clicked.connect(self.btnOpenEvent)
-        self.btnConfig.clicked.connect(self.btnConfigEvent)
         self.btnNext.clicked.connect(self.parent.first_to_second)
-
-    def btnConfigEvent(self):
-        filename, _ = QFileDialog.getOpenFileName(self, 'Choose the file name', '', 'All files (*)',
-                                                  options=QFileDialog.Options() | QFileDialog.DontUseNativeDialog)
-        if not filename:
-            return
-        self.fromBox.clear()
-        self.toBox.clear()
-        self.confNameBox.clear()
-        self.transformation = None
-
-        success, self.transformation = load_transformation_map(filename)
-        if not success:
-            QMessageBox.critical(self, 'Error', 'The configuration is not valid.',
-                                 QMessageBox.Ok)
-            return
-        self.confNameBox.setText(filename)
-        for label in self.transformation.labels:
-            self.fromBox.addItem(label)
-            self.toBox.addItem(label)
 
     def btnOpenEvent(self):
         self.btnNext.setEnabled(False)
         w = QFileDialog()
-        w.setWindowTitle('Choisir un ou plusieurs dossiers')
+        w.setWindowTitle('Choisir un ou plusieurs dossiers contenant un sous-dossier gis')
         w.setFileMode(QFileDialog.DirectoryOnly)
         w.setOption(QFileDialog.DontUseNativeDialog, True)
         tree = w.findChild(QTreeView)
@@ -430,15 +372,19 @@ class FirstStep(QWidget):
             name = tree.model().data(index)
             self.dir_names.append(name)
             self.dir_paths.append(os.path.join(current_dir, name))
-
+        for name, path in zip(self.dir_names, self.dir_paths):
+            if not os.path.exists(os.path.join(path, 'gis')):
+                QMessageBox.critical(self, 'Erreur', 'Pas de sous-dossier gis dans le dossier %s !' % name,
+                                     QMessageBox.Ok)
+                return
         all_slfs = set()
         for name, path in zip(self.dir_names, self.dir_paths):
             slfs = set()
-            for f in os.listdir(path):
-                if os.path.isfile(os.path.join(path, f)) and f[-4:] == '.slf':
+            for f in os.listdir(os.path.join(path, 'gis')):
+                if os.path.isfile(os.path.join(path, 'gis', f)) and f[-4:] == '.xml':
                     slfs.add(f)
             if not slfs:
-                QMessageBox.critical(self, 'Erreur', "Le dossier '%s' ne contient pas de fichier .slf !" % name,
+                QMessageBox.critical(self, 'Erreur', "Le dossier '%s/gis' ne contient pas de fichier .xml !" % name,
                                      QMessageBox.Ok)
                 return
             if not all_slfs:
@@ -446,7 +392,7 @@ class FirstStep(QWidget):
             else:
                 all_slfs.intersection_update(slfs)
             if not all_slfs:
-                QMessageBox.critical(self, 'Erreur', 'Pas de fichier .slf avec un nom identique !',
+                QMessageBox.critical(self, 'Erreur', 'Pas de fichier .xml avec un nom identique !',
                                      QMessageBox.Ok)
                 return
 
@@ -457,85 +403,6 @@ class FirstStep(QWidget):
 
 
 class SecondStep(QWidget):
-    def __init__(self, parent):
-        super().__init__()
-        self.parent = parent
-
-        self._initWidgets()
-        self._setLayout()
-        self._bindEvents()
-
-    def _initWidgets(self):
-        # create the back button
-        self.btnBack = QPushButton('Précédent', self, icon=self.style().standardIcon(QStyle.SP_MediaSeekBackward))
-        self.btnBack.setFixedSize(105, 50)
-
-        # create a combo box for vector selection
-        self.varBox = QComboBox()
-        self.varBox.setFixedSize(200, 30)
-
-        # create the next button
-        self.btnNext = QPushButton('Suivant', self, icon=self.style().standardIcon(QStyle.SP_MediaSeekForward))
-        self.btnNext.setFixedSize(105, 50)
-
-    def _setLayout(self):
-        mainLayout = QVBoxLayout()
-        mainLayout.addItem(QSpacerItem(10, 10))
-        mainLayout.setSpacing(15)
-        hlayout = QHBoxLayout()
-        hlayout.addWidget(self.btnBack)
-        hlayout.addWidget(self.btnNext)
-        mainLayout.addLayout(hlayout)
-        mainLayout.addItem(QSpacerItem(10, 10))
-
-        mainLayout.addWidget(QLabel('<p style="font-size:10pt">'
-                                    '<b>Étape 2</b> (optionel): Choisir une couche vecteur.<br>'
-                                    'Les fichiers de sorties seront nommés <i>sig/nom_entrée</i>_vector.shp.<br>'))
-        hlayout = QHBoxLayout()
-        hlayout.addWidget(QLabel('   Choisir une couple de vecteur  '))
-        hlayout.addWidget(self.varBox, Qt.AlignLeft)
-        hlayout.addStretch()
-        mainLayout.addLayout(hlayout)
-        mainLayout.addStretch()
-        self.setLayout(mainLayout)
-
-    def _bindEvents(self):
-        self.btnBack.clicked.connect(lambda _: self.parent.steps.setCurrentIndex(0))
-        self.btnNext.clicked.connect(self.next)
-
-    def first_to_second(self):
-        self.varBox.clear()
-        self.varBox.addItem('None')
-        common_vectors = set()
-        first = True
-        for file_header in self.parent.headers:
-            vars = file_header.var_IDs
-            vectors = convert.available_vectors(vars)
-            if first:
-                common_vectors = set(vectors)
-                first = False
-                continue
-            common_vectors.intersection_update(set(vectors))
-        for vec in common_vectors:
-            self.varBox.addItem('(%s, %s)' % vec)
-
-    def next(self):
-        vector = self.varBox.currentText()
-        if vector != 'None':
-            vector = tuple(vector[1:-1].split(', '))
-            for dir_path, file_header in zip(self.parent.first_step.dir_paths,
-                                             self.parent.headers):
-                if not os.path.exists(os.path.join(dir_path, 'sig')):
-                    os.mkdir(os.path.join(dir_path, 'sig'))
-                shp_name = os.path.join(dir_path, 'sig', self.parent.first_step.slf_name[:-4] +
-                                                         '_vector_%s_%s.shp' % vector)
-                if not os.path.exists(shp_name):
-                    convert.vectors_to_shp(os.path.join(dir_path, self.parent.first_step.slf_name),
-                                           file_header, shp_name, vector)
-        self.parent.second_to_third()
-
-
-class ThirdStep(QWidget):
     def __init__(self, parent):
         super().__init__()
         self.parent = parent
@@ -568,13 +435,8 @@ class ThirdStep(QWidget):
         mainLayout.addItem(QSpacerItem(10, 10))
 
         mainLayout.addWidget(QLabel('<p style="font-size:10pt">'
-                                    '<b>Étape 3</b> (optionel): Choisir une couche scalaire.<br>'
-                                    'Les fichiers de sortie seront nommés <i>sig/nom_entrée</i>_scalar.xml.<br>'
-                                    'puis converti en tin dans le dossier <i>sig/nom_entrée_scalar/</i>.'))
-        hlayout = QHBoxLayout()
-        hlayout.addWidget(QLabel('   Choisir une scalaire '))
-        hlayout.addWidget(self.varBox, Qt.AlignLeft)
-        hlayout.addStretch()
+                                    '<b>Étape 2</b>: Conversion vers tin.<br>'
+                                    'Les fichiers tin seront dans le dossier <i>sig/nom_entrée/</i>.'))
         mainLayout.addLayout(hlayout)
         mainLayout.addStretch()
         self.setLayout(mainLayout)
@@ -583,29 +445,12 @@ class ThirdStep(QWidget):
         self.btnBack.clicked.connect(lambda _: self.parent.steps.setCurrentIndex(1))
         self.btnNext.clicked.connect(self.next)
 
-    def second_to_third(self):
+    def first_to_second(self):
         self.varBox.clear()
         self.varBox.addItem('None')
 
-        common_vars = set()
-        first = True
-        for file_header in self.parent.headers:
-            vars = set(file_header.var_IDs)
-            if first:
-                common_vars = vars
-                first = False
-                continue
-            common_vars.intersection_update(vars)
-        for var in common_vars:
-            self.varBox.addItem(var)
-
     def next(self):
-        var = self.varBox.currentText()
-        if var == 'None':
-            self.parent.steps.setCurrentIndex(3)
-            return
-        dlg = LandXMLtoTinDialog(self.parent.first_step.dir_names, self.parent.first_step.dir_paths,
-                                 self.parent.first_step.slf_name, self.parent.headers, var)
+        dlg = LandXMLtoTinDialog(self.parent.first_step.dir_names, self.parent.first_step.dir_paths)
         if dlg.exec_() == QDialog.Accepted:
             if dlg.success:
                 self.parent.steps.setCurrentIndex(3)
@@ -686,7 +531,6 @@ class FourStepsGUI(QWidget):
         super().__init__()
         self.first_step = FirstStep(self)
         self.second_step = SecondStep(self)
-        self.third_step = ThirdStep(self)
         self.last_step = FinalStep(self)
 
         self.steps = QStackedLayout()
@@ -697,42 +541,11 @@ class FourStepsGUI(QWidget):
 
         self.steps.setCurrentIndex(0)
         self.setLayout(self.steps)
-        self.setWindowTitle('Transformer and convertir les fichiers .slf en .PNG')
+        self.setWindowTitle('Transformer and convertir les fichiers .xml en .PNG')
 
         self.headers = []
 
     def first_to_second(self):
-        self.first_step.slf_name = self.first_step.fileBox.currentText()
-        self.headers = []
-
-        transformations = []
-        if self.first_step.transformation is not None:
-            from_index, to_index = self.first_step.fromBox.currentIndex(), self.first_step.toBox.currentIndex()
-            transformations = self.first_step.transformation.get_transformation(from_index, to_index)
-
-        for dir_path, dir_name in zip(self.first_step.dir_paths, self.first_step.dir_names):
-            name = os.path.join(dir_path, self.first_step.slf_name)
-            try:
-                with open(name, 'r') as f:
-                    pass
-            except PermissionError:
-                QMessageBox.critical(self, 'Error', "Access to folder '%s' denied!" % dir_name,
-                                     QMessageBox.Ok)
-                self.first_step.btnNext.setEnabled(False)
-                return
-            with Serafin.Read(name, 'fr') as resin:
-                resin.read_header()
-                resin.get_time()
-                if len(resin.time) != 1:
-                    QMessageBox.critical(self, 'Error', "The file %s in '%s' has more than one frame!"
-                                                        % (self.first_step.slf_name, dir_name), QMessageBox.Ok)
-                    self.first_step.btnNext.setEnabled(False)
-                    return
-
-                new_header = resin.header.apply_transform(transformations)
-                self.headers.append(new_header)
-
-        self.second_step.first_to_second()
         self.steps.setCurrentIndex(1)
 
     def second_to_third(self):
@@ -849,8 +662,8 @@ class WelcomeToCarto(QDialog):
     def __init__(self):
         super().__init__()
         self.choice = None
-        left_button = QPushButton("J'ai des dossiers contenant des fichiers .slf\n"
-                                  "J'aimerais produire les couches .shp ou tin\npuis produire des cartes")
+        left_button = QPushButton("J'ai des dossiers contenant des fichiers .xml\n"
+                                  "J'aimerais produire les fichiers tin\npuis produire des cartes")
         right_button = QPushButton("J'ai déjà toutes les couches .shp et tin\n"
                                    "J'aimerais refaire d'autres cartes avec différents .mxd")
         for bt in [left_button, right_button]:

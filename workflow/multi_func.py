@@ -1207,15 +1207,11 @@ def write_shp(node_id, fid, data, options):
     if len(data.selected_time_indices) != 1:
         return False, node_id, fid, None, fail_message('the input data has more than one frame', 'Write Vector shp',
                                                        data.job_id)
-    available_var = [var for var in data.selected_vars if var in data.header.var_IDs]
-    if len(available_var) == 0:
+    available_vars = [var for var in data.selected_vars if var in data.header.var_IDs]
+    if len(available_vars) == 0:
         return False, node_id, fid, None, fail_message('no variable available', 'Write Vector shp',
                                                        data.job_id)
-    elif len(available_var) > 1:
-        return False, node_id, fid, None, fail_message('the input data has more than one variable', 'Write Vector shp',
-                                                       data.job_id)
     selected_frame = data.selected_time_indices[0]
-    selected_var = available_var[0]
 
     suffix, in_source_folder, dir_path, double_name, overwrite = options
     input_name = os.path.split(data.filename)[1][:-4]
@@ -1241,7 +1237,7 @@ def write_shp(node_id, fid, data, options):
     except PermissionError:
         return False, node_id, fid, None, fail_message('access denied', 'Write shp', data.job_id)
 
-    operations.scalar_to_xml(data.filename, data.header, filename, selected_var, selected_frame)
+    operations.slf_to_shp(data.filename, data.header, filename, available_vars, selected_frame)
 
     return True, node_id, fid, None, success_message('Write Vector shp', data.job_id)
 
