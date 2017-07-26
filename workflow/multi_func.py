@@ -407,7 +407,7 @@ def write_slf(node_id, fid, data, options):
         if os.path.exists(filename):
             new_data = SerafinData(data.job_id, filename, data.language)
             new_data.read()
-            return True, node_id, fid, data, success_message('Write Serafin', data.job_id, 'reload existing file')
+            return True, node_id, fid, new_data, success_message('Write Serafin', data.job_id, 'reload existing file')
 
     try:
         with open(filename, 'w') as f:
@@ -1142,6 +1142,17 @@ def min_between(node_id, fid, data, second_data, use_reference):
     return True, node_id, fid, new_data, success_message('Min(A,B)', data.job_id, second_job_id=second_data.job_id)
 
 
+def add_transform(node_id, fid, data, options):
+    if 'transformation' in data.metadata:
+        return False, node_id, fid, None, fail_message('cannot re-apply transformation', 'Add Transformation',
+                                                       data.job_id)
+    trans = options[0]
+    new_data = data.copy()
+    new_data.transform(trans)
+    new_data.metadata['transformation'] = trans
+    return True, node_id, fid, new_data, success_message('Add Transformation', data.job_id)
+
+
 FUNCTIONS = {'Select Variables': select_variables, 'Add Rouse': add_rouse, 'Select Time': select_time,
              'Select Single Frame': select_single_frame,
              'Select First Frame': select_first_frame, 'Select Last Frame': select_last_frame,
@@ -1152,7 +1163,7 @@ FUNCTIONS = {'Select Variables': select_variables, 'Add Rouse': add_rouse, 'Sele
              'Interpolate on Points': interpolate_points, 'Interpolate along Lines': interpolate_lines,
              'Project Lines': project_lines, 'Project B on A': project_mesh, 'A Minus B': minus,
              'B Minus A': reverse_minus, 'Max(A,B)': max_between,
-             'Min(A,B)': min_between,
+             'Min(A,B)': min_between, 'Add Transformation': add_transform,
              'Load Serafin': read_slf, 'Load Serafin 3D': read_slf_3d, 'Load Reference Serafin': read_slf_reference}
 
 

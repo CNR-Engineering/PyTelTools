@@ -7,6 +7,7 @@ from PyQt5.QtGui import *
 from workflow.Node import Node, OneInOneOutNode, TwoInOneOutNode
 from gui.util import TableWidgetDragRows, SimpleTimeDateSelection,\
     TimeRangeSlider, DoubleSliderBox, FrictionLawMessage, FallVelocityMessage
+from geom.transformation import load_transformation_map
 from slf.variables import get_available_variables, get_necessary_equations, add_US, get_US_equation
 import slf.misc as operations
 
@@ -1230,4 +1231,153 @@ class MinBetweenNode(BinaryOperatorNode):
         super().__init__(index, operations.MIN_BETWEEN)
         self.category = 'Operators'
         self.label = 'Min(A,B)'
+
+
+class AddTransformationNode(OneInOneOutNode):
+    def __init__(self, index):
+        super().__init__(index)
+        self.category = 'Basic operations'
+        self.label = 'Add\nTransformation'
+        self.in_port.data_type = ('slf', 'slf 3d')
+        self.out_port.data_type = ('slf geom', 'slf')
+        self.filename = ''
+        self.data = None
+
+        self.map = None
+        self.from_index = -1
+        self.to_index = -1
+        self.transformation = None
+
+        self.name_box = None
+        self.from_box = None
+        self.to_box = None
+        self.new_transformation = None
+        self.new_options = tuple()
+
+    def get_option_panel(self):
+        self.new_transformation = self.transformation
+        conf_box = QGroupBox('Apply coordinate transformation')
+        conf_box.setStyleSheet('QGroupBox {font-size: 12px;font-weight: bold;}')
+        open_button = QPushButton('Load\nTransformation')
+        open_button.setToolTip('<b>Open</b> a transformation config file')
+        open_button.setFixedSize(105, 50)
+        self.name_box = QLineEdit()
+        self.name_box.setReadOnly(True)
+        self.name_box.setFixedHeight(30)
+        self.from_box = QComboBox()
+        self.from_box.setFixedWidth(150)
+        self.to_box = QComboBox()
+        self.to_box.setFixedWidth(150)
+
+        print(self.filename)
+        if self.transformation is not None:
+            print('yo')
+            for label in self.new_transformation.labels:
+                self.from_box.addItem(label)
+                self.to_box.addItem(label)
+            self.from_box.setCurrentIndex(self.from_index)
+            self.to_box.setCurrentIndex(self.to_index)
+            self.name_box.setText(self.filename)
+
+        option_panel = QWidget()
+        vlayout = QVBoxLayout()
+        hlayout = QHBoxLayout()
+        hlayout.addWidget(open_button)
+        hlayout.addWidget(self.name_box)
+        vlayout.addLayout(hlayout)
+
+        hlayout = QHBoxLayout()
+        hlayout.addWidget(QLabel('    Transform from'))
+        hlayout.addWidget(self.from_box)
+        hlayout.addWidget(QLabel('to'))
+        hlayout.addWidget(self.to_box)
+        hlayout.setAlignment(Qt.AlignLeft)
+        vlayout.addLayout(hlayout)
+        vlayout.setSpacing(15)
+        conf_box.setLayout(vlayout)
+
+        layout = QVBoxLayout()
+        layout.addWidget(conf_box)
+        option_panel.setLayout(layout)
+        open_button.clicked.connect(self._open)
+        option_panel.destroyed.connect(self._select)
+        return option_panel
+
+    def _open(self):
+        filename, _ = QFileDialog.getOpenFileName(None, 'Open a transformation configuration file', '',
+                                                  'All file (*)', QDir.currentPath(),
+                                                  options=QFileDialog.Options() | QFileDialog.DontUseNativeDialog)
+        if not filename:
+            return
+        success, self.new_transformation = load_transformation_map(filename)
+        if not success:
+            QMessageBox.critical(None, 'Error', 'The configuration is not valid.', QMessageBox.Ok)
+            return
+        self.name_box.setText(filename)
+        for label in self.new_transformation.labels:
+            self.from_box.addItem(label)
+            self.to_box.addItem(label)
+
+    def _check(self):
+        if self.new_transformation is None:
+            return 0
+        elif self.from_box.currentIndex() == self.to_box.currentIndex():
+            QMessageBox.critical(None, 'Error', 'The two systems cannot be identical!', QMessageBox.Ok)
+            return 1
+        return 2
+
+    def _select(self):
+        from_index, to_index = self.from_box.currentIndex(), self.to_box.currentIndex()
+        self.new_options = (self.new_transformation, from_index, to_index, self.name_box.text())
+
+    def configure(self, check=None):
+        if super().configure(self._check):
+            self.transformation, self.from_index, self.to_index, self.filename = self.new_options
+            self.reconfigure_downward()
+
+    def save(self):
+        return '|'.join([self.category, self.name(), str(self.index()),
+                         str(self.pos().x()), str(self.pos().y()), self.filename, str(self.from_index),
+                         str(self.to_index)])
+
+    def load(self, options):
+        filename, from_index, to_index = options
+        if not filename:
+            return
+        try:
+            with open(filename) as f:
+                pass
+        except FileNotFoundError:
+            self.state = Node.NOT_CONFIGURED
+            return
+        success, transformation = load_transformation_map(filename)
+        if not success:
+            self.state = Node.NOT_CONFIGURED
+            return
+        from_index, to_index = int(from_index), int(to_index)
+        if from_index not in transformation.nodes or to_index not in transformation.nodes:
+            self.state = Node.NOT_CONFIGURED
+            return
+        self.filename = filename
+        self.transformation = transformation
+        self.from_index = from_index
+        self.to_index = to_index
+        self.state = Node.READY
+        self.update()
+
+    def run(self):
+        success = super().run_upward()
+        if not success:
+            self.fail('input failed.')
+            return
+        input_data = self.in_port.mother.parentItem().data
+        if 'transformation' in input_data.metadata:
+            self.fail('cannot re-apply transformation.')
+            return
+
+        trans = self.transformation.get_transformation(self.from_index, self.to_index)
+        self.data = input_data.copy()
+        self.data.transform(trans)
+        self.data.metadata['transformation'] = trans
+        self.success()
 

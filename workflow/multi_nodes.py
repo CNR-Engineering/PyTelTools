@@ -6,6 +6,7 @@ from workflow.MultiNode import MultiNode, MultiOneInOneOutNode, \
 from workflow.util import MultiLoadSerafinDialog
 import slf.variables as variables
 import slf.misc as operations
+from geom.transformation import load_transformation_map
 
 
 class MultiLoadSerafinNode(MultiSingleOutputNode):
@@ -137,6 +138,34 @@ class MultiLoadReferenceSerafinNode(MultiSingleOutputNode):
             self.state = MultiNode.NOT_CONFIGURED
             return
         self.options = (filename,)
+
+
+class MultiAddTransformationNode(MultiOneInOneOutNode):
+    def __init__(self, index):
+        super().__init__(index)
+        self.category = 'Basic operations'
+        self.label = 'Add\nTransformation'
+
+    def load(self, options):
+        filename, from_index, to_index = options
+        if not filename:
+            return
+        try:
+            with open(filename) as f:
+                pass
+        except FileNotFoundError:
+            self.state = MultiNode.NOT_CONFIGURED
+            return
+        success, transformation = load_transformation_map(filename)
+        if not success:
+            self.state = MultiNode.NOT_CONFIGURED
+            return
+        from_index, to_index = int(from_index), int(to_index)
+        if from_index not in transformation.nodes or to_index not in transformation.nodes:
+            self.state = MultiNode.NOT_CONFIGURED
+            return
+        trans = transformation.get_transformation(from_index, to_index)
+        self.options = (trans,)
 
 
 class MultiConvertToSinglePrecisionNode(MultiOneInOneOutNode):
