@@ -1154,6 +1154,126 @@ class ComplexExpressionPool:
         return values
 
 
+class ComplexExpressionMultiPool:
+    def __init__(self):
+        self.input_headers = []
+        self.nb_pools = 0
+        self.pools = []
+        self.representative = None
+
+    def get_data(self, input_headers):
+        self.input_headers = input_headers
+        self.nb_pools = len(input_headers)
+        common_vars = set(input_headers[0].var_IDs)
+        for header in input_headers[1:]:
+            common_vars.intersection_update(header.var_IDs)
+        variables = [var for var in input_headers[0].var_IDs if var in common_vars]
+        names = [name.decode('utf-8').strip() for (var, name)
+                 in zip(input_headers[0].var_IDs, input_headers[0].var_names) if var in common_vars]
+
+        for i, header in enumerate(self.input_headers):
+            pool = ComplexExpressionPool()
+            pool.init(variables, names, header.x, header.y)
+            self.pools.append(pool)
+        self.representative = self.pools[0]
+
+    def add_polygonal_mask(self, polygons, attribute_index):
+        for pool in self.pools:
+            pool.add_polygonal_mask(polygons, attribute_index)
+
+    def add_simple_expression(self, literal_expression):
+        success_code = self.representative.add_simple_expression(literal_expression)
+        if success_code != 0:
+            return success_code
+        for pool in self.pools[1:]:
+            pool.add_simple_expression(literal_expression)
+        return success_code
+
+    def add_conditional_expression(self, condition, true_expression, false_expression):
+        success_code = self.representative.add_conditional_expression(condition, true_expression, false_expression)
+        if success_code != 0:
+            return success_code
+        for pool in self.pools[1:]:
+            pool.add_conditional_expression(condition, true_expression, false_expression)
+        return success_code
+
+    def add_max_min_expression(self, first_expression, second_expression, is_max):
+        success_code = self.representative.add_max_min_expression(first_expression, second_expression, is_max)
+        if success_code != 0:
+            return success_code
+        for pool in self.pools[1:]:
+            pool.add_max_min_expression(first_expression, second_expression, is_max)
+        return success_code
+
+    def add_masked_expression(self, inside_expression, outside_expression):
+        for pool in self.pools:
+            pool.add_masked_expression(inside_expression, outside_expression)
+
+    def add_condition(self, expression, comparator, threshold):
+        for pool in self.pools:
+            pool.add_condition(expression, comparator, threshold)
+
+    def add_and_or_condition(self, first_condition, second_condition, is_and):
+        success_code = self.representative.add_and_or_condition(first_condition, second_condition, is_and)
+        if success_code != 0:
+            return success_code
+        for pool in self.pools[1:]:
+            pool.add_and_or_condition(first_condition, second_condition, is_and)
+        return success_code
+
+    def vars(self):
+        return self.representative.vars
+
+    def var_names(self):
+        return self.representative.var_names
+
+    def nb_expressions(self):
+        return self.representative.nb_expressions
+
+    def expressions(self):
+        return self.representative.expressions
+
+    def nb_masks(self):
+        return self.representative.nb_masks
+
+    def masks(self):
+        return self.representative.masks
+
+    def nb_conditions(self):
+        return self.representative.nb_conditions
+
+    def conditions(self):
+        return self.representative.conditions
+
+    def get_expression(self, text):
+        return self.representative.get_expression(text)
+
+    def get_condition(self, text):
+        return self.representative.get_condition(text)
+
+    def ready_for_conditional_expression(self):
+        return self.representative.ready_for_conditional_expression()
+
+    def ready_for_max_min_expression(self):
+        return self.representative.ready_for_max_min_expression()
+
+    def ready_for_masked_expression(self):
+        return self.representative.ready_for_masked_expression()
+
+    def evaluable_expressions(self):
+        for code, text in self.representative.evaluable_expressions():
+            yield code, text
+
+    def output_headers(self, selected_names):
+        for input_header in self.input_headers:
+            output_header = input_header.copy()
+            output_header.nb_var = len(selected_names)
+            output_header.var_IDs, output_header.var_names, output_header.var_units = [], [], []
+            for name in selected_names:
+                output_header.var_IDs.append('DUMMY')
+                output_header.var_names.append(bytes(name, 'utf-8').ljust(16))
+                output_header.var_units.append(bytes('', 'utf-8').ljust(16))
+            yield output_header
 
 
 

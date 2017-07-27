@@ -1,4 +1,5 @@
 import sys
+import os
 import struct
 from PyQt5.QtWidgets import *
 from PyQt5.QtGui import *
@@ -8,6 +9,7 @@ from slf import Serafin
 import slf.misc as op
 from geom import Shapefile
 from gui.util import testOpen, handleOverwrite, OutputProgressDialog, OutputThread, TelToolWidget
+from workflow.util import MultiLoadSerafinDialog
 
 
 class WriteVariableThread(OutputThread):
@@ -35,12 +37,12 @@ class VariableList(QListWidget):
     def __init__(self, pool, editor):
         super().__init__()
         self.pool = pool
-        for var, var_name in zip(pool.vars, pool.var_names):
+        for var, var_name in zip(pool.vars(), pool.var_names()):
             self.addItem('%s (%s)' % (var, var_name))
-        for i in range(1, pool.nb_masks+1):
-            self.addItem(pool.masks[i].code())
-        for i in range(1, pool.nb_expressions+1):
-            expr = pool.expressions[i]
+        for i in range(1, pool.nb_masks()+1):
+            self.addItem(pool.masks()[i].code())
+        for i in range(1, pool.nb_expressions()+1):
+            expr = pool.expressions()[i]
             if not expr.masked:
                 self.addItem(str(expr))
         self.setMaximumWidth(250)
@@ -60,7 +62,7 @@ class VariableList(QListWidget):
     def mouseDoubleClickEvent(self, *args, **kwargs):
         var = self.currentItem().text()
         if var:
-            if '(' in var and var.split(' (')[0] in self.pool.vars:  # variable
+            if '(' in var and var.split(' (')[0] in self.pool.vars():  # variable
                 var = var.split(' (')[0]
                 self.colorful_text(var, self.blue)
             elif var[:4] == 'POLY':  # mask value
@@ -183,14 +185,14 @@ class ExpressionDialog(QDialog):
         for box in (self.condition_box, self.true_box, self.false_box):
             box.setFixedHeight(30)
             box.setMaximumWidth(250)
-        for i in range(1, self.pool.nb_expressions+1):
-            expr = self.pool.expressions[i]
+        for i in range(1, self.pool.nb_expressions()+1):
+            expr = self.pool.expressions()[i]
             if expr.masked:
                 continue
             self.true_box.addItem(str(expr))
             self.false_box.addItem(str(expr))
-        for i in range(1, self.pool.nb_conditions+1):
-            self.condition_box.addItem(str(self.pool.conditions[i]))
+        for i in range(1, self.pool.nb_conditions()+1):
+            self.condition_box.addItem(str(self.pool.conditions()[i]))
         vlayout = QVBoxLayout()
         glayout = QGridLayout()
         glayout.addWidget(QLabel('Condition'), 1, 1, Qt.AlignHCenter)
@@ -232,8 +234,8 @@ class ExpressionDialog(QDialog):
             box.setFixedHeight(30)
             box.setMaximumWidth(250)
         self.max_min_box.setFixedSize(100, 30)
-        for i in range(1, self.pool.nb_expressions+1):
-            expr = self.pool.expressions[i]
+        for i in range(1, self.pool.nb_expressions()+1):
+            expr = self.pool.expressions()[i]
             if expr.masked:
                 continue
             self.first_box.addItem(str(expr))
@@ -276,12 +278,12 @@ class ExpressionDialog(QDialog):
         for box in (self.poly_box, self.inside_box, self.outside_box):
             box.setFixedHeight(30)
             box.setMaximumWidth(250)
-        for i in range(1, self.pool.nb_masks+1):
-            mask = self.pool.masks[i]
+        for i in range(1, self.pool.nb_masks()+1):
+            mask = self.pool.masks()[i]
             if mask.nb_children > 0:
                 self.poly_box.addItem(mask.code())
-        for i in range(1, self.pool.nb_expressions+1):
-            expr = self.pool.expressions[i]
+        for i in range(1, self.pool.nb_expressions()+1):
+            expr = self.pool.expressions()[i]
             if not expr.polygonal:
                 self.outside_box.addItem(str(expr))
         self.update_inside_mask(self.poly_box.currentText())
@@ -404,7 +406,7 @@ class ConditionDialog(QDialog):
         self.simple_button.setChecked(True)
         self.and_or_button = QRadioButton('AND/OR condition\nUse two existing conditions and AND/OR operators'
                                           'to create a new condition. Example: (B > 0) AND (B < 100)')
-        self.and_or_button.setEnabled(self.expr_pool.nb_conditions > 1)
+        self.and_or_button.setEnabled(self.expr_pool.nb_conditions() > 1)
         vlayout = QVBoxLayout()
         vlayout.addWidget(self.simple_button)
         vlayout.addWidget(self.and_or_button)
@@ -440,8 +442,8 @@ class ConditionDialog(QDialog):
         self.expression_box.setMinimumWidth(150)
         self.expression_box.setMaximumWidth(250)
 
-        for i in range(1, self.expr_pool.nb_expressions+1):
-            expr = self.expr_pool.expressions[i]
+        for i in range(1, self.expr_pool.nb_expressions()+1):
+            expr = self.expr_pool.expressions()[i]
             if expr.masked:
                 continue
             self.expression_box.addItem(str(expr))
@@ -488,8 +490,8 @@ class ConditionDialog(QDialog):
             box.setFixedHeight(30)
             box.setMaximumWidth(250)
         self.and_or_box.setFixedSize(100, 30)
-        for i in range(1, self.expr_pool.nb_conditions+1):
-            condition = str(self.expr_pool.conditions[i])
+        for i in range(1, self.expr_pool.nb_conditions()+1):
+            condition = str(self.expr_pool.conditions()[i])
             self.first_box.addItem(condition)
             self.second_box.addItem(condition)
         vlayout = QVBoxLayout()
@@ -618,11 +620,10 @@ class InputTab(QWidget):
         super().__init__()
         self.parent = parent
 
-        self.filename = None
+        self.dir_paths = []
+        self.slf_name = ''
+        self.job_ids = []
         self.language = None
-
-        self.header = None
-        self.time = []
 
         self._initWidgets()
         self._setLayout()
@@ -631,14 +632,9 @@ class InputTab(QWidget):
 
     def _initWidgets(self):
         self.btnOpen = QPushButton('Open', self, icon=self.style().standardIcon(QStyle.SP_DialogOpenButton))
-        self.btnOpen.setToolTip('<b>Open</b> a .slf file')
+        self.btnOpen.setToolTip('<b>Open</b> one or multiple folders')
         self.btnOpen.setFixedSize(105, 50)
-        self.inNameBox = QLineEdit()
-        self.inNameBox.setReadOnly(True)
-        self.inNameBox.setFixedHeight(30)
-        self.summaryTextBox = QPlainTextEdit()
-        self.summaryTextBox.setFixedHeight(50)
-        self.summaryTextBox.setReadOnly(True)
+
         self.langBox = QGroupBox('Input language')
         hlayout = QHBoxLayout()
         self.frenchButton = QRadioButton('French')
@@ -647,10 +643,18 @@ class InputTab(QWidget):
         hlayout.addWidget(self.englishButton)
         self.langBox.setLayout(hlayout)
         self.langBox.setMaximumHeight(80)
+        self.langBox.setMaximumWidth(200)
         if self.parent.language == 'fr':
             self.frenchButton.setChecked(True)
         else:
             self.englishButton.setChecked(True)
+
+        self.table = QTableWidget()
+        self.table.setColumnCount(2)
+        self.table.horizontalHeader().setDefaultSectionSize(100)
+        self.table.setHorizontalHeaderLabels(['Folder', 'Job ID'])
+        self.table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.table.setMaximumWidth(305)
 
         self.polygon_box = QGroupBox('Add Polygonal Masks (optional)')
         self.polygon_box.setStyleSheet('QGroupBox {font-size: 12px;font-weight: bold;}')
@@ -660,47 +664,34 @@ class InputTab(QWidget):
         self.polygon_table = QTableWidget()
         self.polygon_table.setColumnCount(3)
         self.polygon_table.setHorizontalHeaderLabels(['ID', 'Value', 'File'])
+
         vh = self.polygon_table.verticalHeader()
         vh.setSectionResizeMode(QHeaderView.Fixed)
         vh.setDefaultSectionSize(25)
         self.polygon_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
-        self.polygon_table.setMaximumHeight(400)
-        hlayout = QHBoxLayout()
-        hlayout.addWidget(self.polygon_button)
-        hlayout.addWidget(self.polygon_table)
-        self.polygon_box.setLayout(hlayout)
+        vlayout = QVBoxLayout()
+        vlayout.addWidget(self.polygon_button)
+        vlayout.addWidget(self.polygon_table)
+        self.polygon_box.setLayout(vlayout)
         self.polygon_box.setEnabled(False)
 
     def _setLayout(self):
-        mainLayout = QVBoxLayout()
-        mainLayout.addItem(QSpacerItem(10, 10))
-        mainLayout.setSpacing(15)
+        mainLayout = QHBoxLayout()
+        vlayout = QVBoxLayout()
         hlayout = QHBoxLayout()
-        hlayout.setAlignment(Qt.AlignLeft)
-        hlayout.addItem(QSpacerItem(50, 1))
         hlayout.addWidget(self.btnOpen)
-        hlayout.addItem(QSpacerItem(30, 1))
         hlayout.addWidget(self.langBox)
-        mainLayout.addLayout(hlayout)
-        mainLayout.addItem(QSpacerItem(10, 10))
-
-        glayout = QGridLayout()
-        glayout.addWidget(QLabel('Input file'), 1, 1)
-        glayout.addWidget(self.inNameBox, 1, 2)
-        glayout.addWidget(QLabel('Summary'), 2, 1)
-        glayout.addWidget(self.summaryTextBox, 2, 2)
-        glayout.setAlignment(Qt.AlignLeft)
-        glayout.setSpacing(10)
-        mainLayout.addLayout(glayout)
+        vlayout.addLayout(hlayout)
+        vlayout.addWidget(self.table)
+        mainLayout.addLayout(vlayout)
         mainLayout.addItem(QSpacerItem(10, 10))
         mainLayout.addWidget(self.polygon_box)
-        mainLayout.addStretch()
         self.setLayout(mainLayout)
 
     def _reinitInput(self):
-        self.summaryTextBox.clear()
-        self.header = None
-        self.time = []
+        self.dir_paths = []
+        self.slf_name = ''
+        self.job_ids = []
         if not self.frenchButton.isChecked():
             self.language = 'en'
         else:
@@ -709,32 +700,50 @@ class InputTab(QWidget):
         self.polygon_box.setEnabled(False)
         self.parent.reset()
 
+    def read(self):
+        headers = []
+        for (job_id, dir_path) in zip(self.job_ids, self.dir_paths):
+            filename = os.path.join(dir_path, self.slf_name)
+            try:
+                with open(filename, 'rb') as f:
+                    pass
+            except PermissionError:
+                QMessageBox.critical(self, 'Error', 'Fail to open the file with ID %s: permission denied.' % job_id,
+                                     QMessageBox.Ok)
+                return []
+            with Serafin.Read(filename, self.language) as f:
+                f.read_header()
+                if not f.header.is_2d:
+                    QMessageBox.critical(self, 'Error', 'The file with ID %s is not TELEMAC 2D.' % job_id,
+                                         QMessageBox.Ok)
+                    return []
+                headers.append(f.header)
+        return headers
+
     def btnOpenEvent(self):
-        options = QFileDialog.Options()
-        options |= QFileDialog.DontUseNativeDialog
-        filename, _ = QFileDialog.getOpenFileName(self, 'Open a .slf file', '',
-                                                  'Serafin Files (*.slf)', options=options)
-        if not filename:
+        if not self.slf_name:
+            old_options = []
+        else:
+            old_options = [self.dir_paths, self.slf_name, self.job_ids]
+        dlg = MultiLoadSerafinDialog(old_options)
+        if dlg.exec_() == QDialog.Rejected:
             return
-        if not testOpen(filename):
+        self._reinitInput()
+        self.dir_paths, self.slf_name, self.job_ids = dlg.dir_paths, dlg.slf_name, dlg.job_ids
+
+        headers = self.read()
+        if not headers:
             return
 
-        # reinitialize input file data
-        self._reinitInput()
-        self.filename = filename
-        self.inNameBox.setText(filename)
-        with Serafin.Read(self.filename, self.language) as resin:
-            resin.read_header()
-            if not resin.header.is_2d:
-                QMessageBox.critical(self, 'Error', 'The file type (TELEMAC 3D) is currently not supported.',
-                                     QMessageBox.Ok)
-                return
-            self.summaryTextBox.appendPlainText(resin.get_summary())
-            resin.get_time()
-            self.header = resin.header.copy()
-            self.time = resin.time[:]
+        self.table.setRowCount(len(self.dir_paths))
+        for i, (path, job_id) in enumerate(zip(self.dir_paths, self.job_ids)):
+            name = os.path.basename(path)
+            name_item, id_item = QTableWidgetItem(name), QTableWidgetItem(job_id)
+            self.table.setItem(i, 0, name_item)
+            self.table.setItem(i, 1, id_item)
+
         self.polygon_box.setEnabled(True)
-        self.parent.get_input()
+        self.parent.get_input(headers)
 
     def polygon_event(self):
         filename, _ = QFileDialog.getOpenFileName(self, 'Open a .shp file', '', 'Polygon file (*.shp)',
@@ -766,12 +775,12 @@ class InputTab(QWidget):
         attribute_index, attribute_name = dlg.attribute_box.currentText().split(' - ')
         attribute_index = int(attribute_index)
 
+        short_name = os.path.join(os.path.basename(filename), os.path.split(filename)[1])
         row = self.polygon_table.rowCount()
         self.polygon_table.insertRow(row)
         self.polygon_table.setItem(row, 0, QTableWidgetItem('POLY%d' % (row+1)))
         self.polygon_table.setItem(row, 1, QTableWidgetItem(attribute_name))
-        self.polygon_table.setItem(row, 2, QTableWidgetItem(filename))
-
+        self.polygon_table.setItem(row, 2, QTableWidgetItem(short_name))
         self.parent.editor_tab.pool.add_polygonal_mask(polygons, attribute_index)
 
 
@@ -779,7 +788,7 @@ class EditorTab(QWidget):
     def __init__(self, input_tab):
         super().__init__()
         self.input = input_tab
-        self.pool = op.ComplexExpressionPool()
+        self.pool = op.ComplexExpressionMultiPool()
 
         self.add_expression_button = QPushButton('Add Expression')
         self.add_condition_button = QPushButton('Add Condition')
@@ -798,6 +807,9 @@ class EditorTab(QWidget):
         self.expression_list = QListWidget()
         self.expression_list.setMinimumWidth(250)
 
+        self._set_layout()
+
+    def _set_layout(self):
         hlayout = QHBoxLayout()
         vlayout = QVBoxLayout()
         vlayout.addItem(QSpacerItem(10, 15))
@@ -826,16 +838,14 @@ class EditorTab(QWidget):
         self.expression_list.clear()
         self.condition_list.clear()
 
-    def get_input(self):
-        self.pool.init(self.input.header.var_IDs,
-                       list(map(lambda x: x.decode('utf-8').strip(), self.input.header.var_names)),
-                       self.input.header.x, self.input.header.y)
+    def get_input(self, headers):
+        self.pool.get_data(headers)
 
     def add_expression(self):
         dlg = ExpressionDialog(self.pool)
         value = dlg.exec_()
         if value == QDialog.Accepted:
-            item = QListWidgetItem(str(self.pool.expressions[self.pool.nb_expressions]))
+            item = QListWidgetItem(str(self.pool.expressions()[self.pool.nb_expressions()]))
             self.expression_list.addItem(item)
             self.add_condition_button.setEnabled(True)
 
@@ -843,7 +853,7 @@ class EditorTab(QWidget):
         dlg = ConditionDialog(self.pool)
         value = dlg.exec_()
         if value == QDialog.Accepted:
-            new_condition = str(self.pool.conditions[self.pool.nb_conditions])
+            new_condition = str(self.pool.conditions()[self.pool.nb_conditions()])
             item = QListWidgetItem(new_condition)
             self.condition_list.addItem(item)
 
@@ -899,7 +909,7 @@ class SubmitTab(QWidget):
         self.submit_button.setEnabled(False)
 
     def old_names(self):
-        names = self.editor.pool.var_names[:]
+        names = self.editor.pool.var_names()[:]
         for row in range(self.table.rowCount()):
             names.append(self.table.item(row, 2).text())
         return names
@@ -911,16 +921,6 @@ class SubmitTab(QWidget):
             expressions.append(self.table.item(row, 0).text())
             names.append(self.table.item(row, 2).text())
         return expressions, names
-
-    def output_header(self, names):
-        output_header = self.input.header.copy()
-        output_header.nb_var = len(names)
-        output_header.var_IDs, output_header.var_names, output_header.var_units = [], [], []
-        for name in names:
-            output_header.var_IDs.append('DUMMY')
-            output_header.var_names.append(bytes(name, 'utf-8').ljust(16))
-            output_header.var_units.append(bytes('', 'utf-8').ljust(16))
-        return output_header
 
     def add_event(self):
         expressions = [(code, text) for code, text in self.editor.pool.evaluable_expressions()]
@@ -937,51 +937,52 @@ class SubmitTab(QWidget):
             self.submit_button.setEnabled(True)
 
     def submit_event(self):
+        pass # TODO
         # create the save file dialog
-        options = QFileDialog.Options()
-        options |= QFileDialog.DontUseNativeDialog
-        options |= QFileDialog.DontConfirmOverwrite
-        filename, _ = QFileDialog.getSaveFileName(self, 'Choose the output file name', '',
-                                                  'Serafin Files (*.slf)', options=options)
-
-        # check the file name consistency
-        if not filename:
-            return
-        if len(filename) < 5 or filename[-4:] != '.slf':
-            filename += '.slf'
-
-        # overwrite to the input file is forbidden
-        if filename == self.input.filename:
-            QMessageBox.critical(self, 'Error', 'Cannot overwrite to the input file.',
-                                 QMessageBox.Ok)
-            return
-
-        # handle overwrite manually
-        overwrite = handleOverwrite(filename)
-        if overwrite is None:
-            return
-
-        selected, names = self.selected_expressions()
-        output_header = self.output_header(names)
-
-        self.parent.inDialog()
-        progress_bar = OutputProgressDialog()
-
-        with Serafin.Read(self.input.filename, self.input.language) as input_stream:
-            input_stream.header = self.input.header
-            input_stream.time = self.input.time
-
-            with Serafin.Write(filename, self.input.language, True) as output_stream:
-                output_stream.write_header(output_header)
-
-                process = WriteVariableThread(input_stream, output_stream, output_header, self.editor.pool, selected)
-                progress_bar.connectToThread(process)
-                process.run()
-
-                if not process.canceled:
-                    progress_bar.outputFinished()
-                progress_bar.exec_()
-                self.parent.outDialog()
+        # options = QFileDialog.Options()
+        # options |= QFileDialog.DontUseNativeDialog
+        # options |= QFileDialog.DontConfirmOverwrite
+        # filename, _ = QFileDialog.getSaveFileName(self, 'Choose the output file name', '',
+        #                                           'Serafin Files (*.slf)', options=options)
+        #
+        # # check the file name consistency
+        # if not filename:
+        #     return
+        # if len(filename) < 5 or filename[-4:] != '.slf':
+        #     filename += '.slf'
+        #
+        # # overwrite to the input file is forbidden
+        # if filename == self.input.filename:
+        #     QMessageBox.critical(self, 'Error', 'Cannot overwrite to the input file.',
+        #                          QMessageBox.Ok)
+        #     return
+        #
+        # # handle overwrite manually
+        # overwrite = handleOverwrite(filename)
+        # if overwrite is None:
+        #     return
+        #
+        # selected, names = self.selected_expressions()
+        # output_header = self.output_header(names)
+        #
+        # self.parent.inDialog()
+        # progress_bar = OutputProgressDialog()
+        #
+        # with Serafin.Read(self.input.filename, self.input.language) as input_stream:
+        #     input_stream.header = self.input.header
+        #     input_stream.time = self.input.time
+        #
+        #     with Serafin.Write(filename, self.input.language, True) as output_stream:
+        #         output_stream.write_header(output_header)
+        #
+        #         process = WriteVariableThread(input_stream, output_stream, output_header, self.editor.pool, selected)
+        #         progress_bar.connectToThread(process)
+        #         process.run()
+        #
+        #         if not process.canceled:
+        #             progress_bar.outputFinished()
+        #         progress_bar.exec_()
+        #         self.parent.outDialog()
 
 
 class CalculatorGUI(TelToolWidget):
@@ -1005,17 +1006,17 @@ class CalculatorGUI(TelToolWidget):
         layout = QVBoxLayout()
         layout.addWidget(self.tab)
         self.setLayout(layout)
-        self.resize(600, 500)
+        self.resize(800, 500)
 
     def reset(self):
         self.tab.setTabEnabled(1, False)
         self.tab.setTabEnabled(2, False)
         self.submit_tab.reset()
 
-    def get_input(self):
+    def get_input(self, headers):
         self.tab.setTabEnabled(1, True)
         self.tab.setTabEnabled(2, True)
-        self.editor_tab.get_input()
+        self.editor_tab.get_input(headers)
 
 
 def exception_hook(exctype, value, traceback):

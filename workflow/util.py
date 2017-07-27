@@ -260,7 +260,6 @@ class MultiLoadDialog(QDialog):
         if old_options:
             self.dir_paths, self.slf_name, self.job_ids = old_options
             self.nb_files = len(self.dir_paths)
-            self.file_box.addItem(self.slf_name)
             self.table.setRowCount(self.nb_files)
             for i, (path, job_id) in enumerate(zip(self.dir_paths, self.job_ids)):
                 name = os.path.basename(path)
