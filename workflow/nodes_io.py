@@ -5,14 +5,14 @@ from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 
 from workflow.Node import Node, SingleInputNode, SingleOutputNode, OneInOneOutNode
-from workflow.util import OutputOptionPanel, GeomOutputOptionPanel
+from workflow.datatypes import SerafinData, PointData, PolylineData
+from workflow.util import LoadSerafinDialog, OutputOptionPanel, GeomOutputOptionPanel, \
+                          process_output_options, process_geom_output_options
 from slf import Serafin
 from slf.interpolation import MeshInterpolator
 from slf.variables import do_calculations_in_frame
 import slf.misc as operations
 from geom import BlueKenue, Shapefile
-from workflow.datatypes import SerafinData, PointData, PolylineData
-from workflow.util import LoadSerafinDialog
 
 
 class LoadSerafinNode(SingleOutputNode):
@@ -20,7 +20,7 @@ class LoadSerafinNode(SingleOutputNode):
         super().__init__(index)
         self.category = 'Input/Output'
         self.label = 'Load\nSerafin'
-        self.out_port.data_type = ('slf',)
+        self.out_port.data_type = ('slf', 'slf geom')
 
         self.dir_path = ''
         self.slf_name = ''
@@ -331,12 +331,11 @@ class WriteSerafinNode(OneInOneOutNode):
         # map points of A onto mesh B
         mesh = MeshInterpolator(second_input.header, False)
 
-        if second_input.has_index:
+        if second_input.triangles:
             mesh.index = second_input.index
             mesh.triangles = second_input.triangles
         else:
             self.construct_mesh(mesh)
-            second_input.has_index = True
             second_input.index = mesh.index
             second_input.triangles = mesh.triangles
 
@@ -380,17 +379,16 @@ class WriteSerafinNode(OneInOneOutNode):
             return
 
         input_data = self.in_port.mother.parentItem().data
-        input_name = os.path.split(input_data.filename)[1][:-4]
-        if self.double_name:
-            output_name = input_name + '_' + input_data.job_id + self.suffix + '.slf'
-        else:
-            output_name = input_name + self.suffix + '.slf'
-        if self.in_source_folder:
-            self.filename = os.path.join(os.path.split(input_data.filename)[0], output_name)
-        else:
-            self.filename = os.path.join(self.dir_path, output_name)
+        self.filename = process_output_options(input_data.filename, input_data.job_id, '.slf',
+                                               self.suffix, self.in_source_folder, self.dir_path, self.double_name)
         if not self.overwrite:
             if os.path.exists(self.filename):
+                try:
+                    with open(self.filename, 'r') as f:
+                        pass
+                except PermissionError:
+                    self.fail('Access denied when reloading existing file.')
+
                 self.data = SerafinData(input_data.job_id, self.filename, input_data.language)
                 self.data.read()
                 self.success('Reload existing file.')
@@ -902,23 +900,12 @@ class WriteLandXMLNode(SingleInputNode):
         selected_frame = input_data.selected_time_indices[0]
         selected_var = available_var[0]
 
-        input_name = os.path.split(input_data.filename)[1][:-4]
-        if self.double_name:
-            output_name = input_name + '_' + input_data.job_id + self.suffix + '.xml'
-        else:
-            output_name = input_name + self.suffix + '.xml'
-
-        if self.in_source_folder:
-            path = os.path.join(os.path.split(input_data.filename)[0], 'gis')
-            if not os.path.exists(path):
-                os.mkdir(path)
-            filename = os.path.join(path, output_name)
-        else:
-            filename = os.path.join(self.dir_path, output_name)
+        filename = process_geom_output_options(input_data.filename, input_data.job_id, '.xml',
+                                               self.suffix, self.in_source_folder, self.dir_path, self.double_name)
 
         if not self.overwrite:
             if os.path.exists(filename):
-                self.success('Use existing file.')
+                self.success('File already exists.')
                 return
         try:
             with open(filename, 'w') as f:
@@ -994,23 +981,12 @@ class WriteShpNode(SingleInputNode):
             return
         selected_frame = input_data.selected_time_indices[0]
 
-        input_name = os.path.split(input_data.filename)[1][:-4]
-        if self.double_name:
-            output_name = input_name + '_' + input_data.job_id + self.suffix + '.shp'
-        else:
-            output_name = input_name + self.suffix + '.shp'
-
-        if self.in_source_folder:
-            path = os.path.join(os.path.split(input_data.filename)[0], 'gis')
-            if not os.path.exists(path):
-                os.mkdir(path)
-            filename = os.path.join(path, output_name)
-        else:
-            filename = os.path.join(self.dir_path, output_name)
+        filename = process_geom_output_options(input_data.filename, input_data.job_id, '.shp',
+                                               self.suffix, self.in_source_folder, self.dir_path, self.double_name)
 
         if not self.overwrite:
             if os.path.exists(filename):
-                self.success('Use existing file.')
+                self.success('File already exists.')
                 return
         try:
             with open(filename, 'w') as f:

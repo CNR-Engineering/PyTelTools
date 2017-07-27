@@ -3,7 +3,7 @@ Representation of the 2D mesh in a 2D Serafin file.
 """
 
 import numpy as np
-import shapely.geometry as geom
+from shapely.geometry import Polygon
 from rtree.index import Index
 
 
@@ -30,7 +30,7 @@ class Mesh2D:
         """
         self.index = Index()
         for i, j, k in self.ikle:
-            t = geom.Polygon([self.points[i], self.points[j], self.points[k]])
+            t = Polygon([self.points[i], self.points[j], self.points[k]])
             self.triangles[i, j, k] = t
             self.index.insert(i, t.bounds, obj=(i, j, k))
 

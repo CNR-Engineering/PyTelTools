@@ -6,6 +6,7 @@ from multiprocessing import Process, Queue, cpu_count
 from shapely.geometry import Polygon
 
 from workflow.datatypes import SerafinData, PolylineData, PointData, CSVData
+from workflow.util import process_output_options, process_geom_output_options
 from geom import BlueKenue, Shapefile
 import slf.misc as operations
 from slf import Serafin
@@ -347,7 +348,7 @@ def synch_max(node_id, fid, data, options):
                                                        data.job_id)
     if data.operator is not None:
         return False, node_id, fid, None, fail_message('duplicated operator', 'SynchMax', data.job_id)
-    var = operations[0]
+    var = options[0]
     available_vars = [var for var in data.selected_vars if var in data.header.var_IDs]
     if var not in available_vars:
         return False, node_id, fid, None, fail_message('variable not available', 'SynchMax', data.job_id)
@@ -394,17 +395,16 @@ def convert_to_single(node_id, fid, data, options):
 def write_slf(node_id, fid, data, options):
     suffix, in_source_folder, dir_path, double_name, overwrite = options
 
-    input_name = os.path.split(data.filename)[1][:-4]
-    if double_name:
-        output_name = input_name + '_' + data.job_id + suffix + '.slf'
-    else:
-        output_name = input_name + suffix + '.slf'
-    if in_source_folder:
-        filename = os.path.join(os.path.split(data.filename)[0], output_name)
-    else:
-        filename = os.path.join(dir_path, output_name)
+    filename = process_output_options(data.filename, data.job_id, '.slf',
+                                      suffix, in_source_folder, dir_path, double_name)
     if not overwrite:
         if os.path.exists(filename):
+            try:
+                with open(filename, 'r') as f:
+                    pass
+            except PermissionError:
+                return False, node_id, fid, None, fail_message('access denied when reloading existing file',
+                                                               'Write Serafin', data.job_id)
             new_data = SerafinData(data.job_id, filename, data.language)
             new_data.read()
             return True, node_id, fid, new_data, success_message('Write Serafin', data.job_id, 'reload existing file')
@@ -430,6 +430,9 @@ def write_slf(node_id, fid, data, options):
     if success:
         new_data = SerafinData(data.job_id, filename, data.language)
         new_data.read()
+    else:
+        os.remove(filename)
+
     return success, node_id, fid, new_data, message
 
 
@@ -633,12 +636,11 @@ def write_project_mesh(first_input, filename):
     # map points of A onto mesh B
     mesh = MeshInterpolator(second_input.header, False)
 
-    if second_input.has_index:
+    if second_input.triangles:
         mesh.index = second_input.index
         mesh.triangles = second_input.triangles
     else:
         construct_mesh(mesh)
-        second_input.has_index = True
         second_input.index = mesh.index
         second_input.triangles = mesh.triangles
 
@@ -696,19 +698,11 @@ def compute_volume(node_id, fid, data, aux_data, options, csv_separator):
         volume_type = VolumeCalculator.NET
 
     # process output options
-    input_name = os.path.split(data.filename)[1][:-4]
-    if double_name:
-        output_name = input_name + '_' + data.job_id + suffix + '.csv'
-    else:
-        output_name = input_name + suffix + '.csv'
-    if in_source_folder:
-        filename = os.path.join(os.path.split(data.filename)[0], output_name)
-    else:
-        filename = os.path.join(dir_path, output_name)
+    filename = process_output_options(data.filename, data.job_id, '.csv',
+                                      suffix, in_source_folder, dir_path, double_name)
     if not overwrite:
         if os.path.exists(filename):
-            csv_data = CSVData(data.filename, None, filename)
-            return True, node_id, fid, csv_data, success_message('Compute Volume', data.job_id, 'reload existing file')
+            return True, node_id, fid, None, success_message('Compute Volume', data.job_id, 'file already exists')
 
     try:
         with open(filename, 'w') as f:
@@ -719,12 +713,11 @@ def compute_volume(node_id, fid, data, aux_data, options, csv_separator):
     # prepare the mesh
     mesh = TruncatedTriangularPrisms(data.header, False)
 
-    if data.has_index:
+    if data.triangles:
         mesh.index = data.index
         mesh.triangles = data.triangles
     else:
         construct_mesh(mesh)
-        data.has_index = True
         data.index = mesh.index
         data.triangles = mesh.triangles
 
@@ -746,7 +739,7 @@ def compute_volume(node_id, fid, data, aux_data, options, csv_separator):
             csv_data.add_row(row)
 
     csv_data.write(filename, csv_separator)
-    return True, node_id, fid, csv_data, success_message('Compute Volume', data.job_id)
+    return True, node_id, fid, None, success_message('Compute Volume', data.job_id)
 
 
 def compute_flux(node_id, fid, data, aux_data, options, csv_separator):
@@ -776,19 +769,12 @@ def compute_flux(node_id, fid, data, aux_data, options, csv_separator):
         flux_type = FluxCalculator.MASS_FLUX
 
     # process output options
-    input_name = os.path.split(data.filename)[1][:-4]
-    if double_name:
-        output_name = input_name + '_' + data.job_id + suffix + '.csv'
-    else:
-        output_name = input_name + suffix + '.csv'
-    if in_source_folder:
-        filename = os.path.join(os.path.split(data.filename)[0], output_name)
-    else:
-        filename = os.path.join(dir_path, output_name)
+    filename = process_output_options(data.filename, data.job_id, '.csv',
+                                      suffix, in_source_folder, dir_path, double_name)
+
     if not overwrite:
         if os.path.exists(filename):
-            csv_data = CSVData(data.filename, None, filename)
-            return True, node_id, fid, csv_data, success_message('Compute Flux', data.job_id, 'reload existing file')
+            return True, node_id, fid, None, success_message('Compute Flux', data.job_id, 'file already exists')
     try:
         with open(filename, 'w') as f:
             pass
@@ -798,12 +784,11 @@ def compute_flux(node_id, fid, data, aux_data, options, csv_separator):
     # prepare the mesh
     mesh = TriangularVectorField(data.header, False)
 
-    if data.has_index:
+    if data.triangles:
         mesh.index = data.index
         mesh.triangles = data.triangles
     else:
         construct_mesh(mesh)
-        data.has_index = True
         data.index = mesh.index
         data.triangles = mesh.triangles
 
@@ -824,7 +809,7 @@ def compute_flux(node_id, fid, data, aux_data, options, csv_separator):
             csv_data.add_row(row)
 
     csv_data.write(filename, csv_separator)
-    return True, node_id, fid, csv_data, success_message('Compute Flux', data.job_id)
+    return True, node_id, fid, None, success_message('Compute Flux', data.job_id)
 
 
 def interpolate_points(node_id, fid, data, aux_data, options, csv_separator):
@@ -839,21 +824,13 @@ def interpolate_points(node_id, fid, data, aux_data, options, csv_separator):
 
     # process options
     suffix, in_source_folder, dir_path, double_name, overwrite = options
+    filename = process_output_options(data.filename, data.job_id, '.csv',
+                                      suffix, in_source_folder, dir_path, double_name)
 
-    input_name = os.path.split(data.filename)[1][:-4]
-    if double_name:
-        output_name = input_name + '_' + data.job_id + suffix + '.csv'
-    else:
-        output_name = input_name + suffix + '.csv'
-    if in_source_folder:
-        filename = os.path.join(os.path.split(data.filename)[0], output_name)
-    else:
-        filename = os.path.join(dir_path, output_name)
     if not overwrite:
         if os.path.exists(filename):
-            csv_data = CSVData(data.filename, None, filename)
-            return True, node_id, fid, csv_data, success_message('Interpolate on Points', data.job_id,
-                                                                 'reload existing file')
+            return True, node_id, fid, None, success_message('Interpolate on Points', data.job_id,
+                                                             'file already exists')
     try:
         with open(filename, 'w') as f:
             pass
@@ -863,12 +840,11 @@ def interpolate_points(node_id, fid, data, aux_data, options, csv_separator):
     # prepare the mesh
     mesh = MeshInterpolator(data.header, False)
 
-    if data.has_index:
+    if data.triangles:
         mesh.index = data.index
         mesh.triangles = data.triangles
     else:
         construct_mesh(mesh)
-        data.has_index = True
         data.index = mesh.index
         data.triangles = mesh.triangles
 
@@ -879,6 +855,7 @@ def interpolate_points(node_id, fid, data, aux_data, options, csv_separator):
     point_interpolators = [p for i, p in enumerate(point_interpolators) if is_inside[i]]
     nb_inside = sum(map(int, is_inside))
     if nb_inside == 0:
+        os.remove(filename)
         return False, node_id, fid, None, fail_message('no point inside the mesh', 'Interpolate on Points', data.job_id)
 
     # do calculation
@@ -907,7 +884,7 @@ def interpolate_points(node_id, fid, data, aux_data, options, csv_separator):
             csv_data.add_row(row)
 
     csv_data.write(filename, csv_separator)
-    return True, node_id, fid, csv_data, \
+    return True, node_id, fid, None, \
                  success_message('Interpolate on Points', data.job_id, 
                                  '%s point%s inside the mesh' % (nb_inside, 's are' if nb_inside > 1 else ' is'))
 
@@ -924,21 +901,12 @@ def interpolate_lines(node_id, fid, data, aux_data, options, csv_separator):
 
     # process options
     suffix, in_source_folder, dir_path, double_name, overwrite = options
-
-    input_name = os.path.split(data.filename)[1][:-4]
-    if double_name:
-        output_name = input_name + '_' + data.job_id + suffix + '.csv'
-    else:
-        output_name = input_name + suffix + '.csv'
-    if in_source_folder:
-        filename = os.path.join(os.path.split(data.filename)[0], output_name)
-    else:
-        filename = os.path.join(dir_path, output_name)
+    filename = process_output_options(data.filename, data.job_id, '.csv',
+                                      suffix, in_source_folder, dir_path, double_name)
     if not overwrite:
         if os.path.exists(filename):
-            csv_data = CSVData(data.filename, None, filename)
-            return True, node_id, fid, csv_data, success_message('Interpolate along Lines', data.job_id,
-                                                                 'reload existing file')
+            return True, node_id, fid, None, success_message('Interpolate along Lines', data.job_id,
+                                                             'file already exists')
     try:
         with open(filename, 'w') as f:
             pass
@@ -948,12 +916,11 @@ def interpolate_lines(node_id, fid, data, aux_data, options, csv_separator):
     # prepare the mesh
     mesh = MeshInterpolator(data.header, False)
 
-    if data.has_index:
+    if data.triangles:
         mesh.index = data.index
         mesh.triangles = data.triangles
     else:
         construct_mesh(mesh)
-        data.has_index = True
         data.index = mesh.index
         data.triangles = mesh.triangles
 
@@ -961,6 +928,7 @@ def interpolate_lines(node_id, fid, data, aux_data, options, csv_separator):
     lines = aux_data.lines
     nb_nonempty, indices_nonempty, line_interpolators, _ = mesh.get_line_interpolators(lines)
     if nb_nonempty == 0:
+        os.remove(filename)
         return False, node_id, fid, None, fail_message('no polyline intersects the mesh continuously', 
                                                        'Interpolate along Lines', data.job_id)
 
@@ -977,9 +945,10 @@ def interpolate_lines(node_id, fid, data, aux_data, options, csv_separator):
             csv_data.add_row(row)
 
     csv_data.write(filename, csv_separator)
-    return True, node_id, fid, csv_data, \
-                 success_message('Interpolate along Lines', data.job_id, 
-                                 '%s line%s the mesh continuously' % (nb_nonempty, 's intersect' if nb_nonempty > 1 else ' intersects'))
+    return True, node_id, fid, None, \
+           success_message('Interpolate along Lines', data.job_id,
+                           '%s line%s the mesh continuously' % (nb_nonempty,
+                                                                's intersect' if nb_nonempty > 1 else ' intersects'))
 
 
 def project_lines(node_id, fid, data, aux_data, options, csv_separator):
@@ -1001,19 +970,11 @@ def project_lines(node_id, fid, data, aux_data, options, csv_separator):
         return False, node_id, fid, None, fail_message('reference line not found (wrong polyline file?)',
                                                        'Project Lines', data.job_id)
 
-    input_name = os.path.split(data.filename)[1][:-4]
-    if double_name:
-        output_name = input_name + '_' + data.job_id + suffix + '.csv'
-    else:
-        output_name = input_name + suffix + '.csv'
-    if in_source_folder:
-        filename = os.path.join(os.path.split(data.filename)[0], output_name)
-    else:
-        filename = os.path.join(dir_path, output_name)
+    filename = process_output_options(data.filename, data.job_id, '.csv',
+                                      suffix, in_source_folder, dir_path, double_name)
     if not overwrite:
         if os.path.exists(filename):
-            csv_data = CSVData(data.filename, None, filename)
-            return True, node_id, fid, csv_data, success_message('Project Lines', data.job_id, 'reload existing file')
+            return True, node_id, fid, None, success_message('Project Lines', data.job_id, 'file already exists')
     try:
         with open(filename, 'w') as f:
             pass
@@ -1023,21 +984,22 @@ def project_lines(node_id, fid, data, aux_data, options, csv_separator):
     # prepare the mesh
     mesh = MeshInterpolator(data.header, False)
 
-    if data.has_index:
+    if data.triangles:
         mesh.index = data.index
         mesh.triangles = data.triangles
     else:
         construct_mesh(mesh)
-        data.has_index = True
         data.index = mesh.index
         data.triangles = mesh.triangles
 
     # process the line
     nb_nonempty, indices_nonempty, line_interpolators, _ = mesh.get_line_interpolators(lines)
     if nb_nonempty == 0:
+        os.remove(filename)
         return False, node_id, fid, None, fail_message('no polyline intersects the mesh continuously',
                                                        'Project Lines', data.job_id)
     elif reference_index not in indices_nonempty:
+        os.remove(filename)
         return False, node_id, fid, None, fail_message('the reference line does not intersect the mesh continuously ',
                                                        'Project Lines', data.job_id)
 
@@ -1172,23 +1134,12 @@ def write_landxml(node_id, fid, data, options):
     selected_var = available_var[0]
 
     suffix, in_source_folder, dir_path, double_name, overwrite = options
-    input_name = os.path.split(data.filename)[1][:-4]
-    if double_name:
-        output_name = input_name + '_' + data.job_id + suffix + '.xml'
-    else:
-        output_name = input_name + suffix + '.xml'
-
-    if in_source_folder:
-        path = os.path.join(os.path.split(data.filename)[0], 'gis')
-        if not os.path.exists(path):
-            os.mkdir(path)
-        filename = os.path.join(os.path.split(data.filename)[0], output_name)
-    else:
-        filename = os.path.join(dir_path, output_name)
+    filename = process_geom_output_options(data.filename, data.job_id, '.xml',
+                                           suffix, in_source_folder, dir_path, double_name)
 
     if not overwrite:
         if os.path.exists(filename):
-            return True, node_id, fid, None, success_message('Write LandXML', data.job_id, 'use existing file')
+            return True, node_id, fid, None, success_message('Write LandXML', data.job_id, 'file already exists')
     try:
         with open(filename, 'w') as f:
             pass
@@ -1214,23 +1165,12 @@ def write_shp(node_id, fid, data, options):
     selected_frame = data.selected_time_indices[0]
 
     suffix, in_source_folder, dir_path, double_name, overwrite = options
-    input_name = os.path.split(data.filename)[1][:-4]
-    if double_name:
-        output_name = input_name + '_' + data.job_id + suffix + '.shp'
-    else:
-        output_name = input_name + suffix + '.shp'
-
-    if in_source_folder:
-        path = os.path.join(os.path.split(data.filename)[0], 'gis')
-        if not os.path.exists(path):
-            os.mkdir(path)
-        filename = os.path.join(os.path.split(data.filename)[0], output_name)
-    else:
-        filename = os.path.join(dir_path, output_name)
+    filename = process_geom_output_options(data.filename, data.job_id, '.shp',
+                                           suffix, in_source_folder, dir_path, double_name)
 
     if not overwrite:
         if os.path.exists(filename):
-            return True, node_id, fid, None, success_message('Write shp', data.job_id, 'use existing file')
+            return True, node_id, fid, None, success_message('Write shp', data.job_id, 'file already exists')
     try:
         with open(filename, 'w') as f:
             pass

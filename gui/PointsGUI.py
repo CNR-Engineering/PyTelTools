@@ -632,8 +632,8 @@ class ImageTab(TemporalPlotViewer):
     def replot(self):
         self.canvas.axes.clear()
         for point in self.current_columns:
-            self.canvas.axes.plot(self.time[self.timeFormat], self.data[self._to_column(point)], '-', color=self.column_colors[point],
-                                  linewidth=2, label=self.column_labels[point])
+            self.canvas.axes.plot(self.time[self.timeFormat], self.data[self._to_column(point)], '-',
+                                  color=self.column_colors[point], linewidth=2, label=self.column_labels[point])
         self.canvas.axes.legend()
         self.canvas.axes.grid(linestyle='dotted')
         self.canvas.axes.set_xlabel(self.current_xlabel)

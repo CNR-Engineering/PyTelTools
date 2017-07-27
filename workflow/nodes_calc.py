@@ -3,7 +3,7 @@ from PyQt5.QtCore import *
 import os
 
 from workflow.Node import Node, OneInOneOutNode, TwoInOneOutNode
-from workflow.util import OutputOptionPanel
+from workflow.util import OutputOptionPanel, process_output_options
 from workflow.datatypes import CSVData
 from slf import Serafin
 from slf.volume import TruncatedTriangularPrisms, VolumeCalculator
@@ -515,12 +515,11 @@ class ComputeVolumeNode(TwoInOneOutNode):
         self.progress_bar.setVisible(True)
         mesh = TruncatedTriangularPrisms(self.in_data.header, False)
 
-        if self.in_data.has_index:
+        if self.in_data.triangles:
             mesh.index = self.in_data.index
             mesh.triangles = self.in_data.triangles
         else:
             self.construct_mesh(mesh)
-            self.in_data.has_index = True
             self.in_data.index = mesh.index
             self.in_data.triangles = mesh.triangles
         
@@ -563,17 +562,15 @@ class ComputeVolumeNode(TwoInOneOutNode):
             return
 
         self.in_data = self.first_in_port.mother.parentItem().data
-        input_name = os.path.split(self.in_data.filename)[1][:-4]
-        if self.double_name:
-            output_name = input_name + '_' + self.in_data.job_id + self.suffix + '.csv'
-        else:
-            output_name = input_name + self.suffix + '.csv'
-        if self.in_source_folder:
-            filename = os.path.join(os.path.split(self.in_data.filename)[0], output_name)
-        else:
-            filename = os.path.join(self.dir_path, output_name)
+        filename = process_output_options(self.in_data.filename, self.in_data.job_id, '.csv',
+                                          self.suffix, self.in_source_folder, self.dir_path, self.double_name)
         if not self.overwrite:
             if os.path.exists(filename):
+                try:
+                    with open(filename, 'r') as f:
+                        pass
+                except PermissionError:
+                    self.fail('Access denied when reloading existing file.')
                 self.data = CSVData(self.in_data.filename, None, filename)
                 self.data.metadata = {'var': self.first_var, 'second var': self.second_var,
                                       'start time': self.in_data.start_time, 'language': self.in_data.language}
@@ -819,12 +816,11 @@ class ComputeFluxNode(TwoInOneOutNode):
         self.progress_bar.setVisible(True)
         mesh = TriangularVectorField(self.in_data.header, False)
 
-        if self.in_data.has_index:
+        if self.in_data.triangles:
             mesh.index = self.in_data.index
             mesh.triangles = self.in_data.triangles
         else:
             self.construct_mesh(mesh)
-            self.in_data.has_index = True
             self.in_data.index = mesh.index
             self.in_data.triangles = mesh.triangles
     
@@ -866,17 +862,15 @@ class ComputeFluxNode(TwoInOneOutNode):
             return
 
         self.in_data = self.first_in_port.mother.parentItem().data
-        input_name = os.path.split(self.in_data.filename)[1][:-4]
-        if self.double_name:
-            output_name = input_name + '_' + self.in_data.job_id + self.suffix + '.csv'
-        else:
-            output_name = input_name + self.suffix + '.csv'
-        if self.in_source_folder:
-            filename = os.path.join(os.path.split(self.in_data.filename)[0], output_name)
-        else:
-            filename = os.path.join(self.dir_path, output_name)
+        filename = process_output_options(self.in_data.filename, self.in_data.job_id, '.csv',
+                                          self.suffix, self.in_source_folder, self.dir_path, self.double_name)
         if not self.overwrite:
             if os.path.exists(filename):
+                try:
+                    with open(filename, 'r') as f:
+                        pass
+                except PermissionError:
+                    self.fail('Access denied when reloading existing file.')
                 self.data = CSVData(self.in_data.filename, None, filename)
                 self.data.metadata = {'flux title': self.flux_options,
                                       'language': self.in_data.language, 'start time': self.in_data.start_time,
@@ -954,12 +948,11 @@ class InterpolateOnPointsNode(TwoInOneOutNode):
 
         mesh = MeshInterpolator(self.in_data.header, False)
 
-        if self.in_data.has_index:
+        if self.in_data.triangles:
             mesh.index = self.in_data.index
             mesh.triangles = self.in_data.triangles
         else:
             self.construct_mesh(mesh)
-            self.in_data.has_index = True
             self.in_data.index = mesh.index
             self.in_data.triangles = mesh.triangles
 
@@ -1021,15 +1014,8 @@ class InterpolateOnPointsNode(TwoInOneOutNode):
             self.fail('no variable available.')
             return
 
-        input_name = os.path.split(self.in_data.filename)[1][:-4]
-        if self.double_name:
-            output_name = input_name + '_' + self.in_data.job_id + self.suffix + '.csv'
-        else:
-            output_name = input_name + self.suffix + '.csv'
-        if self.in_source_folder:
-            filename = os.path.join(os.path.split(self.in_data.filename)[0], output_name)
-        else:
-            filename = os.path.join(self.dir_path, output_name)
+        filename = process_output_options(self.in_data.filename, self.in_data.job_id, '.csv',
+                                          self.suffix, self.in_source_folder, self.dir_path, self.double_name)
 
         points, point_interpolators, is_inside, nb_inside = self._prepare_points()
         if is_inside == 0:
@@ -1038,6 +1024,11 @@ class InterpolateOnPointsNode(TwoInOneOutNode):
 
         if not self.overwrite:
             if os.path.exists(filename):
+                try:
+                    with open(filename, 'r') as f:
+                        pass
+                except PermissionError:
+                    self.fail('Access denied when reloading existing file.')
                 self.data = CSVData(self.in_data.filename, None, filename)
                 self.data.metadata = {'start time': self.in_data.start_time, 'var IDs': selected_vars,
                                       'point indices': [i for i in range(len(points)) if is_inside[i]],
@@ -1111,12 +1102,11 @@ class InterpolateAlongLinesNode(TwoInOneOutNode):
         self.progress_bar.setVisible(True)
         mesh = MeshInterpolator(self.in_data.header, False)
 
-        if self.in_data.has_index:
+        if self.in_data.triangles:
             mesh.index = self.in_data.index
             mesh.triangles = self.in_data.triangles
         else:
             self.construct_mesh(mesh)
-            self.in_data.has_index = True
             self.in_data.index = mesh.index
             self.in_data.triangles = mesh.triangles
             
@@ -1163,18 +1153,16 @@ class InterpolateAlongLinesNode(TwoInOneOutNode):
             self.fail('no variable available.')
             return
 
-        input_name = os.path.split(self.in_data.filename)[1][:-4]
-        if self.double_name:
-            output_name = input_name + '_' + self.in_data.job_id + self.suffix + '.csv'
-        else:
-            output_name = input_name + self.suffix + '.csv'
-        if self.in_source_folder:
-            filename = os.path.join(os.path.split(self.in_data.filename)[0], output_name)
-        else:
-            filename = os.path.join(self.dir_path, output_name)
+        filename = process_output_options(self.in_data.filename, self.in_data.job_id, '.csv',
+                                          self.suffix, self.in_source_folder, self.dir_path, self.double_name)
 
         if not self.overwrite:
             if os.path.exists(filename):
+                try:
+                    with open(filename, 'r') as f:
+                        pass
+                except PermissionError:
+                    self.fail('Access denied when reloading existing file.')
                 self.data = CSVData(self.in_data.filename, None, filename)
                 self.success('Reload existing file.')
                 return
@@ -1190,6 +1178,7 @@ class InterpolateAlongLinesNode(TwoInOneOutNode):
             self.data.write(filename, self.scene().csv_separator)
             self.success('Output saved to %s\n' % filename + message)
         else:
+            os.remove(filename)
             self.fail(message)
 
 
@@ -1335,18 +1324,16 @@ class ProjectLinesNode(TwoInOneOutNode):
         time_index = input_data.selected_time_indices[0]
         selected_vars = [var for var in input_data.header.var_IDs if var in input_data.selected_vars]
 
-        input_name = os.path.split(input_data.filename)[1][:-4]
-        if self.double_name:
-            output_name = input_name + '_' + input_data.job_id + self.suffix + '.csv'
-        else:
-            output_name = input_name + self.suffix + '.csv'
-        if self.in_source_folder:
-            filename = os.path.join(os.path.split(input_data.filename)[0], output_name)
-        else:
-            filename = os.path.join(self.dir_path, output_name)
+        filename = process_output_options(input_data.filename, input_data.job_id, '.csv',
+                                          self.suffix, self.in_source_folder, self.dir_path, self.double_name)
 
         if not self.overwrite:
             if os.path.exists(filename):
+                try:
+                    with open(filename, 'r') as f:
+                        pass
+                except PermissionError:
+                    self.fail('Access denied when reloading existing file.')
                 self.data = CSVData(input_data.filename, None, filename)
                 self.success('Reload existing file.')
                 return
@@ -1361,20 +1348,22 @@ class ProjectLinesNode(TwoInOneOutNode):
 
         lines = self.second_in_port.mother.parentItem().data.lines
         mesh = MeshInterpolator(input_data.header, False)
-        if input_data.has_index:
+
+        if input_data.triangles:
             mesh.index = input_data.index
             mesh.triangles = input_data.triangles
         else:
             self.construct_mesh(mesh)
-            input_data.has_index = True
             input_data.index = mesh.index
             input_data.triangles = mesh.triangles
 
         nb_nonempty, indices_nonempty, line_interpolators, _ = mesh.get_line_interpolators(lines)
         if nb_nonempty == 0:
+            os.remove(filename)
             self.fail('no polyline intersects the mesh continuously.')
             return
         elif self.reference_index not in indices_nonempty:
+            os.remove(filename)
             self.fail('the reference line does not intersect the mesh continuously.')
             return
 

@@ -17,9 +17,7 @@ from matplotlib.figure import Figure
 from matplotlib.collections import PatchCollection
 from descartes import PolygonPatch
 from matplotlib import cm
-import matplotlib.tri as tri
 import matplotlib.lines as mlines
-
 from matplotlib.colors import Normalize, colorConverter
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
@@ -1040,20 +1038,26 @@ class ConditionDialog(QDialog):
 
 
 class PlotColumnsSelector(QDialog):
-    def __init__(self, columns, current_columns, name):
+    def __init__(self, columns, current_columns, name, unique_selection):
         super().__init__()
         self.name = name
         self.plural = str(''.join([name, 's']))
+        self.unique = unique_selection
 
         self.list = QListWidget()
         for name in columns:
-            item = QListWidgetItem(name)
-            item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
-            if name in current_columns:
-                item.setCheckState(Qt.Checked)
-            else:
-                item.setCheckState(Qt.Unchecked)
+            item = QListWidgetItem('    ' + name)
+            if not self.unique:
+                item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
+                if name in current_columns:
+                    item.setCheckState(Qt.Checked)
+                else:
+                    item.setCheckState(Qt.Unchecked)
             self.list.addItem(item)
+            if self.unique:
+                self.list.setItemWidget(item, QRadioButton())
+                if name in current_columns:
+                    self.list.itemWidget(item).setChecked(True)
 
         self.selection = tuple([])
 
@@ -1062,12 +1066,13 @@ class PlotColumnsSelector(QDialog):
         buttons.accepted.connect(self.checkSelection)
         buttons.rejected.connect(self.reject)
         vlayout = QVBoxLayout()
-        vlayout.addWidget(QLabel('  Select up to 10 %s to plot' % self.plural))
+        vlayout.addWidget(QLabel('  Select up to 10 %s to plot' % self.plural if not self.unique else
+                                 '  Select a single %s to plot' % self.name))
         vlayout.addWidget(self.list)
         vlayout.addWidget(buttons)
         self.setLayout(vlayout)
 
-        self.setWindowTitle('Select %s to plot' % self.plural)
+        self.setWindowTitle('Select %s to plot' % (self.name if self.unique else self.plural))
         self.resize(self.sizeHint())
         self.setMinimumWidth(300)
 
@@ -1075,8 +1080,12 @@ class PlotColumnsSelector(QDialog):
         selection = []
         for row in range(self.list.count()):
             item = self.list.item(row)
-            if item.checkState() == Qt.Checked:
-                selection.append(item.text())
+            if not self.unique:
+                if item.checkState() == Qt.Checked:
+                    selection.append(item.text().strip())
+            else:
+                if self.list.itemWidget(item).isChecked():
+                    selection.append(item.text().strip())
         return tuple(selection)
 
     def checkSelection(self):
@@ -1562,6 +1571,7 @@ class TemporalPlotViewer(PlotViewer):
         self.language = 'fr'
 
         # initialize graphical parameters
+        self.time_seconds = []
         self.time = []
         self.current_columns = []
         self.column_labels = {}
@@ -1595,8 +1605,8 @@ class TemporalPlotViewer(PlotViewer):
             return 'Temps ({})'.format(['seconde', '', '', 'minute', 'heure', 'jour'][self.timeFormat])
         return 'Time ({})'.format(['second', '', '', 'minute', 'hour', 'day'][self.timeFormat])
 
-    def selectColumns(self):
-        msg = PlotColumnsSelector(self.columns, self.current_columns, self.column_name)
+    def selectColumns(self, unique_selection=False):
+        msg = PlotColumnsSelector(self.columns, self.current_columns, self.column_name, unique_selection)
         value = msg.exec_()
         if value == QDialog.Rejected:
             return
@@ -1664,7 +1674,7 @@ class TemporalPlotViewer(PlotViewer):
             QMessageBox.critical(self, 'Error', 'Invalid input.',
                                  QMessageBox.Ok)
             return
-        self.datetime = list(map(lambda x: self.start_time + datetime.timedelta(seconds=x), self.data['time']))
+        self.datetime = list(map(lambda x: self.start_time + datetime.timedelta(seconds=x), self.time_seconds))
         self.str_datetime = list(map(lambda x: x.strftime('%Y/%m/%d\n%H:%M'), self.datetime))
         self.str_datetime_bis = list(map(lambda x: x.strftime('%d/%m/%y\n%H:%M'), self.datetime))
         self.replot()

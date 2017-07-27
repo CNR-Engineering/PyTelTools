@@ -2,12 +2,17 @@ import os
 import datetime
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib import cm
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 import pandas
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 
 from gui.util import TemporalPlotViewer, PointLabelEditor
+from workflow.datatypes import SerafinData
+from slf import Serafin
+from slf.interpolation import MeshInterpolator
 from slf.volume import VolumeCalculator
 
 
@@ -189,11 +194,12 @@ class GeomOutputOptionPanel(OutputOptionPanel):
 
 
 class MultiSaveDialog(QDialog):
-    def __init__(self, old_options):
+    def __init__(self, suffix):
         super().__init__()
         buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel,
                                    Qt.Horizontal, self)
-        self.panel = OutputOptionPanel(old_options)
+        self.panel = OutputOptionPanel([suffix, True, '', False, False])
+
         buttons.accepted.connect(self.check)
         buttons.rejected.connect(self.reject)
 
@@ -214,6 +220,13 @@ class MultiSaveDialog(QDialog):
         elif success_code == 1:
             return
         self.reject()
+
+
+class MultiFigureSaveDialog(MultiSaveDialog):
+    def __init__(self, suffix):
+        super().__init__(suffix)
+        self.panel.overwrite_button.setChecked(True)
+        self.panel.no_button.setEnabled(False)
 
 
 class MultiLoadDialog(QDialog):
@@ -598,6 +611,7 @@ class VolumePlotViewer(TemporalPlotViewer):
             for j, item in enumerate(row):
                 self.data[header[j]].append(float(item))
         self.data['time'] = np.array(self.data['time'])
+        self.time_seconds = self.data['time']
 
         self.start_time = csv_data.metadata['start time']
         self.current_columns = ('Polygon 1',)
@@ -707,6 +721,7 @@ class FluxPlotViewer(TemporalPlotViewer):
                 self.data[header[j]].append(float(item))
         for item in header:
             self.data[item] = np.array(self.data[item])
+        self.time_seconds = self.data['time']
 
         self.flux_title = csv_data.metadata['flux title']
         self.start_time = csv_data.metadata['start time']
@@ -846,6 +861,7 @@ class PointPlotViewer(TemporalPlotViewer):
                 self.data[header[j]].append(float(item))
         for item in header:
             self.data[item] = np.array(self.data[item])
+        self.time_seconds = self.data['time']
 
         self.var_IDs = csv_data.metadata['var IDs']
         self.current_var = self.var_IDs[0]
@@ -879,6 +895,240 @@ class PointPlotViewer(TemporalPlotViewer):
                                    self.current_xlabel, self.current_ylabel, self.current_title, self.timeFormat,
                                    self.start_time, [self._to_column(p) for p in self.current_columns])
         dlg.exec_()
+
+
+class ColorMapStyleDialog(QDialog):
+    def __init__(self, parent):
+        super().__init__()
+        self.parent = parent
+        self.color_box = QComboBox()
+        self.color_box.setFixedHeight(30)
+        for name in self.parent.color_styles:
+            self.color_box.addItem(name)
+        self.color_box.setCurrentIndex(self.parent.color_styles.index(self.parent.current_style))
+        self.buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel,
+                                        Qt.Horizontal, self)
+        apply_button = QPushButton('Apply')
+        self.buttons.addButton(apply_button, QDialogButtonBox.ApplyRole)
+        self.buttons.accepted.connect(self.accept)
+        self.buttons.rejected.connect(self.reject)
+        apply_button.clicked.connect(lambda: self.parent.change_color(self.color_box.currentText()))
+
+        vlayout = QVBoxLayout()
+        vlayout.setSpacing(10)
+        vlayout.addWidget(QLabel('Select a colormap style'))
+        vlayout.addWidget(self.color_box)
+        vlayout.addStretch()
+        vlayout.addWidget(self.buttons)
+        self.setLayout(vlayout)
+        self.setWindowTitle('Change colormap style')
+        self.resize(300, 150)
+
+
+class VerticalProfilePlotViewer(TemporalPlotViewer):
+    def __init__(self):
+        super().__init__('point')
+        self.data = None
+        self.current_var = ''
+        self.points = []
+        self.point_interpolators = []
+        self.indices = []
+        self.y, self.z = [], []
+        self.triangles = []
+        self.n, self.k, self.m = -1, -1, -1
+        self.clim = None
+        self.cmap = None
+        self.current_style = 'viridis'
+        self.color_styles = ['viridis', 'plasma', 'inferno', 'magma',
+                             'Greys', 'Purples', 'Blues', 'Greens', 'Oranges', 'Reds',
+                             'YlOrBr', 'YlOrRd', 'OrRd', 'PuRd', 'RdPu', 'BuPu',
+                             'GnBu', 'PuBu', 'YlGnBu', 'PuBuGn', 'BuGn', 'YlGn']
+
+        self.select_variable = QAction('Select\nvariable', self, triggered=self.selectVariableEvent,
+                                       icon=self.style().standardIcon(QStyle.SP_FileDialogDetailedView))
+        self.change_color_style_act = QAction('Change\ncolor style', self, triggered=self.change_color_style,
+                                              icon=self.style().standardIcon(QStyle.SP_DialogHelpButton))
+        self.change_color_range_act = QAction('Change\ncolor range', self, triggered=self.change_color_range,
+                                              icon=self.style().standardIcon(QStyle.SP_DialogHelpButton))
+        self.current_columns = ('Point 1',)
+        self.toolBar.addAction(self.select_variable)
+        self.toolBar.addAction(self.selectColumnsAct)
+        self.toolBar.addSeparator()
+        self.toolBar.addAction(self.change_color_style_act)
+        self.toolBar.addAction(self.change_color_range_act)
+        self.toolBar.addSeparator()
+        self.toolBar.addAction(self.convertTimeAct)
+        self.toolBar.addAction(self.changeDateAct)
+
+        self.data_menu = QMenu('&Data', self)
+        self.data_menu.addAction(self.select_variable)
+        self.data_menu.addAction(self.selectColumnsAct)
+        self.menuBar.addMenu(self.data_menu)
+
+        self.color_menu = QMenu('&Colors', self)
+        self.color_menu.addAction(self.change_color_style_act)
+        self.color_menu.addAction(self.change_color_range_act)
+        self.menuBar.addMenu(self.color_menu)
+
+    def selectColumns(self, unique_selection=False):
+        super().selectColumns(True)
+
+    def _defaultTitle(self):
+        value = {'fr': 'Valeurs', 'en': 'Values'}[self.language]
+        of = {'fr': 'de', 'en': 'of'}[self.language]
+        at = {'fr': 'au', 'en': 'at'}[self.language]
+        return '%s %s %s %s %s' % (value, of, self.current_var, at, self.current_columns[0])
+
+    def _defaultYLabel(self):
+        return {'fr': 'Cote Z', 'en': 'Elevation Z'}[self.language]
+
+    def selectVariableEvent(self):
+        msg = QDialog()
+        combo = QComboBox()
+        combo.setFixedHeight(30)
+        variables = [var for var in self.data.header.var_IDs if var != 'Z']
+        names = [name.decode('utf-8').strip() for var, name in zip(self.data.header.var_IDs,
+                                                                   self.data.header.var_names) if var in variables]
+        for var, name in zip(variables, names):
+            combo.addItem(var + ' (%s)' % name)
+        combo.setCurrentIndex(variables.index(self.current_var))
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel,
+                                   Qt.Horizontal, msg)
+        buttons.accepted.connect(msg.accept)
+        buttons.rejected.connect(msg.reject)
+        vlayout = QVBoxLayout()
+        vlayout.setSpacing(10)
+        vlayout.addWidget(QLabel('Select a variable'))
+        vlayout.addWidget(combo)
+        vlayout.addStretch()
+        vlayout.addWidget(buttons)
+        msg.setLayout(vlayout)
+        msg.setWindowTitle('Select a variable to plot')
+        msg.resize(300, 150)
+        msg.exec_()
+        self.current_var = combo.currentText().split(' (')[0]
+        self.current_ylabel = self._defaultYLabel()
+        self.clim = None
+        self.replot()
+
+    def change_color(self, style):
+        self.current_style = style
+        self.replot(False)
+
+    def change_color_style(self):
+        msg = ColorMapStyleDialog(self)
+        if msg.exec_() == QDialog.Accepted:
+            self.change_color(msg.color_box.currentText())
+
+    def change_color_range(self):
+        value, ok = QInputDialog.getText(None, 'Change color bar range',
+                                         'Enter the new color range',
+                                         text=', '.join(map(lambda x: '{:+f}'.format(x),
+                                                            self.cmap.get_clim())))
+        if not ok:
+            return
+        try:
+            cmin, cmax = map(float, value.split(','))
+        except ValueError:
+            QMessageBox.critical(self, 'Error', 'Invalid input.', QMessageBox.Ok)
+            return
+
+        self.clim = (cmin, cmax)
+        self.replot(False)
+
+    def compute(self):
+        (a, b, c), interpolator = self.point_interpolators[int(self.current_columns[0].split()[1])-1]
+
+        with Serafin.Read(self.data.filename, self.data.language) as input_stream:
+            input_stream.header = self.data.header
+            input_stream.time = self.data.time
+
+            point_y = np.empty((self.n, self.k))
+            point_values = np.empty((self.n, self.k))
+
+            for i in range(self.n):
+                z = input_stream.read_var_in_frame(i, 'Z').reshape((self.k, self.m))
+                values = input_stream.read_var_in_frame(i, self.current_var).reshape((self.k, self.m))
+
+                for j in range(self.k):
+                    point_y[i, j] = z[j, [a, b, c]].dot(interpolator)
+                    point_values[i, j] = values[j, [a, b, c]].dot(interpolator)
+
+        y = point_y.flatten()
+        z = point_values.flatten()
+        return y, z
+
+    def replot(self, compute=True):
+        if compute:
+            self.y, self.z = self.compute()
+
+        self.canvas.figure.clear()   # remove the old color bar
+        self.canvas.axes = self.canvas.figure.add_subplot(111)
+        if self.clim is not None:
+            self.canvas.axes.tripcolor(self.time[self.timeFormat], self.y, self.triangles, self.z,
+                                       cmap=self.current_style,
+                                       vmin=self.clim[0], vmax=self.clim[1])
+        else:
+            self.canvas.axes.tripcolor(self.time[self.timeFormat], self.y, self.triangles, self.z,
+                                       cmap=self.current_style)
+
+        divider = make_axes_locatable(self.canvas.axes)
+        cax = divider.append_axes('right', size='5%', pad=0.2)
+        self.cmap = cm.ScalarMappable(cmap=self.current_style)
+        if self.clim is not None:
+            self.cmap.set_array(np.linspace(self.clim[0], self.clim[1], 1000))
+        else:
+            self.cmap.set_array(np.linspace(np.min(self.z), np.max(self.z), 1000))
+        self.canvas.figure.colorbar(self.cmap, cax=cax)
+
+        self.canvas.axes.set_xlabel(self.current_xlabel)
+        self.canvas.axes.set_ylabel(self.current_ylabel)
+        self.canvas.axes.set_title(self.current_title)
+        if self.timeFormat in [1, 2]:
+            self.canvas.axes.set_xticklabels(self.str_datetime if self.timeFormat == 1 else self.str_datetime_bis)
+            for label in self.canvas.axes.get_xticklabels():
+                label.set_rotation(45)
+                label.set_fontsize(8)
+        self.canvas.draw()
+
+    def get_data(self, data, points, point_interpolators, indices):
+        self.data = data
+        self.points = points
+        self.point_interpolators = point_interpolators
+        self.indices = indices
+
+        self.current_var = [var for var in self.data.header.var_IDs if var != 'Z'][0]
+        self.columns = ['Point %d' % (i+1) for i in self.indices]
+        self.current_columns = self.columns[0:1]
+        self.column_labels = {x: x for x in self.columns}
+        self.column_colors = {x: None for x in self.columns}
+        for i in range(min(len(self.columns), len(self.defaultColors))):
+            self.column_colors[self.columns[i]] = self.defaultColors[i]
+
+        self.start_time = self.data.start_time
+        self.datetime = list(map(lambda x: self.start_time + datetime.timedelta(seconds=x), self.data.time))
+        self.str_datetime = list(map(lambda x: x.strftime('%Y/%m/%d\n%H:%M'), self.datetime))
+        self.str_datetime_bis = list(map(lambda x: x.strftime('%d/%m/%y\n%H:%M'), self.datetime))
+
+        # initialize the plot
+        self.language = self.data.language
+
+        self.current_xlabel = self._defaultXLabel()
+        self.current_ylabel = self._defaultYLabel()
+        self.current_title = self._defaultTitle()
+
+        self.n, self.k, self.m = len(self.data.time), self.data.header.nb_planes, self.data.header.nb_nodes_2d
+        point_x = np.array([[self.data.time[i]] * self.k for i in range(self.n)])
+        point_x = point_x.flatten()
+        self.time_seconds = np.array(self.data.time)
+        self.time = [point_x, point_x, point_x,
+                     point_x / 60, point_x / 3600, point_x / 86400]
+
+        self.triangles = [(i*self.k+j, i*self.k+j+1, i*self.k+j+1-self.k)
+                          for i in range(1, self.n) for j in range(self.k-1)] + \
+                         [(i*self.k+j, i*self.k+j-self.k, i*self.k+j+1-self.k)
+                          for i in range(1, self.n) for j in range(self.k-1)]
+        self.replot()
 
 
 class MultiSaveTemporalPlotDialog(QDialog):
@@ -962,7 +1212,7 @@ class MultiSaveTemporalPlotDialog(QDialog):
 
     def build_third_page(self):
         third_page = QWidget()
-        self.output_panel = OutputOptionPanel(['_plot', True, '', '', True])
+        self.output_panel = OutputOptionPanel(['_plot', True, '', False, True])
         self.output_panel.no_button.setEnabled(False)
         back_button = QPushButton('Back')
         ok_button = QPushButton('OK')
@@ -1020,16 +1270,9 @@ class MultiSaveTemporalPlotDialog(QDialog):
     def run(self):
         if not self.out_names:
             suffix, in_source_folder, dir_path, double_name, _ = self.output_panel.get_options()
-
             for path, job_id in zip(self.dir_paths, self.job_ids):
-                if double_name:
-                    output_name = self.csv_name[:-4] + '_' + job_id + suffix + '.png'
-                else:
-                    output_name = self.csv_name[:-4] + suffix + '.png'
-                if in_source_folder:
-                    filename = os.path.join(path, output_name)
-                else:
-                    filename = os.path.join(dir_path, output_name)
+                filename = process_output_options(os.path.join(path, self.csv_name), job_id, '.png',
+                                                  suffix, in_source_folder, dir_path, double_name)
                 self.out_names.append(filename)
 
         self.plot()
@@ -1150,18 +1393,19 @@ class MultiSavePointDialog(MultiSaveTemporalPlotDialog):
             fig.savefig(png_name, dpi=100)
 
 
-class MultiPlotDialog(QDialog):
-    def __init__(self, parent, name, tasks, input_options, output_options, compute_options):
+class MultiInterpolationPlotDialog(QDialog):
+    def __init__(self, parent, name, input_options, output_options, compute_options):
         super().__init__()
         self.parent = parent
         self.compute_options = compute_options
+        self.lines = []
 
         self.table = QTableWidget()
         self.table.setRowCount(len(input_options[0]))
-        self.table.setColumnCount(len(tasks)+1)
+        self.table.setColumnCount(4)
         self.table.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.table.horizontalHeader().setDefaultSectionSize(100)
-        self.table.setHorizontalHeaderLabels(['Job'] + tasks)
+        self.table.setHorizontalHeaderLabels(['Job', 'Load Serafin', 'Interpolation', 'Export PNG'])
 
         self.red = QColor(255, 160, 160, 255)
         self.green = QColor(180, 250, 165, 255)
@@ -1193,18 +1437,12 @@ class MultiPlotDialog(QDialog):
 
         # process IO options
         self.dir_paths, self.slf_name, self.job_ids = input_options
-        self.suffix, self.in_source_folder, self.dir_path, self.double_name, self.overwrite = output_options
+        suffix, in_source_folder, dir_path, double_name, _ = output_options
         self.png_names = []
         for path, job_id in zip(self.dir_paths, self.job_ids):
-            if self.double_name:
-                output_name = self.slf_name[:-4] + '_' + job_id + self.suffix + '.png'
-            else:
-                output_name = self.slf_name[:-4] + self.suffix + '.png'
-            if self.in_source_folder:
-                filename = os.path.join(path, output_name)
-            else:
-                filename = os.path.join(self.dir_path, output_name)
-            self.png_names.append(filename)
+            png_name = process_output_options(os.path.join(path, self.slf_name), job_id, '.png',
+                                              suffix, in_source_folder, dir_path, double_name)
+            self.png_names.append(png_name)
 
     def fail(self, i, j):
         self.table.item(i, j).setBackground(self.red)
@@ -1214,233 +1452,431 @@ class MultiPlotDialog(QDialog):
         self.table.item(i, j).setBackground(self.green)
         QApplication.processEvents()
 
+    def load(self, row, input_file, job_id, language):
+        try:
+            with open(input_file) as f:
+                pass
+        except PermissionError:
+            self.fail(row, 1)
+            return None
+        input_data = SerafinData(job_id, input_file, language)
+        if input_data.read():
+            return input_data
+        self.fail(row, 1)
+        return None
 
-class MultiSaveMultiVarLinePlotDialog(MultiPlotDialog):
+    def check_load(self, row, input_data):
+        pass
+
+    def build_mesh(self, input_data):
+        return MeshInterpolator(input_data.header, True)
+
+    def interpolate(self, row, input_mesh):
+        nb_nonempty, indices_nonempty, \
+                     line_interpolators, line_interpolators_internal = input_mesh.get_line_interpolators(self.lines)
+        if nb_nonempty == 0:
+            self.fail(row, 2)
+            return False, None, None
+        return True, line_interpolators, line_interpolators_internal
+
+    def check_interpolate(self, row, line_interpolators, line_interpolators_internal):
+        line_interpolator, distances = line_interpolators[self.line_id]
+        if not line_interpolator:
+            self.fail(row, 2)
+            return False, None, None, None, None
+        line_interpolator_internal, distances_internal = line_interpolators_internal[self.line_id]
+        self.success(row, 2)
+        return True, line_interpolator, distances, line_interpolator_internal, distances_internal
+
+    def first_step(self):
+        successful_input_data = []
+        successful_rows = []
+
+        for row, (dir_path, job_id) in enumerate(zip(self.dir_paths, self.job_ids)):
+            input_name = os.path.join(dir_path, self.slf_name)
+            input_data = self.load(row, input_name, job_id, self.language)
+            if input_data is None:
+                continue
+            success = self.check_load(row, input_data)
+            if not success:
+                continue
+            successful_rows.append(row)
+            successful_input_data.append(input_data)
+        return successful_rows, successful_input_data
+
+    def finishing_up(self, nb_successes):
+        if nb_successes == len(self.dir_paths):
+            QMessageBox.information(None, 'Success', 'Figures saved successfully',
+                                    QMessageBox.Ok)
+        else:
+            QMessageBox.information(None, 'Failed', 'Failed to produce all figures.',
+                                    QMessageBox.Ok)
+        self.btnClose.setEnabled(True)
+
+
+class MultiSaveMultiVarLinePlotDialog(MultiInterpolationPlotDialog):
     def __init__(self, parent, input_options, output_options, compute_options):
-        super().__init__(parent, 'MultiVar Line Plot', ['Load Serafin', 'Interpolation', 'Export PNG'],
+        super().__init__(parent, 'MultiVar Line Plot',
                          input_options, output_options, compute_options)
+        self.lines, self.line_id, self.time_index, self.current_vars, self.language = self.compute_options
+
+    def check_load(self, row, input_data):
+        # check time
+        if self.time_index >= len(input_data.time):
+            self.fail(row, 1)
+            return False
+        # check variables
+        for var in self.current_vars:
+            if var not in input_data.header.var_IDs:
+                self.fail(row, 1)
+                return False
+        self.success(row, 1)
+        return True
+
+    def compute(self, input_data, line_interpolator, line_interpolator_internal):
+        values = []
+        values_internal = []
+        with Serafin.Read(input_data.filename, input_data.language) as input_stream:
+            input_stream.header = input_data.header
+            input_stream.time = input_data.time
+            for var in self.current_vars:
+                line_var_values = []
+                line_var_values_internal = []
+                var_values = input_stream.read_var_in_frame(self.time_index, var)
+
+                for x, y, (i, j, k), interpolator in line_interpolator:
+                    line_var_values.append(interpolator.dot(var_values[[i, j, k]]))
+                values.append(line_var_values)
+
+                for x, y, (i, j, k), interpolator in line_interpolator_internal:
+                    line_var_values_internal.append(interpolator.dot(var_values[[i, j, k]]))
+                values_internal.append(line_var_values_internal)
+
+        return values, values_internal
 
     def run(self):
-        line_id, time_index, current_vars = self.compute_options
-        nb_success = 0
-        for i, (dir_path, job_id, png_name) in enumerate(zip(self.dir_paths, self.job_ids, self.png_names)):
-            # Load Serafin
-            input_name = os.path.join(dir_path, self.slf_name)
-            input_data = self.parent.open(job_id, input_name)
-            if input_data is None:
-                self.fail(i, 1)
+        # load serafin
+        successful_rows, successful_input_data = self.first_step()
+
+        nb_successes = 0
+        for row, input_data in zip(successful_rows, successful_input_data):
+            # interpolation
+            mesh = self.build_mesh(input_data)
+            success, line_interpolators, line_interpolators_internal = self.interpolate(row, mesh)
+            if not success:
                 continue
-            # check time
-            if time_index >= len(input_data.time):
-                self.fail(i, 1)
+
+            success, line_interpolator, distances, \
+                line_interpolator_internal, distances_internal = self.check_interpolate(row, line_interpolators,
+                                                                                        line_interpolators_internal)
+            if not success:
                 continue
-            # check variables
-            failed = False
-            for var in current_vars:
+
+            # export PNG
+            values, values_internal = self.compute(input_data, line_interpolator, line_interpolator_internal)
+            self.parent.plot(values, distances, values_internal, distances_internal,
+                             self.current_vars, self.png_names[row])
+            self.success(row, 3)
+            nb_successes += 1
+
+        self.finishing_up(nb_successes)
+
+
+class MultiSaveMultiFrameLinePlotDialog(MultiInterpolationPlotDialog):
+    def __init__(self, parent, input_options, output_options, compute_options):
+        super().__init__(parent, 'MultiVar Frame Plot',
+                         input_options, output_options, compute_options)
+        self.lines, self.line_id, self.current_var, self.time_indices, self.language = self.compute_options
+
+    def check_load(self, row, input_data):
+        # check variable
+        if self.current_var not in input_data.header.var_IDs:
+            self.fail(row, 1)
+            return False
+        # check time
+        for time_index in self.time_indices:
+            if time_index not in input_data.selected_time_indices:
+                self.fail(row, 1)
+                return False
+        self.success(row, 1)
+        return True
+
+    def compute(self, input_data, line_interpolator, line_interpolator_internal):
+        values = []
+        values_internal = []
+        with Serafin.Read(input_data.filename, input_data.language) as input_stream:
+            input_stream.header = input_data.header
+            input_stream.time = input_data.time
+            for index in self.time_indices:
+                line_var_values = []
+                line_var_values_internal = []
+                var_values = input_stream.read_var_in_frame(index, self.current_var)
+
+                for x, y, (i, j, k), interpolator in line_interpolator:
+                    line_var_values.append(interpolator.dot(var_values[[i, j, k]]))
+                values.append(line_var_values)
+
+                for x, y, (i, j, k), interpolator in line_interpolator_internal:
+                    line_var_values_internal.append(interpolator.dot(var_values[[i, j, k]]))
+                values_internal.append(line_var_values)
+        return values, values_internal
+
+    def run(self):
+        # load serafin
+        successful_rows, successful_input_data = self.first_step()
+
+        nb_successes = 0
+        for row, input_data in zip(successful_rows, successful_input_data):
+            # interpolation
+            mesh = self.build_mesh(input_data)
+            success, line_interpolators, line_interpolators_internal = self.interpolate(row, mesh)
+            if not success:
+                continue
+
+            success, line_interpolator, distances, \
+                line_interpolator_internal, distances_internal = self.check_interpolate(row, line_interpolators,
+                                                                                        line_interpolators_internal)
+            if not success:
+                continue
+
+            # Export PNG
+            values, values_internal = self.compute(input_data, line_interpolator, line_interpolator_internal)
+            self.parent.plot(values, distances, values_internal, distances_internal,
+                             self.time_indices, self.png_names[row])
+            self.success(row, 3)
+            nb_successes += 1
+
+        self.finishing_up(nb_successes)
+
+
+class MultiSaveProjectLinesDialog(MultiInterpolationPlotDialog):
+    def __init__(self, parent, input_options, output_options, compute_options):
+        super().__init__(parent, 'Project Lines',
+                         input_options, output_options, compute_options)
+        self.lines, self.ref_id, self.reference, self.max_distance, \
+                    self.time_index, self.current_vars, self.language = self.compute_options
+
+    def check_load(self, row, input_data):
+         # check time
+        if self.time_index >= len(input_data.time):
+            self.fail(row, 1)
+            return False
+        # check variables
+        for line_id, variables in self.current_vars.items():
+            for var in variables:
                 if var not in input_data.header.var_IDs:
-                    self.fail(i, 1)
-                    failed = True
-            if failed:
-                continue
-            self.success(i, 1)
+                    self.fail(row, 1)
+                    return False
+        self.success(row, 1)
+        return True
 
-            # Interpolation
-            success, line_interpolators, line_interpolators_internal = self.parent.interpolate(input_data)
-            if not success:
-                self.fail(i, 2)
-                continue
-            self.success(i, 2)
+    def check_interpolate(self, row, all_line_interpolators, all_line_interpolators_internal):
+        if all_line_interpolators[self.ref_id] is None:
+            self.fail(row, 2)
+            return False, None, None
 
-            # Export PNG
-            line_interpolator, distances = line_interpolators[line_id]
-            line_interpolator_internal, distances_internal = line_interpolators_internal[line_id]
+        line_interpolators = {}
+        line_interpolators_internal = {}
+        for line_id in self.current_vars:
+            line_interpolator, _ = all_line_interpolators[line_id]
+            if not line_interpolator:
+                self.fail(row, 2)
+                return False, None, None
+            line_interpolators[line_id] = line_interpolator
 
-            values, values_internal = self.parent.compute(time_index, input_data,
-                                                          line_interpolator, line_interpolator_internal, current_vars)
-            self.parent.plot(values, distances, values_internal, distances_internal, current_vars, png_name)
-            self.success(i, 3)
-            nb_success += 1
+            line_interpolator_internal, _ = all_line_interpolators_internal[line_id]
+            line_interpolators_internal[line_id] = line_interpolator_internal
 
-        if nb_success == len(self.dir_paths):
-            QMessageBox.information(None, 'Success', 'Figures saved successfully',
-                                    QMessageBox.Ok)
-        else:
-            QMessageBox.information(None, 'Failed', 'Failed to produce all figures.',
-                                    QMessageBox.Ok)
-        self.btnClose.setEnabled(True)
+        self.success(row, 2)
+        return True, line_interpolators, line_interpolators_internal
 
+    def compute(self, input_data, line_interpolators, line_interpolators_internal):
+        distances, values, distances_internal, values_internal = {}, {}, {}, {}
 
-class MultiSaveMultiFrameLinePlotDialog(MultiPlotDialog):
-    def __init__(self, parent, input_options, output_options, compute_options):
-        super().__init__(parent, 'MultiVar Frame Plot', ['Load Serafin', 'Interpolation', 'Export PNG'],
-                         input_options, output_options, compute_options)
+        with Serafin.Read(input_data.filename, input_data.language) as input_stream:
+            input_stream.header = input_data.header
+            input_stream.time = input_data.time
+            for line_id in self.current_vars:
+                distances[line_id] = []
+                distances_internal[line_id] = []
+                values[line_id] = {}
+                values_internal[line_id] = {}
 
-    def run(self):
-        line_id, current_var, time_indices = self.compute_options
-        nb_success = 0
-        for i, (dir_path, job_id, png_name) in enumerate(zip(self.dir_paths, self.job_ids, self.png_names)):
-            # Load Serafin
-            input_name = os.path.join(dir_path, self.slf_name)
-            input_data = self.parent.open(job_id, input_name)
-            if input_data is None:
-                self.fail(i, 1)
-                continue
-            # check variable
-            if current_var not in input_data.header.var_IDs:
-                self.fail(i, 1)
-                continue
-            # check time
-            failed = False
-            for time_index in time_indices:
-                if time_index not in input_data.selected_time_indices:
-                    self.fail(i, 1)
-                    failed = True
-            if failed:
-                continue
-            self.success(i, 1)
+                for var in self.current_vars[line_id]:
+                    values[line_id][var] = []
+                    values_internal[line_id][var] = []
 
-            # Interpolation
-            success, line_interpolators, line_interpolators_internal = self.parent.interpolate(input_data)
-            if not success:
-                self.fail(i, 2)
-                continue
-            self.success(i, 2)
+                for x, y, (i, j, k), interpolator in line_interpolators[line_id]:
+                    d = self.reference.project(x, y)
+                    if d <= 0 or d >= self.max_distance:
+                        continue
+                    distances[line_id].append(d)
 
-            # Export PNG
-            line_interpolator, distances = line_interpolators[line_id]
-            line_interpolator_internal, distances_internal = line_interpolators_internal[line_id]
+                    for var in self.current_vars[line_id]:
+                        all_values = input_stream.read_var_in_frame(self.time_index, var)
+                        values[line_id][var].append(interpolator.dot(all_values[[i, j, k]]))
+                distances[line_id] = np.array(distances[line_id])
 
-            values, values_internal = self.parent.compute(input_data, line_interpolator, line_interpolator_internal,
-                                                          current_var, time_indices)
-            self.parent.plot(values, distances, values_internal, distances_internal, time_indices, png_name)
-            self.success(i, 3)
-            nb_success += 1
+                for x, y, (i, j, k), interpolator in line_interpolators_internal[line_id]:
+                    d = self.reference.project(x, y)
+                    if d <= 0 or d >= self.max_distance:
+                        continue
+                    distances_internal[line_id].append(d)
 
-        if nb_success == len(self.dir_paths):
-            QMessageBox.information(None, 'Success', 'Figures saved successfully',
-                                    QMessageBox.Ok)
-        else:
-            QMessageBox.information(None, 'Failed', 'Failed to produce all figures.',
-                                    QMessageBox.Ok)
-        self.btnClose.setEnabled(True)
+                    for var in self.current_vars[line_id]:
+                        all_values = input_stream.read_var_in_frame(self.time_index, var)
+                        values_internal[line_id][var].append(interpolator.dot(all_values[[i, j, k]]))
+                distances_internal[line_id] = np.array(distances_internal[line_id])
 
-
-class MultiSaveProjectLinesDialog(MultiPlotDialog):
-    def __init__(self, parent, input_options, output_options, compute_options):
-        super().__init__(parent, 'Project Lines', ['Load Serafin', 'Interpolation', 'Export PNG'],
-                         input_options, output_options, compute_options)
+        return distances, values, distances_internal, values_internal
 
     def run(self):
-        reference, max_distance, time_index, current_vars = self.compute_options
-        nb_success = 0
-        for i, (dir_path, job_id, png_name) in enumerate(zip(self.dir_paths, self.job_ids, self.png_names)):
-            # Load Serafin
-            input_name = os.path.join(dir_path, self.slf_name)
+        # load serafin
+        successful_rows, successful_input_data = self.first_step()
 
-            input_data = self.parent.open(job_id, input_name)
-            if input_data is None:
-                self.fail(i, 1)
-                continue
-             # check time
-            if time_index >= len(input_data.time):
-                self.fail(i, 1)
-                continue
-            # check variables
-            failed = False
-            for line_id, variables in current_vars.items():
-                for var in variables:
-                    if var not in input_data.header.var_IDs:
-                        self.fail(i, 1)
-                        failed = True
-            if failed:
-                continue
-            self.success(i, 1)
-
-            # Interpolation
-            success, all_lines, all_lines_internal = self.parent.interpolate(input_data)
+        nb_successes = 0
+        for row, input_data in zip(successful_rows, successful_input_data):
+            # interpolation
+            mesh = self.build_mesh(input_data)
+            success, all_line_interpolators, all_line_interpolators_internal = self.interpolate(row, mesh)
             if not success:
-                self.fail(i, 2)
                 continue
-            self.success(i, 2)
 
-            # Export PNG
-            distances, values, distances_internal, values_internal = self.parent.compute(reference, max_distance,
-                                                                                         time_index, input_data,
-                                                                                         all_lines, all_lines_internal)
-            self.parent.plot(values, distances, values_internal, distances_internal, current_vars, png_name)
-            self.success(i, 3)
-            nb_success += 1
+            success, line_interpolators, \
+                     line_interpolators_internal = self.check_interpolate(row,  all_line_interpolators,
+                                                                          all_line_interpolators_internal)
+            if not success:
+                continue
 
-        if nb_success == len(self.dir_paths):
-            QMessageBox.information(None, 'Success', 'Figures saved successfully',
-                                    QMessageBox.Ok)
-        else:
-            QMessageBox.information(None, 'Failed', 'Failed to produce all figures.',
-                                    QMessageBox.Ok)
-        self.btnClose.setEnabled(True)
+            # export PNG
+            distances, values, distances_internal, values_internal = self.compute(input_data, line_interpolators,
+                                                                                  line_interpolators_internal)
+            self.parent.plot(values, distances, values_internal, distances_internal,
+                             self.current_vars, self.png_names[row])
+            self.success(row, 3)
+            nb_successes += 1
+
+        self.finishing_up(nb_successes)
 
 
-class VerticalProfilePlotViewer(TemporalPlotViewer):
-    def __init__(self):
-        super().__init__('point')
-        self.data = None
-        self.current_var = ''
-        self.points = []
+class MultiSaveVerticalProfileDialog(MultiInterpolationPlotDialog):
+    def __init__(self, parent, input_options, output_options, compute_options):
+        super().__init__(parent, 'Vertical Temporal Profile',
+                         input_options, output_options, compute_options)
+        self.point, self.current_var, self.language = self.compute_options
 
-        self.multi_save_act = QAction('Multi-Save', self, triggered=self.multi_save,
-                                      icon=self.style().standardIcon(QStyle.SP_DialogSaveButton))
-        self.select_variable = QAction('Select\nvariable', self, triggered=self.selectVariableEvent,
-                                       icon=self.style().standardIcon(QStyle.SP_FileDialogDetailedView))
-        self.current_columns = ('Point 1',)
-        self.toolBar.addAction(self.select_variable)
-        self.toolBar.addAction(self.selectColumnsAct)
-        self.toolBar.addSeparator()
-        self.toolBar.addAction(self.convertTimeAct)
-        self.toolBar.addAction(self.changeDateAct)
-        self.toolBar.addSeparator()
-        self.toolBar.addAction(self.multi_save_act)
+    def load(self, row, input_file, job_id, language):
+        try:
+            with open(input_file) as f:
+                pass
+        except PermissionError:
+            self.fail(row, 1)
+            return None
+        input_data = SerafinData(job_id, input_file, language)
+        if not input_data.read():
+            return input_data
+        self.fail(row, 1)
+        return None
 
-        self.data_menu = QMenu('&Data', self)
-        self.data_menu.addAction(self.select_variable)
-        self.data_menu.addAction(self.selectColumnsAct)
-        self.menuBar.addMenu(self.data_menu)
+    def check_load(self, row, input_data):
+        # check variables
+        if self.current_var not in input_data.header.var_IDs:
+            self.fail(row, 1)
+            return False
+        self.success(row, 1)
+        return True
 
-        self.multi_menu = QMenu('&Multi', self)
-        self.multi_menu.addAction(self.multi_save_act)
-        self.menuBar.addMenu(self.multi_menu)
+    def interpolate(self, row, input_mesh):
+        is_inside, point_interpolator = input_mesh.get_point_interpolators([self.point])
+        is_inside, point_interpolator = is_inside[0], point_interpolator[0]
+        if not is_inside:
+            self.fail(row, 2)
+            return False, None
+        self.success(row, 2)
+        return True, point_interpolator
 
-    def _defaultTitle(self):
-        word = {'fr': 'de', 'en': 'of'}[self.data.header.language]
-        return 'Values %s %s' % (word, self.current_var)
+    def compute(self, input_data, point_interpolator):
+        n, k, m = len(input_data.time), input_data.header.nb_planes, input_data.header.nb_nodes_2d
+        point_x = np.array([[input_data.time[i]] * k for i in range(n)])
+        x = point_x.flatten()
 
-    def _defaultYLabel(self):
-        return {'fr': 'Cote Z', 'en': 'Elevation Z'}[self.data.header.language]
+        (a, b, c), interpolator = point_interpolator
 
-    def selectVariableEvent(self):
-        msg = QDialog()
-        combo = QComboBox()
-        for var in self.data.header.var_IDs:
-            combo.addItem(var)
-        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel,
-                                   Qt.Horizontal, msg)
-        buttons.accepted.connect(msg.accept)
-        buttons.rejected.connect(msg.reject)
-        vlayout = QVBoxLayout()
-        vlayout.addWidget(combo)
-        vlayout.addWidget(buttons)
-        msg.setLayout(vlayout)
-        msg.setWindowTitle('Select a variable to plot')
-        msg.resize(300, 150)
-        msg.exec_()
-        self.current_var = combo.currentText()
-        self.current_ylabel = self._defaultYLabel()
-        self.replot()
+        with Serafin.Read(input_data.filename, input_data.language) as input_stream:
+            input_stream.header = input_data.header
+            input_stream.time = input_data.time
 
-    def replot(self):
-        pass
+            point_y = np.empty((n, k))
+            point_values = np.empty((n, k))
 
-    def multi_save(self):
-        pass
+            for i in range(n):
+                z = input_stream.read_var_in_frame(i, 'Z').reshape((k, m))
+                values = input_stream.read_var_in_frame(i, self.current_var).reshape((k, m))
 
-    def get_data(self, data, points):
-        pass
+                for j in range(k):
+                    point_y[i, j] = z[j, [a, b, c]].dot(interpolator)
+                    point_values[i, j] = values[j, [a, b, c]].dot(interpolator)
+
+        y = point_y.flatten()
+        z = point_values.flatten()
+
+        start_time = input_data.start_time
+        dates = list(map(lambda x: start_time + datetime.timedelta(seconds=x), input_data.time))
+        str_datetime = list(map(lambda x: x.strftime('%Y/%m/%d\n%H:%M'), dates))
+        str_datetime_bis = list(map(lambda x: x.strftime('%d/%m/%y\n%H:%M'), dates))
+        time = [x, x, x, x / 60, x / 3600, x / 86400]
+        triangles = [(i*k+j, i*k+j+1, i*k+j+1-k) for i in range(1, n) for j in range(k-1)] + \
+                    [(i*k+j, i*k+j-k, i*k+j+1-k) for i in range(1, n) for j in range(k-1)]
+        return time, y, z, triangles, str_datetime, str_datetime_bis
+
+    def run(self):
+        # load serafin
+        successful_rows, successful_input_data = self.first_step()
+
+        nb_successes = 0
+        for row, input_data in zip(successful_rows, successful_input_data):
+            # interpolation
+            mesh = self.build_mesh(input_data)
+            success, point_interpolator = self.interpolate(row, mesh)
+            if not success:
+                continue
+
+            # export PNG
+            time, y, z, triangles, str_datetime, str_datetime_bis = self.compute(input_data, point_interpolator)
+            self.parent.plot(time, y, z, triangles, str_datetime, str_datetime_bis, self.png_names[row])
+            self.success(row, 3)
+            nb_successes += 1
+
+        self.finishing_up(nb_successes)
+
+
+def process_output_options(input_file, job_id, extension, suffix, in_source_folder, dir_path, double_name):
+    input_path, input_name = os.path.split(input_file)
+    input_name = input_name[:-4]
+    if double_name:
+        output_name = input_name + '_' + job_id + suffix + extension
+    else:
+        output_name = input_name + suffix + extension
+    if in_source_folder:
+        filename = os.path.join(input_path, output_name)
+    else:
+        filename = os.path.join(dir_path, output_name)
+    return filename
+
+
+def process_geom_output_options(input_file, job_id, extension, suffix, in_source_folder, dir_path, double_name):
+    input_path, input_name = os.path.split(input_file)
+    if double_name:
+        output_name = input_name + '_' + job_id + suffix + extension
+    else:
+        output_name = input_name + suffix + extension
+    if in_source_folder:
+        path = os.path.join(input_path, 'gis')
+        if not os.path.exists(path):
+            os.mkdir(path)
+        filename = os.path.join(path, output_name)
+    else:
+        filename = os.path.join(dir_path, output_name)
+    return filename
+
+

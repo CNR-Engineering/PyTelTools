@@ -8,7 +8,6 @@ class SerafinData:
         self.job_id = job_id
         self.language = language
         self.filename = filename
-        self.has_index = False
         self.index = None
         self.triangles = {}
         self.header = None
@@ -48,7 +47,6 @@ class SerafinData:
 
     def copy(self):
         copy_data = SerafinData(self.job_id, self.filename, self.language)
-        copy_data.has_index = self.has_index
         copy_data.index = self.index
         copy_data.triangles = self.triangles
         copy_data.header = self.header
@@ -86,6 +84,8 @@ class SerafinData:
             transformed_points = [t(p) for p in transformed_points]
         self.header.x = [p[0] for p in transformed_points]
         self.header.y = [p[1] for p in transformed_points]
+        self.index = None
+        self.triangles = {}
 
 
 class CSVData:
