@@ -18,7 +18,7 @@ class ArrivalDurationNode(OneInOneOutNode):
         super().__init__(index)
         self.category = 'Calculations'
         self.label = 'Compute\nArrival\nDuration'
-        self.out_port.data_type = ('slf',)
+        self.out_port.data_type = ('slf out',)
         self.in_port.data_type = ('slf',)
         self.in_data = None
         self.data = None
@@ -244,14 +244,6 @@ class ArrivalDurationNode(OneInOneOutNode):
                 QMessageBox.critical(None, 'Error', 'Configure and run the input before configure this node!',
                                      QMessageBox.Ok)
                 return
-        if parent_node.data.operator is not None:
-            if parent_node.data.operator == operations.ARRIVAL_DURATION:
-                QMessageBox.critical(None, 'Error', 'The input data is already the result of Arrival Duration.',
-                                     QMessageBox.Ok)
-            else:
-                QMessageBox.critical(None, 'Error', 'The input data is already the result of another computation.',
-                                     QMessageBox.Ok)
-            return
         self.in_data = self.in_port.mother.parentItem().data
         if not self.in_data.header.is_2d:
             QMessageBox.critical(None, 'Error', 'The input file is not 2D.',
@@ -451,10 +443,6 @@ class ComputeVolumeNode(TwoInOneOutNode):
                 QMessageBox.critical(None, 'Error', 'Configure and run the input before configure this node!',
                                      QMessageBox.Ok)
                 return
-        if parent_node.data.operator is not None:
-            QMessageBox.critical(None, 'Error', 'The input data is already the result of another computation.',
-                                 QMessageBox.Ok)
-            return
         self.in_data = self.first_in_port.mother.parentItem().data
         if not self.in_data.header.is_2d:
             QMessageBox.critical(None, 'Error', 'The input file is not 2D.',
@@ -747,10 +735,6 @@ class ComputeFluxNode(TwoInOneOutNode):
                 QMessageBox.critical(None, 'Error', 'Configure and run the input before configure this node!',
                                      QMessageBox.Ok)
                 return
-        if parent_node.data.operator is not None:
-            QMessageBox.critical(None, 'Error', 'The input data is already the result of another computation.',
-                                 QMessageBox.Ok)
-            return
         self.in_data = self.first_in_port.mother.parentItem().data
         if not self.in_data.header.is_2d:
             QMessageBox.critical(None, 'Error', 'The input file is not 2D.',
@@ -1005,10 +989,6 @@ class InterpolateOnPointsNode(TwoInOneOutNode):
         if not self.in_data.header.is_2d:
             self.fail('the input file is not 2D')
             return
-        if self.in_data.operator is not None:
-            self.fail('the input data is already the result of another computation.')
-            return
-        
         selected_vars = [var for var in self.in_data.header.var_IDs if var in self.in_data.selected_vars]
         if not selected_vars:
             self.fail('no variable available.')
@@ -1144,10 +1124,6 @@ class InterpolateAlongLinesNode(TwoInOneOutNode):
         if not self.in_data.header.is_2d:
             self.fail('the input file is not 2D')
             return
-        if self.in_data.operator is not None:
-            self.fail('the input data is already the result of another computation.')
-            return
-
         selected_vars = [var for var in self.in_data.header.var_IDs if var in self.in_data.selected_vars]
         if not selected_vars:
             self.fail('no variable available.')
@@ -1251,10 +1227,6 @@ class ProjectLinesNode(TwoInOneOutNode):
                 return
         if len(parent_node.data.selected_time_indices) != 1:
             QMessageBox.critical(None, 'Error', 'Choose one single time frame first!',
-                                 QMessageBox.Ok)
-            return
-        if parent_node.data.operator is not None:
-            QMessageBox.critical(None, 'Error', 'The input data is already the result of another computation.',
                                  QMessageBox.Ok)
             return
         if not parent_node.data.header.is_2d:

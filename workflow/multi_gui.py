@@ -13,7 +13,7 @@ NODES = {'Input/Output': {'Load Serafin': MultiLoadSerafinNode, 'Load Serafin 3D
                           'Load 2D Open Polylines': MultiLoadOpenPolyline2DNode,
                           'Load 2D Points': MultiLoadPoint2DNode,
                           'Load Reference Serafin': MultiLoadReferenceSerafinNode},
-         'Basic operations': {'Select Variables': MultiSelectVariablesNode, 'Add Rouse': MultiAddRouseNode,
+         'Basic operations': {'Select Variables': MultiSelectVariablesNode, 'Add Rouse Numbers': MultiAddRouseNode,
                               'Convert to Single Precision': MultiConvertToSinglePrecisionNode,
                               'Select First Frame': MultiSelectFirstFrameNode,
                               'Select Last Frame': MultiSelectLastFrameNode, 'Select Time': MultiSelectTimeNode,

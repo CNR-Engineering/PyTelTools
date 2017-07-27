@@ -77,7 +77,7 @@ class LoadSerafinNode(SingleOutputNode):
 class WriteSerafinNode(OneInOneOutNode):
     def __init__(self, index):
         super().__init__(index)
-        self.in_port.data_type = ('slf', 'slf 3d')
+        self.in_port.data_type = ('slf out', 'slf', 'slf 3d')
         self.out_port.data_type = ('slf', 'slf 3d')
         self.category = 'Input/Output'
         self.label = 'Write\nSerafin'

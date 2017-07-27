@@ -187,9 +187,6 @@ def read_points(node_id, filename):
 
 
 def select_variables(node_id, fid, data, options):
-    if data.operator is not None:
-        return False, node_id, fid, None, fail_message('cannot select variable after computation',
-                                                       'Select Variables', data.job_id)
     us_equation, selected_vars, selected_vars_names = options
 
     # check if all selected variables are computable
@@ -218,9 +215,6 @@ def add_rouse(node_id, fid, data, options):
     if not data.header.is_2d:
         return False, node_id, fid, None, fail_message('the input file is not 2d', 'Add Rouse',
                                                        data.job_id)
-    if data.operator is not None:
-        return False, node_id, fid, None, fail_message('cannot add Rouse after computation',
-                                                       'Add Rouse', data.job_id)
     if 'US' not in data.selected_vars:
         return False, node_id, fid, None, fail_message('US not found', 'Add Rouse', data.job_id)
         
@@ -247,9 +241,6 @@ def add_rouse(node_id, fid, data, options):
 
 
 def select_time(node_id, fid, data, options):
-    if data.operator is not None:
-        return False, node_id, fid, None, fail_message('cannot select time after computation',
-                                                       'Select Time', data.job_id)
     if len(data.selected_time_indices) != len(data.time):
         return False, node_id, fid, None, fail_message('cannot re-select time', 'Select Time', data.job_id)
 
@@ -270,8 +261,6 @@ def select_time(node_id, fid, data, options):
 
 
 def select_single_frame(node_id, fid, data, options):
-    if data.operator is not None:
-        return False, node_id, fid, None, fail_message('cannot select time after computation', 'Select Time', data.job_id)
     if len(data.selected_time_indices) != len(data.time):
         return False, node_id, fid, None, fail_message('cannot re-select time', 'Select Time', data.job_id)
 
@@ -288,9 +277,6 @@ def select_single_frame(node_id, fid, data, options):
 
 
 def select_first_frame(node_id, fid, data, options):
-    if data.operator is not None:
-        return False, node_id, fid, None, fail_message('cannot select time after computation',
-                                                       'Select First Frame', data.job_id)
     if len(data.selected_time_indices) != len(data.time):
         return False, node_id, fid, None, fail_message('cannot re-select time', 'Select First Frame', data.job_id)
     new_data = data.copy()
@@ -299,9 +285,6 @@ def select_first_frame(node_id, fid, data, options):
 
 
 def select_last_frame(node_id, fid, data, options):
-    if data.operator is not None:
-        return False, node_id, fid, None, fail_message('cannot select time after computation',
-                                                       'Select Last Frame', data.job_id)
     if len(data.selected_time_indices) != len(data.time):
         return False, node_id, fid, None, fail_message('cannot re-select time', 'Select Last Frame', data.job_id)
     new_data = data.copy()
@@ -313,8 +296,6 @@ def compute_max(node_id, fid, data, options):
     if not data.header.is_2d:
         return False, node_id, fid, None, fail_message('the input file is not 2d', 'Max',
                                                        data.job_id)
-    if data.operator is not None:
-        return False, node_id, fid, None, fail_message('duplicated operator', 'Max', data.job_id)
     new_data = data.copy()
     new_data.operator = operations.MAX
     return True, node_id, fid, new_data, success_message('Max', data.job_id)
@@ -324,8 +305,6 @@ def compute_min(node_id, fid, data, options):
     if not data.header.is_2d:
         return False, node_id, fid, None, fail_message('the input file is not 2d', 'Min',
                                                        data.job_id)
-    if data.operator is not None:
-        return False, node_id, fid, None, fail_message('duplicated operator', 'Min', data.job_id)
     new_data = data.copy()
     new_data.operator = operations.MIN
     return True, node_id, fid, new_data, success_message('Compute Min', data.job_id)
@@ -335,8 +314,6 @@ def compute_mean(node_id, fid, data, options):
     if not data.header.is_2d:
         return False, node_id, fid, None, fail_message('the input file is not 2d', 'Mean',
                                                        data.job_id)
-    if data.operator is not None:
-        return False, node_id, fid, None, fail_message('duplicated operator', 'Mean', data.job_id)
     new_data = data.copy()
     new_data.operator = operations.MEAN
     return True, node_id, fid, new_data, success_message('Mean', data.job_id)
@@ -346,8 +323,6 @@ def synch_max(node_id, fid, data, options):
     if not data.header.is_2d:
         return False, node_id, fid, None, fail_message('the input file is not 2d', 'SynchMax',
                                                        data.job_id)
-    if data.operator is not None:
-        return False, node_id, fid, None, fail_message('duplicated operator', 'SynchMax', data.job_id)
     var = options[0]
     available_vars = [var for var in data.selected_vars if var in data.header.var_IDs]
     if var not in available_vars:
@@ -362,8 +337,6 @@ def arrival_duration(node_id, fid, data, options):
     if not data.header.is_2d:
         return False, node_id, fid, None, fail_message('the input file is not 2d', 'Compute Arrival Duration',
                                                        data.job_id)
-    if data.operator is not None:
-        return False, node_id, fid, None, fail_message('duplicated operator', 'Compute Arrival Duration', data.job_id)
     table, conditions, time_unit = options
     needed_vars = set()
     for condition in conditions:
@@ -816,8 +789,6 @@ def interpolate_points(node_id, fid, data, aux_data, options, csv_separator):
     if not data.header.is_2d:
         return False, node_id, fid, None, fail_message('the input file is not 2d', 'Interpolate on Points',
                                                        data.job_id)
-    if data.operator is not None:
-        return False, node_id, fid, None, fail_message('duplicated operator', 'Interpolate on Points', data.job_id)
     selected_vars = [var for var in data.header.var_IDs if var in data.selected_vars]
     if not selected_vars:
         return False, node_id, fid, None, fail_message('no available variable', 'Interpolate on Points', data.job_id)
@@ -893,8 +864,6 @@ def interpolate_lines(node_id, fid, data, aux_data, options, csv_separator):
     if not data.header.is_2d:
         return False, node_id, fid, None, fail_message('the input file is not 2d', 'Interpolate along Lines',
                                                        data.job_id)
-    if data.operator is not None:
-        return False, node_id, fid, None, fail_message('duplicated operator', 'Interpolate along Lines', data.job_id)
     selected_vars = [var for var in data.header.var_IDs if var in data.selected_vars]
     if not selected_vars:
         return False, node_id, fid, None, fail_message('no available variable', 'Interpolate along Lines', data.job_id)
@@ -1025,14 +994,15 @@ def project_lines(node_id, fid, data, aux_data, options, csv_separator):
 
 
 def project_mesh(node_id, fid, data, second_data, use_reference):
+    if data.filename == second_data.filename:
+        return False, node_id, fid, None, fail_message('the two input files cannot be the same', 'Project B on A',
+                                                       data.job_id, second_job_id=second_data.job_id)
+
     if not data.header.is_2d:
-        return False, node_id, fid, None, fail_message('the input file is not 2d', 'Project B on A',
-                                                       data.job_id)
+        return False, node_id, fid, None, fail_message('the first input file is not 2d', 'Project B on A',
+                                                       data.job_id, second_job_id=second_data.job_id)
     if not second_data.header.is_2d:
-        return False, node_id, fid, None, fail_message('the input file is not 2d', 'Project B on A',
-                                                       data.job_id)
-    if data.operator is not None:
-        return False, node_id, fid, None, fail_message('duplicated operator', 'Project B on A',
+        return False, node_id, fid, None, fail_message('the second input file is not 2d', 'Project B on A',
                                                        data.job_id, second_job_id=second_data.job_id)
     new_data = data.copy()
     new_data.operator = operations.PROJECT
@@ -1042,14 +1012,14 @@ def project_mesh(node_id, fid, data, second_data, use_reference):
 
 
 def minus(node_id, fid, data, second_data, use_reference):
+    if data.filename == second_data.filename:
+        return False, node_id, fid, None, fail_message('the two input files cannot be the same', 'A Minus B',
+                                                       data.job_id, second_job_id=second_data.job_id)
     if not data.header.is_2d:
-        return False, node_id, fid, None, fail_message('the input file is not 2d', 'A Minus B',
-                                                       data.job_id)
+        return False, node_id, fid, None, fail_message('the first input file is not 2d', 'A Minus B',
+                                                       data.job_id, second_job_id=second_data.job_id)
     if not second_data.header.is_2d:
-        return False, node_id, fid, None, fail_message('the input file is not 2d', 'A Minus B',
-                                                       data.job_id)
-    if data.operator is not None:
-        return False, node_id, fid, None, fail_message('duplicated operator', 'A Minus B',
+        return False, node_id, fid, None, fail_message('the second input file is not 2d', 'A Minus B',
                                                        data.job_id, second_job_id=second_data.job_id)
     new_data = data.copy()
     new_data.operator = operations.DIFF
@@ -1058,14 +1028,14 @@ def minus(node_id, fid, data, second_data, use_reference):
 
 
 def reverse_minus(node_id, fid, data, second_data, use_reference):
+    if data.filename == second_data.filename:
+        return False, node_id, fid, None, fail_message('the two input files cannot be the same', 'B Minus A',
+                                                       data.job_id, second_job_id=second_data.job_id)
     if not data.header.is_2d:
-        return False, node_id, fid, None, fail_message('the input file is not 2d', 'B Minus A',
-                                                       data.job_id)
+        return False, node_id, fid, None, fail_message('the first input file is not 2d', 'B Minus A',
+                                                       data.job_id, second_job_id=second_data.job_id)
     if not second_data.header.is_2d:
-        return False, node_id, fid, None, fail_message('the input file is not 2d', 'B Minus A',
-                                                       data.job_id)
-    if data.operator is not None:
-        return False, node_id, fid, None, fail_message('duplicated operator', 'B Minus A',
+        return False, node_id, fid, None, fail_message('the second input file is not 2d', 'B Minus A',
                                                        data.job_id, second_job_id=second_data.job_id)
     new_data = data.copy()
     new_data.operator = operations.REV_DIFF
@@ -1074,14 +1044,14 @@ def reverse_minus(node_id, fid, data, second_data, use_reference):
 
 
 def max_between(node_id, fid, data, second_data, use_reference):
+    if data.filename == second_data.filename:
+        return False, node_id, fid, None, fail_message('the two input files cannot be the same', 'Max(A,B)',
+                                                       data.job_id, second_job_id=second_data.job_id)
     if not data.header.is_2d:
-        return False, node_id, fid, None, fail_message('the input file is not 2d', 'Max(A,B)',
-                                                       data.job_id)
+        return False, node_id, fid, None, fail_message('the first input file is not 2d', 'Max(A,B)',
+                                                       data.job_id, second_job_id=second_data.job_id)
     if not second_data.header.is_2d:
-        return False, node_id, fid, None, fail_message('the input file is not 2d', 'Max(A,B)',
-                                                       data.job_id)
-    if data.operator is not None:
-        return False, node_id, fid, None, fail_message('duplicated operator', 'Max(A,B)',
+        return False, node_id, fid, None, fail_message('the second input file is not 2d', 'Max(A,B)',
                                                        data.job_id, second_job_id=second_data.job_id)
     new_data = data.copy()
     new_data.operator = operations.MAX_BETWEEN
@@ -1090,15 +1060,16 @@ def max_between(node_id, fid, data, second_data, use_reference):
 
 
 def min_between(node_id, fid, data, second_data, use_reference):
-    if not data.header.is_2d:
-        return False, node_id, fid, None, fail_message('the input file is not 2d', 'Min(A,B)',
-                                                       data.job_id)
-    if not second_data.header.is_2d:
-        return False, node_id, fid, None, fail_message('the input file is not 2d', 'Min(A,B)',
-                                                       data.job_id)
-    if data.operator is not None:
-        return False, node_id, fid, None, fail_message('duplicated operator', 'Min(A,B)',
+    if data.filename == second_data.filename:
+        return False, node_id, fid, None, fail_message('the two input files cannot be the same', 'Min(A,B)',
                                                        data.job_id, second_job_id=second_data.job_id)
+    if not data.header.is_2d:
+        return False, node_id, fid, None, fail_message('the first input file is not 2d', 'Min(A,B)',
+                                                       data.job_id, second_job_id=second_data.job_id)
+    if not second_data.header.is_2d:
+        return False, node_id, fid, None, fail_message('the second input file is not 2d', 'Min(A,B)',
+                                                       data.job_id, second_job_id=second_data.job_id)
+
     new_data = data.copy()
     new_data.operator = operations.MIN_BETWEEN
     new_data.metadata = {'operand': second_data.copy(), 'reference': use_reference}
