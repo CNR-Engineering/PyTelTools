@@ -870,7 +870,7 @@ class SynchMaxNode(OneInOneOutNode):
 
     def _reset(self):
         self.in_data = self.in_port.mother.parentItem().data
-        if not self.in_data.header.is_2d:
+        if not self.in_data.header.is_2d or len(self.in_data.selected_time_indices) == 1:
             self.state = Node.NOT_CONFIGURED
         elif self.in_data.operator is not None:
             self.state = Node.NOT_CONFIGURED
@@ -933,6 +933,9 @@ class SynchMaxNode(OneInOneOutNode):
         if not self.in_data.header.is_2d:
             QMessageBox.critical(None, 'Error', 'The input file is not 2D.', QMessageBox.Ok)
             return
+        if not len(self.in_data.selected_time_indices) == 1:
+            QMessageBox.critical(None, 'Error', 'The input file must have more than one frame.', QMessageBox.Ok)
+            return
         if self.state != Node.SUCCESS:
             self._reset()
         if super().configure():
@@ -959,9 +962,8 @@ class SynchMaxNode(OneInOneOutNode):
 
 
 class UnaryOperatorNode(OneInOneOutNode):
-    def __init__(self, index, operator):
+    def __init__(self, index):
         super().__init__(index)
-        self.operator = operator
         self.state = Node.READY
         self.data = None
         self.message = 'Nothing to configure.'
@@ -985,17 +987,7 @@ class UnaryOperatorNode(OneInOneOutNode):
         self.state = Node.READY
 
     def run(self):
-        success = super().run_upward()
-        if not success:
-            self.fail('input failed.')
-            return
-        input_data = self.in_port.mother.parentItem().data
-        if not input_data.header.is_2d:
-            self.fail('the input file is not 2D')
-            return
-        self.data = input_data.copy()
-        self.data.operator = self.operator
-        self.success()
+        pass
 
 
 class BinaryOperatorNode(TwoInOneOutNode):
@@ -1072,7 +1064,7 @@ class ConvertToSinglePrecisionNode(UnaryOperatorNode):
 
 class SelectFirstFrameNode(UnaryOperatorNode):
     def __init__(self, index):
-        super().__init__(index, None)
+        super().__init__(index)
         self.category = 'Basic operations'
         self.label = 'Select\nFirst\nFrame'
         self.out_port.data_type = ('slf', 'slf 3d', 'slf geom')
@@ -1084,9 +1076,6 @@ class SelectFirstFrameNode(UnaryOperatorNode):
             self.fail('input failed.')
             return
         input_data = self.in_port.mother.parentItem().data
-        if input_data.operator is not None:
-            self.fail('cannot select time after computation.')
-            return
         if len(input_data.selected_time_indices) != len(input_data.time):
             self.fail('cannot re-select time.')
             return
@@ -1098,7 +1087,7 @@ class SelectFirstFrameNode(UnaryOperatorNode):
 
 class SelectLastFrameNode(UnaryOperatorNode):
     def __init__(self, index):
-        super().__init__(index, None)
+        super().__init__(index)
         self.category = 'Basic operations'
         self.label = 'Select\nLast\nFrame'
         self.out_port.data_type = ('slf', 'slf 3d', 'slf geom')
@@ -1110,9 +1099,6 @@ class SelectLastFrameNode(UnaryOperatorNode):
             self.fail('input failed.')
             return
         input_data = self.in_port.mother.parentItem().data
-        if input_data.operator is not None:
-            self.fail('cannot select time after computation.')
-            return
         if len(input_data.selected_time_indices) != len(input_data.time):
             self.fail('cannot re-select time.')
             return
@@ -1124,23 +1110,74 @@ class SelectLastFrameNode(UnaryOperatorNode):
 
 class ComputeMaxNode(UnaryOperatorNode):
     def __init__(self, index):
-        super().__init__(index, operations.MAX)
+        super().__init__(index)
         self.category = 'Operators'
         self.label = 'Max'
+
+    def run(self):
+        success = super().run_upward()
+        if not success:
+            self.fail('input failed.')
+            return
+        input_data = self.in_port.mother.parentItem().data
+        if not input_data.header.is_2d:
+            self.fail('the input file is not 2D')
+            return
+        if len(input_data.selected_time_indices) == 1:
+            self.fail('the input data must have more than one frame')
+            return
+
+        self.data = input_data.copy()
+        self.data.operator = operations.MAX
+        self.success()
 
 
 class ComputeMinNode(UnaryOperatorNode):
     def __init__(self, index):
-        super().__init__(index, operations.MIN)
+        super().__init__(index)
         self.category = 'Operators'
         self.label = 'Min'
+
+    def run(self):
+        success = super().run_upward()
+        if not success:
+            self.fail('input failed.')
+            return
+        input_data = self.in_port.mother.parentItem().data
+        if not input_data.header.is_2d:
+            self.fail('the input file is not 2D')
+            return
+        if len(input_data.selected_time_indices) == 1:
+            self.fail('the input data must have more than one frame')
+            return
+
+        self.data = input_data.copy()
+        self.data.operator = operations.MIN
+        self.success()
 
 
 class ComputeMeanNode(UnaryOperatorNode):
     def __init__(self, index):
-        super().__init__(index, operations.MEAN)
+        super().__init__(index)
         self.category = 'Operators'
         self.label = 'Mean'
+
+    def run(self):
+        success = super().run_upward()
+        if not success:
+            self.fail('input failed.')
+            return
+        input_data = self.in_port.mother.parentItem().data
+        if not input_data.header.is_2d:
+            self.fail('the input file is not 2D')
+            return
+        if len(input_data.selected_time_indices) == 1:
+            self.fail('the input data must have more than one frame')
+            return
+
+        self.data = input_data.copy()
+        self.data.operator = operations.MEAN
+        self.success()
 
 
 class MinusNode(BinaryOperatorNode):
@@ -1184,7 +1221,7 @@ class AddTransformationNode(OneInOneOutNode):
         self.category = 'Basic operations'
         self.label = 'Add\nTransformation'
         self.in_port.data_type = ('slf', 'slf 3d')
-        self.out_port.data_type = ('slf geom', 'slf')
+        self.out_port.data_type = ('slf geom', 'slf', 'slf 3d')
         self.filename = ''
         self.data = None
 

@@ -301,8 +301,10 @@ def select_last_frame(node_id, fid, data, options):
 
 def compute_max(node_id, fid, data, options):
     if not data.header.is_2d:
-        return False, node_id, fid, None, fail_message('the input file is not 2d', 'Max',
-                                                       data.job_id)
+        return False, node_id, fid, None, fail_message('the input file is not 2d', 'Max', data.job_id)
+    if len(data.selected_time_indices) == 1:
+        return False, node_id, fid, None, fail_message('the input file has only one frame', 'Max', data.job_id)
+
     new_data = data.copy()
     new_data.operator = operations.MAX
     return True, node_id, fid, new_data, success_message('Max', data.job_id)
@@ -310,8 +312,10 @@ def compute_max(node_id, fid, data, options):
 
 def compute_min(node_id, fid, data, options):
     if not data.header.is_2d:
-        return False, node_id, fid, None, fail_message('the input file is not 2d', 'Min',
-                                                       data.job_id)
+        return False, node_id, fid, None, fail_message('the input file is not 2d', 'Min', data.job_id)
+    if len(data.selected_time_indices) == 1:
+        return False, node_id, fid, None, fail_message('the input file has only one frame', 'Min', data.job_id)
+
     new_data = data.copy()
     new_data.operator = operations.MIN
     return True, node_id, fid, new_data, success_message('Compute Min', data.job_id)
@@ -319,8 +323,10 @@ def compute_min(node_id, fid, data, options):
 
 def compute_mean(node_id, fid, data, options):
     if not data.header.is_2d:
-        return False, node_id, fid, None, fail_message('the input file is not 2d', 'Mean',
-                                                       data.job_id)
+        return False, node_id, fid, None, fail_message('the input file is not 2d', 'Mean', data.job_id)
+    if len(data.selected_time_indices) == 1:
+        return False, node_id, fid, None, fail_message('the input file has only one frame', 'Mean', data.job_id)
+
     new_data = data.copy()
     new_data.operator = operations.MEAN
     return True, node_id, fid, new_data, success_message('Mean', data.job_id)
@@ -328,8 +334,10 @@ def compute_mean(node_id, fid, data, options):
 
 def synch_max(node_id, fid, data, options):
     if not data.header.is_2d:
-        return False, node_id, fid, None, fail_message('the input file is not 2d', 'SynchMax',
-                                                       data.job_id)
+        return False, node_id, fid, None, fail_message('the input file is not 2d', 'SynchMax', data.job_id)
+    if len(data.selected_time_indices) == 1:
+        return False, node_id, fid, None, fail_message('the input file has only one frame', 'SynchMax', data.job_id)
+
     var = options[0]
     available_vars = [var for var in data.selected_vars if var in data.header.var_IDs]
     if var not in available_vars:
@@ -343,6 +351,9 @@ def synch_max(node_id, fid, data, options):
 def arrival_duration(node_id, fid, data, options):
     if not data.header.is_2d:
         return False, node_id, fid, None, fail_message('the input file is not 2d', 'Compute Arrival Duration',
+                                                       data.job_id)
+    if len(data.selected_time_indices) == 1:
+        return False, node_id, fid, None, fail_message('the input file has only one frame', 'Compute Arrival Duration',
                                                        data.job_id)
     table, conditions, time_unit = options
     needed_vars = set()
@@ -932,7 +943,7 @@ def project_lines(node_id, fid, data, aux_data, options, csv_separator):
         return False, node_id, fid, None, fail_message('the input file is not 2d', 'Project Lines',
                                                        data.job_id)
     if len(data.selected_time_indices) != 1:
-        return False, node_id, fid, None, fail_message('the file has more than one time frame',
+        return False, node_id, fid, None, fail_message('the file has more than one time frames',
                                                        'Project Lines', data.job_id)
     time_index = data.selected_time_indices[0]
     selected_vars = [var for var in data.header.var_IDs if var in data.selected_vars]

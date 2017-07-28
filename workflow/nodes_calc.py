@@ -1,4 +1,6 @@
 import os
+from PyQt5.QtWidgets import *
+from PyQt5.QtCore import *
 
 import slf.misc as operations
 from gui.util import ConditionDialog
@@ -176,7 +178,7 @@ class ArrivalDurationNode(OneInOneOutNode):
 
     def _reset(self):
         self.in_data = self.in_port.mother.parentItem().data
-        if not self.in_data.header.is_2d:
+        if not self.in_data.header.is_2d or len(self.in_data.selected_time_indices) == 1:
             self.state = Node.NOT_CONFIGURED
             self.reconfigure_downward()
             self.update()
@@ -246,6 +248,9 @@ class ArrivalDurationNode(OneInOneOutNode):
         if not self.in_data.header.is_2d:
             QMessageBox.critical(None, 'Error', 'The input file is not 2D.',
                                  QMessageBox.Ok)
+            return
+        if not len(self.in_data.selected_time_indices) == 1:
+            QMessageBox.critical(None, 'Error', 'The input file must have more than one frame.', QMessageBox.Ok)
             return
         if self.state != Node.SUCCESS:
             self._reset()
