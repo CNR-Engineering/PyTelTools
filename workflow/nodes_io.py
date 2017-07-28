@@ -2,6 +2,8 @@ import os
 import struct
 
 import numpy as np
+from PyQt5.QtWidgets import *
+from PyQt5.QtCore import *
 
 import slf.misc as operations
 from geom import BlueKenue, Shapefile
