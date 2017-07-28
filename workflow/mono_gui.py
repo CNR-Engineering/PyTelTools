@@ -144,6 +144,13 @@ class MonoScene(QGraphicsScene):
             node.configure()
             self.selection_changed()
 
+    def keyPressEvent(self, event):
+        if event.key() == Qt.Key_Delete:
+            selected = self.selectedItems()
+            if selected:
+                link = selected[0]
+                self._handle_remove_link(link)
+
     def selection_changed(self):
         view = self.views()[0]
         selected = self.selectedItems()

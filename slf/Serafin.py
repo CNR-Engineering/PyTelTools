@@ -271,12 +271,6 @@ class Serafin:
         self.file.close()
         return False
 
-    def get_summary(self):
-        if self.header is None:
-            module_logger.error('ERROR: (forgot read_header ?) header is None')
-            raise SerafinRequestError('(forgot read_header ?) Cannot display the file summary.')
-        return self.header.summary()
-
     def read_header(self):
         """!
         @brief Read the file header and check the file consistency

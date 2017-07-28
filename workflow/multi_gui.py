@@ -615,7 +615,7 @@ class MultiWidget(QWidget):
             self.worker.add_tasks(aux_tasks)
             self.worker.start()
             for i in range(len(aux_tasks)):
-                success, node_id, data, message = self.worker.done_queue.get()
+                success, node_id, data, message = self.worker.get_result()
                 self.message_box.appendPlainText(message)
 
                 if not success:
@@ -647,14 +647,14 @@ class MultiWidget(QWidget):
 
     def _get_double_input_task(self, fun, node, node_id, fid, data):
         if node.has_auxiliary:
-            self.worker.task_queue.put((fun, (node_id, fid, node.auxiliary_data, data, True)))
+            self.worker.add_task((fun, (node_id, fid, node.auxiliary_data, data, True)))
             return True
         if fid in node.first_ids:
             pair_index = node.first_ids.index(fid)
             second_id = node.second_ids[pair_index]
             if second_id in node.pending_data:
-                self.worker.task_queue.put((fun, (node_id, fid,
-                                                  data, node.pending_data[second_id], False)))
+                self.worker.add_task((fun, (node_id, fid,
+                                      data, node.pending_data[second_id], False)))
                 return True
             else:
                 node.pending_data[fid] = data
@@ -663,8 +663,8 @@ class MultiWidget(QWidget):
             pair_index = node.second_ids.index(fid)
             first_id = node.first_ids[pair_index]
             if first_id in node.pending_data:
-                self.worker.task_queue.put((fun, (node_id, first_id,
-                                                  node.pending_data[first_id], data, False)))
+                self.worker.add_task((fun, (node_id, first_id,
+                                            node.pending_data[first_id], data, False)))
                 return True
             else:
                 node.pending_data[fid] = data
@@ -672,7 +672,7 @@ class MultiWidget(QWidget):
 
     def _listen(self, nb_tasks, csv_separator):
         # get one task result
-        success, node_id, fid, data, message = self.worker.done_queue.get()
+        success, node_id, fid, data, message = self.worker.get_result()
         nb_tasks -= 1
         self.message_box.appendPlainText(message)
         current_node = self.scene.nodes[node_id]
@@ -686,8 +686,8 @@ class MultiWidget(QWidget):
                 next_node = self.scene.nodes[next_node_id]
                 fun = worker.FUNCTIONS[next_node.name()]
                 if next_node.double_input:
-                    self.worker.task_queue.put((fun, (next_node_id, fid, data, next_node.auxiliary_data,
-                                                      next_node.options, csv_separator)))
+                    self.worker.add_task((fun, (next_node_id, fid, data, next_node.auxiliary_data,
+                                                next_node.options, csv_separator)))
                     nb_tasks += 1
                 elif next_node.two_in_one_out:
                     if current_node.second_parent:
@@ -697,7 +697,7 @@ class MultiWidget(QWidget):
                     if new_task_available:
                         nb_tasks += 1
                 else:
-                    self.worker.task_queue.put((fun, (next_node_id, fid, data, next_node.options)))
+                    self.worker.add_task((fun, (next_node_id, fid, data, next_node.options)))
                     nb_tasks += 1
         else:
             current_node.nb_fail += 1

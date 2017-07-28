@@ -43,6 +43,12 @@ class Workers:
             self.task_queue.put('STOP')
         self.stopped = True
 
+    def add_task(self, task):
+        self.task_queue.put(task)
+
+    def get_result(self):
+        return self.done_queue.get()
+
 
 def worker(input_queue, output_queue):
     for func, args in iter(input_queue.get, 'STOP'):
