@@ -68,7 +68,7 @@ class LandXMLtoTinDialog(QDialog):
 
         for i, (dir_name, dir_path) in enumerate(zip(self.dir_names, self.dir_paths)):
             xml_name = os.path.join(dir_path, 'gis', self.xml_name)
-            tin_name = os.path.join(dir_path, 'gis', self.xml_name[:-4])
+            tin_name = os.path.join(dir_path, 'gis', self.xml_name[:-4]).lower()
 
             if os.path.exists(tin_name):
                 if self.overwrite:
@@ -339,7 +339,7 @@ class LandXMLtoTin(QWidget):
         self.btnOpen.setFixedSize(105, 50)
 
         # create a checkbox for overwrite option
-        self.overwriteBox = QCheckBox('Re-générer si le fichier tin existe déjà')
+        self.overwriteBox = QCheckBox("Re-générer si le fichier tin existe déjà (risque d'échec)")
         self.overwriteBox.setChecked(False)
 
         # create a combo box for input file name
