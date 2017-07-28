@@ -56,7 +56,7 @@ class SelectVariablesNode(OneInOneOutNode):
                 name_item = QTableWidgetItem(var_name.decode('utf-8').strip())
                 unit_item = QTableWidgetItem(var_unit.decode('utf-8').strip())
                 for j, item in enumerate([id_item, name_item, unit_item]):
-                    if var_id == 'Z':
+                    if not self.in_data.header.is_2d and var_id == 'Z':
                         item.setFlags(Qt.NoItemFlags)
                     self.second_table.setItem(row, j, item)
             else:

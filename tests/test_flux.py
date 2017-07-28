@@ -171,7 +171,7 @@ class FluxTestCase(unittest.TestCase):
        [ 0.16374261,  0.68782208,  0.77777459,  0.27683339]])]
 
         header = TestHeader()
-        with Serafin.Write(self.path, 'fr', True) as f:
+        with Serafin.Write(self.path, 'fr') as f:
             f.write_header(header)
             for i in range(len(test_values)):
                 f.write_entire_frame(header, i, test_values[i])

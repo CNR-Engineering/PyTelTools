@@ -29,7 +29,7 @@ NODES = {'Input/Output': {'Load Serafin': LoadSerafinNode, 'Load Serafin 3D': Lo
                            'Locate Points': LocatePointsNode,
                            'Volume Plot': VolumePlotNode, 'Flux Plot': FluxPlotNode, 'Point Plot': PointPlotNode,
                            'Point Attribute Table': PointAttributeTableNode, 'MultiVar Line Plot': MultiVarLinePlotNode,
-                           'MultiFrame Line Plot': MultiFrameLinePlotNode, 'Project Lines Plot': ProjectLinesNode,
+                           'MultiFrame Line Plot': MultiFrameLinePlotNode, 'Project Lines Plot': ProjectLinesPlotNode,
                            'Vertical Temporal Profile 3D': VerticalTemporalProfileNode}}
 
 

@@ -73,7 +73,7 @@ class VolumeTestCase(unittest.TestCase):
                                 [1.73661732, -2.35347814, -2.19024393, 1.63727437],
                                 [1.87608204, 1.77958726, -1.55296534, -2.92199993]], dtype=np.float64)
         header = TestHeader()
-        with Serafin.Write(self.path, 'fr', True) as f:
+        with Serafin.Write(self.path, 'fr') as f:
             f.write_header(header)
             for time, vals in enumerate(test_values):
                 vals = vals.reshape(1, 4)

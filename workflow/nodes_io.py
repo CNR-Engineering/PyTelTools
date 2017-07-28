@@ -130,7 +130,7 @@ class WriteSerafinNode(OneInOneOutNode):
         with Serafin.Read(input_data.filename, input_data.language) as input_stream:
             input_stream.header = input_data.header
             input_stream.time = input_data.time
-            with Serafin.Write(self.filename, input_data.language, True) as output_stream:
+            with Serafin.Write(self.filename, input_data.language) as output_stream:
                 output_stream.write_header(output_header)
                 for i, time_index in enumerate(input_data.selected_time_indices):
                     values = do_calculations_in_frame(input_data.equations, input_data.us_equation,
@@ -191,7 +191,7 @@ class WriteSerafinNode(OneInOneOutNode):
             else:
                 values = np.vstack((scalar_calculator.finishing_up(), vector_calculator.finishing_up()))
 
-            with Serafin.Write(self.filename, input_data.language, True) as output_stream:
+            with Serafin.Write(self.filename, input_data.language) as output_stream:
                 output_stream.write_header(output_header)
                 output_stream.write_entire_frame(output_header, input_data.time[0], values)
         self.success('Output saved to {}.'.format(self.filename))
@@ -225,7 +225,7 @@ class WriteSerafinNode(OneInOneOutNode):
                 QApplication.processEvents()
 
             values = calculator.finishing_up()
-            with Serafin.Write(self.filename, input_data.language, True) as output_stream:
+            with Serafin.Write(self.filename, input_data.language) as output_stream:
                 output_stream.write_header(output_header)
                 output_stream.write_entire_frame(output_header, input_data.time[0], values)
         self.success('Output saved to {}.'.format(self.filename))
@@ -278,7 +278,7 @@ class WriteSerafinNode(OneInOneOutNode):
                 values *= 100 / (input_data.time[input_data.selected_time_indices[-1]]
                                  - input_data.time[input_data.selected_time_indices[0]])
 
-            with Serafin.Write(self.filename, input_data.language, True) as output_stream:
+            with Serafin.Write(self.filename, input_data.language) as output_stream:
                 output_stream.write_header(output_header)
                 output_stream.write_entire_frame(output_header, input_data.time[0], values)
         self.success('Output saved to {}.'.format(self.filename))
@@ -355,7 +355,7 @@ class WriteSerafinNode(OneInOneOutNode):
                 calculator = operations.ProjectMeshCalculator(first_in, second_in, common_vars, is_inside,
                                                               point_interpolators, common_frames, operation_type)
 
-                with Serafin.Write(self.filename, first_input.language, True) as out_stream:
+                with Serafin.Write(self.filename, first_input.language) as out_stream:
                     out_stream.write_header(output_header)
 
                     for i, (first_time_index, second_time_index) in enumerate(calculator.time_indices):

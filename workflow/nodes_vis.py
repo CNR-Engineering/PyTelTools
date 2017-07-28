@@ -658,7 +658,7 @@ class MultiFrameLinePlotNode(DoubleInputNode):
         dlg.exec_()
 
 
-class ProjectLinesNode(DoubleInputNode):
+class ProjectLinesPlotNode(DoubleInputNode):
     def __init__(self, index):
         super().__init__(index)
         self.category = 'Visualization'

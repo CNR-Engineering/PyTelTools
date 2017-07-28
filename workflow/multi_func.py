@@ -422,23 +422,27 @@ def write_slf(node_id, fid, data, options):
         new_data = SerafinData(data.job_id, filename, data.language)
         new_data.read()
     else:
-        os.remove(filename)
+        try:
+            os.remove(filename)
+        except PermissionError:
+            pass
 
     return success, node_id, fid, new_data, message
 
 
 def write_simple_slf(input_data, filename):
     output_header = input_data.default_output_header()
-    with Serafin.Read(input_data.filename, input_data.language) as resin:
-        resin.header = input_data.header
-        resin.time = input_data.time
-        with Serafin.Write(filename, input_data.language, True) as resout:
-            resout.write_header(output_header)
+    with Serafin.Read(input_data.filename, input_data.language) as input_stream:
+        input_stream.header = input_data.header
+        input_stream.time = input_data.time
+
+        with Serafin.Write(filename, input_data.language) as output_stream:
+            output_stream.write_header(output_header)
             for i, time_index in enumerate(input_data.selected_time_indices):
                 values = variables.do_calculations_in_frame(input_data.equations, input_data.us_equation,
-                                                            resin, time_index, input_data.selected_vars,
+                                                            input_stream, time_index, input_data.selected_vars,
                                                             output_header.np_float_type)
-                resout.write_entire_frame(output_header, input_data.time[time_index], values)
+                output_stream.write_entire_frame(output_header, input_data.time[time_index], values)
     return True, success_message('Write Serafin', input_data.job_id)
 
 
@@ -485,7 +489,7 @@ def write_max_min_mean(input_data, filename):
         else:
             values = np.vstack((scalar_calculator.finishing_up(), vector_calculator.finishing_up()))
 
-        with Serafin.Write(filename, input_data.language, True) as resout:
+        with Serafin.Write(filename, input_data.language) as resout:
             resout.write_header(output_header)
             resout.write_entire_frame(output_header, input_data.time[0], values)
 
@@ -514,7 +518,7 @@ def write_synch_max(input_data, filename):
         calculator.run()
         values = calculator.finishing_up()
 
-        with Serafin.Write(filename, input_data.language, True) as output_stream:
+        with Serafin.Write(filename, input_data.language) as output_stream:
             output_stream.write_header(output_header)
             output_stream.write_entire_frame(output_header, input_data.time[0], values)
 
@@ -564,7 +568,7 @@ def write_arrival_duration(input_data, filename):
             values *= 100 / (input_data.time[input_data.selected_time_indices[-1]]
                              - input_data.time[input_data.selected_time_indices[0]])
 
-        with Serafin.Write(filename, input_data.language, True) as resout:
+        with Serafin.Write(filename, input_data.language) as resout:
             resout.write_header(output_header)
             resout.write_entire_frame(output_header, input_data.time[0], values)
 
@@ -650,7 +654,7 @@ def write_project_mesh(first_input, filename):
                                                           point_interpolators, common_frames, operation_type,
                                                           use_reference)
 
-            with Serafin.Write(filename, first_input.language, True) as out_stream:
+            with Serafin.Write(filename, first_input.language) as out_stream:
                 out_stream.write_header(output_header)
                 calculator.run(out_stream, output_header)
 
@@ -713,11 +717,11 @@ def compute_volume(node_id, fid, data, aux_data, options, csv_separator):
         data.triangles = mesh.triangles
 
     # run the calculator
-    with Serafin.Read(data.filename, data.language) as resin:
-        resin.header = data.header
-        resin.time = data.time
+    with Serafin.Read(data.filename, data.language) as input_stream:
+        input_stream.header = data.header
+        input_stream.time = data.time
 
-        calculator = VolumeCalculator(volume_type, first_var, second_var, resin,
+        calculator = VolumeCalculator(volume_type, first_var, second_var, input_stream,
                                       polygon_names, polygons, 1)
         calculator.time_indices = data.selected_time_indices
         calculator.mesh = mesh
@@ -784,12 +788,12 @@ def compute_flux(node_id, fid, data, aux_data, options, csv_separator):
         data.triangles = mesh.triangles
 
    # run the calculator
-    with Serafin.Read(data.filename, data.language) as resin:
-        resin.header = data.header
-        resin.time = data.time
+    with Serafin.Read(data.filename, data.language) as input_stream:
+        input_stream.header = data.header
+        input_stream.time = data.time
 
         calculator = FluxCalculator(flux_type, var_IDs,
-                                    resin, section_names, sections, 1)
+                                    input_stream, section_names, sections, 1)
         calculator.time_indices = data.selected_time_indices
         calculator.mesh = mesh
         calculator.construct_intersections()
@@ -844,7 +848,11 @@ def interpolate_points(node_id, fid, data, aux_data, options, csv_separator):
     point_interpolators = [p for i, p in enumerate(point_interpolators) if is_inside[i]]
     nb_inside = sum(map(int, is_inside))
     if nb_inside == 0:
-        os.remove(filename)
+        try:
+            os.remove(filename)
+        except PermissionError:
+            pass
+
         return False, node_id, fid, None, fail_message('no point inside the mesh', 'Interpolate on Points', data.job_id)
 
     # do calculation
@@ -915,7 +923,10 @@ def interpolate_lines(node_id, fid, data, aux_data, options, csv_separator):
     lines = aux_data.lines
     nb_nonempty, indices_nonempty, line_interpolators, _ = mesh.get_line_interpolators(lines)
     if nb_nonempty == 0:
-        os.remove(filename)
+        try:
+            os.remove(filename)
+        except PermissionError:
+            pass
         return False, node_id, fid, None, fail_message('no polyline intersects the mesh continuously', 
                                                        'Interpolate along Lines', data.job_id)
 
@@ -982,11 +993,17 @@ def project_lines(node_id, fid, data, aux_data, options, csv_separator):
     # process the line
     nb_nonempty, indices_nonempty, line_interpolators, _ = mesh.get_line_interpolators(lines)
     if nb_nonempty == 0:
-        os.remove(filename)
+        try:
+            os.remove(filename)
+        except PermissionError:
+            pass
         return False, node_id, fid, None, fail_message('no polyline intersects the mesh continuously',
                                                        'Project Lines', data.job_id)
     elif reference_index not in indices_nonempty:
-        os.remove(filename)
+        try:
+            os.remove(filename)
+        except PermissionError:
+            pass
         return False, node_id, fid, None, fail_message('the reference line does not intersect the mesh continuously ',
                                                        'Project Lines', data.job_id)
 

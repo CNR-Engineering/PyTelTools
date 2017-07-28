@@ -72,7 +72,10 @@ class LandXMLtoTinDialog(QDialog):
 
             if os.path.exists(tin_name):
                 if self.overwrite:
-                    os.remove(tin_name)
+                    try:
+                        os.remove(tin_name)
+                    except PermissionError:
+                        pass
                 else:
                     nb_success += 1
                     nb_reload += 1
@@ -260,7 +263,10 @@ class MxdToPngDialog(QDialog):
                     QApplication.processEvents()
                     continue
                 else:
-                    os.remove(os.path.join(png_folder, png_name))
+                    try:
+                        os.remove(os.path.join(png_folder, png_name))
+                    except PermissionError:
+                        pass
 
             # copy .mxd to sig folder
             tmp_mxd = os.path.join(dir_path, 'gis', tmp_id + '.mxd')
@@ -277,7 +283,10 @@ class MxdToPngDialog(QDialog):
                 shutil.move(old_path, png_folder)
 
             # remove .mxd
-            os.remove(tmp_mxd)
+            try:
+                os.remove(tmp_mxd)
+            except PermissionError:
+                continue
 
             if returncode == 1:
                 fail_messages.append("%s : arcpy.mapping n'est pas disponible." % dir_name)

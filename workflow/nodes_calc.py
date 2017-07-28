@@ -515,11 +515,11 @@ class ComputeVolumeNode(TwoInOneOutNode):
             self.in_data.triangles = mesh.triangles
         
         # run the calculator
-        with Serafin.Read(self.in_data.filename, self.in_data.language) as resin:
-            resin.header = self.in_data.header
-            resin.time = self.in_data.time
+        with Serafin.Read(self.in_data.filename, self.in_data.language) as input_stream:
+            input_stream.header = self.in_data.header
+            input_stream.time = self.in_data.time
 
-            calculator = VolumeCalculator(volume_type, self.first_var, self.second_var, resin,
+            calculator = VolumeCalculator(volume_type, self.first_var, self.second_var, input_stream,
                                           polygon_names, polygons, 1)
             calculator.time_indices = self.in_data.selected_time_indices
             calculator.mesh = mesh
@@ -1157,7 +1157,10 @@ class InterpolateAlongLinesNode(TwoInOneOutNode):
             self.data.write(filename, self.scene().csv_separator)
             self.success('Output saved to %s\n' % filename + message)
         else:
-            os.remove(filename)
+            try:
+                os.remove(filename)
+            except PermissionError:
+                pass
             self.fail(message)
 
 
@@ -1334,11 +1337,17 @@ class ProjectLinesNode(TwoInOneOutNode):
 
         nb_nonempty, indices_nonempty, line_interpolators, _ = mesh.get_line_interpolators(lines)
         if nb_nonempty == 0:
-            os.remove(filename)
+            try:
+                os.remove(filename)
+            except PermissionError:
+                pass
             self.fail('no polyline intersects the mesh continuously.')
             return
         elif self.reference_index not in indices_nonempty:
-            os.remove(filename)
+            try:
+                os.remove(filename)
+            except PermissionError:
+                pass
             self.fail('the reference line does not intersect the mesh continuously.')
             return
 
