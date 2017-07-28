@@ -13,7 +13,7 @@ from slf import Serafin
 from slf.flux import FluxCalculator
 from geom import BlueKenue, Shapefile
 from gui.util import TemporalPlotViewer, QPlainTextEditLogger, LineMapCanvas, MapViewer, OutputThread, \
-    OutputProgressDialog, LoadMeshDialog, TelToolWidget, handleOverwrite, testOpen
+    OutputProgressDialog, LoadMeshDialog, SerafinInputTab, TelToolWidget, handleOverwrite, testOpen
 
 
 class FluxCalculatorThread(OutputThread):
@@ -66,10 +66,9 @@ class FluxCalculatorThread(OutputThread):
         self.calculator.write_csv(result, output_stream, self.separator)
 
 
-class InputTab(QWidget):
+class InputTab(SerafinInputTab):
     def __init__(self, parent):
-        super().__init__()
-        self.parent = parent
+        super().__init__(parent)
         self.old_options = ('1', '')
 
         self.filename = None
@@ -87,25 +86,6 @@ class InputTab(QWidget):
         self.setMinimumWidth(800)
 
     def _initWidgets(self):
-        # create a checkbox for language selection
-        self.langBox = QGroupBox('Input language')
-        hlayout = QHBoxLayout()
-        self.frenchButton = QRadioButton('French')
-        self.englishButton = QRadioButton('English')
-        hlayout.addWidget(self.frenchButton)
-        hlayout.addWidget(self.englishButton)
-        self.langBox.setLayout(hlayout)
-        self.langBox.setMaximumHeight(80)
-        if self.parent.language == 'fr':
-            self.frenchButton.setChecked(True)
-        else:
-            self.englishButton.setChecked(True)
-
-        # create the button open Serafin
-        self.btnOpenSerafin = QPushButton('Load\nSerafin', self, icon=self.style().standardIcon(QStyle.SP_DialogOpenButton))
-        self.btnOpenSerafin.setToolTip('<b>Open</b> a .slf file')
-        self.btnOpenSerafin.setFixedSize(105, 50)
-
         # create the button open Polygon
         self.btnOpenPolyline = QPushButton('Load\nSections', self, icon=self.style().standardIcon(QStyle.SP_DialogOpenButton))
         self.btnOpenPolyline.setToolTip('<b>Open</b> a .i2s or .shp file')
@@ -113,12 +93,6 @@ class InputTab(QWidget):
         self.btnOpenPolyline.setEnabled(False)
 
         # create some text fields displaying the IO files info
-        self.serafinNameBox = QLineEdit()
-        self.serafinNameBox.setReadOnly(True)
-        self.serafinNameBox.setFixedHeight(30)
-        self.summaryTextBox = QPlainTextEdit()
-        self.summaryTextBox.setFixedHeight(50)
-        self.summaryTextBox.setReadOnly(True)
         self.polygonNameBox = QPlainTextEdit()
         self.polygonNameBox.setReadOnly(True)
         self.polygonNameBox.setFixedHeight(50)
@@ -137,14 +111,8 @@ class InputTab(QWidget):
         self.btnSubmit.setFixedSize(105, 50)
         self.btnSubmit.setEnabled(False)
 
-        # create the widget displaying message logs
-        self.logTextBox = QPlainTextEditLogger(self)
-        self.logTextBox.setFormatter(logging.Formatter('%(asctime)s - [%(levelname)s] - \n%(message)s'))
-        logging.getLogger().addHandler(self.logTextBox)
-        logging.getLogger().setLevel(logging.INFO)
-
     def _bindEvents(self):
-        self.btnOpenSerafin.clicked.connect(self.btnOpenSerafinEvent)
+        self.btnOpen.clicked.connect(self.btnOpenSerafinEvent)
         self.btnOpenPolyline.clicked.connect(self.btnOpenPolylineEvent)
         self.btnSubmit.clicked.connect(self.btnSubmitEvent)
         self.timeSampling.editingFinished.connect(self._checkSamplingFrequency)
@@ -153,24 +121,7 @@ class InputTab(QWidget):
         mainLayout = QVBoxLayout()
         mainLayout.addItem(QSpacerItem(10, 10))
         mainLayout.setSpacing(15)
-
-        hlayout = QHBoxLayout()
-        hlayout.setAlignment(Qt.AlignLeft)
-        hlayout.addItem(QSpacerItem(30, 1))
-        hlayout.addWidget(self.btnOpenSerafin)
-        hlayout.addItem(QSpacerItem(30, 1))
-        hlayout.addWidget(self.langBox)
-        mainLayout.addLayout(hlayout)
-        mainLayout.addItem(QSpacerItem(10, 10))
-
-        glayout = QGridLayout()
-        glayout.addWidget(QLabel('     Input file'), 1, 1)
-        glayout.addWidget(self.serafinNameBox, 1, 2)
-        glayout.addWidget(QLabel('     Summary'), 2, 1)
-        glayout.addWidget(self.summaryTextBox, 2, 2)
-        glayout.setAlignment(Qt.AlignLeft)
-        glayout.setSpacing(10)
-        mainLayout.addLayout(glayout)
+        mainLayout.addLayout(self.input_layout)
         mainLayout.addItem(QSpacerItem(10, 20))
 
         hlayout = QHBoxLayout()
@@ -194,7 +145,6 @@ class InputTab(QWidget):
         glayout.setSpacing(10)
         mainLayout.addLayout(glayout)
 
-
         hlayout = QHBoxLayout()
         hlayout.addItem(QSpacerItem(30, 1))
         hlayout.addWidget(self.btnSubmit)
@@ -208,7 +158,7 @@ class InputTab(QWidget):
 
     def _reinitInput(self, filename):
         self.filename = filename
-        self.serafinNameBox.setText(filename)
+        self.inNameBox.setText(filename)
         self.summaryTextBox.clear()
         self.csvNameBox.clear()
         self.header = None
@@ -475,9 +425,12 @@ class FluxPlotViewer(TemporalPlotViewer):
 
         self.locateSections = QAction('Locate sections\non map', self, icon=self.style().standardIcon(QStyle.SP_DialogHelpButton),
                                       triggered=self.locateSectionsEvent)
-        self.map.closeEvent = lambda event: self.locateSections.setEnabled(True)
+        self.locateSections_short = QAction('Locate sections\non map', self,
+                                            icon=self.style().standardIcon(QStyle.SP_DialogHelpButton),
+                                            triggered=self.locateSectionsEvent)
+        self.map.closeEvent = self.enable_locate
         self.cumulativeFluxAct = QAction('Show\ncumulative flux', self, checkable=True,
-                                          icon=self.style().standardIcon(QStyle.SP_DialogApplyButton))
+                                         icon=self.style().standardIcon(QStyle.SP_DialogApplyButton))
         self.cumulativeFluxAct.toggled.connect(self.changeFluxType)
 
         self.toolBar.addAction(self.locateSections)
@@ -492,14 +445,18 @@ class FluxPlotViewer(TemporalPlotViewer):
         self.toolBar.addAction(self.cumulativeFluxAct)
 
         self.mapMenu = QMenu('&Map', self)
-        self.mapMenu.addAction(self.locateSections)
+        self.mapMenu.addAction(self.locateSections_short)
         self.polyMenu = QMenu('&Sections', self)
-        self.polyMenu.addAction(self.selectColumnsAct)
-        self.polyMenu.addAction(self.editColumnNamesAct)
-        self.polyMenu.addAction(self.editColumColorAct)
+        self.polyMenu.addAction(self.selectColumnsAct_short)
+        self.polyMenu.addAction(self.editColumnNamesAct_short)
+        self.polyMenu.addAction(self.editColumColorAct_short)
 
         self.menuBar.addMenu(self.mapMenu)
         self.menuBar.addMenu(self.polyMenu)
+
+    def enable_locate(self, event):
+        self.locateSections.setEnabled(True)
+        self.locateSections_short.setEnabled(True)
 
     def changeFluxType(self):
         self.cumulative = not self.cumulative
@@ -572,6 +529,7 @@ class FluxPlotViewer(TemporalPlotViewer):
 
             self.has_map = True
         self.locateSections.setEnabled(False)
+        self.locateSections_short.setEnabled(False)
         self.map.show()
 
     def reset(self):

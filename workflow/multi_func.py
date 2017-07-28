@@ -1,19 +1,20 @@
 import os
 import struct
-import numpy as np
 from datetime import datetime
 from multiprocessing import Process, Queue, cpu_count
+
+import numpy as np
 from shapely.geometry import Polygon
 
-from workflow.datatypes import SerafinData, PolylineData, PointData, CSVData
-from workflow.util import process_output_options, process_geom_output_options
-from geom import BlueKenue, Shapefile
 import slf.misc as operations
-from slf import Serafin
 import slf.variables as variables
-from slf.volume import TruncatedTriangularPrisms, VolumeCalculator
+from geom import BlueKenue, Shapefile
+from slf import Serafin
+from slf.datatypes import SerafinData, PolylineData, PointData, CSVData
 from slf.flux import TriangularVectorField, FluxCalculator
 from slf.interpolation import MeshInterpolator
+from slf.volume import TruncatedTriangularPrisms, VolumeCalculator
+from workflow.util import process_output_options, process_geom_output_options
 
 
 class Workers:

@@ -1589,16 +1589,31 @@ class TemporalPlotViewer(PlotViewer):
                                           triggered=self.editColumns)
         self.editColumColorAct = QAction('Edit %s\ncolors' % self.column_name, self, icon=self.style().standardIcon(QStyle.SP_FileDialogDetailedView),
                                          triggered=self.editColor)
+        self.selectColumnsAct_short = QAction('Select %s' % self.column_name,
+                                              self, icon=self.style().standardIcon(QStyle.SP_FileDialogDetailedView),
+                                              triggered=self.selectColumns)
+        self.editColumnNamesAct_short = QAction('Edit %s labels' % self.column_name, self,
+                                                icon=self.style().standardIcon(QStyle.SP_FileDialogDetailedView),
+                                                triggered=self.editColumns)
+        self.editColumColorAct_short = QAction('Edit %s colors' % self.column_name, self,
+                                               icon=self.style().standardIcon(QStyle.SP_FileDialogDetailedView),
+                                               triggered=self.editColor)
+
         self.convertTimeAct = QAction('Toggle date/time\nformat', self, checkable=True,
                                       icon=self.style().standardIcon(QStyle.SP_DialogApplyButton))
+        convertTimeAct_short = QAction('Toggle date/time format', self, checkable=True,
+                                       icon=self.style().standardIcon(QStyle.SP_DialogApplyButton))
         self.changeDateAct = QAction('Edit\nstart date', self, triggered=self.changeDate,
                                      icon=self.style().standardIcon(QStyle.SP_DialogApplyButton))
+        changeDateAct_short = QAction('Edit start date', self, triggered=self.changeDate,
+                                      icon=self.style().standardIcon(QStyle.SP_DialogApplyButton))
         self.convertTimeAct.toggled.connect(self.convertTime)
+        convertTimeAct_short.toggled.connect(self.convertTime)
 
-        self.timeMenu = QMenu('&Date/&Time', self)
-        self.timeMenu.addAction(self.convertTimeAct)
-        self.timeMenu.addAction(self.changeDateAct)
-        self.menuBar.addMenu(self.timeMenu)
+        timeMenu = QMenu('&Date/&Time', self)
+        timeMenu.addAction(convertTimeAct_short)
+        timeMenu.addAction(changeDateAct_short)
+        self.menuBar.addMenu(timeMenu)
 
     def _defaultXLabel(self):
         if self.language == 'fr':
@@ -2806,6 +2821,63 @@ class ProjectLinesPlotViewer(QWidget):
                 self.control.lineBox.addItem('Line %s' % id_line)
                 self.line_colors[i] = self.plotViewer.defaultColors[j]   # initialize default line colors
                 j += 1
+
+
+class SerafinInputTab(QWidget):
+    def __init__(self, parent=None):
+        super().__init__()
+        self.parent = parent
+
+        # create the button open
+        self.btnOpen = QPushButton('Open', self, icon=self.style().standardIcon(QStyle.SP_DialogOpenButton))
+        self.btnOpen.setToolTip('<b>Open</b> a .slf file')
+        self.btnOpen.setFixedSize(105, 50)
+
+        # create some text fields displaying the IO files info
+        self.inNameBox = QLineEdit()
+        self.inNameBox.setReadOnly(True)
+        self.summaryTextBox = QPlainTextEdit()
+        self.summaryTextBox.setFixedHeight(50)
+        self.summaryTextBox.setReadOnly(True)
+
+        # create a checkbox for language selection
+        self.langBox = QGroupBox('Input language')
+        hlayout = QHBoxLayout()
+        self.frenchButton = QRadioButton('French')
+        self.englishButton = QRadioButton('English')
+        hlayout.addWidget(self.frenchButton)
+        hlayout.addWidget(self.englishButton)
+        self.langBox.setLayout(hlayout)
+        self.langBox.setMaximumHeight(80)
+        if self.parent.language == 'fr':
+            self.frenchButton.setChecked(True)
+        else:
+            self.englishButton.setChecked(True)
+
+        # create the widget displaying message logs
+        self.logTextBox = QPlainTextEditLogger(self)
+        self.logTextBox.setFormatter(logging.Formatter('%(asctime)s - [%(levelname)s] - \n%(message)s'))
+        logging.getLogger().addHandler(self.logTextBox)
+        logging.getLogger().setLevel(logging.INFO)
+
+        self.input_layout = QVBoxLayout()
+        hlayout = QHBoxLayout()
+        hlayout.setAlignment(Qt.AlignLeft)
+        hlayout.addItem(QSpacerItem(50, 1))
+        hlayout.addWidget(self.btnOpen)
+        hlayout.addItem(QSpacerItem(30, 1))
+        hlayout.addWidget(self.langBox)
+        self.input_layout.addLayout(hlayout)
+        self.input_layout.addItem(QSpacerItem(10, 10))
+
+        glayout = QGridLayout()
+        glayout.addWidget(QLabel('Input file'), 1, 1)
+        glayout.addWidget(self.inNameBox, 1, 2)
+        glayout.addWidget(QLabel('Summary'), 2, 1)
+        glayout.addWidget(self.summaryTextBox, 2, 2)
+        glayout.setAlignment(Qt.AlignLeft)
+        glayout.setSpacing(10)
+        self.input_layout.addLayout(glayout)
 
 
 class TelToolWidget(QWidget):

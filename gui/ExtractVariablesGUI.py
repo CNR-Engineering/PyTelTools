@@ -9,7 +9,8 @@ from slf import Serafin
 from slf.variables import get_available_variables, \
     do_calculations_in_frame, get_necessary_equations, get_US_equation, add_US
 from gui.util import TableWidgetDragRows, QPlainTextEditLogger, FallVelocityMessage, FrictionLawMessage, \
-    TimeRangeSlider, DoubleSliderBox, OutputProgressDialog, OutputThread, TelToolWidget, testOpen, handleOverwrite
+    TimeRangeSlider, DoubleSliderBox, OutputProgressDialog, OutputThread, SerafinInputTab, \
+    TelToolWidget, testOpen, handleOverwrite
 
 
 class ExtractVariablesThread(OutputThread):
@@ -169,10 +170,9 @@ class ManualTimeSelection(QWidget):
                 self.firstTable.setItem(row, 2, date_item)
 
 
-class InputTab(QWidget):
+class InputTab(SerafinInputTab):
     def __init__(self, parent):
-        super().__init__()
-        self.parent = parent
+        super().__init__(parent)
 
         self.filename = None
         self.language = None
@@ -195,32 +195,6 @@ class InputTab(QWidget):
         """!
         @brief (Used in __init__) Create widgets
         """
-        # create the button open
-        self.btnOpen = QPushButton('Open', self, icon=self.style().standardIcon(QStyle.SP_DialogOpenButton))
-        self.btnOpen.setToolTip('<b>Open</b> a .slf file')
-        self.btnOpen.setFixedSize(105, 50)
-
-        # create some text fields displaying the IO files info
-        self.inNameBox = QLineEdit()
-        self.inNameBox.setReadOnly(True)
-        self.summaryTextBox = QPlainTextEdit()
-        self.summaryTextBox.setFixedHeight(50)
-        self.summaryTextBox.setReadOnly(True)
-
-        # create a checkbox for language selection
-        self.langBox = QGroupBox('Input language')
-        hlayout = QHBoxLayout()
-        self.frenchButton = QRadioButton('French')
-        self.englishButton = QRadioButton('English')
-        hlayout.addWidget(self.frenchButton)
-        hlayout.addWidget(self.englishButton)
-        self.langBox.setLayout(hlayout)
-        self.langBox.setMaximumHeight(80)
-        if self.parent.language == 'fr':
-            self.frenchButton.setChecked(True)
-        else:
-            self.englishButton.setChecked(True)
-
         # create two 3-column tables for variables selection
         self.firstTable = TableWidgetDragRows()
         self.secondTable = TableWidgetDragRows()
@@ -249,12 +223,6 @@ class InputTab(QWidget):
         self.btnAddWs.setEnabled(False)
         self.btnAddWs.setFixedWidth(200)
 
-        # create the widget displaying message logs
-        self.logTextBox = QPlainTextEditLogger(self)
-        self.logTextBox.setFormatter(logging.Formatter('%(asctime)s - [%(levelname)s] - \n%(message)s'))
-        logging.getLogger().addHandler(self.logTextBox)
-        logging.getLogger().setLevel(logging.INFO)
-
     def _bindEvents(self):
         """!
         @brief (Used in __init__) Bind events to widgets
@@ -270,25 +238,9 @@ class InputTab(QWidget):
         mainLayout = QVBoxLayout()
         mainLayout.addItem(QSpacerItem(10, 10))
         mainLayout.setSpacing(15)
-        hlayout = QHBoxLayout()
-        hlayout.setAlignment(Qt.AlignLeft)
-        hlayout.addItem(QSpacerItem(50, 1))
-        hlayout.addWidget(self.btnOpen)
-        hlayout.addItem(QSpacerItem(30, 1))
-        hlayout.addWidget(self.langBox)
-        mainLayout.addLayout(hlayout)
-        mainLayout.addItem(QSpacerItem(10, 10))
-
-        glayout = QGridLayout()
-        glayout.addWidget(QLabel('Input file'), 1, 1)
-        glayout.addWidget(self.inNameBox, 1, 2)
-        glayout.addWidget(QLabel('Summary'), 2, 1)
-        glayout.addWidget(self.summaryTextBox, 2, 2)
-        glayout.setAlignment(Qt.AlignLeft)
-        glayout.setSpacing(10)
-        mainLayout.addLayout(glayout)
-
+        mainLayout.addLayout(self.input_layout)
         mainLayout.addItem(QSpacerItem(1, 10))
+
         hlayout = QHBoxLayout()
         hlayout.addItem(QSpacerItem(30, 1))
         vlayout = QVBoxLayout()

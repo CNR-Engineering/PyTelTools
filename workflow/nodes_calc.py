@@ -1,16 +1,14 @@
-from PyQt5.QtWidgets import *
-from PyQt5.QtCore import *
 import os
 
-from workflow.Node import Node, OneInOneOutNode, TwoInOneOutNode
-from workflow.util import OutputOptionPanel, process_output_options
-from workflow.datatypes import CSVData
-from slf import Serafin
-from slf.volume import TruncatedTriangularPrisms, VolumeCalculator
-from slf.flux import TriangularVectorField, FluxCalculator
-from slf.interpolation import MeshInterpolator
 import slf.misc as operations
 from gui.util import ConditionDialog
+from slf import Serafin
+from slf.datatypes import CSVData
+from slf.flux import TriangularVectorField, FluxCalculator
+from slf.interpolation import MeshInterpolator
+from slf.volume import TruncatedTriangularPrisms, VolumeCalculator
+from workflow.Node import Node, OneInOneOutNode, TwoInOneOutNode
+from workflow.util import OutputOptionPanel, process_output_options
 
 
 class ArrivalDurationNode(OneInOneOutNode):

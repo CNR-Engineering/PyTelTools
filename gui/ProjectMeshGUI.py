@@ -8,7 +8,7 @@ from PyQt5.QtCore import *
 import slf.misc as operations
 
 from gui.util import LoadMeshDialog, OutputProgressDialog, OutputThread, \
-    TableWidgetDragRows, QPlainTextEditLogger, TelToolWidget, testOpen, handleOverwrite
+    TableWidgetDragRows, QPlainTextEditLogger, SerafinInputTab, TelToolWidget, testOpen, handleOverwrite
 from slf import Serafin
 
 
@@ -36,11 +36,9 @@ class ProjectMeshThread(OutputThread):
             QApplication.processEvents()
 
 
-class InputTab(QWidget):
+class InputTab(SerafinInputTab):
     def __init__(self, parent):
-        super().__init__()
-        self.parent = parent
-
+        super().__init__(parent)
         self.first_language = 'fr'
         self.second_language = 'fr'
         self.first_filename = None
@@ -62,24 +60,7 @@ class InputTab(QWidget):
         self._bindEvents()
 
     def _initWidgets(self):
-        # create a checkbox for language selection
-        self.langBox = QGroupBox('Input language')
-        hlayout = QHBoxLayout()
-        self.frenchButton = QRadioButton('French')
-        self.englishButton = QRadioButton('English')
-        hlayout.addWidget(self.frenchButton)
-        hlayout.addWidget(self.englishButton)
-        self.langBox.setLayout(hlayout)
-        self.langBox.setMaximumHeight(80)
-        if self.parent.language == 'fr':
-            self.frenchButton.setChecked(True)
-        else:
-            self.englishButton.setChecked(True)
-
-        # create the button open the reference file
-        self.btnOpenFirst = QPushButton('Load\nFile A', self, icon=self.style().standardIcon(QStyle.SP_DialogOpenButton))
-        self.btnOpenFirst.setToolTip('<b>Open</b> a .slf file')
-        self.btnOpenFirst.setFixedSize(105, 50)
+        self.btnOpen.setText('Loaf\nFile A')
 
         # create the button open the test file
         self.btnOpenSecond = QPushButton('Load\nFile B', self, icon=self.style().standardIcon(QStyle.SP_DialogOpenButton))
@@ -88,15 +69,6 @@ class InputTab(QWidget):
         self.btnOpenSecond.setEnabled(False)
 
         # create some text fields displaying the IO files info
-        self.firstNameBox = QLineEdit()
-        self.firstNameBox.setReadOnly(True)
-        self.firstNameBox.setFixedHeight(30)
-        self.firstNameBox.setMinimumWidth(600)
-        self.firstSummaryTextBox = QPlainTextEdit()
-        self.firstSummaryTextBox.setMinimumHeight(40)
-        self.firstSummaryTextBox.setMaximumHeight(50)
-        self.firstSummaryTextBox.setMinimumWidth(600)
-        self.firstSummaryTextBox.setReadOnly(True)
         self.secondNameBox = QLineEdit()
         self.secondNameBox.setReadOnly(True)
         self.secondNameBox.setFixedHeight(30)
@@ -107,14 +79,8 @@ class InputTab(QWidget):
         self.secondSummaryTextBox.setMaximumHeight(50)
         self.secondSummaryTextBox.setMinimumWidth(600)
 
-        # create the widget displaying message logs
-        self.logTextBox = QPlainTextEditLogger(self)
-        self.logTextBox.setFormatter(logging.Formatter('%(asctime)s - [%(levelname)s] - \n%(message)s'))
-        logging.getLogger().addHandler(self.logTextBox)
-        logging.getLogger().setLevel(logging.INFO)
-
     def _bindEvents(self):
-        self.btnOpenFirst.clicked.connect(self.btnOpenFirstEvent)
+        self.btnOpen.clicked.connect(self.btnOpenFirstEvent)
         self.btnOpenSecond.clicked.connect(self.btnOpenSecondEvent)
 
     def _setLayout(self):
@@ -125,7 +91,7 @@ class InputTab(QWidget):
         hlayout = QHBoxLayout()
         hlayout.setAlignment(Qt.AlignLeft)
         hlayout.addItem(QSpacerItem(50, 1))
-        hlayout.addWidget(self.btnOpenFirst)
+        hlayout.addWidget(self.btnOpen)
         hlayout.addWidget(self.btnOpenSecond)
         hlayout.addItem(QSpacerItem(30, 1))
         hlayout.addWidget(self.langBox)
@@ -135,9 +101,9 @@ class InputTab(QWidget):
 
         glayout = QGridLayout()
         glayout.addWidget(QLabel('     File A'), 1, 1)
-        glayout.addWidget(self.firstNameBox, 1, 2)
+        glayout.addWidget(self.inNameBox, 1, 2)
         glayout.addWidget(QLabel('     Summary'), 2, 1)
-        glayout.addWidget(self.firstSummaryTextBox, 2, 2)
+        glayout.addWidget(self.summaryTextBox, 2, 2)
         glayout.addWidget(QLabel('     File B'), 3, 1)
         glayout.addWidget(self.secondNameBox, 3, 2)
         glayout.addWidget(QLabel('     Summary'), 4, 1)
@@ -158,8 +124,8 @@ class InputTab(QWidget):
         else:
             self.first_language = 'fr'
         self.first_filename = filename
-        self.firstNameBox.setText(filename)
-        self.firstSummaryTextBox.clear()
+        self.inNameBox.setText(filename)
+        self.summaryTextBox.clear()
         self.first_header = None
         self.btnOpenSecond.setEnabled(False)
         self.first_start_time = datetime.datetime(1900, 1, 1, 0, 0, 0)
@@ -221,7 +187,7 @@ class InputTab(QWidget):
             resin.get_time()
 
             # update the file summary
-            self.firstSummaryTextBox.appendPlainText(resin.get_summary())
+            self.summaryTextBox.appendPlainText(resin.get_summary())
 
             # copy to avoid reading the same data in the future
             self.first_header = resin.header.copy()
