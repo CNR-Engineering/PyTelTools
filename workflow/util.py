@@ -1,11 +1,12 @@
 import datetime
 import os
-
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas
 from matplotlib import cm
 from mpl_toolkits.axes_grid1 import make_axes_locatable
+from PyQt5.QtWidgets import *
+from PyQt5.QtCore import *
 
 from gui.util import TemporalPlotViewer, PointLabelEditor
 from slf import Serafin

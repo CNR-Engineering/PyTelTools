@@ -185,6 +185,7 @@ class InputTab(SerafinInputTab):
         mainLayout.setSpacing(15)
         mainLayout.addLayout(self.input_layout)
         mainLayout.addItem(QSpacerItem(10, 15))
+        mainLayout.addStretch()
         mainLayout.addWidget(QLabel('   Message logs'))
         mainLayout.addWidget(self.logTextBox.widget)
         self.setLayout(mainLayout)

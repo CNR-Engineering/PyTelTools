@@ -40,9 +40,10 @@ class ProjectWindow(QWidget):
             for line in self.mono.scene.save():
                 f.write(line)
                 f.write('\n')
-            for line in self.multi.scene.save():
-                f.write(line)
-                f.write('\n')
+            if not self.mono.scene.not_connected():
+                for line in self.multi.scene.save():
+                    f.write(line)
+                    f.write('\n')
         return True
 
     def create_new(self, filename):

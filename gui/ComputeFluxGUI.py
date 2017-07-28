@@ -130,6 +130,7 @@ class InputTab(SerafinInputTab):
         hlayout.addWidget(self.polygonNameBox)
         mainLayout.addLayout(hlayout)
         mainLayout.addItem(QSpacerItem(10, 10))
+        mainLayout.addStretch()
 
         glayout = QGridLayout()
         glayout.addWidget(QLabel('     Select the flux to compute'), 1, 1)
@@ -150,7 +151,7 @@ class InputTab(SerafinInputTab):
         hlayout.addWidget(self.btnSubmit)
         hlayout.addWidget(self.csvNameBox)
         mainLayout.addLayout(hlayout)
-
+        mainLayout.addStretch()
         mainLayout.addItem(QSpacerItem(10, 15))
         mainLayout.addWidget(QLabel('   Message logs'))
         mainLayout.addWidget(self.logTextBox.widget)
