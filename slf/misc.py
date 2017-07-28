@@ -84,8 +84,10 @@ def to_infix(expression):
     """!
     Convert an expression string to an infix expression (list of varIDs, constants, parenthesis and operators)
     """
-    return list(filter(None, map(lambda x: x.strip(), re.split('(\d+\.*\d+E*e*-*\d+|(?!e)-|(?!E)-'
-                                                               '|[+*()^/]|\[[A-Z]+\])', expression))))
+    return list(filter(None, map(lambda x: x.strip(), re.split('(\d+\.*\d+E*e*-*\d+(?=[^\]]*(?:\[|$))'
+                                                               '|(?!e)-(?=[^\]]*(?:\[|$))|(?!E)-(?=[^\]]*(?:\[|$))'
+                                                               '|\[^[a-zA-Z0-9_.-]*\]|[+*()^/](?=[^\]]*(?:\[|$)))',
+                                                               expression))))
 
 
 def infix_to_postfix(expression):
@@ -795,13 +797,7 @@ class AndOrCondition(ComplexCondition):
 
 
 class ComplexExpressionPool:
-    def __init__(self):
-        self.vars = []
-        self.var_names = []
-        self.id_pool = []
-        self.x = []
-        self.y = []
-
+    def __init__(self, variables, names, x, y):
         self.nb_expressions = 0
         self.expressions = {}
         self.nb_conditions = 0
@@ -809,20 +805,6 @@ class ComplexExpressionPool:
         self.nb_masks = 0
         self.masks = {}
 
-        self.dependency_graph = {}
-
-    def clear(self):
-        self.x = []
-        self.y = []
-        self.nb_expressions = 0
-        self.expressions = {}
-        self.nb_conditions = 0
-        self.conditions = {}
-        self.nb_masks = 0
-        self.masks = {}
-
-    def init(self, variables, names, x, y):
-        self.clear()
         self.x = x
         self.y = y
         self.vars = ['COORDX', 'COORDY'] + variables
@@ -836,7 +818,9 @@ class ComplexExpressionPool:
 
     def add_simple_expression(self, literal_expression):
         infix = to_infix(literal_expression)
+        print(infix)
         postfix = infix_to_postfix(infix)
+        print(postfix)
         if not self.is_valid(postfix):
             return -1
 
@@ -1103,20 +1087,14 @@ class ComplexExpressionPool:
             if expr.masked or not expr.polygonal:
                 yield expr.code(), repr(expr)
 
-    def evaluate_expressions(self, input_stream, selected_expressions):
-        # build augmented path
-        augmented_path = self.get_dependence(selected_expressions[0])
-        for expr in selected_expressions[1:]:
-            path = self.get_dependence(expr)
-            for node in path:
-                if node not in augmented_path:
-                    augmented_path.append(node)
-
-        # evaluate each node on the augmented path
+    def evaluate_expressions(self, augmented_path, input_stream, selected_expressions):
         nb_row = len(selected_expressions)
         nb_col = input_stream.header.nb_nodes
+
         for time_index, time_value in enumerate(input_stream.time):
             values = self._evaluate_expressions(input_stream, time_index, augmented_path)
+
+            # build nd-array in the selected order
             value_array = np.empty((nb_row, nb_col))
             for i, expr in enumerate(selected_expressions):
                 value_array[i, :] = values[expr]
@@ -1140,6 +1118,7 @@ class ComplexExpressionPool:
             return None, self.expressions[index]
 
     def _evaluate_expressions(self, input_stream, time_index, path):
+        # evaluate each node on the augmented path
         values = {node: None for node in path}
         for node in path:
             node_values, node_object = self.decode(input_stream, time_index, node)
@@ -1156,24 +1135,30 @@ class ComplexExpressionPool:
 
 class ComplexExpressionMultiPool:
     def __init__(self):
-        self.input_headers = []
+        self.input_data = []
         self.nb_pools = 0
         self.pools = []
         self.representative = None
 
-    def get_data(self, input_headers):
-        self.input_headers = input_headers
-        self.nb_pools = len(input_headers)
-        common_vars = set(input_headers[0].var_IDs)
-        for header in input_headers[1:]:
-            common_vars.intersection_update(header.var_IDs)
-        variables = [var for var in input_headers[0].var_IDs if var in common_vars]
-        names = [name.decode('utf-8').strip() for (var, name)
-                 in zip(input_headers[0].var_IDs, input_headers[0].var_names) if var in common_vars]
+    def clear(self):
+        self.input_data = []
+        self.nb_pools = 0
+        self.pools = []
+        self.representative = None
 
-        for i, header in enumerate(self.input_headers):
-            pool = ComplexExpressionPool()
-            pool.init(variables, names, header.x, header.y)
+    def get_data(self, input_data):
+        self.input_data = input_data
+        self.nb_pools = len(input_data)
+
+        common_vars = set(input_data[0].header.var_IDs)
+        for data in input_data[1:]:
+            common_vars.intersection_update(data.header.var_IDs)
+        variables = [var for var in input_data[0].header.var_IDs if var in common_vars]
+        names = [name.decode('utf-8').strip() for (var, name)
+                 in zip(input_data[0].header.var_IDs, input_data[0].header.var_names) if var in common_vars]
+
+        for data in input_data:
+            pool = ComplexExpressionPool(variables, names, data.header.x, data.header.y)
             self.pools.append(pool)
         self.representative = self.pools[0]
 
@@ -1183,7 +1168,7 @@ class ComplexExpressionMultiPool:
 
     def add_simple_expression(self, literal_expression):
         success_code = self.representative.add_simple_expression(literal_expression)
-        if success_code != 0:
+        if success_code not in (0, 1):
             return success_code
         for pool in self.pools[1:]:
             pool.add_simple_expression(literal_expression)
@@ -1191,7 +1176,7 @@ class ComplexExpressionMultiPool:
 
     def add_conditional_expression(self, condition, true_expression, false_expression):
         success_code = self.representative.add_conditional_expression(condition, true_expression, false_expression)
-        if success_code != 0:
+        if success_code not in (0, 1):
             return success_code
         for pool in self.pools[1:]:
             pool.add_conditional_expression(condition, true_expression, false_expression)
@@ -1199,7 +1184,7 @@ class ComplexExpressionMultiPool:
 
     def add_max_min_expression(self, first_expression, second_expression, is_max):
         success_code = self.representative.add_max_min_expression(first_expression, second_expression, is_max)
-        if success_code != 0:
+        if success_code not in (1, 2):
             return success_code
         for pool in self.pools[1:]:
             pool.add_max_min_expression(first_expression, second_expression, is_max)
@@ -1215,7 +1200,7 @@ class ComplexExpressionMultiPool:
 
     def add_and_or_condition(self, first_condition, second_condition, is_and):
         success_code = self.representative.add_and_or_condition(first_condition, second_condition, is_and)
-        if success_code != 0:
+        if success_code not in (0, 1):
             return success_code
         for pool in self.pools[1:]:
             pool.add_and_or_condition(first_condition, second_condition, is_and)
@@ -1251,6 +1236,9 @@ class ComplexExpressionMultiPool:
     def get_condition(self, text):
         return self.representative.get_condition(text)
 
+    def get_mask(self, text):
+        return self.representative.get_mask(text)
+
     def ready_for_conditional_expression(self):
         return self.representative.ready_for_conditional_expression()
 
@@ -1265,8 +1253,8 @@ class ComplexExpressionMultiPool:
             yield code, text
 
     def output_headers(self, selected_names):
-        for input_header in self.input_headers:
-            output_header = input_header.copy()
+        for data in self.input_data:
+            output_header = data.header.copy()
             output_header.nb_var = len(selected_names)
             output_header.var_IDs, output_header.var_names, output_header.var_units = [], [], []
             for name in selected_names:
@@ -1274,6 +1262,19 @@ class ComplexExpressionMultiPool:
                 output_header.var_names.append(bytes(name, 'utf-8').ljust(16))
                 output_header.var_units.append(bytes('', 'utf-8').ljust(16))
             yield output_header
+
+    def build_augmented_path(self, selected_expressions):
+        augmented_path = self.representative.get_dependence(selected_expressions[0])
+        for expr in selected_expressions[1:]:
+            path = self.representative.get_dependence(expr)
+            for node in path:
+                if node not in augmented_path:
+                    augmented_path.append(node)
+        return augmented_path
+
+    def evaluate_iterator(self, selected_names):
+        for data, output_header, pool in zip(self.input_data, self.output_headers(selected_names), self.pools):
+            yield data.filename, data.header, output_header, pool
 
 
 

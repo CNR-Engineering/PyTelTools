@@ -6,31 +6,56 @@ from PyQt5.QtGui import *
 from PyQt5.QtCore import *
 
 from slf import Serafin
+from slf.datatypes import SerafinData
 import slf.misc as op
 from geom import Shapefile
 from gui.util import testOpen, handleOverwrite, OutputProgressDialog, OutputThread, TelToolWidget
-from workflow.util import MultiLoadSerafinDialog
+from workflow.util import MultiLoadSerafinDialog, MultiSaveDialog, process_output_options
 
 
 class WriteVariableThread(OutputThread):
-    def __init__(self, input_stream, output_stream, output_header, pool, selected):
+    def __init__(self, pool, selected_expressions, selected_names, output_names, overwrite):
         super().__init__()
-        self.input_stream = input_stream
-        self.output_stream = output_stream
-        self.output_header = output_header
         self.pool = pool
-        self.selected = selected
-        self.nb_frames = len(self.input_stream.time)
+        self.inv_nb_files = 1 / pool.nb_pools
+
+        self.selected_expressions = selected_expressions
+        self.augmented_path = self.pool.build_augmented_path(self.selected_expressions)
+        self.selected_names = selected_names
+        self.output_names = output_names
+        self.overwrite = overwrite
+
+    def run_single(self, input_name, input_header, output_name, output_header, pool):
+        i = 0
+        with Serafin.Read(input_name, input_header.language) as input_stream:
+            input_stream.header = input_header
+            input_stream.get_time()
+            inv_nb_frames = len(input_stream.time)
+
+            with Serafin.Write(output_name, input_header.language, True) as output_stream:
+                output_stream.write_header(output_header)
+
+                for time_value, value_array in pool.evaluate_expressions(self.augmented_path,
+                                                                         input_stream, self.selected_expressions):
+                    if self.canceled:
+                        return
+                    i += 1
+                    output_stream.write_entire_frame(output_header, time_value, value_array)
+
+                    self.tick.emit(100 * i * self.inv_nb_files * inv_nb_frames)
+                    QApplication.processEvents()
 
     def run(self):
-        i = 0
-        for time_value, value_array in self.pool.evaluate_expressions(self.input_stream, self.selected):
+        for (input_name, input_header, output_header, pool), \
+                output_name in zip(self.pool.evaluate_iterator(self.selected_names), self.output_names):
+            if not self.overwrite:
+                if os.path.exists(output_name):
+                    continue
+
             if self.canceled:
                 return
-            i += 1
-            self.output_stream.write_entire_frame(self.output_header, time_value, value_array)
-            self.tick.emit(100 * i / self.nb_frames)
-            QApplication.processEvents()
+
+            self.run_single(input_name, input_header, output_name, output_header, pool)
 
 
 class VariableList(QListWidget):
@@ -701,7 +726,7 @@ class InputTab(QWidget):
         self.parent.reset()
 
     def read(self):
-        headers = []
+        input_data = []
         for (job_id, dir_path) in zip(self.job_ids, self.dir_paths):
             filename = os.path.join(dir_path, self.slf_name)
             try:
@@ -711,14 +736,13 @@ class InputTab(QWidget):
                 QMessageBox.critical(self, 'Error', 'Fail to open the file with ID %s: permission denied.' % job_id,
                                      QMessageBox.Ok)
                 return []
-            with Serafin.Read(filename, self.language) as f:
-                f.read_header()
-                if not f.header.is_2d:
-                    QMessageBox.critical(self, 'Error', 'The file with ID %s is not TELEMAC 2D.' % job_id,
-                                         QMessageBox.Ok)
-                    return []
-                headers.append(f.header)
-        return headers
+            data = SerafinData(job_id, filename, self.language)
+            if not data.read():
+                QMessageBox.critical(self, 'Error', 'The file with ID %s is not TELEMAC 2D.' % job_id,
+                                     QMessageBox.Ok)
+                return []
+            input_data.append(data)
+        return input_data
 
     def btnOpenEvent(self):
         if not self.slf_name:
@@ -731,8 +755,8 @@ class InputTab(QWidget):
         self._reinitInput()
         self.dir_paths, self.slf_name, self.job_ids = dlg.dir_paths, dlg.slf_name, dlg.job_ids
 
-        headers = self.read()
-        if not headers:
+        input_data = self.read()
+        if not input_data:
             return
 
         self.table.setRowCount(len(self.dir_paths))
@@ -743,7 +767,7 @@ class InputTab(QWidget):
             self.table.setItem(i, 1, id_item)
 
         self.polygon_box.setEnabled(True)
-        self.parent.get_input(headers)
+        self.parent.get_input(input_data)
 
     def polygon_event(self):
         filename, _ = QFileDialog.getOpenFileName(self, 'Open a .shp file', '', 'Polygon file (*.shp)',
@@ -837,9 +861,10 @@ class EditorTab(QWidget):
         self.add_condition_button.setEnabled(False)
         self.expression_list.clear()
         self.condition_list.clear()
+        self.pool.clear()
 
-    def get_input(self, headers):
-        self.pool.get_data(headers)
+    def get_input(self, input_data):
+        self.pool.get_data(input_data)
 
     def add_expression(self):
         dlg = ExpressionDialog(self.pool)
@@ -937,52 +962,45 @@ class SubmitTab(QWidget):
             self.submit_button.setEnabled(True)
 
     def submit_event(self):
-        pass # TODO
-        # create the save file dialog
-        # options = QFileDialog.Options()
-        # options |= QFileDialog.DontUseNativeDialog
-        # options |= QFileDialog.DontConfirmOverwrite
-        # filename, _ = QFileDialog.getSaveFileName(self, 'Choose the output file name', '',
-        #                                           'Serafin Files (*.slf)', options=options)
-        #
-        # # check the file name consistency
-        # if not filename:
-        #     return
-        # if len(filename) < 5 or filename[-4:] != '.slf':
-        #     filename += '.slf'
-        #
-        # # overwrite to the input file is forbidden
-        # if filename == self.input.filename:
-        #     QMessageBox.critical(self, 'Error', 'Cannot overwrite to the input file.',
-        #                          QMessageBox.Ok)
-        #     return
-        #
-        # # handle overwrite manually
-        # overwrite = handleOverwrite(filename)
-        # if overwrite is None:
-        #     return
-        #
-        # selected, names = self.selected_expressions()
-        # output_header = self.output_header(names)
-        #
-        # self.parent.inDialog()
-        # progress_bar = OutputProgressDialog()
-        #
-        # with Serafin.Read(self.input.filename, self.input.language) as input_stream:
-        #     input_stream.header = self.input.header
-        #     input_stream.time = self.input.time
-        #
-        #     with Serafin.Write(filename, self.input.language, True) as output_stream:
-        #         output_stream.write_header(output_header)
-        #
-        #         process = WriteVariableThread(input_stream, output_stream, output_header, self.editor.pool, selected)
-        #         progress_bar.connectToThread(process)
-        #         process.run()
-        #
-        #         if not process.canceled:
-        #             progress_bar.outputFinished()
-        #         progress_bar.exec_()
-        #         self.parent.outDialog()
+        dlg = MultiSaveDialog('_new_variables')
+        if dlg.exec_() == QDialog.Rejected:
+            return
+        suffix, in_source_folder, dir_path, double_name, overwrite = dlg.panel.get_options()
+
+        out_names = []
+        for data in self.editor.pool.input_data:
+            name = process_output_options(data.filename, data.job_id, '.slf',
+                                          suffix, in_source_folder, dir_path, double_name)
+            out_names.append(name)
+
+        if overwrite:
+            for out_name in out_names:
+                try:
+                    with open(out_name, 'w') as f:
+                        pass
+                except PermissionError:
+                    QMessageBox.critical(None, 'Permission denied',
+                                         'Permission denied (Is the file opened by another application?)\n'
+                                         'when trying to write %s.' % out_name,
+                                         QMessageBox.Ok, QMessageBox.Ok)
+                    return
+
+        selected_expressions, selected_names = self.selected_expressions()
+
+        self.parent.inDialog()
+        progress_bar = OutputProgressDialog()
+        process = WriteVariableThread(self.editor.pool, selected_expressions, selected_names, out_names, overwrite)
+        progress_bar.connectToThread(process)
+        process.run()
+
+        if not process.canceled:
+            progress_bar.outputFinished()
+        elif overwrite:
+            for out_name in out_names:
+                os.remove(out_name)
+
+        progress_bar.exec_()
+        self.parent.outDialog()
 
 
 class CalculatorGUI(TelToolWidget):
@@ -1011,12 +1029,13 @@ class CalculatorGUI(TelToolWidget):
     def reset(self):
         self.tab.setTabEnabled(1, False)
         self.tab.setTabEnabled(2, False)
+        self.editor_tab.reset()
         self.submit_tab.reset()
 
-    def get_input(self, headers):
+    def get_input(self, input_data):
         self.tab.setTabEnabled(1, True)
         self.tab.setTabEnabled(2, True)
-        self.editor_tab.get_input(headers)
+        self.editor_tab.get_input(input_data)
 
 
 def exception_hook(exctype, value, traceback):
