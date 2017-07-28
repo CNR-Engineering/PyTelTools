@@ -114,7 +114,7 @@ class LandXMLtoTinDialog(QDialog):
             QMessageBox.information(self, 'Succès', message, QMessageBox.Ok)
         else:
             message = "Les fichiers tin n'ont pas tous été générés :\n" + '\n'.join(fail_messages)
-            QMessageBox.warining(self, 'Echec', message, QMessageBox.Ok)
+            QMessageBox.warning(self, 'Echec', message, QMessageBox.Ok)
 
 
 class PngDialog(QDialog):
@@ -317,7 +317,7 @@ class MxdToPngDialog(QDialog):
             QMessageBox.information(self, 'Succès', message, QMessageBox.Ok)
         else:
             message = "Les fichiers tin n'ont pas tous été générés :\n" + '\n'.join(fail_messages)
-            QMessageBox.warining(self, 'Echec', message, QMessageBox.Ok)
+            QMessageBox.warning(self, 'Echec', message, QMessageBox.Ok)
         return True
 
 
