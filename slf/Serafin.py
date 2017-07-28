@@ -358,9 +358,8 @@ class Write(Serafin):
     """!
     @brief .slf file output stream
     """
-    def __init__(self, filename, language, overwrite):
-        mode = 'wb' if overwrite else 'xb'
-        super().__init__(filename, mode, language)
+    def __init__(self, filename, language):
+        super().__init__(filename, 'wb', language)
         module_logger.info('Writing the output file: "%s"' % filename)
 
     def __enter__(self):

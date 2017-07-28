@@ -5,7 +5,7 @@ from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 
 from workflow.Node import Node, OneInOneOutNode, TwoInOneOutNode
-from gui.util import TableWidgetDragRows, SimpleTimeDateSelection,\
+from gui.util import VariableTable, SimpleTimeDateSelection,\
     TimeRangeSlider, DoubleSliderBox, FrictionLawMessage, FallVelocityMessage
 from geom.transformation import load_transformation_map
 from slf.variables import get_available_variables, get_necessary_equations, add_US, get_US_equation
@@ -36,18 +36,8 @@ class SelectVariablesNode(OneInOneOutNode):
 
     def get_option_panel(self):
         option_panel = QWidget()
-        self.first_table = TableWidgetDragRows()
-        self.second_table = TableWidgetDragRows()
-        for tw in [self.first_table, self.second_table]:
-            tw.setColumnCount(3)
-            tw.setHorizontalHeaderLabels(['ID', 'Name', 'Unit'])
-            vh = tw.verticalHeader()
-            vh.setSectionResizeMode(QHeaderView.Fixed)
-            vh.setDefaultSectionSize(20)
-            hh = tw.horizontalHeader()
-            hh.setDefaultSectionSize(100)
-            tw.setEditTriggers(QAbstractItemView.NoEditTriggers)
-            tw.setMaximumHeight(800)
+        self.first_table = VariableTable()
+        self.second_table = VariableTable()
         for var_id, (var_name, var_unit) in self.in_data.selected_vars_names.items():
             if var_id in self.selected_vars_names:
                 row = self.second_table.rowCount()

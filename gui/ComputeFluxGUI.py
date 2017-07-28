@@ -3,17 +3,14 @@ import logging
 import datetime
 import numpy as np
 import pandas as pd
-import struct
 
 from PyQt5.QtWidgets import *
-from PyQt5.QtGui import *
 from PyQt5.QtCore import *
 
 from slf import Serafin
 from slf.flux import FluxCalculator
-from geom import BlueKenue, Shapefile
-from gui.util import TemporalPlotViewer, QPlainTextEditLogger, LineMapCanvas, MapViewer, OutputThread, \
-    OutputProgressDialog, LoadMeshDialog, SerafinInputTab, TelToolWidget, handleOverwrite, testOpen
+from gui.util import TemporalPlotViewer, LineMapCanvas, MapViewer, OutputThread, \
+    OutputProgressDialog, LoadMeshDialog, SerafinInputTab, TelToolWidget, save_dialog, open_polylines
 
 
 class FluxCalculatorThread(OutputThread):
@@ -71,11 +68,8 @@ class InputTab(SerafinInputTab):
         super().__init__(parent)
         self.old_options = ('1', '')
 
-        self.filename = None
-        self.header = None
+        self.data = None
         self.mesh = None
-        self.language = 'fr'
-        self.time = []
         self.polylines = []
         self.var_IDs = []
 
@@ -157,13 +151,10 @@ class InputTab(SerafinInputTab):
         mainLayout.addWidget(self.logTextBox.widget)
         self.setLayout(mainLayout)
 
-    def _reinitInput(self, filename):
-        self.filename = filename
-        self.inNameBox.setText(filename)
-        self.summaryTextBox.clear()
+    def _reinitInput(self):
+        self.reset()
+        self.data = None
         self.csvNameBox.clear()
-        self.header = None
-        self.time = []
         self.mesh = None
         self.csvNameBox.clear()
         self.old_options = (self.timeSampling.text(),
@@ -173,14 +164,9 @@ class InputTab(SerafinInputTab):
         self.fluxBox.clear()
         self.btnSubmit.setEnabled(False)
 
-        if not self.frenchButton.isChecked():
-            self.language = 'en'
-        else:
-            self.language = 'fr'
-
     def _resetDefaultOptions(self):
         sampling_frequency, flux_type = self.old_options
-        if int(sampling_frequency) <= len(self.time):
+        if int(sampling_frequency) <= len(self.data.time):
             self.timeSampling.setText(sampling_frequency)
         for i in range(self.fluxBox.count()):
             text = self.fluxBox.itemText(i)
@@ -236,7 +222,7 @@ class InputTab(SerafinInputTab):
                                  QMessageBox.Ok)
             self.timeSampling.setText('1')
             return
-        if sampling_frequency < 1 or sampling_frequency > len(self.time):
+        if sampling_frequency < 1 or sampling_frequency > len(self.data.time):
             QMessageBox.critical(self, 'Error', 'The sampling frequency must be in the range [1; nbFrames]!',
                                  QMessageBox.Ok)
             self.timeSampling.setText('1')
@@ -260,86 +246,43 @@ class InputTab(SerafinInputTab):
         return flux_type, var_IDs, selection
 
     def btnOpenSerafinEvent(self):
-        options = QFileDialog.Options()
-        options |= QFileDialog.DontUseNativeDialog
-        filename, _ = QFileDialog.getOpenFileName(self, 'Open a .slf file', '',
-                                                  'Serafin Files (*.slf)', QDir.currentPath(), options=options)
-        if not filename:
-            return
-        if not testOpen(filename):
+        canceled, filename = super().open_event()
+        if canceled:
             return
 
-        self._reinitInput(filename)
+        self._reinitInput()
+        success, data = self.read_2d(filename)
+        if not success:
+            return
 
-        with Serafin.Read(filename, self.language) as resin:
-            resin.read_header()
+        flux_added = self._addFluxOptions(data.header)
+        if not flux_added:
+            QMessageBox.critical(self, 'Error', 'No flux is computable from this file.', QMessageBox.Ok)
+            self.summaryTextBox.clear()
+            return
 
-            # check if the file is 2D
-            if not resin.header.is_2d:
-                QMessageBox.critical(self, 'Error', 'The file type (TELEMAC 3D) is currently not supported.',
-                                     QMessageBox.Ok)
-                return
+        # record the mesh for future visualization and calculations
+        self.parent.inDialog()
+        meshLoader = LoadMeshDialog('flux', data.header)
+        self.mesh = meshLoader.run()
+        self.parent.outDialog()
+        if meshLoader.thread.canceled:
+            self.fluxBox.clear()
+            self.polygonNameBox.clear()
+            self.summaryTextBox.clear()
+            return
 
-            flux_added = self._addFluxOptions(resin.header)
-            if not flux_added:
-                QMessageBox.critical(self, 'Error', 'No flux is computable from this file.',
-                                     QMessageBox.Ok)
-                return
-
-            # record the time series
-            resin.get_time()
-
-            # record the mesh for future visualization and calculations
-            self.parent.inDialog()
-            meshLoader = LoadMeshDialog('flux', resin.header)
-            self.mesh = meshLoader.run()
-            self.parent.outDialog()
-            if meshLoader.thread.canceled:
-                self.fluxBox.clear()
-                self.polygonNameBox.clear()
-                return
-
-            # update the file summary
-            self.summaryTextBox.appendPlainText(resin.get_summary())
-
-            # copy to avoid reading the same data in the future
-            self.header = resin.header.copy()
-            self.time = resin.time[:]
-
+        self.data = data
         self._resetDefaultOptions()
         self.btnOpenPolyline.setEnabled(True)
         self.parent.imageTab.reset()
         self.parent.tab.setTabEnabled(1, False)
 
     def btnOpenPolylineEvent(self):
-        options = QFileDialog.Options()
-        options |= QFileDialog.DontUseNativeDialog
-        filename, _ = QFileDialog.getOpenFileName(self, 'Open a .i2s or .shp file', '',
-                                                  'Polyline file (*.i2s *.shp)', options=options)
-        if not filename:
+        success, filename, polylines = open_polylines()
+        if not success:
             return
-        if not testOpen(filename):
-            return
-        is_i2s = filename[-4:] == '.i2s'
-
-        self.polylines = []
-        if is_i2s:
-            with BlueKenue.Read(filename) as f:
-                f.read_header()
-                for poly in f.get_open_polylines():
-                    self.polylines.append(poly)
-        else:
-            try:
-                for poly in Shapefile.get_open_polylines(filename):
-                    self.polylines.append(poly)
-            except struct.error:
-                QMessageBox.critical(self, 'Error', 'Inconsistent bytes.', QMessageBox.Ok)
-                return
-        if not self.polylines:
-            QMessageBox.critical(self, 'Error', 'The file does not contain any open polyline.',
-                                 QMessageBox.Ok)
-            return
-
+        self.polylines = polylines
         logging.info('Finished reading the polyline file %s' % filename)
         self.polygonNameBox.clear()
         self.polygonNameBox.appendPlainText(filename + '\n' + 'The file contains {} open polyline{}.'.format(
@@ -350,27 +293,15 @@ class InputTab(SerafinInputTab):
         self.parent.tab.setTabEnabled(1, False)
 
     def btnSubmitEvent(self):
+        canceled, filename = save_dialog('.csv')
+        if canceled:
+            return
+        self.csvNameBox.setText(filename)
+
         sampling_frequency = int(self.timeSampling.text())
-
-        options = QFileDialog.Options()
-        options |= QFileDialog.DontUseNativeDialog
-        options |= QFileDialog.DontConfirmOverwrite
-        filename, _ = QFileDialog.getSaveFileName(self, 'Choose the output file name', '',
-                                                  'CSV Files (*.csv)', options=options)
-
-        # check the file name consistency
-        if not filename:
-            return
-        if len(filename) < 5 or filename[-4:] != '.csv':
-            filename += '.csv'
-        overwrite = handleOverwrite(filename)
-        if overwrite is None:
-            return
-
         flux_type, self.var_IDs, flux_title = self._getFluxSection()
         self.parent.tab.setTabEnabled(1, False)
 
-        self.csvNameBox.setText(filename)
         logging.info('Writing the output to %s' % filename)
         self.parent.inDialog()
 
@@ -380,11 +311,11 @@ class InputTab(SerafinInputTab):
         # do the calculations
         names = ['Section %d' % (i+1) for i in range(len(self.polylines))]
 
-        with Serafin.Read(self.filename, self.language) as resin:
-            resin.header = self.header
-            resin.time = self.time
+        with Serafin.Read(self.data.filename, self.data.language) as input_stream:
+            input_stream.header = self.data.header
+            input_stream.time = self.data.time
             calculator = FluxCalculatorThread(flux_type, self.var_IDs,
-                                              resin, names, self.polylines, sampling_frequency,
+                                              input_stream, names, self.polylines, sampling_frequency,
                                               self.mesh, self.parent.csv_separator)
             progressBar.setValue(5)
             QApplication.processEvents()
@@ -468,10 +399,12 @@ class FluxPlotViewer(TemporalPlotViewer):
         self.canvas.axes.clear()
         for column in self.current_columns:
             if not self.cumulative:
-                self.canvas.axes.plot(self.time[self.timeFormat], self.data[column], '-', color=self.column_colors[column],
+                self.canvas.axes.plot(self.time[self.timeFormat], self.data[column], '-',
+                                      color=self.column_colors[column],
                                       linewidth=2, label=self.column_labels[column])
             else:
-                self.canvas.axes.plot(self.time[self.timeFormat], np.cumsum(self.data[column]), '-', color=self.column_colors[column],
+                self.canvas.axes.plot(self.time[self.timeFormat], np.cumsum(self.data[column]), '-',
+                                      color=self.column_colors[column],
                                       linewidth=2, label=self.column_labels[column])
 
         self.canvas.axes.legend()
@@ -495,8 +428,8 @@ class FluxPlotViewer(TemporalPlotViewer):
         self.data.sort_values('time', inplace=True)
 
         self.var_IDs = self.input.var_IDs
-        if self.input.header.date is not None:
-            year, month, day, hour, minute, second = self.input.header.date
+        if self.input.data.header.date is not None:
+            year, month, day, hour, minute, second = self.input.data.header.date
             self.start_time = datetime.datetime(year, month, day, hour, minute, second)
         else:
             self.start_time = datetime.datetime(1900, 1, 1, 0, 0, 0)
@@ -514,7 +447,7 @@ class FluxPlotViewer(TemporalPlotViewer):
         # initialize the plot
         self.time = [self.data['time'], self.data['time'], self.data['time'],
                      self.data['time'] / 60, self.data['time'] / 3600, self.data['time'] / 86400]
-        self.language = self.input.language
+        self.language = self.input.data.language
         self.current_xlabel = self._defaultXLabel()
         self.current_ylabel = self.flux_title
         self.current_title = ''

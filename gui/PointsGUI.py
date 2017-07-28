@@ -7,10 +7,9 @@ from PyQt5.QtCore import *
 import pandas as pd
 
 from slf import Serafin
-from geom import Shapefile
-from gui.util import TemporalPlotViewer, MapViewer, MapCanvas, QPlainTextEditLogger, OutputThread,\
-    TableWidgetDragRows, OutputProgressDialog, LoadMeshDialog, handleOverwrite, SerafinInputTab, TelToolWidget, \
-    testOpen, PointAttributeTable, PointLabelEditor
+from gui.util import TemporalPlotViewer, MapViewer, MapCanvas, OutputThread,\
+    VariableTable, OutputProgressDialog, LoadMeshDialog, SerafinInputTab, TelToolWidget, \
+    PointAttributeTable, PointLabelEditor, open_points, save_dialog
 
 
 class WriteCSVProcess(OutputThread):
@@ -63,10 +62,7 @@ class InputTab(SerafinInputTab):
         self.map = MapViewer(canvas)
         self.has_map = False
 
-        self.filename = None
-        self.header = None
-        self.language = 'fr'
-        self.time = []
+        self.data = None
         self.mesh = None
 
         self.points = []
@@ -97,19 +93,8 @@ class InputTab(SerafinInputTab):
         self.pointsNameBox.setFixedHeight(50)
 
         # create two 3-column tables for variables selection
-        self.firstTable = TableWidgetDragRows()
-        self.secondTable = TableWidgetDragRows()
-        for tw in [self.firstTable, self.secondTable]:
-            tw.setColumnCount(3)
-            tw.setHorizontalHeaderLabels(['ID', 'Name', 'Unit'])
-            vh = tw.verticalHeader()
-            vh.setSectionResizeMode(QHeaderView.Fixed)
-            vh.setDefaultSectionSize(20)
-            hh = tw.horizontalHeader()
-            hh.setDefaultSectionSize(110)
-            tw.setEditTriggers(QAbstractItemView.NoEditTriggers)
-            tw.setMaximumHeight(800)
-            tw.setMinimumHeight(100)
+        self.firstTable = VariableTable()
+        self.secondTable = VariableTable()
 
         self.timeSampling = QLineEdit('1')
         self.timeSampling.setFixedWidth(50)
@@ -211,13 +196,10 @@ class InputTab(SerafinInputTab):
         mainLayout.addWidget(self.logTextBox.widget)
         self.setLayout(mainLayout)
 
-    def _reinitInput(self, filename):
-        self.filename = filename
+    def _reinitInput(self):
+        self.reset()
+        self.data = None
         self.has_map = False
-        self.inNameBox.setText(filename)
-        self.summaryTextBox.clear()
-        self.header = None
-        self.time = []
         self.firstTable.setRowCount(0)
         self.secondTable.setRowCount(0)
         self.btnMap.setEnabled(False)
@@ -231,13 +213,8 @@ class InputTab(SerafinInputTab):
         self.csvNameBox.clear()
         self.parent.tab.setTabEnabled(1, False)
 
-        if not self.frenchButton.isChecked():
-            self.language = 'en'
-        else:
-            self.language = 'fr'
-
     def _resetDefaultOptions(self):
-        if int(self.old_frequency) <= len(self.time):
+        if int(self.old_frequency) <= len(self.data.time):
             self.timeSampling.setText(self.old_frequency)
 
         is_inside, self.point_interpolators = self.mesh.get_point_interpolators(self.points)
@@ -259,14 +236,7 @@ class InputTab(SerafinInputTab):
             self.btnMap.setEnabled(True)
 
     def _initVarTables(self):
-        for i, (id, name, unit) in enumerate(zip(self.header.var_IDs, self.header.var_names, self.header.var_units)):
-            self.firstTable.insertRow(self.firstTable.rowCount())
-            id_item = QTableWidgetItem(id.strip())
-            name_item = QTableWidgetItem(name.decode('utf-8').strip())
-            unit_item = QTableWidgetItem(unit.decode('utf-8').strip())
-            self.firstTable.setItem(i, 0, id_item)
-            self.firstTable.setItem(i, 1, name_item)
-            self.firstTable.setItem(i, 2, unit_item)
+        self.firstTable.fill(self.data.header)
 
     def _checkSamplingFrequency(self):
         try:
@@ -276,59 +246,36 @@ class InputTab(SerafinInputTab):
                                  QMessageBox.Ok)
             self.timeSampling.setText('1')
             return
-        if sampling_frequency < 1 or sampling_frequency > len(self.time):
+        if sampling_frequency < 1 or sampling_frequency > len(self.data.time):
             QMessageBox.critical(self, 'Error', 'The sampling frequency must be in the range [1; nbFrames]!',
                                  QMessageBox.Ok)
             self.timeSampling.setText('1')
             return
 
     def getSelectedVariables(self):
-        selected = []
-        for i in range(self.secondTable.rowCount()):
-            selected.append(self.secondTable.item(i, 0).text())
-        return selected
+        return self.secondTable.get_selected()
 
     def btnOpenSerafinEvent(self):
-        options = QFileDialog.Options()
-        options |= QFileDialog.DontUseNativeDialog
-        filename, _ = QFileDialog.getOpenFileName(self, 'Open a .slf file', '',
-                                                  'Serafin Files (*.slf)', QDir.currentPath(), options=options)
-        if not filename:
-            return
-        if not testOpen(filename):
+        canceled, filename = super().open_event()
+        if canceled:
             return
 
-        self._reinitInput(filename)
+        self._reinitInput()
+        success, data = self.read_2d(filename)
+        if not success:
+            return
 
-        with Serafin.Read(filename, self.language) as resin:
-            resin.read_header()
+        # record the mesh for future visualization and calculations
+        self.parent.inDialog()
+        meshLoader = LoadMeshDialog('interpolation', data.header)
+        self.mesh = meshLoader.run()
+        self.parent.outDialog()
+        if meshLoader.thread.canceled:
+            self.pointsNameBox.clear()
+            self.summaryTextBox.clear()
+            return
 
-            # check if the file is 2D
-            if not resin.header.is_2d:
-                QMessageBox.critical(self, 'Error', 'The file type (TELEMAC 3D) is currently not supported.',
-                                     QMessageBox.Ok)
-                return
-
-
-            # record the time series
-            resin.get_time()
-
-            # record the mesh for future visualization and calculations
-            self.parent.inDialog()
-            meshLoader = LoadMeshDialog('interpolation', resin.header)
-            self.mesh = meshLoader.run()
-            self.parent.outDialog()
-            if meshLoader.thread.canceled:
-                self.pointsNameBox.clear()
-                return
-
-            # update the file summary
-            self.summaryTextBox.appendPlainText(resin.get_summary())
-
-            # copy to avoid reading the same data in the future
-            self.header = resin.header.copy()
-            self.time = resin.time[:]
-
+        self.data = data
         self.btnOpenPoints.setEnabled(True)
         self._resetDefaultOptions()
         self.parent.imageTab.reset()
@@ -337,45 +284,22 @@ class InputTab(SerafinInputTab):
         self._initVarTables()
 
     def btnOpenPointsEvent(self):
-        options = QFileDialog.Options()
-        options |= QFileDialog.DontUseNativeDialog
-        filename, _ = QFileDialog.getOpenFileName(self, 'Open a .shp file', '',
-                                                  'Shapefile (*.shp)', options=options)
-        if not filename:
-            return
-        if not testOpen(filename):
+        success, filename, points, attributes, fields = open_points()
+        if not success:
             return
 
-        is_shp = filename[-4:] == '.shp'
-
-        if not is_shp:
-            QMessageBox.critical(self, 'Error', 'Only .shp file format is currently supported.',
-                                 QMessageBox.Ok)
-            return
-
-        self.points = []
-        self.attributes = []
-
-        self.fields, indices = Shapefile.get_attribute_names(filename)
-        for point, attribute in Shapefile.get_points(filename, indices):
-            self.points.append(point)
-            self.attributes.append(attribute)
-
-        if not self.points:
-            QMessageBox.critical(self, 'Error', 'The file does not contain any points.',
-                                 QMessageBox.Ok)
-            return
         logging.info('Finished reading the points file %s' % filename)
-
-        is_inside, self.point_interpolators = self.mesh.get_point_interpolators(self.points)
+        is_inside, point_interpolators = self.mesh.get_point_interpolators(points)
         nb_inside = sum(map(int, is_inside))
         if nb_inside == 0:
-            QMessageBox.critical(self, 'Error', 'No point inside the mesh.',
-                                 QMessageBox.Ok)
+            QMessageBox.critical(self, 'Error', 'No point inside the mesh.', QMessageBox.Ok)
             return
 
+        self.points = points
+        self.attributes = attributes
+        self.fields = fields
         self.attribute_table.getData(self.points, is_inside, self.fields, self.attributes)
-
+        self.point_interpolators = point_interpolators
         self.pointsNameBox.clear()
         self.pointsNameBox.appendPlainText(filename + '\n' + 'The file contains {} point{}.'
                                                              '{} point{} inside the mesh.'.format(
@@ -416,44 +340,33 @@ class InputTab(SerafinInputTab):
                                  QMessageBox.Ok)
             return
 
-        sampling_frequency = int(self.timeSampling.text())
-
-        options = QFileDialog.Options()
-        options |= QFileDialog.DontUseNativeDialog
-        options |= QFileDialog.DontConfirmOverwrite
-        filename, _ = QFileDialog.getSaveFileName(self, 'Choose the output file name', '',
-                                                  'CSV Files (*.csv)', options=options)
-
-        # check the file name consistency
-        if not filename:
-            return
-        if len(filename) < 5 or filename[-4:] != '.csv':
-            filename += '.csv'
-        overwrite = handleOverwrite(filename)
-        if overwrite is None:
+        canceled, filename = save_dialog('.csv')
+        if canceled:
             return
 
         self.csvNameBox.setText(filename)
         logging.info('Writing the output to %s' % filename)
         self.parent.inDialog()
 
-        selected_time = self.time[::sampling_frequency]
+
+        sampling_frequency = int(self.timeSampling.text())
+        selected_time = self.data.time[::sampling_frequency]
         indices_inside = [i for i in range(len(self.points)) if self.point_interpolators[i] is not None]
 
         # initialize the progress bar
         process = WriteCSVProcess(self.parent.csv_separator, self.mesh)
         progressBar = OutputProgressDialog()
 
-        with Serafin.Read(self.filename, self.language) as resin:
-            resin.header = self.header
-            resin.time = self.time
+        with Serafin.Read(self.data.filename, self.data.language) as input_stream:
+            input_stream.header = self.data.header
+            input_stream.time = self.data.time
 
             progressBar.setValue(1)
             QApplication.processEvents()
 
-            with open(filename, 'w') as fout:
+            with open(filename, 'w') as output_stream:
                 progressBar.connectToThread(process)
-                process.write_csv(resin, selected_time, selected_var_IDs, fout,
+                process.write_csv(input_stream, selected_time, selected_var_IDs, output_stream,
                                   [self.points[i] for i in indices_inside],
                                   [self.point_interpolators[i] for i in indices_inside])
         if not process.canceled:
@@ -587,8 +500,8 @@ class ImageTab(TemporalPlotViewer):
         self.data = pd.read_csv(csv_file, header=0, sep=self.input.parent.csv_separator)
         self.data.sort_values('time', inplace=True)
 
-        if self.input.header.date is not None:
-            year, month, day, hour, minute, second = self.input.header.date
+        if self.input.data.header.date is not None:
+            year, month, day, hour, minute, second = self.input.data.header.date
             self.start_time = datetime.datetime(year, month, day, hour, minute, second)
         else:
             self.start_time = datetime.datetime(1900, 1, 1, 0, 0, 0)
@@ -607,7 +520,7 @@ class ImageTab(TemporalPlotViewer):
         # initialize the plot
         self.time = [self.data['time'], self.data['time'], self.data['time'],
                      self.data['time'] / 60, self.data['time'] / 3600, self.data['time'] / 86400]
-        self.language = self.input.language
+        self.language = self.input.data.language
         self.current_xlabel = self._defaultXLabel()
         self.current_ylabel = self._defaultYLabel()
         self.current_title = ''

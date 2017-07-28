@@ -26,12 +26,12 @@ class SerafinData:
         self.metadata = {}
 
     def read(self):
-        with Serafin.Read(self.filename, self.language) as resin:
-            resin.read_header()
-            resin.get_time()
+        with Serafin.Read(self.filename, self.language) as input_stream:
+            input_stream.read_header()
+            input_stream.get_time()
 
-            self.header = resin.header.copy()
-            self.time = resin.time[:]
+            self.header = input_stream.header.copy()
+            self.time = input_stream.time[:]
 
         if self.header.date is not None:
             year, month, day, hour, minute, second = self.header.date

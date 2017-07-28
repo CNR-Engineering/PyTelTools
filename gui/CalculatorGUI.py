@@ -2,14 +2,13 @@ import sys
 import os
 import struct
 from PyQt5.QtWidgets import *
-from PyQt5.QtGui import *
 from PyQt5.QtCore import *
 
 from slf import Serafin
 from slf.datatypes import SerafinData
 import slf.misc as op
 from geom import Shapefile
-from gui.util import testOpen, handleOverwrite, OutputProgressDialog, OutputThread, TelToolWidget
+from gui.util import testOpen, OutputProgressDialog, OutputThread, TelToolWidget
 from workflow.util import MultiLoadSerafinDialog, MultiSaveDialog, process_output_options
 
 
@@ -32,7 +31,7 @@ class WriteVariableThread(OutputThread):
             input_stream.get_time()
             inv_nb_frames = len(input_stream.time)
 
-            with Serafin.Write(output_name, input_header.language, True) as output_stream:
+            with Serafin.Write(output_name, input_header.language) as output_stream:
                 output_stream.write_header(output_header)
 
                 for time_value, value_array in pool.evaluate_expressions(self.augmented_path,
@@ -934,7 +933,7 @@ class SubmitTab(QWidget):
         self.submit_button.setEnabled(False)
 
     def old_names(self):
-        names = self.editor.pool.var_names()[:]
+        names = []
         for row in range(self.table.rowCount()):
             names.append(self.table.item(row, 2).text())
         return names
@@ -997,7 +996,10 @@ class SubmitTab(QWidget):
             progress_bar.outputFinished()
         elif overwrite:
             for out_name in out_names:
-                os.remove(out_name)
+                try:
+                    os.remove(out_name)
+                except PermissionError:
+                    continue
 
         progress_bar.exec_()
         self.parent.outDialog()

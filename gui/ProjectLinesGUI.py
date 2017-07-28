@@ -6,9 +6,8 @@ from PyQt5.QtCore import *
 from itertools import islice, cycle
 
 from slf import Serafin
-from geom import Shapefile, BlueKenue
-from gui.util import MapViewer, LineMapCanvas, QPlainTextEditLogger, TelToolWidget, testOpen,\
-    TableWidgetDragRows, OutputProgressDialog, LoadMeshDialog, handleOverwrite, \
+from gui.util import MapViewer, LineMapCanvas, QPlainTextEditLogger, TelToolWidget, open_polylines, save_dialog,\
+    VariableTable, OutputProgressDialog, LoadMeshDialog, \
     SimpleTimeDateSelection, OutputThread, ProjectLinesPlotViewer, SerafinInputTab
 
 
@@ -73,10 +72,7 @@ class InputTab(SerafinInputTab):
         self.map = MapViewer(canvas)
         self.has_map = False
 
-        self.filename = None
-        self.header = None
-        self.language = 'fr'
-        self.time = []
+        self.data = None
         self.mesh = None
 
         self.lines = []
@@ -141,23 +137,14 @@ class InputTab(SerafinInputTab):
         mainLayout.addWidget(self.logTextBox.widget)
         self.setLayout(mainLayout)
 
-    def _reinitInput(self, filename):
-        self.filename = filename
+    def _reinitInput(self):
+        self.reset()
+        self.data = None
         self.has_map = False
-        self.inNameBox.setText(filename)
-        self.summaryTextBox.clear()
-        self.header = None
-        self.time = []
-
         self.btnMap.setEnabled(False)
         self.mesh = None
         self.btnOpenLines.setEnabled(False)
         self.parent.reset()
-
-        if not self.frenchButton.isChecked():
-            self.language = 'en'
-        else:
-            self.language = 'fr'
 
     def _resetDefaultOptions(self):
         nb_nonempty = 0
@@ -194,82 +181,35 @@ class InputTab(SerafinInputTab):
             self.parent.getInput()
 
     def btnOpenSerafinEvent(self):
-        options = QFileDialog.Options()
-        options |= QFileDialog.DontUseNativeDialog
-        filename, _ = QFileDialog.getOpenFileName(self, 'Open a .slf file', '',
-                                                  'Serafin Files (*.slf)', QDir.currentPath(), options=options)
-        if not filename:
-            return
-        if not testOpen(filename):
+        canceled, filename = super().open_event()
+        if canceled:
             return
 
-        self._reinitInput(filename)
+        self._reinitInput()
+        success, data = self.read_2d(filename)
+        if not success:
+            return
 
-        with Serafin.Read(filename, self.language) as resin:
-            resin.read_header()
+        # record the mesh for future visualization and calculations
+        self.parent.inDialog()
+        meshLoader = LoadMeshDialog('interpolation', data.header)
+        self.mesh = meshLoader.run()
+        self.parent.outDialog()
+        if meshLoader.thread.canceled:
+            self.linesNameBox.clear()
+            self.parent.reset()
+            return
 
-            # check if the file is 2D
-            if not resin.header.is_2d:
-                QMessageBox.critical(self, 'Error', 'The file type (TELEMAC 3D) is currently not supported.',
-                                     QMessageBox.Ok)
-                return
-
-
-            # record the time series
-            resin.get_time()
-
-            # record the mesh for future visualization and calculations
-            self.parent.inDialog()
-            meshLoader = LoadMeshDialog('interpolation', resin.header)
-            self.mesh = meshLoader.run()
-            self.parent.outDialog()
-            if meshLoader.thread.canceled:
-                self.linesNameBox.clear()
-                self.parent.reset()
-                return
-
-            # update the file summary
-            self.summaryTextBox.appendPlainText(resin.get_summary())
-
-            # copy to avoid reading the same data in the future
-            self.header = resin.header
-            self.time = resin.time[:]
-
+        self.data = data
         self.btnOpenLines.setEnabled(True)
         self._resetDefaultOptions()
 
     def btnOpenLinesEvent(self):
-        options = QFileDialog.Options()
-        options |= QFileDialog.DontUseNativeDialog
-        filename, _ = QFileDialog.getOpenFileName(self, 'Open a .i2s or .shp file', '',
-                                                  'Polyline file (*.i2s *.shp)',
-                                                  options=options)
-        if not filename:
+        success, filename, polylines = open_polylines()
+        if not success:
             return
-        if not testOpen(filename):
-            return
-
-        is_i2s = filename[-4:] == '.i2s'
-        is_shp = filename[-4:] == '.shp'
-
-        if not is_i2s and not is_shp:
-            QMessageBox.critical(self, 'Error', 'Only .i2s and .shp file formats are currently supported.',
-                                 QMessageBox.Ok)
-            return
-
-        self.lines = []
-        if is_i2s:
-            with BlueKenue.Read(filename) as f:
-                f.read_header()
-                for poly in f.get_open_polylines():
-                    self.lines.append(poly)
-        else:
-            for poly in Shapefile.get_open_polylines(filename):
-                self.lines.append(poly)
-        if not self.lines:
-            QMessageBox.critical(self, 'Error', 'The file does not contain any open polyline.',
-                                 QMessageBox.Ok)
-            return
+        self.lines = polylines
+        logging.info('Finished reading the lines file %s' % filename)
 
         nb_nonempty, indices_nonempty, \
             self.line_interpolators, self.line_interpolators_internal = self.mesh.get_line_interpolators(self.lines)
@@ -317,19 +257,8 @@ class CSVTab(QWidget):
 
     def _initWidget(self):
         # create two 3-column tables for variables selection
-        self.firstTable = TableWidgetDragRows()
-        self.secondTable = TableWidgetDragRows()
-        for tw in [self.firstTable, self.secondTable]:
-            tw.setColumnCount(3)
-            tw.setHorizontalHeaderLabels(['ID', 'Name', 'Unit'])
-            vh = tw.verticalHeader()
-            vh.setSectionResizeMode(QHeaderView.Fixed)
-            vh.setDefaultSectionSize(20)
-            hh = tw.horizontalHeader()
-            hh.setDefaultSectionSize(110)
-            tw.setEditTriggers(QAbstractItemView.NoEditTriggers)
-            tw.setMaximumHeight(800)
-            tw.setMinimumHeight(250)
+        self.firstTable = VariableTable()
+        self.secondTable = VariableTable()
 
         # create the options
         self.intersect = QCheckBox()
@@ -410,33 +339,22 @@ class CSVTab(QWidget):
         self.setLayout(mainLayout)
 
     def getSelectedVariables(self):
-        selected = []
-        for i in range(self.secondTable.rowCount()):
-            selected.append(self.secondTable.item(i, 0).text())
-        return selected
+        return self.secondTable.get_selected()
 
     def _initVarTables(self):
-        for i, (id, name, unit) in enumerate(zip(self.input.header.var_IDs,
-                                                 self.input.header.var_names, self.input.header.var_units)):
-            self.firstTable.insertRow(self.firstTable.rowCount())
-            id_item = QTableWidgetItem(id.strip())
-            name_item = QTableWidgetItem(name.decode('utf-8').strip())
-            unit_item = QTableWidgetItem(unit.decode('utf-8').strip())
-            self.firstTable.setItem(i, 0, id_item)
-            self.firstTable.setItem(i, 1, name_item)
-            self.firstTable.setItem(i, 2, unit_item)
+        self.firstTable.fill(self.input.data.header)
 
     def getInput(self):
         self._initVarTables()
         self.btnSubmit.setEnabled(True)
         self.csvNameBox.clear()
-        if self.input.header.date is not None:
-            year, month, day, hour, minute, second = self.input.header.date
+        if self.input.data.header.date is not None:
+            year, month, day, hour, minute, second = self.input.data.header.date
             start_time = datetime.datetime(year, month, day, hour, minute, second)
         else:
             start_time = datetime.datetime(1900, 1, 1, 0, 0, 0)
-        frames = list(map(lambda x: start_time + datetime.timedelta(seconds=x), self.input.time))
-        self.timeSelection.initTime(self.input.time, frames)
+        frames = list(map(lambda x: start_time + datetime.timedelta(seconds=x), self.input.data.time))
+        self.timeSelection.initTime(self.input.data.time, frames)
         for i in range(len(self.input.lines)):
             id_line = str(i+1)
             if self.input.line_interpolators[i][0]:
@@ -454,25 +372,13 @@ class CSVTab(QWidget):
 
     def btnSubmitEvent(self):
         selected_var_IDs = self.getSelectedVariables()
-
         if not selected_var_IDs:
             QMessageBox.critical(self, 'Error', 'Choose at least one output variable before submit!',
                                  QMessageBox.Ok)
             return
 
-        options = QFileDialog.Options()
-        options |= QFileDialog.DontUseNativeDialog
-        options |= QFileDialog.DontConfirmOverwrite
-        filename, _ = QFileDialog.getSaveFileName(self, 'Choose the output file name', '',
-                                                  'CSV Files (*.csv)', options=options)
-
-        # check the file name consistency
-        if not filename:
-            return
-        if len(filename) < 5 or filename[-4:] != '.csv':
-            filename += '.csv'
-        overwrite = handleOverwrite(filename)
-        if overwrite is None:
+        canceled, filename = save_dialog('.csv')
+        if canceled:
             return
 
         self.csvNameBox.setText(filename)
@@ -487,21 +393,21 @@ class CSVTab(QWidget):
         process = WriteCSVProcess(self.parent.csv_separator, self.input.mesh)
         progressBar = OutputProgressDialog()
 
-        with Serafin.Read(self.input.filename, self.input.language) as resin:
-            resin.header = self.input.header
-            resin.time = self.input.time
+        with Serafin.Read(self.input.data.filename, self.input.data.language) as input_stream:
+            input_stream.header = self.input.data.header
+            input_stream.time = self.input.data.time
 
             progressBar.setValue(1)
             QApplication.processEvents()
 
-            with open(filename, 'w') as fout:
+            with open(filename, 'w') as output_stream:
                 progressBar.connectToThread(process)
 
                 if self.intersect.isChecked():
-                    process.write_csv(resin, selected_var_IDs, fout,
+                    process.write_csv(input_stream, selected_var_IDs, output_stream,
                                       self.input.line_interpolators, indices_nonempty, reference, time_index)
                 else:
-                    process.write_csv(resin, selected_var_IDs, fout,
+                    process.write_csv(input_stream, selected_var_IDs, output_stream,
                                       self.input.line_interpolators_internal, indices_nonempty, reference, time_index)
         if not process.canceled:
             progressBar.outputFinished()
@@ -545,8 +451,8 @@ class ProjectLinesGUI(TelToolWidget):
         self.tab.setTabEnabled(1, True)
         self.tab.setTabEnabled(2, True)
         self.csvTab.getInput()
-        self.imageTab.getInput(self.input.filename, self.input.header, self.input.time,
-                               self.input.lines, self.input.line_interpolators, self.input.line_interpolators_internal)
+        self.imageTab.getInput(self.input.data, self.input.lines,
+                               self.input.line_interpolators, self.input.line_interpolators_internal)
 
 
 def exception_hook(exctype, value, traceback):

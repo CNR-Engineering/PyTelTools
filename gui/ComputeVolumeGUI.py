@@ -1,16 +1,14 @@
 import sys
 import logging
 import datetime
-import struct
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 import pandas as pd
 
 from slf import Serafin
 from slf.volume import VolumeCalculator
-from geom import BlueKenue, Shapefile
-from gui.util import TemporalPlotViewer, QPlainTextEditLogger, MapViewer, PolygonMapCanvas, OutputThread,\
-    OutputProgressDialog, LoadMeshDialog, SerafinInputTab, TelToolWidget, testOpen, handleOverwrite
+from gui.util import TemporalPlotViewer, MapViewer, PolygonMapCanvas, OutputThread,\
+    OutputProgressDialog, LoadMeshDialog, SerafinInputTab, TelToolWidget, open_polygons, save_dialog
 
 
 class VolumeCalculatorThread(OutputThread):
@@ -115,7 +113,7 @@ class VolumePlotViewer(TemporalPlotViewer):
         self.locatePolygons_short.setEnabled(True)
 
     def _defaultYLabel(self):
-        word = {'fr': 'de', 'en': 'of'}[self.language]
+        word = {'fr': 'de', 'en': 'of'}[self.input.data.language]
         if self.second_var_ID == VolumeCalculator.INIT_VALUE:
             return 'Volume %s (%s - %s$_0$)' % (word, self.var_ID, self.var_ID)
         elif self.second_var_ID is None:
@@ -147,8 +145,8 @@ class VolumePlotViewer(TemporalPlotViewer):
 
         self.var_ID = self.input.var_ID
         self.second_var_ID = self.input.second_var_ID
-        if self.input.header.date is not None:
-            year, month, day, hour, minute, second = self.input.header.date
+        if self.input.data.header.date is not None:
+            year, month, day, hour, minute, second = self.input.data.header.date
             self.start_time = datetime.datetime(year, month, day, hour, minute, second)
         else:
             self.start_time = datetime.datetime(1900, 1, 1, 0, 0, 0)
@@ -166,7 +164,7 @@ class VolumePlotViewer(TemporalPlotViewer):
         # initialize the plot
         self.time = [self.data['time'], self.data['time'], self.data['time'],
                      self.data['time'] / 60, self.data['time'] / 3600, self.data['time'] / 86400]
-        self.language = self.input.language
+        self.language = self.input.data.language
         self.current_xlabel = self._defaultXLabel()
         self.current_ylabel = self._defaultYLabel()
         self.current_title = ''
@@ -194,10 +192,7 @@ class InputTab(SerafinInputTab):
     def __init__(self, parent):
         super().__init__(parent)
         self.old_options = ('1', '', '0')
-        self.filename = None
-        self.header = None
-        self.language = 'fr'
-        self.time = []
+        self.data = None
         self.mesh = None
         self.polygons = []
         self.var_ID = None
@@ -304,14 +299,9 @@ class InputTab(SerafinInputTab):
             self.timeSampling.setText('1')
             return
 
-    def _reinitInput(self, filename):
-        self.filename = filename
-        self.inNameBox.setText(filename)
-        self.summaryTextBox.clear()
+    def _reinitInput(self):
+        self.reset()
         self.csvNameBox.clear()
-        self.header = None
-        self.time = []
-        self.mesh = None
         self.old_options = (self.timeSampling.text(),
                             self.firstVarBox.currentText(),
                             self.secondVarBox.currentText())
@@ -321,73 +311,49 @@ class InputTab(SerafinInputTab):
         self.csvNameBox.clear()
         self.btnOpenPolygon.setEnabled(False)
 
-        if not self.frenchButton.isChecked():
-            self.language = 'en'
-        else:
-            self.language = 'fr'
-
     def _resetDefaultOptions(self):
         sampling_frequency, first_var, second_var = self.old_options
-        if int(sampling_frequency) <= len(self.time):
+        if int(sampling_frequency) <= len(self.data.time):
             self.timeSampling.setText(sampling_frequency)
         var_ID = first_var.split('(')[0][:-1]
-        if var_ID in self.header.var_IDs:
-            self.firstVarBox.setCurrentIndex(self.header.var_IDs.index(var_ID))
+        if var_ID in self.data.header.var_IDs:
+            self.firstVarBox.setCurrentIndex(self.data.header.var_IDs.index(var_ID))
         if '(' in second_var:
             var_ID = second_var.split('(')[0][:-1]
-            if var_ID in self.header.var_IDs:
-                self.secondVarBox.setCurrentIndex(2 + self.header.var_IDs.index(var_ID))
+            if var_ID in self.data.header.var_IDs:
+                self.secondVarBox.setCurrentIndex(2 + self.data.header.var_IDs.index(var_ID))
         elif second_var[:4] == 'Init':
             self.secondVarBox.setCurrentIndex(1)
         else:
             self.secondVarBox.setCurrentIndex(0)
 
     def btnOpenSerafinEvent(self):
-        options = QFileDialog.Options()
-        options |= QFileDialog.DontUseNativeDialog
-        filename, _ = QFileDialog.getOpenFileName(self, 'Open a .slf file', '',
-                                                  'Serafin Files (*.slf)',
-                                                  QDir.currentPath(), options=options)
-        if not filename:
+        canceled, filename = super().open_event()
+        if canceled:
             return
 
-        if not testOpen(filename):
+        self._reinitInput()
+
+        success, data = self.read_2d(filename)
+        if not success:
             return
 
-        self._reinitInput(filename)
-        with Serafin.Read(filename, self.language) as resin:
-            resin.read_header()
+        # record the mesh for future visualization and calculations
+        self.parent.inDialog()
+        meshLoader = LoadMeshDialog('volume', data.header)
+        self.mesh = meshLoader.run()
+        self.parent.outDialog()
+        if meshLoader.thread.canceled:
+            self.polygonNameBox.clear()
+            self.summaryTextBox.clear()
+            return
 
-            # check if the file is 2D
-            if not resin.header.is_2d:
-                QMessageBox.critical(self, 'Error', 'The file type (TELEMAC 3D) is currently not supported.',
-                                     QMessageBox.Ok)
-                return
-
-            # record the time series
-            resin.get_time()
-
-            # update the file summary
-            self.summaryTextBox.appendPlainText(resin.get_summary())
-
-            # record the mesh for future visualization and calculations
-            self.parent.inDialog()
-            meshLoader = LoadMeshDialog('volume', resin.header)
-            self.mesh = meshLoader.run()
-            self.parent.outDialog()
-            if meshLoader.thread.canceled:
-                self.polygonNameBox.clear()
-                return
-
-            # copy to avoid reading the same data in the future
-            self.header = resin.header.copy()
-            self.time = resin.time[:]
-
+        self.data = data
         self.btnOpenPolygon.setEnabled(True)
         self.secondVarBox.addItem('0')
         self.secondVarBox.addItem('Initial values of the first variable')
 
-        for var_ID, var_name in zip(self.header.var_IDs, self.header.var_names):
+        for var_ID, var_name in zip(self.data.header.var_IDs, self.data.header.var_names):
             self.firstVarBox.addItem(var_ID + ' (%s)' % var_name.decode('utf-8').strip())
             self.secondVarBox.addItem(var_ID + ' (%s)' % var_name.decode('utf-8').strip())
 
@@ -397,35 +363,10 @@ class InputTab(SerafinInputTab):
         self.parent.tab.setTabEnabled(1, False)
 
     def btnOpenPolygonEvent(self):
-        options = QFileDialog.Options()
-        options |= QFileDialog.DontUseNativeDialog
-        filename, _ = QFileDialog.getOpenFileName(self, 'Open a .i2s or .shp file', '',
-                                                  'Line sets (*.i2s *.shp)', options=options)
-        if not filename:
+        success, filename, polygons = open_polygons()
+        if not success:
             return
-        if not testOpen(filename):
-            return
-
-        is_i2s = filename[-4:] == '.i2s'
-
-        self.polygons = []
-        if is_i2s:
-            with BlueKenue.Read(filename) as f:
-                f.read_header()
-                for poly in f.get_polygons():
-                    self.polygons.append(poly)
-        else:
-            try:
-                for polygon in Shapefile.get_polygons(filename):
-                    self.polygons.append(polygon)
-            except struct.error:
-                QMessageBox.critical(self, 'Error', 'Inconsistent bytes.', QMessageBox.Ok)
-                return
-        if not self.polygons:
-            QMessageBox.critical(self, 'Error', 'The file does not contain any polygon.',
-                                 QMessageBox.Ok)
-            return
-
+        self.polygons = polygons
         logging.info('Finished reading the polygon file %s' % filename)
         self.polygonNameBox.clear()
         self.polygonNameBox.appendPlainText(filename + '\n' + 'The file contains {} polygon{}.'.format(
@@ -436,21 +377,8 @@ class InputTab(SerafinInputTab):
         self.parent.tab.setTabEnabled(1, False)
 
     def btnSubmitEvent(self):
-        sampling_frequency = int(self.timeSampling.text())
-
-        options = QFileDialog.Options()
-        options |= QFileDialog.DontUseNativeDialog
-        options |= QFileDialog.DontConfirmOverwrite
-        filename, _ = QFileDialog.getSaveFileName(self, 'Choose the output file name', '',
-                                                  'CSV Files (*.csv)', options=options)
-
-        # check the file name consistency
-        if not filename:
-            return
-        if len(filename) < 5 or filename[-4:] != '.csv':
-            filename += '.csv'
-        overwrite = handleOverwrite(filename)
-        if overwrite is None:
+        canceled, filename = save_dialog('.csv')
+        if canceled:
             return
 
         self.csvNameBox.setText(filename)
@@ -461,6 +389,7 @@ class InputTab(SerafinInputTab):
         progressBar = OutputProgressDialog()
 
         # do the calculations
+        sampling_frequency = int(self.timeSampling.text())
         self.var_ID = self.firstVarBox.currentText().split('(')[0][:-1]
         self.second_var_ID = self.secondVarBox.currentText()
         if self.second_var_ID == '0':
@@ -472,9 +401,9 @@ class InputTab(SerafinInputTab):
 
         names = ['Polygon %d' % (i+1) for i in range(len(self.polygons))]
 
-        with Serafin.Read(self.filename, self.language) as resin:
-            resin.header = self.header
-            resin.time = self.time
+        with Serafin.Read(self.data.filename, self.data.language) as resin:
+            resin.header = self.data.header
+            resin.time = self.data.time
             if self.supVolumeBox.isChecked():
                 calculator = VolumeCalculatorThread(VolumeCalculator.POSITIVE, self.var_ID, self.second_var_ID,
                                                     resin, names, self.polygons, sampling_frequency,

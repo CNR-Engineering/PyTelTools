@@ -8,9 +8,9 @@ import logging
 from slf import Serafin
 from slf.variables import get_available_variables, \
     do_calculations_in_frame, get_necessary_equations, get_US_equation, add_US
-from gui.util import TableWidgetDragRows, QPlainTextEditLogger, FallVelocityMessage, FrictionLawMessage, \
+from gui.util import TableWidgetDragRows, VariableTable, QPlainTextEditLogger, FallVelocityMessage, FrictionLawMessage, \
     TimeRangeSlider, DoubleSliderBox, OutputProgressDialog, OutputThread, SerafinInputTab, \
-    TelToolWidget, testOpen, handleOverwrite
+    TelToolWidget, save_dialog
 
 
 class ExtractVariablesThread(OutputThread):
@@ -46,9 +46,9 @@ class TimeTable(TableWidgetDragRows):
 
 
 class ManualTimeSelection(QWidget):
-    def __init__(self, input, timeSelection):
+    def __init__(self, timeSelection):
         super().__init__()
-        self.input = input
+        self.time = []
         self.timeSelection = timeSelection
 
         self._initWidgets()
@@ -131,7 +131,7 @@ class ManualTimeSelection(QWidget):
         self.firstTable.setRowCount(0)
         self.secondTable.setRowCount(0)
 
-        for i, (value, date) in enumerate(zip(self.input.time, self.time_frames)):
+        for i, (value, date) in enumerate(zip(self.time, self.time_frames)):
             self.firstTable.insertRow(self.firstTable.rowCount())
             index_item = QTableWidgetItem(str(i+1))
             value_item = QTableWidgetItem(str(value))
@@ -140,10 +140,11 @@ class ManualTimeSelection(QWidget):
             self.firstTable.setItem(i, 1, value_item)
             self.firstTable.setItem(i, 2, date_item)
 
-    def getData(self):
+    def getData(self, time_seconds):
+        self.time = time_seconds
         if self.time_frames is None:
             self.time_frames = list(map(lambda x: self.timeSelection.start_time + datetime.timedelta(seconds=x),
-                                        self.input.time))
+                                        time_seconds))
         self.defaultSelection()
         self.hasData = True
 
@@ -152,7 +153,7 @@ class ManualTimeSelection(QWidget):
         self.firstTable.setRowCount(0)
         self.secondTable.setRowCount(0)
 
-        for i, (value, date) in enumerate(zip(self.input.time, self.time_frames)):
+        for i, (value, date) in enumerate(zip(self.time, self.time_frames)):
             index_item = QTableWidgetItem(str(i+1))
             value_item = QTableWidgetItem(str(value))
             date_item = QTableWidgetItem(str(date))
@@ -174,14 +175,10 @@ class InputTab(SerafinInputTab):
     def __init__(self, parent):
         super().__init__(parent)
 
-        self.filename = None
-        self.language = None
-
-        # some attributes to store the input file info
-        self.header = None
+        self.data = None
         self.time = []
+
         self.available_vars = []
-        self.us_equation = None
         self.fall_velocities = []
 
         self.YELLOW = QColor(245, 255, 207)
@@ -196,19 +193,8 @@ class InputTab(SerafinInputTab):
         @brief (Used in __init__) Create widgets
         """
         # create two 3-column tables for variables selection
-        self.firstTable = TableWidgetDragRows()
-        self.secondTable = TableWidgetDragRows()
-        for tw in [self.firstTable, self.secondTable]:
-            tw.setColumnCount(3)
-            tw.setHorizontalHeaderLabels(['ID', 'Name', 'Unit'])
-            vh = tw.verticalHeader()
-            vh.setSectionResizeMode(QHeaderView.Fixed)
-            vh.setDefaultSectionSize(20)
-            hh = tw.horizontalHeader()
-            hh.setDefaultSectionSize(110)
-            tw.setEditTriggers(QAbstractItemView.NoEditTriggers)
-            tw.setMaximumHeight(800)
-
+        self.firstTable = VariableTable()
+        self.secondTable = VariableTable()
         self.secondTable.setMinimumHeight(300)
 
         # create a button for interpreting W from user-defined friction law
@@ -288,8 +274,9 @@ class InputTab(SerafinInputTab):
         """
 
         # add original variables to the table
-        for var_ID, var_name, var_unit in zip(self.header.var_IDs, self.header.var_names, self.header.var_units):
-            if var_ID == 'Z':
+        for var_ID, var_name, var_unit in zip(self.data.header.var_IDs, self.data.header.var_names,
+                                              self.data.header.var_units):
+            if not self.data.header.is_2d and var_ID == 'Z':
                 self.secondTable.insertRow(self.secondTable.rowCount())
                 id_item = QTableWidgetItem(var_ID.strip())
                 name_item = QTableWidgetItem(var_name.decode('utf-8').strip())
@@ -306,16 +293,16 @@ class InputTab(SerafinInputTab):
             for j, item in enumerate([id_item, name_item, unit_item]):
                 self.firstTable.setItem(row, j, item)
 
-        if self.header.is_2d:
+        if self.data.header.is_2d:
             # find new computable variables (stored as slf.variables.Variable objects)
-            self.available_vars = get_available_variables(self.header.var_IDs)
+            self.available_vars = get_available_variables(self.data.header.var_IDs)
 
             # add new variables to the table
             for var in self.available_vars:
                 row = self.firstTable.rowCount()
                 self.firstTable.insertRow(row)
                 id_item = QTableWidgetItem(var.ID())
-                name_item = QTableWidgetItem(var.name(self.language))
+                name_item = QTableWidgetItem(var.name(self.data.language))
                 unit_item = QTableWidgetItem(var.unit())
                 for j, item in enumerate([id_item, name_item, unit_item]):
                     self.firstTable.setItem(row, j, item)
@@ -325,31 +312,18 @@ class InputTab(SerafinInputTab):
         """!
         @brief (Used in btnOpenEvent) Reinitialize input file data before reading a new file
         """
-        self.summaryTextBox.clear()
         self.available_vars = []
-        self.header = None
-        self.time = []
-        self.us_equation = None
+        self.data = None
         self.fall_velocities = []
         self.btnAddUS.setEnabled(False)
         self.btnAddWs.setEnabled(False)
         self.firstTable.setRowCount(0)
         self.secondTable.setRowCount(0)
-
-        if not self.frenchButton.isChecked():
-            self.language = 'en'
-        else:
-            self.language = 'fr'
-
+        self.reset()
         self.parent.reset()
 
     def getSelectedVariables(self):
-        selected = []
-        for i in range(self.secondTable.rowCount()):
-            selected.append((self.secondTable.item(i, 0).text(),
-                            bytes(self.secondTable.item(i, 1).text(), 'utf-8').ljust(16),
-                            bytes(self.secondTable.item(i, 2).text(), 'utf-8').ljust(16)))
-        return selected
+        return self.secondTable.get_selected_all()
 
     def btnAddUSEvent(self):
         msg = FrictionLawMessage()
@@ -358,17 +332,17 @@ class InputTab(SerafinInputTab):
             return
 
         friction_law = msg.getChoice()
-        self.us_equation = get_US_equation(friction_law)
+        self.data.us_equation = get_US_equation(friction_law)
         new_vars = []
-        add_US(new_vars, self.header.var_IDs)
+        add_US(new_vars, self.data.header.var_IDs)
 
         # add US, TAU and DMAX to available variable
         offset = self.firstTable.rowCount()
         for i in range(len(new_vars)):
-            var = self.new_vars[i]
+            var = new_vars[i]
             self.firstTable.insertRow(self.firstTable.rowCount())
             id_item = QTableWidgetItem(var.ID().strip())
-            name_item = QTableWidgetItem(var.name(self.language))
+            name_item = QTableWidgetItem(var.name(self.data.language))
             unit_item = QTableWidgetItem(var.unit())
             self.firstTable.setItem(offset+i, 0, id_item)
             self.firstTable.setItem(offset+i, 1, name_item)
@@ -400,60 +374,39 @@ class InputTab(SerafinInputTab):
             self.fall_velocities.append(float(table[i][0][6:]))
 
     def btnOpenEvent(self):
-        options = QFileDialog.Options()
-        options |= QFileDialog.DontUseNativeDialog
-        filename, _ = QFileDialog.getOpenFileName(self, 'Open a .slf file', '',
-                                                  'Serafin Files (*.slf)', options=options)
-        if not filename:
-            return
-
-        if not testOpen(filename):
+        canceled, filename = super().open_event()
+        if canceled:
             return
 
         # reinitialize input file data
         self._reinitInput()
 
-        self.filename = filename
-        self.inNameBox.setText(filename)
-
-        with Serafin.Read(self.filename, self.language) as resin:
-            resin.read_header()
-
-            # update the file summary
-            self.summaryTextBox.appendPlainText(resin.get_summary())
-
-            # record the time series
-            resin.get_time()
-
-            # copy to avoid reading the same data in the future
-            self.header = resin.header.copy()
-            self.time = resin.time[:]
-
-        logging.info('Finished reading the input file')
+        self.data = self.read(filename)
+        self.time = self.data.time
 
         # displaying the available variables
         self._initVarTables()
 
-        if self.header.is_2d:
+        if self.data.header.is_2d:
             # unlock add US button
-            if 'US' not in self.header.var_IDs and 'W' in self.header.var_IDs:
+            if 'US' not in self.data.header.var_IDs and 'W' in self.data.header.var_IDs:
                 available_var_IDs = list(map(lambda x: x.ID(), self.available_vars))
-                available_var_IDs.extend(self.header.var_IDs)
+                available_var_IDs.extend(self.data.header.var_IDs)
                 if 'H' in available_var_IDs and 'M' in available_var_IDs:
                     self.btnAddUS.setEnabled(True)
 
             # unlock add Ws button
-            if 'US' in self.header.var_IDs:
+            if 'US' in self.data.header.var_IDs:
                 self.btnAddWs.setEnabled(True)
-        self.parent.getInput()
+        self.parent.getInput(self.data)
 
 
 class TimeTab(QWidget):
-    def __init__(self, parent, input):
+    def __init__(self, parent):
         super().__init__()
         self.parent = parent
-        self.input = input
         self.start_time = None
+        self.time = []
 
         # create a slider for time selection
         self.timeSlider = TimeRangeSlider()
@@ -470,7 +423,7 @@ class TimeTab(QWidget):
         self.timeSelection.endValue.setEnabled(False)
 
         # create the tables for manual selection
-        self.manualSelection = ManualTimeSelection(self.input, self)
+        self.manualSelection = ManualTimeSelection(self)
 
         # create the button for manual selection
         self.btnManual = QPushButton('Manual selection')
@@ -548,18 +501,19 @@ class TimeTab(QWidget):
         self.selectionTextBox.clear()
         self.selectionTextBox.appendPlainText('=== Manual selection mode OFF ===')
 
-    def getInput(self):
-        if self.input.header.date is not None:
-            year, month, day, hour, minute, second = self.input.header.date
+    def getInput(self, data):
+        if data.header.date is not None:
+            year, month, day, hour, minute, second = data.header.date
             self.start_time = datetime.datetime(year, month, day, hour, minute, second)
         else:
             self.start_time = datetime.datetime(1900, 1, 1, 0, 0, 0)
 
-        time_frames = list(map(lambda x: datetime.timedelta(seconds=x), self.input.time))
+        self.time = data.time
+        time_frames = list(map(lambda x: datetime.timedelta(seconds=x), data.time))
         self.timeSelection.clearText()
         self.timeSlider.reinit(self.start_time, time_frames, self.timeSelection)
 
-        if self.input.header.nb_frames > 1:
+        if data.header.nb_frames > 1:
             self.timeSlider.setEnabled(True)
             self.timeSelection.startIndex.setEnabled(True)
             self.timeSelection.endIndex.setEnabled(True)
@@ -597,7 +551,7 @@ class TimeTab(QWidget):
                                         QMessageBox.Ok)
             if reply == QMessageBox.Cancel:
                 return
-            self.manualSelection.getData()
+            self.manualSelection.getData(self.time)
             self.selectionTextBox.appendPlainText('=== Manual selection mode ON ===')
         self.parent.inDialog()
         self.manualSelection.show()
@@ -619,7 +573,8 @@ class TimeTab(QWidget):
 class SubmitTab(QWidget):
     def __init__(self, inputTab, timeSelection, parent):
         super().__init__()
-        self.input = inputTab
+        self.inputTab = inputTab
+        self.data = None
         self.timeSelection = timeSelection
         self.parent = parent
 
@@ -663,7 +618,7 @@ class SubmitTab(QWidget):
         self.singlePrecisionBox.setEnabled(False)
 
     def getOutputHeader(self, selected_vars):
-        output_header = self.input.header.copy()
+        output_header = self.data.header.copy()
         output_header.nb_var = len(selected_vars)
         output_header.var_IDs, output_header.var_names, output_header.var_units = [], [], []
         for var_ID, var_name, var_unit in selected_vars:
@@ -674,41 +629,22 @@ class SubmitTab(QWidget):
             output_header.to_single_precision()
         return output_header
 
-    def getInput(self):
+    def getInput(self, data):
+        self.data = data
         # unlock convert to single precision
-        if self.input.header.float_type == 'd':
+        if self.data.header.float_type == 'd':
             self.singlePrecisionBox.setEnabled(True)
 
         # unlock the submit button
         self.btnSubmit.setEnabled(True)
 
     def btnSubmitEvent(self):
-        # create the save file dialog
-        options = QFileDialog.Options()
-        options |= QFileDialog.DontUseNativeDialog
-        options |= QFileDialog.DontConfirmOverwrite
-        filename, _ = QFileDialog.getSaveFileName(self, 'Choose the output file name', '',
-                                                  'Serafin Files (*.slf)', options=options)
-
-        # check the file name consistency
-        if not filename:
-            return
-        if len(filename) < 5 or filename[-4:] != '.slf':
-            filename += '.slf'
-
-        # overwrite to the input file is forbidden
-        if filename == self.input.filename:
-            QMessageBox.critical(self, 'Error', 'Cannot overwrite to the input file.',
-                                 QMessageBox.Ok)
-            return
-
-        # handle overwrite manually
-        overwrite = handleOverwrite(filename)
-        if overwrite is None:
+        canceled, filename = save_dialog('.slf', self.data.filename)
+        if canceled:
             return
 
         # fetch the list of selected variables
-        selected_vars = self.input.getSelectedVariables()
+        selected_vars = self.inputTab.getSelectedVariables()
 
         # deduce header from selected variable IDs and write header
         output_header = self.getOutputHeader(selected_vars)
@@ -717,36 +653,36 @@ class SubmitTab(QWidget):
         if self.timeSelection.manualSelection.hasData:
             output_time_indices = self.timeSelection.getManualTime()
             output_message = 'Writing the output with variables %s for %d frame%s between frame %d and %d.' \
-                              % (str(output_header.var_IDs), len(output_time_indices), ['', 's'][len(output_time_indices) > 1],
-                                 output_time_indices[0]+1, output_time_indices[-1]+1)
+                             % (str(output_header.var_IDs), len(output_time_indices),
+                             ['', 's'][len(output_time_indices) > 1], output_time_indices[0]+1, output_time_indices[-1]+1)
         else:
             start_index, end_index, sampling_frequency, output_time_indices = self.timeSelection.getTime()
             output_message = 'Writing the output with variables %s between frame %d and %d with sampling frequency %d.' \
-                              % (str(output_header.var_IDs), start_index, end_index, sampling_frequency)
+                             % (str(output_header.var_IDs), start_index, end_index, sampling_frequency)
 
 
         self.parent.inDialog()
         progressBar = OutputProgressDialog()
 
         # do some calculations
-        with Serafin.Read(self.input.filename, self.input.language) as resin:
+        with Serafin.Read(self.data.filename, self.data.language) as input_stream:
             # instead of re-reading the header and the time, just do a copy
-            resin.header = self.input.header
-            resin.time = self.input.time
+            input_stream.header = self.data.header
+            input_stream.time = self.data.time
             progressBar.setValue(5)
             QApplication.processEvents()
 
-            with Serafin.Write(filename, self.input.language, overwrite) as resout:
+            with Serafin.Write(filename, self.data.language) as output_stream:
                 logging.info(output_message)
 
-                resout.write_header(output_header)
+                output_stream.write_header(output_header)
 
                 # do some additional computations
-                necessary_equations = get_necessary_equations(self.input.header.var_IDs, output_header.var_IDs,
-                                                              self.input.us_equation)
+                necessary_equations = get_necessary_equations(self.data.header.var_IDs, output_header.var_IDs,
+                                                              self.data.us_equation)
 
-                process = ExtractVariablesThread(necessary_equations, self.input.us_equation, resin, resout,
-                                                 output_header, output_time_indices)
+                process = ExtractVariablesThread(necessary_equations, self.data.us_equation, input_stream,
+                                                 output_stream, output_header, output_time_indices)
                 progressBar.connectToThread(process)
                 process.run()
 
@@ -761,7 +697,7 @@ class ExtractVariablesGUI(TelToolWidget):
         super().__init__(parent)
 
         self.input = InputTab(self)
-        self.timeTab = TimeTab(self, self.input)
+        self.timeTab = TimeTab(self)
         self.submitTab = SubmitTab(self.input, self.timeTab, self)
 
         self.setWindowTitle('Extract variables and time')
@@ -794,9 +730,9 @@ class ExtractVariablesGUI(TelToolWidget):
             tab.reset()
             self.tab.setTabEnabled(i+1, False)
 
-    def getInput(self):
+    def getInput(self, data):
         for i, tab in enumerate([self.timeTab, self.submitTab]):
-            tab.getInput()
+            tab.getInput(data)
             self.tab.setTabEnabled(i+1, True)
 
 

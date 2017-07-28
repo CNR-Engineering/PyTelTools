@@ -818,9 +818,7 @@ class ComplexExpressionPool:
 
     def add_simple_expression(self, literal_expression):
         infix = to_infix(literal_expression)
-        print(infix)
         postfix = infix_to_postfix(infix)
-        print(postfix)
         if not self.is_valid(postfix):
             return -1
 

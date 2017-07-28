@@ -410,9 +410,7 @@ class MultiVarLinePlotNode(DoubleInputNode):
         if nb_nonempty == 0:
             return False
         self.success()
-        self.plot_viewer.getInput(input_data.filename, input_data.header, input_data.time,
-                                  lines, line_interpolators,
-                                  line_interpolators_internal)
+        self.plot_viewer.getInput(input_data, lines, line_interpolators, line_interpolators_internal)
         self.has_plot = True
         return True
 
@@ -575,9 +573,7 @@ class MultiFrameLinePlotNode(DoubleInputNode):
         if nb_nonempty == 0:
             return False
         self.success()
-        self.plot_viewer.getInput(input_data.filename, input_data.header, input_data.time,
-                                  lines, line_interpolators,
-                                  line_interpolators_internal)
+        self.plot_viewer.getInput(input_data, lines, line_interpolators, line_interpolators_internal)
         self.has_plot = True
         return True
 
@@ -741,9 +737,7 @@ class ProjectLinesPlotNode(DoubleInputNode):
         if nb_nonempty == 0:
             return False
         self.success()
-        self.plot_viewer.getInput(input_data.filename, input_data.header, input_data.time,
-                                  lines, line_interpolators,
-                                  line_interpolators_internal)
+        self.plot_viewer.getInput(input_data, lines, line_interpolators, line_interpolators_internal)
         self.has_plot = True
         return True
 

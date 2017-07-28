@@ -3,12 +3,11 @@ import logging
 import datetime
 
 from PyQt5.QtWidgets import *
-from PyQt5.QtGui import *
 from PyQt5.QtCore import *
 import slf.misc as operations
 
 from gui.util import LoadMeshDialog, OutputProgressDialog, OutputThread, \
-    TableWidgetDragRows, QPlainTextEditLogger, SerafinInputTab, TelToolWidget, testOpen, handleOverwrite
+    VariableTable, QPlainTextEditLogger, SerafinInputTab, TelToolWidget, save_dialog
 from slf import Serafin
 
 
@@ -39,19 +38,12 @@ class ProjectMeshThread(OutputThread):
 class InputTab(SerafinInputTab):
     def __init__(self, parent):
         super().__init__(parent)
-        self.first_language = 'fr'
-        self.second_language = 'fr'
-        self.first_filename = None
-        self.second_filename = None
-        self.first_header = None
-        self.second_header = None
-        self.first_time = []
-        self.second_time = []
-        self.first_start_time = datetime.datetime(1900, 1, 1, 0, 0, 0)
-        self.second_start_time = datetime.datetime(1900, 1, 1, 0, 0, 0)
+        self.first_data = None
+        self.second_data = None
+        self.second_mesh = None
+
         self.common_frames = []
 
-        self.second_mesh = None
         self.is_inside = []
         self.point_interpolators = []
 
@@ -118,43 +110,22 @@ class InputTab(SerafinInputTab):
         self.setLayout(mainLayout)
         self.setLayout(mainLayout)
 
-    def _reinitFirst(self, filename):
-        if not self.frenchButton.isChecked():
-            self.first_language = 'en'
-        else:
-            self.first_language = 'fr'
-        self.first_filename = filename
-        self.inNameBox.setText(filename)
-        self.summaryTextBox.clear()
-        self.first_header = None
+    def _reinitFirst(self):
+        self.reset()
+        self.first_data = None
         self.btnOpenSecond.setEnabled(False)
-        self.first_start_time = datetime.datetime(1900, 1, 1, 0, 0, 0)
 
     def _reinitSecond(self, filename):
-        if not self.frenchButton.isChecked():
-            self.second_language = 'en'
-        else:
-            self.second_language = 'fr'
-        self.second_header = None
-        self.second_mesh = None
-        self.second_filename = filename
+        self.second_data = None
         self.secondNameBox.setText(filename)
         self.secondSummaryTextBox.clear()
-        self.second_start_time = datetime.datetime(1900, 1, 1, 0, 0, 0)
         self.parent.reset()
 
-    def _reinitStartTime(self):
-        if self.first_header.date is not None:
-            year, month, day, hour, minute, second = self.first_header.date
-            self.first_start_time = datetime.datetime(year, month, day, hour, minute, second)
-        if self.second_header is not None:
-            if self.second_header.date is not None:
-                year, month, day, hour, minute, second = self.second_header.date
-                self.second_start_time = datetime.datetime(year, month, day, hour, minute, second)
-
     def _reinitCommonFrames(self):
-        first_frames = list(map(lambda x: self.first_start_time + datetime.timedelta(seconds=x), self.first_time))
-        second_frames = list(map(lambda x: self.second_start_time + datetime.timedelta(seconds=x), self.second_time))
+        first_frames = list(map(lambda x: self.first_data.start_time
+                                                + datetime.timedelta(seconds=x), self.first_data.time))
+        second_frames = list(map(lambda x: self.second_data.start_time
+                                                + datetime.timedelta(seconds=x), self.second_data.time))
         self.common_frames = []
         for first_index, first_frame in enumerate(first_frames):
             for second_index, second_frame in enumerate(second_frames):
@@ -162,41 +133,19 @@ class InputTab(SerafinInputTab):
                     self.common_frames.append((first_index, second_index))
 
     def btnOpenFirstEvent(self):
-        options = QFileDialog.Options()
-        options |= QFileDialog.DontUseNativeDialog
-        filename, _ = QFileDialog.getOpenFileName(self, 'Open a .slf file', '',
-                                                  'Serafin Files (*.slf)', QDir.currentPath(),
-                                                  options=options)
-        if not filename:
-            return
-        if not testOpen(filename):
+        canceled, filename = super().open_event()
+        if canceled:
             return
 
-        self._reinitFirst(filename)
+        self._reinitFirst()
 
-        with Serafin.Read(self.first_filename, self.first_language) as resin:
-            resin.read_header()
-
-            # check if the file is 2D
-            if not resin.header.is_2d:
-                QMessageBox.critical(self, 'Error', 'The file type (TELEMAC 3D) is currently not supported.',
-                                     QMessageBox.Ok)
-                return
-
-            # record the time series
-            resin.get_time()
-
-            # update the file summary
-            self.summaryTextBox.appendPlainText(resin.get_summary())
-
-            # copy to avoid reading the same data in the future
-            self.first_header = resin.header.copy()
-            self.first_time = resin.time[:]
+        success, self.first_data = self.read_2d(filename)
+        if not success:
+            return
 
         self.btnOpenSecond.setEnabled(True)
-        self._reinitStartTime()
 
-        if self.second_header is not None:
+        if self.second_data is not None:
             keep_second = self.parent.resetFirst()
             if not keep_second:
                 self._reinitSecond('')
@@ -208,65 +157,51 @@ class InputTab(SerafinInputTab):
                     self.parent.getSecond(True, [])
 
     def btnOpenSecondEvent(self):
-        options = QFileDialog.Options()
-        options |= QFileDialog.DontUseNativeDialog
-        filename, _ = QFileDialog.getOpenFileName(self, 'Open a .slf file', '',
-                                                  'Serafin Files (*.slf)', QDir.currentPath(),
-                                                  options=options)
-        if not filename:
-            return
-        if not testOpen(filename):
+        canceled, filename = super().open_event()
+        if canceled:
             return
 
         self._reinitSecond(filename)
+        self.secondNameBox.setText(filename)
 
-        with Serafin.Read(self.second_filename, self.second_language) as resin:
-            resin.read_header()
+        success, self.second_data = self.read_2d(filename, update=False)
+        if not success:
+            return
 
-            # check if the file is 2D
-            if not resin.header.is_2d:
-                QMessageBox.critical(self, 'Error', 'The file type (TELEMAC 3D) is currently not supported.',
-                                     QMessageBox.Ok)
-                return
+        # check if the second file has common variables with the first file
+        common_vars = [(var_ID, var_names, var_unit) for var_ID, var_names, var_unit
+                       in zip(self.first_data.header.var_IDs, self.first_data.header.var_names,
+                              self.first_data.header.var_units)
+                       if var_ID in self.second_data.header.var_IDs]
+        if not common_vars:
+            self.second_data = None
+            QMessageBox.critical(self, 'Error', 'No common variable with file A.',
+                                 QMessageBox.Ok)
+            return
 
-            # check if the second file has common variables with the first file
-            common_vars = [(var_ID, var_names, var_unit) for var_ID, var_names, var_unit
-                           in zip(self.first_header.var_IDs, self.first_header.var_names, self.first_header.var_units)
-                           if var_ID in resin.header.var_IDs]
-            if not common_vars:
-                QMessageBox.critical(self, 'Error', 'No common variable with file A.',
-                                     QMessageBox.Ok)
-                return
+        # check if the second file has common frames with the first file
+        self._reinitCommonFrames()
 
-            # record the time series
-            resin.get_time()
-            # copy to avoid reading the same data in the future
-            self.second_header = resin.header.copy()
-            self.second_time = resin.time[:]
+        if not self.common_frames:
+            QMessageBox.critical(self, 'Error', 'No common frame with file A.', QMessageBox.Ok)
+            self.second_data = None
+            return
 
-            # check if the second file has common frames with the first file
-            self._reinitStartTime()
-            self._reinitCommonFrames()
+        # record the mesh
+        self.parent.inDialog()
+        meshLoader = LoadMeshDialog('interpolation', self.second_data.header)
+        self.second_mesh = meshLoader.run()
 
-            if not self.common_frames:
-                QMessageBox.critical(self, 'Error', 'No common frame with file A.',
-                                     QMessageBox.Ok)
-                return
+        # locate all points of the first mesh in the second mesh
+        self.is_inside, self.point_interpolators \
+            = self.second_mesh.get_point_interpolators(list(zip(self.first_data.header.x, self.first_data.header.y)))
+        self.parent.outDialog()
+        if meshLoader.thread.canceled:
+            self.second_data = None
+            return
 
-            # record the mesh
-            self.parent.inDialog()
-            meshLoader = LoadMeshDialog('interpolation', resin.header)
-            self.second_mesh = meshLoader.run()
-            # locate all points of the first mesh in the second mesh
-            self.is_inside, self.point_interpolators \
-                = self.second_mesh.get_point_interpolators(list(zip(self.first_header.x, self.first_header.y)))
-            self.parent.outDialog()
-            if meshLoader.thread.canceled:
-                return
-
-            # update the file summary
-            self.secondSummaryTextBox.appendPlainText(resin.get_summary())
-
+        # update the file summary
+        self.secondSummaryTextBox.appendPlainText(self.second_data.header.summary())
         self.parent.getSecond(False, common_vars)
 
 
@@ -287,19 +222,8 @@ class SubmitTab(QWidget):
         self.infoBox.setReadOnly(True)
 
         # create two 3-column tables for variables selection
-        self.firstTable = TableWidgetDragRows()
-        self.secondTable = TableWidgetDragRows()
-        for tw in [self.firstTable, self.secondTable]:
-            tw.setColumnCount(3)
-            tw.setHorizontalHeaderLabels(['ID', 'Name', 'Unit'])
-            vh = tw.verticalHeader()
-            vh.setSectionResizeMode(QHeaderView.Fixed)
-            vh.setDefaultSectionSize(20)
-            hh = tw.horizontalHeader()
-            hh.setDefaultSectionSize(110)
-            tw.setEditTriggers(QAbstractItemView.NoEditTriggers)
-            tw.setMaximumHeight(800)
-            tw.setMinimumHeight(150)
+        self.firstTable = VariableTable()
+        self.secondTable = VariableTable()
 
         # create combo box widgets for choosing the operation
         self.operationBox = QComboBox()
@@ -383,16 +307,11 @@ class SubmitTab(QWidget):
             self.firstTable.setItem(i, 2, unit_item)
 
     def _getSelectedVariables(self):
-        selected = []
-        for i in range(self.secondTable.rowCount()):
-            selected.append((self.secondTable.item(i, 0).text(),
-                             bytes(self.secondTable.item(i, 1).text(), 'utf-8').ljust(16),
-                             bytes(self.secondTable.item(i, 2).text(), 'utf-8').ljust(16)))
-        return selected
+        return self.secondTable.get_selected_all()
 
     def _getOutputHeader(self):
         selected_vars = self._getSelectedVariables()
-        output_header = self.input.first_header.copy()
+        output_header = self.input.first_data.header.copy()
         output_header.nb_var = len(selected_vars)
         output_header.var_IDs, output_header.var_names, output_header.var_units = [], [], []
         for var_ID, var_name, var_unit in selected_vars:
@@ -409,7 +328,7 @@ class SubmitTab(QWidget):
                                      'The mesh A has {} / {} nodes inside the mesh B.'.format(
                                      self.firstTable.rowCount() + self.secondTable.rowCount(),
                                      len(self.input.common_frames),
-                                     sum(self.input.is_inside), self.input.first_header.nb_nodes))
+                                     sum(self.input.is_inside), self.input.first_data.header.nb_nodes))
 
     def reset(self):
         self.firstTable.setRowCount(0)
@@ -419,9 +338,9 @@ class SubmitTab(QWidget):
 
     def resetFirst(self):
         common_vars = [(var_ID, var_name, var_unit) for var_ID, var_name, var_unit
-                       in zip(self.input.first_header.var_IDs, self.input.first_header.var_names,
-                              self.input.first_header.var_units)
-                       if var_ID in self.input.second_header.var_IDs]
+                       in zip(self.input.first_data.header.var_IDs, self.input.first_data.header.var_names,
+                              self.input.first_data.header.var_units)
+                       if var_ID in self.input.second_data.header.var_IDs]
         if not common_vars:
             self.firstTable.setRowCount(0)
             self.secondTable.setRowCount(0)
@@ -451,7 +370,7 @@ class SubmitTab(QWidget):
             self.firstTable.setRowCount(0)
             self.secondTable.setRowCount(0)
             self._initVarTables(common_vars)
-            if self.input.second_header.float_type == 'd':
+            if self.input.first_data.header.float_type == 'd':
                 self.singlePrecisionBox.setEnabled(True)
         self._updateInfo()
 
@@ -461,28 +380,9 @@ class SubmitTab(QWidget):
                                  QMessageBox.Ok)
             return
 
-        # create the save file dialog
-        options = QFileDialog.Options()
-        options |= QFileDialog.DontUseNativeDialog
-        options |= QFileDialog.DontConfirmOverwrite
-        filename, _ = QFileDialog.getSaveFileName(self, 'Choose the output file name', '',
-                                                  'Serafin Files (*.slf)', options=options)
-
-        # check the file name consistency
-        if not filename:
-            return
-        if len(filename) < 5 or filename[-4:] != '.slf':
-            filename += '.slf'
-
-        # overwrite to the input file is forbidden
-        if filename == self.input.first_filename or filename == self.input.second_filename:
-            QMessageBox.critical(self, 'Error', 'Cannot overwrite to the input file.',
-                                 QMessageBox.Ok)
-            return
-
-        # handle overwrite manually
-        overwrite = handleOverwrite(filename)
-        if overwrite is None:
+        canceled, filename = save_dialog('.slf', input_names=[self.input.first_data.filename,
+                                                              self.input.second_data.filename])
+        if canceled:
             return
 
         # deduce header from selected variable IDs
@@ -494,18 +394,18 @@ class SubmitTab(QWidget):
         progressBar = OutputProgressDialog()
 
         # do some calculations
-        with Serafin.Read(self.input.first_filename, self.input.first_language) as first_in:
-            first_in.header = self.input.first_header
-            first_in.time = self.input.first_time
+        with Serafin.Read(self.input.first_data.filename, self.input.first_data.language) as first_in:
+            first_in.header = self.input.first_data.header
+            first_in.time = self.input.first_data.time
 
-            with Serafin.Read(self.input.second_filename, self.input.second_language) as second_in:
-                second_in.header = self.input.second_header
-                second_in.time = self.input.second_time
+            with Serafin.Read(self.input.second_data.filename, self.input.second_data.language) as second_in:
+                second_in.header = self.input.second_data.header
+                second_in.time = self.input.second_data.time
 
                 progressBar.setValue(5)
                 QApplication.processEvents()
 
-                with Serafin.Write(filename, self.input.first_language, overwrite) as out_stream:
+                with Serafin.Write(filename, self.input.first_data.language) as out_stream:
 
                     out_stream.write_header(output_header)
                     process = ProjectMeshThread(first_in, second_in, out_stream, output_header, self.input.is_inside,

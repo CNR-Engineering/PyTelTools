@@ -1,12 +1,11 @@
 import sys
 from PyQt5.QtWidgets import *
-from PyQt5.QtGui import *
 from PyQt5.QtCore import *
 
 import numpy as np
 
 from gui.util import PlotViewer, MapViewer, PolygonMapCanvas, ColorMapCanvas, LoadMeshDialog, \
-    TimeSliderIndexOnly as TimeSlider, SerafinInputTab, TelToolWidget, testOpen
+    TimeSliderIndexOnly as TimeSlider, SerafinInputTab, TelToolWidget, open_polygons
 from slf import Serafin
 from geom import BlueKenue, Shapefile
 
@@ -90,14 +89,10 @@ class DoubleTimeSelection(QWidget):
 class InputTab(SerafinInputTab):
     def __init__(self, parent):
         super().__init__(parent)
-        self.ref_language = 'fr'
-        self.test_language = 'fr'
-        self.ref_filename = None
-        self.test_filename = None
-        self.ref_header = None
-        self.test_header = None
-        self.ref_time = []
-        self.test_time = []
+        self.ref_data = None
+        self.test_data = None
+        self.ref_mesh = None
+
         self.polygons = []
         self.selected_polygon = None
         self.ref_mesh = None
@@ -216,22 +211,15 @@ class InputTab(SerafinInputTab):
         self.setLayout(mainLayout)
         self.setLayout(mainLayout)
 
-    def _reinitRef(self, filename):
-        if not self.frenchButton.isChecked():
-            self.ref_language = 'en'
-        else:
-            self.ref_language = 'fr'
+    def _reinitRef(self):
+        self.reset()
         self.ref_mesh = None
-        self.ref_filename = filename
-        self.inNameBox.setText(filename)
-        self.summaryTextBox.clear()
-        self.ref_header = None
+        self.ref_data = None
         self.polygon_added = False
         self.selected_polygon = None
         self.polygons = []
 
-        self.test_header = None
-        self.test_filename = None
+        self.test_data = None
         self.testSummaryTextBox.clear()
         self.testNameBox.clear()
         self.polygonNameBox.clear()
@@ -246,12 +234,7 @@ class InputTab(SerafinInputTab):
         self.parent.reset()
 
     def _reinitTest(self, filename):
-        if not self.frenchButton.isChecked():
-            self.test_language = 'en'
-        else:
-            self.test_language = 'fr'
-        self.test_header = None
-        self.test_filename = filename
+        self.test_data = None
         self.testNameBox.setText(filename)
         self.testSummaryTextBox.clear()
         self.varBox.clear()
@@ -275,44 +258,26 @@ class InputTab(SerafinInputTab):
         self.polygon_added = False
 
     def btnOpenRefEvent(self):
-        options = QFileDialog.Options()
-        options |= QFileDialog.DontUseNativeDialog
-        filename, _ = QFileDialog.getOpenFileName(self, 'Open a .slf file', '',
-                                                  'Serafin Files (*.slf)', QDir.currentPath(),
-                                                  options=options)
-        if not filename:
-            return
-        if not testOpen(filename):
+        canceled, filename = super().open_event()
+        if canceled:
             return
 
-        self._reinitRef(filename)
+        self._reinitRef()
+        success, data = self.read_2d(filename)
+        if not success:
+            return
 
-        with Serafin.Read(self.ref_filename, self.ref_language) as resin:
-            resin.read_header()
+        self.ref_data = data
 
-            # check if the file is 2D
-            if not resin.header.is_2d:
-                QMessageBox.critical(self, 'Error', 'The file type (TELEMAC 3D) is currently not supported.',
-                                     QMessageBox.Ok)
-                return
-
-            # record the time series
-            resin.get_time()
-
-            # record the mesh
-            self.parent.inDialog()
-            meshLoader = LoadMeshDialog('comparison', resin.header)
-            self.ref_mesh = meshLoader.run()
-            self.parent.outDialog()
-            if meshLoader.thread.canceled:
-                return
-
-            # update the file summary
-            self.summaryTextBox.appendPlainText(resin.get_summary())
-
-            # copy to avoid reading the same data in the future
-            self.ref_header = resin.header.copy()
-            self.ref_time = resin.time[:]
+        # record the mesh
+        self.parent.inDialog()
+        meshLoader = LoadMeshDialog('comparison', self.ref_data.header)
+        self.ref_mesh = meshLoader.run()
+        self.parent.outDialog()
+        if meshLoader.thread.canceled:
+            self.summaryTextBox.clear()
+            self.ref_data = None
+            return
 
         self.parent.add_reference()
 
@@ -321,53 +286,33 @@ class InputTab(SerafinInputTab):
         self.polygonBox.addItem('Entire mesh')
 
     def btnOpenTestEvent(self):
-        options = QFileDialog.Options()
-        options |= QFileDialog.DontUseNativeDialog
-        filename, _ = QFileDialog.getOpenFileName(self, 'Open a .slf file', '',
-                                                  'Serafin Files (*.slf)', QDir.currentPath(),
-                                                  options=options)
-        if not filename:
-            return
-        if not testOpen(filename):
+        canceled, filename = super().open_event()
+        if canceled:
             return
 
         self._reinitTest(filename)
-
-        with Serafin.Read(self.test_filename, self.test_language) as resin:
-            resin.read_header()
-
-            # check if the file is 2D
-            if not resin.header.is_2d:
-                QMessageBox.critical(self, 'Error', 'The file type (TELEMAC 3D) is currently not supported.',
-                                     QMessageBox.Ok)
-                return
+        success, data = self.read_2d(filename, update=False)
+        if not success:
+            return
 
             # check if the mesh is identical to the reference
-            if not np.all(self.ref_header.x == resin.header.x) or \
-               not np.all(self.ref_header.y == resin.header.y) or \
-               not np.all(self.ref_header.ikle == resin.header.ikle):
-                QMessageBox.critical(self, 'Error', 'The mesh is not identical to the reference.',
-                                     QMessageBox.Ok)
-                return
+        if not np.all(self.ref_data.header.x == data.header.x) or \
+           not np.all(self.ref_data.header.y == data.header.y) or \
+           not np.all(self.ref_data.header.ikle == data.header.ikle):
+            QMessageBox.critical(self, 'Error', 'The mesh is not identical to the reference.', QMessageBox.Ok)
+            return
 
-            # check if the test file has common variables with the reference file
-            common_vars = [(var_ID, var_names) for var_ID, var_names
-                           in zip(self.ref_header.var_IDs, self.ref_header.var_names)
-                           if var_ID in resin.header.var_IDs]
-            if not common_vars:
-                QMessageBox.critical(self, 'Error', 'No common variable with the reference file.',
-                                     QMessageBox.Ok)
-                return
+        # check if the test file has common variables with the reference file
+        common_vars = [(var_ID, var_names) for var_ID, var_names
+                       in zip(self.ref_data.header.var_IDs, self.ref_data.header.var_names)
+                       if var_ID in data.header.var_IDs]
+        if not common_vars:
+            QMessageBox.critical(self, 'Error', 'No common variable with the reference file.', QMessageBox.Ok)
+            return
 
-            # record the time series
-            resin.get_time()
-
-            # update the file summary
-            self.testSummaryTextBox.appendPlainText(resin.get_summary())
-
-            # copy to avoid reading the same data in the future
-            self.test_header = resin.header.copy()
-            self.test_time = resin.time[:]
+        self.test_data = data
+        self.testNameBox.setText(filename)
+        self.testSummaryTextBox.appendPlainText(self.test_data.header.summary())
 
         self.parent.add_test()
 
@@ -375,41 +320,20 @@ class InputTab(SerafinInputTab):
             self.varBox.addItem(var_ID + ' (%s)' % var_name.decode('utf-8').strip())
 
     def btnOpenPolygonEvent(self):
-        options = QFileDialog.Options()
-        options |= QFileDialog.DontUseNativeDialog
-        filename, _ = QFileDialog.getOpenFileName(self, 'Open a .i2s or .shp file', '',
-                                                  'Polygon file (*.i2s *.shp)', options=options)
-        if not filename:
+        success, filename, polygons = open_polygons()
+        if not success:
             return
-        is_i2s = filename[-4:] == '.i2s'
-        self.polygonBox.clear()
-        self.polygonBox.addItem('Entire mesh')
-        self.polygons = []
-        self.polygonNameBox.clear()
+
+        self.polygons = polygons
         self.map.close()
         self.map.has_figure = False
-        self.locatePolygons.setEnabled(False)
 
-        if is_i2s:
-            with BlueKenue.Read(filename) as f:
-                f.read_header()
-                for poly in f.get_polygons():
-                    self.polygons.append(poly)
-        else:
-            shape_type = Shapefile.get_shape_type(filename)
-            if shape_type != 3:
-                QMessageBox.critical(self, 'Error', 'This shape format is not supported.',
-                                     QMessageBox.Ok)
-                return
-            for polygon in Shapefile.get_polygons(filename):
-                self.polygons.append(polygon)
-        if not self.polygons:
-            QMessageBox.critical(self, 'Error', 'The file does not contain any polygon.',
-                                 QMessageBox.Ok)
-            return
-
+        self.polygonNameBox.clear()
         self.polygonNameBox.appendPlainText(filename + '\n' + 'The file contains {} polygon{}.'.format(
                                             len(self.polygons), 's' if len(self.polygons) > 1 else ''))
+
+        self.polygonBox.clear()
+        self.polygonBox.addItem('Entire mesh')
         for i in range(len(self.polygons)):
             self.polygonBox.addItem('Polygon %d' % (i+1))
         self.locatePolygons.setEnabled(True)
@@ -447,10 +371,10 @@ class ComputeErrorsTab(QWidget):
                         'RMSD (Root mean square deviation)    \t{:<30}\n'
 
     def add_reference(self):
-        self.timeSelection.initRef(self.input.ref_header.nb_frames)
+        self.timeSelection.initRef(self.input.ref_data.header.nb_frames)
 
     def add_test(self):
-        self.timeSelection.initTest(self.input.test_header.nb_frames)
+        self.timeSelection.initTest(self.input.test_data.header.nb_frames)
 
     def reset(self):
         self.timeSelection.clearText()
@@ -461,14 +385,14 @@ class ComputeErrorsTab(QWidget):
         test_time = int(self.timeSelection.testIndex.text()) - 1
         selected_variable = self.input.varBox.currentText().split('(')[0][:-1]
 
-        with Serafin.Read(self.input.ref_filename, self.input.ref_language) as resin:
-            resin.header = self.input.ref_header
-            resin.time = self.input.ref_time
+        with Serafin.Read(self.input.ref_data.filename, self.input.ref_data.language) as resin:
+            resin.header = self.input.ref_data.header
+            resin.time = self.input.ref_data.time
             ref_values = resin.read_var_in_frame(ref_time, selected_variable)
 
-        with Serafin.Read(self.input.test_filename, self.input.test_language) as resin:
-            resin.header = self.input.test_header
-            resin.time = self.input.test_time
+        with Serafin.Read(self.input.test_data.filename, self.input.test_data.language) as resin:
+            resin.header = self.input.test_data.header
+            resin.time = self.input.test_data.time
             test_values = resin.read_var_in_frame(test_time, selected_variable)
 
         values = test_values - ref_values
@@ -525,7 +449,7 @@ class ErrorEvolutionTab(QWidget):
         self.setLayout(mainLayout)
 
     def add_reference(self):
-        self.timeSelection.initRef(self.input.ref_header.nb_frames)
+        self.timeSelection.initRef(self.input.ref_data.header.nb_frames)
 
     def add_test(self):
         pass
@@ -541,20 +465,20 @@ class ErrorEvolutionTab(QWidget):
         ref_time = int(self.timeSelection.refIndex.text()) - 1
         selected_variable = self.input.varBox.currentText().split('(')[0][:-1]
 
-        with Serafin.Read(self.input.ref_filename, self.input.ref_language) as resin:
-            resin.header = self.input.ref_header
-            resin.time = self.input.ref_time
+        with Serafin.Read(self.input.ref_data.filename, self.input.ref_data.language) as resin:
+            resin.header = self.input.ref_data.header
+            resin.time = self.input.ref_data.time
             ref_values = resin.read_var_in_frame(ref_time, selected_variable)
 
         mad = []
-        with Serafin.Read(self.input.test_filename, self.input.test_language) as resin:
-            resin.header = self.input.test_header
-            resin.time = self.input.test_time
-            for i in range(len(self.input.test_time)):
+        with Serafin.Read(self.input.test_data.filename, self.input.test_data.language) as resin:
+            resin.header = self.input.test_data.header
+            resin.time = self.input.test_data.time
+            for i in range(len(self.input.test_data.time)):
                 values = resin.read_var_in_frame(i, selected_variable) - ref_values
                 mad.append(self.input.ref_mesh.mean_absolute_deviation(values))
 
-        self.plotViewer.plot(self.input.test_time, mad)
+        self.plotViewer.plot(self.input.test_data.time, mad)
 
 
 class ErrorDistributionTab(QWidget):
@@ -648,10 +572,10 @@ class ErrorDistributionTab(QWidget):
                         'Max          \t{:<30}\n'
 
     def add_reference(self):
-        self.timeSelection.initRef(self.input.ref_header.nb_frames)
+        self.timeSelection.initRef(self.input.ref_data.header.nb_frames)
 
     def add_test(self):
-        self.timeSelection.initTest(self.input.test_header.nb_frames)
+        self.timeSelection.initTest(self.input.test_data.header.nb_frames)
 
     def reset(self):
         self.ewsd = None
@@ -743,14 +667,14 @@ class ErrorDistributionTab(QWidget):
         test_time = int(self.timeSelection.testIndex.text()) - 1
         selected_variable = self.input.varBox.currentText().split('(')[0][:-1]
 
-        with Serafin.Read(self.input.ref_filename, self.input.ref_language) as resin:
-            resin.header = self.input.ref_header
-            resin.time = self.input.ref_time
+        with Serafin.Read(self.input.ref_data.filename, self.input.ref_data.language) as resin:
+            resin.header = self.input.ref_data.header
+            resin.time = self.input.ref_data.time
             ref_values = resin.read_var_in_frame(ref_time, selected_variable)
 
-        with Serafin.Read(self.input.test_filename, self.input.test_language) as resin:
-            resin.header = self.input.test_header
-            resin.time = self.input.test_time
+        with Serafin.Read(self.input.test_data.filename, self.input.test_data.language) as resin:
+            resin.header = self.input.test_data.header
+            resin.time = self.input.test_data.time
             test_values = resin.read_var_in_frame(test_time, selected_variable)
 
         values = test_values - ref_values
@@ -828,11 +752,11 @@ class BSSTab(QWidget):
                         'BSS\t{:<30}\n'
 
     def add_reference(self):
-        self.timeSelection.initRef(self.input.ref_header.nb_frames)
+        self.timeSelection.initRef(self.input.ref_data.header.nb_frames)
 
     def add_test(self):
-        self.timeSelection.initTest(self.input.test_header.nb_frames)
-        self.initSelection.initRef(self.input.test_header.nb_frames)
+        self.timeSelection.initTest(self.input.test_data.header.nb_frames)
+        self.initSelection.initRef(self.input.test_data.header.nb_frames)
 
     def reset(self):
         self.timeSelection.clearText()
@@ -854,18 +778,18 @@ class BSSTab(QWidget):
             init_time = int(self.initSelection.refIndex.text()) - 1
             selected_variable = self.input.varBox.currentText().split('(')[0][:-1]
 
-            with Serafin.Read(self.input.ref_filename, self.input.ref_language) as resin:
-                resin.header = self.input.ref_header
-                resin.time = self.input.ref_time
+            with Serafin.Read(self.input.ref_data.filename, self.input.ref_data.language) as resin:
+                resin.header = self.input.ref_data.header
+                resin.time = self.input.ref_data.time
                 ref_values = resin.read_var_in_frame(ref_time, selected_variable)
 
-            with Serafin.Read(self.input.test_filename, self.input.test_language) as resin:
-                resin.header = self.input.test_header
-                resin.time = self.input.test_time
+            with Serafin.Read(self.input.test_data.filename, self.input.test_data.language) as resin:
+                resin.header = self.input.test_data.header
+                resin.time = self.input.test_data.time
                 init_values = resin.read_var_in_frame(init_time, selected_variable)
                 ref_volume = self.input.ref_mesh.quadratic_volume(ref_values - init_values)
 
-                for index in range(len(self.input.test_time)):
+                for index in range(len(self.input.test_data.time)):
                     test_values = resin.read_var_in_frame(index, selected_variable)
 
                     test_volume = self.input.ref_mesh.quadratic_volume(test_values - ref_values)
@@ -875,7 +799,7 @@ class BSSTab(QWidget):
                         with np.errstate(divide='ignore'):
                             bss = 1 - test_volume / ref_volume
                     all_bss.append(bss)
-            self.plotViewer.plot(self.input.test_time, all_bss)
+            self.plotViewer.plot(self.input.test_data.time, all_bss)
         self.plotViewer.show()
 
     def btnComputeEvent(self):
@@ -884,14 +808,14 @@ class BSSTab(QWidget):
         init_time = int(self.initSelection.refIndex.text()) - 1
         selected_variable = self.input.varBox.currentText().split('(')[0][:-1]
 
-        with Serafin.Read(self.input.ref_filename, self.input.ref_language) as resin:
-            resin.header = self.input.ref_header
-            resin.time = self.input.ref_time
+        with Serafin.Read(self.input.ref_data.filename, self.input.ref_data.language) as resin:
+            resin.header = self.input.ref_data.header
+            resin.time = self.input.ref_data.time
             ref_values = resin.read_var_in_frame(ref_time, selected_variable)
 
-        with Serafin.Read(self.input.test_filename, self.input.test_language) as resin:
-            resin.header = self.input.test_header
-            resin.time = self.input.test_time
+        with Serafin.Read(self.input.test_data.filename, self.input.test_data.language) as resin:
+            resin.header = self.input.test_data.header
+            resin.time = self.input.test_data.time
             test_values = resin.read_var_in_frame(test_time, selected_variable)
             init_values = resin.read_var_in_frame(init_time, selected_variable)
 
@@ -958,7 +882,7 @@ class CompareResultsGUI(TelToolWidget):
         for i, tab in enumerate(self.resultTabs):
             tab.add_test()
             self.tab.setTabEnabled(i+1, True)
-        if self.input.ref_filename == self.input.test_filename:
+        if self.input.ref_data.filename == self.input.test_data.filename:
             self.tab.setTabEnabled(4, False)
 
 

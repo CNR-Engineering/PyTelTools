@@ -13,7 +13,8 @@ from slf.interpolation import MeshInterpolator
 from slf.variables import do_calculations_in_frame
 from workflow.Node import Node, SingleInputNode, SingleOutputNode, OneInOneOutNode
 from workflow.util import LoadSerafinDialog, OutputOptionPanel, GeomOutputOptionPanel, \
-                          process_output_options, process_geom_output_options
+                          process_output_options, process_geom_output_options, \
+                          validate_input_options, validate_output_options
 
 
 class LoadSerafinNode(SingleOutputNode):
@@ -112,18 +113,11 @@ class WriteSerafinNode(OneInOneOutNode):
         self.reconfigure_downward()
 
     def load(self, options):
-        self.suffix = options[0]
-        self.in_source_folder = bool(int(options[1]))
-        self.dir_path = options[2]
-        self.double_name = bool(int(options[3]))
-        self.overwrite = bool(int(options[4]))
-        self.state = Node.READY
-
-        if not self.in_source_folder:
-            if not os.path.exists(self.dir_path):
-                self.in_source_folder = True
-                self.dir_path = ''
-                self.state = Node.NOT_CONFIGURED
+        success, (suffix, in_source_folder, dir_path, double_name, overwrite) = validate_output_options(options)
+        if success:
+            self.state = Node.READY
+            self.suffix, self.in_source_folder, self.dir_path, self.double_name, self.overwrite = \
+                suffix, in_source_folder, dir_path, double_name, overwrite
 
     def _run_simple(self, input_data):
         output_header = input_data.default_output_header()
@@ -471,15 +465,9 @@ class LoadPolygon2DNode(SingleOutputNode):
                          str(self.pos().x()), str(self.pos().y()), self.filename])
 
     def load(self, options):
-        self.filename = options[0]
-        if self.filename:
-            try:
-                with open(self.filename) as f:
-                    pass
-            except FileNotFoundError:
-                self.state = Node.NOT_CONFIGURED
-                self.filename = ''
-                return
+        success, filename = validate_input_options(options)
+        if success:
+            self.filename = filename
             self.state = Node.READY
 
     def run(self):
@@ -565,15 +553,9 @@ class LoadOpenPolyline2DNode(SingleOutputNode):
                          str(self.pos().x()), str(self.pos().y()), self.filename])
 
     def load(self, options):
-        self.filename = options[0]
-        if self.filename:
-            try:
-                with open(self.filename) as f:
-                    pass
-            except FileNotFoundError:
-                self.state = Node.NOT_CONFIGURED
-                self.filename = ''
-                return
+        success, filename = validate_input_options(options)
+        if success:
+            self.filename = filename
             self.state = Node.READY
 
     def run(self):
@@ -659,15 +641,9 @@ class LoadPoint2DNode(SingleOutputNode):
                          str(self.pos().x()), str(self.pos().y()), self.filename])
 
     def load(self, options):
-        self.filename = options[0]
-        if self.filename:
-            try:
-                with open(self.filename) as f:
-                    pass
-            except FileNotFoundError:
-                self.state = Node.NOT_CONFIGURED
-                self.filename = ''
-                return
+        success, filename = validate_input_options(options)
+        if success:
+            self.filename = filename
             self.state = Node.READY
 
     def run(self):
@@ -744,15 +720,9 @@ class LoadReferenceSerafinNode(SingleOutputNode):
                          str(self.pos().x()), str(self.pos().y()), self.filename])
 
     def load(self, options):
-        self.filename = options[0]
-        if self.filename:
-            try:
-                with open(self.filename) as f:
-                    pass
-            except FileNotFoundError:
-                self.state = Node.NOT_CONFIGURED
-                self.filename = ''
-                return
+        success, filename = validate_input_options(options)
+        if success:
+            self.filename = filename
             self.state = Node.READY
 
     def run(self):
@@ -867,16 +837,11 @@ class WriteLandXMLNode(SingleInputNode):
                          str(int(self.double_name)), str(int(self.overwrite))])
 
     def load(self, options):
-        self.suffix = options[0]
-        self.in_source_folder = bool(int(options[1]))
-        self.dir_path = options[2]
-        self.double_name = bool(int(options[3]))
-        self.overwrite = bool(int(options[4]))
-        if not self.in_source_folder:
-            if not os.path.exists(self.dir_path):
-                self.in_source_folder = True
-                self.dir_path = ''
-                self.state = Node.NOT_CONFIGURED
+        success, (suffix, in_source_folder, dir_path, double_name, overwrite) = validate_output_options(options)
+        if success:
+            self.state = Node.READY
+            self.suffix, self.in_source_folder, self.dir_path, self.double_name, self.overwrite = \
+                suffix, in_source_folder, dir_path, double_name, overwrite
 
     def run(self):
         success = super().run_upward()
@@ -952,16 +917,11 @@ class WriteShpNode(SingleInputNode):
                          str(int(self.double_name)), str(int(self.overwrite))])
 
     def load(self, options):
-        self.suffix = options[0]
-        self.in_source_folder = bool(int(options[1]))
-        self.dir_path = options[2]
-        self.double_name = bool(int(options[3]))
-        self.overwrite = bool(int(options[4]))
-        if not self.in_source_folder:
-            if not os.path.exists(self.dir_path):
-                self.in_source_folder = True
-                self.dir_path = ''
-                self.state = Node.NOT_CONFIGURED
+        success, (suffix, in_source_folder, dir_path, double_name, overwrite) = validate_output_options(options)
+        if success:
+            self.state = Node.READY
+            self.suffix, self.in_source_folder, self.dir_path, self.double_name, self.overwrite = \
+                suffix, in_source_folder, dir_path, double_name, overwrite
 
     def run(self):
         success = super().run_upward()

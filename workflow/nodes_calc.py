@@ -10,7 +10,7 @@ from slf.flux import TriangularVectorField, FluxCalculator
 from slf.interpolation import MeshInterpolator
 from slf.volume import TruncatedTriangularPrisms, VolumeCalculator
 from workflow.Node import Node, OneInOneOutNode, TwoInOneOutNode
-from workflow.util import OutputOptionPanel, process_output_options
+from workflow.util import OutputOptionPanel, process_output_options, validate_output_options
 
 
 class ArrivalDurationNode(OneInOneOutNode):
@@ -478,20 +478,16 @@ class ComputeVolumeNode(TwoInOneOutNode):
 
     def load(self, options):
         first, second, sup = options[0:3]
-        self.suffix = options[3]
-        self.in_source_folder = bool(int(options[4]))
-        self.dir_path = options[5]
-        self.double_name = bool(int(options[6]))
-        self.overwrite = bool(int(options[7]))
+        success, (suffix, in_source_folder, dir_path, double_name, overwrite) = validate_output_options(options[3:])
+        if success:
+            self.state = Node.READY
+            self.suffix, self.in_source_folder, self.dir_path, self.double_name, self.overwrite = \
+                suffix, in_source_folder, dir_path, double_name, overwrite
         if first:
             self.first_var = first
         if second:
             self.second_var = second
         self.sup_volume = bool(int(sup))
-        if not self.in_source_folder:
-            if not os.path.exists(self.dir_path):
-                self.in_source_folder = True
-                self.dir_path = ''
 
     def _run_volume(self):
         # process options
@@ -770,15 +766,11 @@ class ComputeFluxNode(TwoInOneOutNode):
 
     def load(self, options):
         self.flux_options = options[0]
-        self.suffix = options[1]
-        self.in_source_folder = bool(int(options[2]))
-        self.dir_path = options[3]
-        self.double_name = bool(int(options[4]))
-        self.overwrite = bool(int(options[5]))
-        if not self.in_source_folder:
-            if not os.path.exists(self.dir_path):
-                self.in_source_folder = True
-                self.dir_path = ''
+        success, (suffix, in_source_folder, dir_path, double_name, overwrite) = validate_output_options(options[1:])
+        if success:
+            self.state = Node.READY
+            self.suffix, self.in_source_folder, self.dir_path, self.double_name, self.overwrite = \
+                suffix, in_source_folder, dir_path, double_name, overwrite
 
     def _run_flux(self):
         # process options
@@ -917,17 +909,11 @@ class InterpolateOnPointsNode(TwoInOneOutNode):
                          str(int(self.double_name)), str(int(self.overwrite))])
 
     def load(self, options):
-        self.suffix = options[0]
-        self.in_source_folder = bool(int(options[1]))
-        self.dir_path = options[2]
-        self.double_name = bool(int(options[3]))
-        self.overwrite = bool(int(options[4]))
-
-        if not self.in_source_folder:
-            if not os.path.exists(self.dir_path):
-                self.in_source_folder = True
-                self.dir_path = ''
-                self.state = Node.NOT_CONFIGURED
+        success, (suffix, in_source_folder, dir_path, double_name, overwrite) = validate_output_options(options)
+        if success:
+            self.state = Node.READY
+            self.suffix, self.in_source_folder, self.dir_path, self.double_name, self.overwrite = \
+                suffix, in_source_folder, dir_path, double_name, overwrite
 
     def _prepare_points(self):
         self.progress_bar.setVisible(True)
@@ -1069,17 +1055,11 @@ class InterpolateAlongLinesNode(TwoInOneOutNode):
                          str(int(self.double_name)), str(int(self.overwrite))])
 
     def load(self, options):
-        self.suffix = options[0]
-        self.in_source_folder = bool(int(options[1]))
-        self.dir_path = options[2]
-        self.double_name = bool(int(options[3]))
-        self.overwrite = bool(int(options[4]))
-
-        if not self.in_source_folder:
-            if not os.path.exists(self.dir_path):
-                self.in_source_folder = True
-                self.dir_path = ''
-                self.state = Node.NOT_CONFIGURED
+        success, (suffix, in_source_folder, dir_path, double_name, overwrite) = validate_output_options(options)
+        if success:
+            self.state = Node.READY
+            self.suffix, self.in_source_folder, self.dir_path, self.double_name, self.overwrite = \
+                suffix, in_source_folder, dir_path, double_name, overwrite
 
     def _run_interpolate(self, selected_vars):
         self.progress_bar.setVisible(True)
@@ -1281,17 +1261,12 @@ class ProjectLinesNode(TwoInOneOutNode):
                          str(int(self.double_name)), str(int(self.overwrite)), str(self.reference_index)])
 
     def load(self, options):
-        self.suffix = options[0]
-        self.in_source_folder = bool(int(options[1]))
-        self.dir_path = options[2]
-        self.double_name = bool(int(options[3]))
-        self.overwrite = bool(int(options[4]))
+        success, (suffix, in_source_folder, dir_path, double_name, overwrite) = validate_output_options(options[:5])
+        if success:
+            self.state = Node.READY
+            self.suffix, self.in_source_folder, self.dir_path, self.double_name, self.overwrite = \
+                suffix, in_source_folder, dir_path, double_name, overwrite
         self.reference_index = int(options[5])
-
-        if not self.in_source_folder:
-            if not os.path.exists(self.dir_path):
-                self.in_source_folder = True
-                self.dir_path = ''
 
     def run(self):
         success = super().run_upward()

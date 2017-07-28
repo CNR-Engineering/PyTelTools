@@ -20,13 +20,16 @@ from matplotlib import cm
 import matplotlib.lines as mlines
 from matplotlib.colors import Normalize, colorConverter
 from mpl_toolkits.axes_grid1 import make_axes_locatable
+import struct
 
 from slf import Serafin
+from slf.datatypes import SerafinData
 from slf.volume import TruncatedTriangularPrisms
 from slf.flux import TriangularVectorField
 from slf.comparison import ReferenceMesh
 from slf.interpolation import MeshInterpolator
 import slf.misc as operations
+from geom import BlueKenue, Shapefile
 
 
 class TimeSlider(QSlider):
@@ -676,6 +679,44 @@ class TableWidgetDropRows(QTableWidget):
             self.item(selectedRow, 1).setText(self.item(dropRow, 1).text())
             self.item(dropRow, 1).setText(source)
         event.accept()
+
+
+class VariableTable(TableWidgetDragRows):
+    def __init__(self):
+        super().__init__()
+        self.setColumnCount(3)
+        self.setHorizontalHeaderLabels(['ID', 'Name', 'Unit'])
+        vh = self.verticalHeader()
+        vh.setSectionResizeMode(QHeaderView.Fixed)
+        vh.setDefaultSectionSize(20)
+        hh = self.horizontalHeader()
+        hh.setDefaultSectionSize(110)
+        self.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.setMaximumHeight(800)
+
+    def fill(self, header):
+        for i, (var_id, name, unit) in enumerate(zip(header.var_IDs, header.var_names, header.var_units)):
+            self.insertRow(self.rowCount())
+            id_item = QTableWidgetItem(var_id.strip())
+            name_item = QTableWidgetItem(name.decode('utf-8').strip())
+            unit_item = QTableWidgetItem(unit.decode('utf-8').strip())
+            self.setItem(i, 0, id_item)
+            self.setItem(i, 1, name_item)
+            self.setItem(i, 2, unit_item)
+
+    def get_selected(self):
+        selected = []
+        for i in range(self.rowCount()):
+            selected.append(self.item(i, 0).text())
+        return selected
+
+    def get_selected_all(self):
+        selected = []
+        for i in range(self.rowCount()):
+            selected.append((self.item(i, 0).text(),
+                            bytes(self.item(i, 1).text(), 'utf-8').ljust(16),
+                            bytes(self.item(i, 2).text(), 'utf-8').ljust(16)))
+        return selected
 
 
 class OutputThread(QThread):
@@ -2147,10 +2188,10 @@ class MultiVarLinePlotViewer(QWidget):
         self.plotViewer.current_ylabel = ''
         self.control.timeSelection.clearText()
 
-    def getInput(self, filename, header, time, lines, line_interpolators, line_interpolators_internal):
-        self.filename = filename
-        self.header = header
-        self.time = time
+    def getInput(self, input_data, lines, line_interpolators, line_interpolators_internal):
+        self.filename = input_data.filename
+        self.header = input_data.header
+        self.time = input_data.time
         self.lines = lines
         self.line_interpolators = line_interpolators
         self.line_interpolators_internal = line_interpolators_internal
@@ -2418,10 +2459,10 @@ class MultiFrameLinePlotViewer(QWidget):
         self.control.timeTable.setRowCount(0)
         self.frame_colors = {}
 
-    def getInput(self, filename, header, time, lines, line_interpolators, line_interpolators_internal):
-        self.filename = filename
-        self.header = header
-        self.time = time
+    def getInput(self, input_data, lines, line_interpolators, line_interpolators_internal):
+        self.filename = input_data.filename
+        self.header = input_data.header
+        self.time = input_data.time
         self.lines = lines
         self.line_interpolators = line_interpolators
         self.line_interpolators_internal = line_interpolators_internal
@@ -2548,6 +2589,7 @@ class ProjectLinesPlotViewer(QWidget):
         self.time = []
         self.lines = []
         self.line_interpolators = []
+        self.line_interpolators_internal = []
 
         self.var_table = {}
         self.current_vars = {}
@@ -2778,26 +2820,25 @@ class ProjectLinesPlotViewer(QWidget):
         self.plotViewer.current_ylabel = ''
         self.control.timeSelection.clearText()
 
-    def getInput(self, filename, input_header, time, lines, line_interpolators, line_interpolators_internal):
-        self.header = input_header
-        self.language = input_header.language
-        self.time = time
-        self.filename = filename
+    def getInput(self, input_data, lines, line_interpolators, line_interpolators_internal):
+        self.filename = input_data.filename
+        self.header = input_data.header
+        self.time = input_data.time
         self.lines = lines
         self.line_interpolators = line_interpolators
         self.line_interpolators_internal = line_interpolators_internal
 
-        if input_header.date is not None:
-            year, month, day, hour, minute, second = input_header.date
+        if self.header.date is not None:
+            year, month, day, hour, minute, second = self.header.date
             start_time = datetime.datetime(year, month, day, hour, minute, second)
         else:
             start_time = datetime.datetime(1900, 1, 1, 0, 0, 0)
-        frames = list(map(lambda x: start_time + datetime.timedelta(seconds=x), time))
-        self.control.timeSelection.initTime(time, frames)
+        frames = list(map(lambda x: start_time + datetime.timedelta(seconds=x), self.time))
+        self.control.timeSelection.initTime(self.time, frames)
 
         self.var_table = {}
-        for var_ID, var_name, var_unit in zip(input_header.var_IDs, input_header.var_names,
-                                              input_header.var_units):
+        for var_ID, var_name, var_unit in zip(self.header.var_IDs, self.header.var_names,
+                                              self.header.var_units):
             var_unit = var_unit.decode('utf-8').strip()
             if var_unit in self.var_table:
                 self.var_table[var_unit].append(var_ID)
@@ -2879,6 +2920,49 @@ class SerafinInputTab(QWidget):
         glayout.setSpacing(10)
         self.input_layout.addLayout(glayout)
 
+    def current_language(self):
+        if self.frenchButton.isChecked():
+            return 'fr'
+        return 'en'
+
+    def reset(self):
+        self.inNameBox.clear()
+        self.summaryTextBox.clear()
+
+    def open_event(self):
+        filename, _ = QFileDialog.getOpenFileName(self, 'Open a .slf file', '', 'Serafin Files (*.slf)',
+                                                  options=QFileDialog.Options() | QFileDialog.DontUseNativeDialog)
+        if not filename:
+            return True, ''
+
+        if not testOpen(filename):
+            return True, ''
+
+        return False, filename
+
+    def read(self, filename):
+        self.inNameBox.setText(filename)
+        data = SerafinData('', filename, self.current_language())
+        data.read()
+        self.summaryTextBox.appendPlainText(data.header.summary())
+        logging.info('Finished reading the input file')
+        return data
+
+    def read_2d(self, filename, update=True):
+        if update:
+            self.inNameBox.setText(filename)
+        data = SerafinData('', filename, self.current_language())
+        is_2d = data.read()
+
+        if not is_2d:
+            QMessageBox.critical(self, 'Error', 'The file type (TELEMAC 3D) is currently not supported.',
+                                 QMessageBox.Ok)
+            return False, None
+        if update:
+            self.summaryTextBox.appendPlainText(data.header.summary())
+        logging.info('Finished reading the input file')
+        return True, data
+
 
 class TelToolWidget(QWidget):
     def __init__(self, parent):
@@ -2949,6 +3033,132 @@ def handleOverwrite(filename):
                                  'Permission denied (Is the file opened by another application?).',
                                  QMessageBox.Ok, QMessageBox.Ok)
             return None
+        try:
+            os.remove(filename)
+        except PermissionError:
+            pass
         return True
     return False
 
+
+def open_polygons():
+    filename, _ = QFileDialog.getOpenFileName(None, 'Open a .i2s or .shp file', '', 'Line sets (*.i2s *.shp)',
+                                              options=QFileDialog.Options() | QFileDialog.DontUseNativeDialog)
+    if not filename:
+        return False, '', []
+    if not testOpen(filename):
+        return False, '', []
+
+    is_i2s = filename[-4:] == '.i2s'
+
+    polygons = []
+    if is_i2s:
+        with BlueKenue.Read(filename) as f:
+            f.read_header()
+            for poly in f.get_polygons():
+                polygons.append(poly)
+    else:
+        try:
+            for polygon in Shapefile.get_polygons(filename):
+                polygons.append(polygon)
+        except struct.error:
+            QMessageBox.critical(None, 'Error', 'Inconsistent bytes.', QMessageBox.Ok)
+            return False, '', []
+    if not polygons:
+        QMessageBox.critical(None, 'Error', 'The file does not contain any polygon.',
+                             QMessageBox.Ok)
+        return False, '', []
+    return True, filename, polygons
+
+
+def open_polylines():
+    filename, _ = QFileDialog.getOpenFileName(None, 'Open a .i2s or .shp file', '', 'Line sets (*.i2s *.shp)',
+                                              options=QFileDialog.Options() | QFileDialog.DontUseNativeDialog)
+    if not filename:
+        return False, '', []
+    if not testOpen(filename):
+        return False, '', []
+
+    is_i2s = filename[-4:] == '.i2s'
+
+    polylines = []
+    if is_i2s:
+        with BlueKenue.Read(filename) as f:
+            f.read_header()
+            for polyline in f.get_open_polylines():
+                polylines.append(polyline)
+    else:
+        try:
+            for polyline in Shapefile.get_open_polylines(filename):
+                polylines.append(polyline)
+        except struct.error:
+            QMessageBox.critical(None, 'Error', 'Inconsistent bytes.', QMessageBox.Ok)
+            return False, '', []
+    if not polylines:
+        QMessageBox.critical(None, 'Error', 'The file does not contain any open polyline.',
+                             QMessageBox.Ok)
+        return False, '', []
+    return True, filename, polylines
+
+
+def open_points():
+    filename, _ = QFileDialog.getOpenFileName(None, 'Open a .shp file', '', 'Point sets (*.shp)',
+                                              options=QFileDialog.Options() | QFileDialog.DontUseNativeDialog)
+    if not filename:
+        return False, '', [], [], []
+    if not testOpen(filename):
+        return False, '', [], [], []
+
+    fields, indices = Shapefile.get_attribute_names(filename)
+    points = []
+    attributes = []
+    try:
+        for point, attribute in Shapefile.get_points(filename, indices):
+            points.append(point)
+            attributes.append(attribute)
+    except struct.error:
+        QMessageBox.critical(None, 'Error', 'Inconsistent bytes.', QMessageBox.Ok)
+        return False, '', [], [], []
+
+    if not points:
+        QMessageBox.critical(None, 'Error', 'The file does not contain any open polyline.',
+                             QMessageBox.Ok)
+        return False, '', [], [], []
+    return True, filename, points, attributes, fields
+
+
+
+def save_dialog(extension, input_name='', input_names=None):
+    # create the save file dialog
+    options = QFileDialog.Options()
+    options |= QFileDialog.DontUseNativeDialog
+    options |= QFileDialog.DontConfirmOverwrite
+    filename, _ = QFileDialog.getSaveFileName(None, 'Choose the output file name', '',
+                                              'Serafin Files (*.slf)' if extension == '.slf'
+                                              else 'CSV Files (*.csv)', options=options)
+
+    # check the file name consistency
+    if not filename:
+        return True, ''
+    if len(filename) < 5 or filename[-4:] != extension:
+        filename += extension
+
+    # overwrite to the input file is forbidden
+    if input_name:
+        if filename == input_name:
+            QMessageBox.critical(None, 'Error', 'Cannot overwrite to the input file.',
+                                 QMessageBox.Ok)
+            return True, ''
+    elif input_names:
+        for name in input_names:
+            if filename == name:
+                QMessageBox.critical(None, 'Error', 'Cannot overwrite to the input file.',
+                                     QMessageBox.Ok)
+                return True, ''
+
+    # handle overwrite manually
+    overwrite = handleOverwrite(filename)
+    if overwrite is None:
+        return True, ''
+
+    return False, filename

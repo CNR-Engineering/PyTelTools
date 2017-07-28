@@ -3,7 +3,7 @@ from datetime import datetime
 from PyQt5.QtWidgets import *
 from workflow.MultiNode import MultiNode, MultiOneInOneOutNode, MultiSingleInputNode, \
                                MultiSingleOutputNode, MultiDoubleInputNode, MultiTwoInOneOutNode
-from workflow.util import MultiLoadSerafinDialog
+from workflow.util import MultiLoadSerafinDialog, validate_output_options, validate_input_options
 import slf.variables as variables
 import slf.misc as operations
 from geom.transformation import load_transformation_map
@@ -48,16 +48,9 @@ class MultiWriteSerafinNode(MultiOneInOneOutNode):
         self.label = 'Write\nSerafin'
 
     def load(self, options):
-        suffix = options[0]
-        in_source_folder = bool(int(options[1]))
-        dir_path = options[2]
-        double_name = bool(int(options[3]))
-        overwrite = bool(int(options[4]))
-        if not in_source_folder:
-            if not os.path.exists(dir_path):
-                self.state = MultiNode.NOT_CONFIGURED
-                return
-        self.options = (suffix, in_source_folder, dir_path, double_name, overwrite)
+        success, self.options = validate_output_options(options)
+        if not success:
+            self.state = MultiNode.NOT_CONFIGURED
 
 
 class MultiLoadPolygon2DNode(MultiSingleOutputNode):
@@ -67,17 +60,9 @@ class MultiLoadPolygon2DNode(MultiSingleOutputNode):
         self.label = 'Load 2D\nPolygons'
 
     def load(self, options):
-        filename = options[0]
-        if not filename:
+        success, self.options = validate_output_options(options)
+        if not success:
             self.state = MultiNode.NOT_CONFIGURED
-            return
-        try:
-            with open(filename) as f:
-                pass
-        except FileNotFoundError:
-            self.state = MultiNode.NOT_CONFIGURED
-            return
-        self.options = (filename,)
 
 
 class MultiLoadOpenPolyline2DNode(MultiSingleOutputNode):
@@ -87,17 +72,9 @@ class MultiLoadOpenPolyline2DNode(MultiSingleOutputNode):
         self.label = 'Load 2D\nOpen\nPolylines'
 
     def load(self, options):
-        filename = options[0]
-        if not filename:
+        success, self.options = validate_output_options(options)
+        if not success:
             self.state = MultiNode.NOT_CONFIGURED
-            return
-        try:
-            with open(filename) as f:
-                pass
-        except FileNotFoundError:
-            self.state = MultiNode.NOT_CONFIGURED
-            return
-        self.options = (filename,)
 
 
 class MultiLoadPoint2DNode(MultiSingleOutputNode):
@@ -107,17 +84,9 @@ class MultiLoadPoint2DNode(MultiSingleOutputNode):
         self.label = 'Load 2D\nPoints'
 
     def load(self, options):
-        filename = options[0]
-        if not filename:
+        success, self.options = validate_output_options(options)
+        if not success:
             self.state = MultiNode.NOT_CONFIGURED
-            return
-        try:
-            with open(filename) as f:
-                pass
-        except FileNotFoundError:
-            self.state = MultiNode.NOT_CONFIGURED
-            return
-        self.options = (filename,)
 
 
 class MultiLoadReferenceSerafinNode(MultiSingleOutputNode):
@@ -127,17 +96,9 @@ class MultiLoadReferenceSerafinNode(MultiSingleOutputNode):
         self.label = 'Load\nReference\nSerafin'
 
     def load(self, options):
-        filename = options[0]
-        if not filename:
+        success, self.options = validate_output_options(options)
+        if not success:
             self.state = MultiNode.NOT_CONFIGURED
-            return
-        try:
-            with open(filename) as f:
-                pass
-        except FileNotFoundError:
-            self.state = MultiNode.NOT_CONFIGURED
-            return
-        self.options = (filename,)
 
 
 class MultiWriteLandXMLNode(MultiSingleInputNode):
@@ -147,16 +108,9 @@ class MultiWriteLandXMLNode(MultiSingleInputNode):
         self.label = 'Write\nLandXML'
 
     def load(self, options):
-        suffix = options[0]
-        in_source_folder = bool(int(options[1]))
-        dir_path = options[2]
-        double_name = bool(int(options[3]))
-        overwrite = bool(int(options[4]))
-        if not in_source_folder:
-            if not os.path.exists(dir_path):
-                self.state = MultiNode.NOT_CONFIGURED
-                return
-        self.options = (suffix, in_source_folder, dir_path, double_name, overwrite)
+        success, self.options = validate_output_options(options)
+        if not success:
+            self.state = MultiNode.NOT_CONFIGURED
 
 
 class MultiWriteShpNode(MultiSingleInputNode):
@@ -166,16 +120,9 @@ class MultiWriteShpNode(MultiSingleInputNode):
         self.label = 'Write shp'
 
     def load(self, options):
-        suffix = options[0]
-        in_source_folder = bool(int(options[1]))
-        dir_path = options[2]
-        double_name = bool(int(options[3]))
-        overwrite = bool(int(options[4]))
-        if not in_source_folder:
-            if not os.path.exists(dir_path):
-                self.state = MultiNode.NOT_CONFIGURED
-                return
-        self.options = (suffix, in_source_folder, dir_path, double_name, overwrite)
+        success, self.options = validate_output_options(options)
+        if not success:
+            self.state = MultiNode.NOT_CONFIGURED
 
 
 class MultiAddTransformationNode(MultiOneInOneOutNode):
@@ -258,11 +205,6 @@ class MultiComputeVolumeNode(MultiDoubleInputNode):
 
     def load(self, options):
         first, second, sup = options[0:3]
-        suffix = options[3]
-        in_source_folder = bool(int(options[4]))
-        dir_path = options[5]
-        double_name = bool(int(options[6]))
-        overwrite = bool(int(options[7]))
         if first:
             first_var = first
         else:
@@ -273,10 +215,10 @@ class MultiComputeVolumeNode(MultiDoubleInputNode):
         else:
             second_var = None
         sup_volume = bool(int(sup))
-        if not in_source_folder:
-            if not os.path.exists(dir_path):
-                self.state = MultiNode.NOT_CONFIGURED
-                return
+        success, (suffix, in_source_folder, dir_path, double_name, overwrite) = validate_output_options(options[3:])
+        if not success:
+            self.state = MultiNode.NOT_CONFIGURED
+            return
         self.options = (first_var, second_var, sup_volume, suffix, in_source_folder, dir_path, double_name, overwrite)
 
 
@@ -291,15 +233,10 @@ class MultiComputeFluxNode(MultiDoubleInputNode):
         if not flux_options:
             self.state = MultiNode.NOT_CONFIGURED
             return
-        suffix = options[1]
-        in_source_folder = bool(int(options[2]))
-        dir_path = options[3]
-        double_name = bool(int(options[4]))
-        overwrite = bool(int(options[5]))
-        if not in_source_folder:
-            if not os.path.exists(dir_path):
-                self.state = MultiNode.NOT_CONFIGURED
-                return
+        success, (suffix, in_source_folder, dir_path, double_name, overwrite) = validate_output_options(options[1:])
+        if not success:
+            self.state = MultiNode.NOT_CONFIGURED
+            return
         self.options = (flux_options, suffix, in_source_folder, dir_path, double_name, overwrite)
 
 
@@ -310,16 +247,9 @@ class MultiInterpolateOnPointsNode(MultiDoubleInputNode):
         self.label = 'Interpolate\non\nPoints'
 
     def load(self, options):
-        suffix = options[0]
-        in_source_folder = bool(int(options[1]))
-        dir_path = options[2]
-        double_name = bool(int(options[3]))
-        overwrite = bool(int(options[4]))
-        if not in_source_folder:
-            if not os.path.exists(dir_path):
-                self.state = MultiNode.NOT_CONFIGURED
-                return
-        self.options = (suffix, in_source_folder, dir_path, double_name, overwrite)
+        success, self.options = validate_output_options(options)
+        if not success:
+            self.state = MultiNode.NOT_CONFIGURED
 
 
 class MultiInterpolateAlongLinesNode(MultiDoubleInputNode):
@@ -329,16 +259,9 @@ class MultiInterpolateAlongLinesNode(MultiDoubleInputNode):
         self.label = 'Interpolate\nalong\nLines'
 
     def load(self, options):
-        suffix = options[0]
-        in_source_folder = bool(int(options[1]))
-        dir_path = options[2]
-        double_name = bool(int(options[3]))
-        overwrite = bool(int(options[4]))
-        if not in_source_folder:
-            if not os.path.exists(dir_path):
-                self.state = MultiNode.NOT_CONFIGURED
-                return
-        self.options = (suffix, in_source_folder, dir_path, double_name, overwrite)
+        success, self.options = validate_output_options(options)
+        if not success:
+            self.state = MultiNode.NOT_CONFIGURED
 
 
 class MultiProjectLinesNode(MultiDoubleInputNode):
@@ -348,15 +271,10 @@ class MultiProjectLinesNode(MultiDoubleInputNode):
         self.label = 'Project\nLines'
 
     def load(self, options):
-        suffix = options[0]
-        in_source_folder = bool(int(options[1]))
-        dir_path = options[2]
-        double_name = bool(int(options[3]))
-        overwrite = bool(int(options[4]))
-        if not in_source_folder:
-            if not os.path.exists(dir_path):
-                self.state = MultiNode.NOT_CONFIGURED
-                return
+        success, (suffix, in_source_folder, dir_path, double_name, overwrite) = validate_output_options(options[:5])
+        if not success:
+            self.state = MultiNode.NOT_CONFIGURED
+            return
         reference_index = int(options[5])
         if reference_index == -1:
             self.state = MultiNode.NOT_CONFIGURED
