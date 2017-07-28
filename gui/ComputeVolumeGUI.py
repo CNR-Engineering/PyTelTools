@@ -10,7 +10,7 @@ from slf import Serafin
 from slf.volume import VolumeCalculator
 from geom import BlueKenue, Shapefile
 from gui.util import TemporalPlotViewer, QPlainTextEditLogger, MapViewer, PolygonMapCanvas, OutputThread,\
-    OutputProgressDialog, LoadMeshDialog, TelToolWidget, testOpen, handleOverwrite
+    OutputProgressDialog, LoadMeshDialog, SerafinInputTab, TelToolWidget, testOpen, handleOverwrite
 
 
 class VolumeCalculatorThread(OutputThread):
@@ -83,9 +83,14 @@ class VolumePlotViewer(TemporalPlotViewer):
 
         self.current_columns = ('Polygon 1',)
 
-        self.locatePolygons = QAction('Locate polygons\non map', self, icon=self.style().standardIcon(QStyle.SP_DialogHelpButton),
+        self.locatePolygons = QAction('Locate polygons\non map', self,
+                                      icon=self.style().standardIcon(QStyle.SP_DialogHelpButton),
                                       triggered=self.locatePolygonsEvent)
-        self.map.closeEvent = lambda event: self.locatePolygons.setEnabled(True)
+        self.locatePolygons_short = QAction('Locate polygons on map', self,
+                                            icon=self.style().standardIcon(QStyle.SP_DialogHelpButton),
+                                            triggered=self.locatePolygonsEvent)
+
+        self.map.closeEvent = self.enable_locate
 
         self.toolBar.addAction(self.locatePolygons)
         self.toolBar.addSeparator()
@@ -97,14 +102,17 @@ class VolumePlotViewer(TemporalPlotViewer):
         self.toolBar.addAction(self.changeDateAct)
 
         self.mapMenu = QMenu('&Map', self)
-        self.mapMenu.addAction(self.locatePolygons)
+        self.mapMenu.addAction(self.locatePolygons_short)
         self.polyMenu = QMenu('&Polygons', self)
-        self.polyMenu.addAction(self.selectColumnsAct)
-        self.polyMenu.addAction(self.editColumnNamesAct)
-        self.polyMenu.addAction(self.editColumColorAct)
-
+        self.polyMenu.addAction(self.selectColumnsAct_short)
+        self.polyMenu.addAction(self.editColumnNamesAct_short)
+        self.polyMenu.addAction(self.editColumColorAct_short)
         self.menuBar.addMenu(self.mapMenu)
         self.menuBar.addMenu(self.polyMenu)
+
+    def enable_locate(self, event):
+        self.locatePolygons.setEnabled(True)
+        self.locatePolygons_short.setEnabled(True)
 
     def _defaultYLabel(self):
         word = {'fr': 'de', 'en': 'of'}[self.language]
@@ -171,6 +179,7 @@ class VolumePlotViewer(TemporalPlotViewer):
                                                                       for i in range(len(self.input.polygons))]))
             self.has_map = True
         self.locatePolygons.setEnabled(False)
+        self.locatePolygons_short.setEnabled(False)
         self.map.show()
 
     def reset(self):
@@ -181,10 +190,9 @@ class VolumePlotViewer(TemporalPlotViewer):
         self.current_columns = ('Polygon 1',)
 
 
-class InputTab(QWidget):
+class InputTab(SerafinInputTab):
     def __init__(self, parent):
-        super().__init__()
-        self.parent = parent
+        super().__init__(parent)
         self.old_options = ('1', '', '0')
         self.filename = None
         self.header = None
@@ -200,25 +208,6 @@ class InputTab(QWidget):
         self._bindEvents()
 
     def _initWidgets(self):
-        # create a checkbox for language selection
-        self.langBox = QGroupBox('Input language')
-        hlayout = QHBoxLayout()
-        self.frenchButton = QRadioButton('French')
-        self.englishButton = QRadioButton('English')
-        hlayout.addWidget(self.frenchButton)
-        hlayout.addWidget(self.englishButton)
-        self.langBox.setLayout(hlayout)
-        self.langBox.setMaximumHeight(80)
-        if self.parent.language == 'fr':
-            self.frenchButton.setChecked(True)
-        else:
-            self.englishButton.setChecked(True)
-
-        # create the button open Serafin
-        self.btnOpenSerafin = QPushButton('Load\nSerafin', self, icon=self.style().standardIcon(QStyle.SP_DialogOpenButton))
-        self.btnOpenSerafin.setToolTip('<b>Open</b> a .slf file')
-        self.btnOpenSerafin.setFixedSize(105, 50)
-
         # create the button open Polygon
         self.btnOpenPolygon = QPushButton('Load\nPolygons', self, icon=self.style().standardIcon(QStyle.SP_DialogOpenButton))
         self.btnOpenPolygon.setToolTip('<b>Open</b> a .i2s or .shp file')
@@ -226,12 +215,6 @@ class InputTab(QWidget):
         self.btnOpenPolygon.setEnabled(False)
 
         # create some text fields displaying the IO files info
-        self.serafinNameBox = QLineEdit()
-        self.serafinNameBox.setReadOnly(True)
-        self.serafinNameBox.setFixedHeight(30)
-        self.summaryTextBox = QPlainTextEdit()
-        self.summaryTextBox.setFixedHeight(50)
-        self.summaryTextBox.setReadOnly(True)
         self.polygonNameBox = QPlainTextEdit()
         self.polygonNameBox.setReadOnly(True)
         self.polygonNameBox.setFixedHeight(50)
@@ -255,14 +238,8 @@ class InputTab(QWidget):
         self.btnSubmit.setFixedSize(105, 50)
         self.btnSubmit.setEnabled(False)
 
-        # create the widget displaying message logs
-        self.logTextBox = QPlainTextEditLogger(self)
-        self.logTextBox.setFormatter(logging.Formatter('%(asctime)s - [%(levelname)s] - \n%(message)s'))
-        logging.getLogger().addHandler(self.logTextBox)
-        logging.getLogger().setLevel(logging.INFO)
-
     def _bindEvents(self):
-        self.btnOpenSerafin.clicked.connect(self.btnOpenSerafinEvent)
+        self.btnOpen.clicked.connect(self.btnOpenSerafinEvent)
         self.btnOpenPolygon.clicked.connect(self.btnOpenPolygonEvent)
         self.btnSubmit.clicked.connect(self.btnSubmitEvent)
         self.timeSampling.editingFinished.connect(self._checkSamplingFrequency)
@@ -271,23 +248,7 @@ class InputTab(QWidget):
         mainLayout = QVBoxLayout()
         mainLayout.addItem(QSpacerItem(10, 10))
         mainLayout.setSpacing(15)
-        hlayout = QHBoxLayout()
-        hlayout.addItem(QSpacerItem(30, 1))
-        hlayout.setAlignment(Qt.AlignLeft)
-        hlayout.addWidget(self.btnOpenSerafin)
-        hlayout.addItem(QSpacerItem(30, 1))
-        hlayout.addWidget(self.langBox)
-        mainLayout.addLayout(hlayout)
-        mainLayout.addItem(QSpacerItem(10, 10))
-
-        glayout = QGridLayout()
-        glayout.addWidget(QLabel('     Input file'), 1, 1)
-        glayout.addWidget(self.serafinNameBox, 1, 2)
-        glayout.addWidget(QLabel('     Summary'), 2, 1)
-        glayout.addWidget(self.summaryTextBox, 2, 2)
-        glayout.setAlignment(Qt.AlignLeft)
-        glayout.setSpacing(10)
-        mainLayout.addLayout(glayout)
+        mainLayout.addLayout(self.input_layout)
         mainLayout.addItem(QSpacerItem(10, 20))
 
         hlayout = QHBoxLayout()
@@ -343,7 +304,7 @@ class InputTab(QWidget):
 
     def _reinitInput(self, filename):
         self.filename = filename
-        self.serafinNameBox.setText(filename)
+        self.inNameBox.setText(filename)
         self.summaryTextBox.clear()
         self.csvNameBox.clear()
         self.header = None

@@ -391,7 +391,6 @@ class MultiVarLinePlotNode(DoubleInputNode):
                                      QMessageBox.Ok)
                 return
         self.plot_viewer.showMaximized()
-        self.success()
 
     def _prepare(self):
         input_data = self.first_in_port.mother.parentItem().data
@@ -410,6 +409,7 @@ class MultiVarLinePlotNode(DoubleInputNode):
                      line_interpolators, line_interpolators_internal = mesh.get_line_interpolators(lines)
         if nb_nonempty == 0:
             return False
+        self.success()
         self.plot_viewer.getInput(input_data.filename, input_data.header, input_data.time,
                                   lines, line_interpolators,
                                   line_interpolators_internal)
@@ -433,7 +433,6 @@ class MultiVarLinePlotNode(DoubleInputNode):
                 self.fail('No line intersects the mesh continuously.')
                 return
         self.plot_viewer.showMaximized()
-        self.success()
 
     def plot(self, values, distances, values_internal, distances_internal, current_vars, png_name):
         fig, axes = plt.subplots(1)
@@ -557,7 +556,6 @@ class MultiFrameLinePlotNode(DoubleInputNode):
                                      QMessageBox.Ok)
                 return
         self.plot_viewer.showMaximized()
-        self.success()
 
     def _prepare(self):
         input_data = self.first_in_port.mother.parentItem().data
@@ -576,6 +574,7 @@ class MultiFrameLinePlotNode(DoubleInputNode):
                      line_interpolators, line_interpolators_internal = mesh.get_line_interpolators(lines)
         if nb_nonempty == 0:
             return False
+        self.success()
         self.plot_viewer.getInput(input_data.filename, input_data.header, input_data.time,
                                   lines, line_interpolators,
                                   line_interpolators_internal)
@@ -599,7 +598,6 @@ class MultiFrameLinePlotNode(DoubleInputNode):
                 self.fail('No line intersects the mesh continuously.')
                 return
         self.plot_viewer.showMaximized()
-        self.success()
 
     def plot(self, values, distances, values_internal, distances_internal, time_indices, png_name):
         fig, axes = plt.subplots(1)
@@ -724,7 +722,6 @@ class ProjectLinesNode(DoubleInputNode):
                                      QMessageBox.Ok)
                 return
         self.plot_viewer.showMaximized()
-        self.success()
 
     def _prepare(self):
         input_data = self.first_in_port.mother.parentItem().data
@@ -743,6 +740,7 @@ class ProjectLinesNode(DoubleInputNode):
                      line_interpolators, line_interpolators_internal = mesh.get_line_interpolators(lines)
         if nb_nonempty == 0:
             return False
+        self.success()
         self.plot_viewer.getInput(input_data.filename, input_data.header, input_data.time,
                                   lines, line_interpolators,
                                   line_interpolators_internal)
@@ -766,7 +764,6 @@ class ProjectLinesNode(DoubleInputNode):
                 self.fail('No line intersects the mesh continuously.')
                 return
         self.plot_viewer.showMaximized()
-        self.success()
 
     def plot(self, values, distances, values_internal, distances_internal, current_vars, png_name):
         fig, axes = plt.subplots(1)
@@ -924,6 +921,7 @@ class VerticalTemporalProfileNode(DoubleInputNode):
         point_indices = [i for i in range(len(points)) if is_inside[i]]
         if nb_inside == 0:
             return False
+        self.success()
         self.plot_viewer.get_data(input_data, points, point_interpolators, point_indices)
         return True
 
@@ -938,7 +936,6 @@ class VerticalTemporalProfileNode(DoubleInputNode):
                 self.fail('no point inside the mesh')
                 return
         self.plot_viewer.showMaximized()
-        self.success()
 
     def plot(self, time, y, z, triangles, str_datetime, str_datetime_bis, png_name):
         fig, axes = plt.subplots(1)

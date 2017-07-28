@@ -9,7 +9,7 @@ from slf import Serafin
 from geom import Shapefile, BlueKenue
 from gui.util import MapViewer, LineMapCanvas, QPlainTextEditLogger, TelToolWidget, testOpen,\
     TableWidgetDragRows, OutputProgressDialog, LoadMeshDialog, handleOverwrite, \
-    SimpleTimeDateSelection, OutputThread, ProjectLinesPlotViewer
+    SimpleTimeDateSelection, OutputThread, ProjectLinesPlotViewer, SerafinInputTab
 
 
 class WriteCSVProcess(OutputThread):
@@ -66,11 +66,9 @@ class WriteCSVProcess(OutputThread):
             QApplication.processEvents()
 
 
-class InputTab(QWidget):
+class InputTab(SerafinInputTab):
     def __init__(self, parent):
-        super().__init__()
-        self.parent = parent
-
+        super().__init__(parent)
         canvas = LineMapCanvas()
         self.map = MapViewer(canvas)
         self.has_map = False
@@ -90,25 +88,6 @@ class InputTab(QWidget):
         self._bindEvents()
 
     def _initWidgets(self):
-        # create a checkbox for language selection
-        self.langBox = QGroupBox('Input language')
-        hlayout = QHBoxLayout()
-        self.frenchButton = QRadioButton('French')
-        self.englishButton = QRadioButton('English')
-        hlayout.addWidget(self.frenchButton)
-        hlayout.addWidget(self.englishButton)
-        self.langBox.setLayout(hlayout)
-        self.langBox.setMaximumHeight(80)
-        if self.parent.language == 'fr':
-            self.frenchButton.setChecked(True)
-        else:
-            self.englishButton.setChecked(True)
-
-        # create the button open Serafin
-        self.btnOpenSerafin = QPushButton('Load\nSerafin', self, icon=self.style().standardIcon(QStyle.SP_DialogOpenButton))
-        self.btnOpenSerafin.setToolTip('<b>Open</b> a .slf file')
-        self.btnOpenSerafin.setFixedSize(105, 50)
-
         # create the button open lines
         self.btnOpenLines = QPushButton('Load\nLines', self, icon=self.style().standardIcon(QStyle.SP_DialogOpenButton))
         self.btnOpenLines.setToolTip('<b>Open</b> a .i2s or .shp file')
@@ -116,12 +95,6 @@ class InputTab(QWidget):
         self.btnOpenLines.setEnabled(False)
 
         # create some text fields displaying the IO files info
-        self.serafinNameBox = QLineEdit()
-        self.serafinNameBox.setReadOnly(True)
-        self.serafinNameBox.setFixedHeight(30)
-        self.summaryTextBox = QPlainTextEdit()
-        self.summaryTextBox.setFixedHeight(50)
-        self.summaryTextBox.setReadOnly(True)
         self.linesNameBox = QPlainTextEdit()
         self.linesNameBox.setReadOnly(True)
         self.linesNameBox.setFixedHeight(50)
@@ -131,14 +104,8 @@ class InputTab(QWidget):
         self.btnMap.setFixedSize(135, 50)
         self.btnMap.setEnabled(False)
 
-        # create the widget displaying message logs
-        self.logTextBox = QPlainTextEditLogger(self)
-        self.logTextBox.setFormatter(logging.Formatter('%(asctime)s - [%(levelname)s] - \n%(message)s'))
-        logging.getLogger().addHandler(self.logTextBox)
-        logging.getLogger().setLevel(logging.INFO)
-
     def _bindEvents(self):
-        self.btnOpenSerafin.clicked.connect(self.btnOpenSerafinEvent)
+        self.btnOpen.clicked.connect(self.btnOpenSerafinEvent)
         self.btnOpenLines.clicked.connect(self.btnOpenLinesEvent)
         self.btnMap.clicked.connect(self.btnMapEvent)
 
@@ -149,7 +116,7 @@ class InputTab(QWidget):
         hlayout = QHBoxLayout()
         hlayout.addItem(QSpacerItem(30, 1))
         hlayout.setAlignment(Qt.AlignLeft)
-        hlayout.addWidget(self.btnOpenSerafin)
+        hlayout.addWidget(self.btnOpen)
         hlayout.addItem(QSpacerItem(30, 1))
         hlayout.addWidget(self.langBox)
         hlayout.addItem(QSpacerItem(30, 1))
@@ -160,7 +127,7 @@ class InputTab(QWidget):
 
         glayout = QGridLayout()
         glayout.addWidget(QLabel('     Input file'), 1, 1)
-        glayout.addWidget(self.serafinNameBox, 1, 2)
+        glayout.addWidget(self.inNameBox, 1, 2)
         glayout.addWidget(QLabel('     Summary'), 2, 1)
         glayout.addWidget(self.summaryTextBox, 2, 2)
         glayout.addWidget(QLabel('     Lines file'), 3, 1)
@@ -177,7 +144,7 @@ class InputTab(QWidget):
     def _reinitInput(self, filename):
         self.filename = filename
         self.has_map = False
-        self.serafinNameBox.setText(filename)
+        self.inNameBox.setText(filename)
         self.summaryTextBox.clear()
         self.header = None
         self.time = []

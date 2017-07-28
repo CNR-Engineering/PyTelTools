@@ -1,18 +1,17 @@
 import os
 import struct
-import numpy as np
-from PyQt5.QtWidgets import *
-from PyQt5.QtCore import *
 
-from workflow.Node import Node, SingleInputNode, SingleOutputNode, OneInOneOutNode
-from workflow.datatypes import SerafinData, PointData, PolylineData
-from workflow.util import LoadSerafinDialog, OutputOptionPanel, GeomOutputOptionPanel, \
-                          process_output_options, process_geom_output_options
-from slf import Serafin
-from slf.interpolation import MeshInterpolator
-from slf.variables import do_calculations_in_frame
+import numpy as np
+
 import slf.misc as operations
 from geom import BlueKenue, Shapefile
+from slf import Serafin
+from slf.datatypes import SerafinData, PointData, PolylineData
+from slf.interpolation import MeshInterpolator
+from slf.variables import do_calculations_in_frame
+from workflow.Node import Node, SingleInputNode, SingleOutputNode, OneInOneOutNode
+from workflow.util import LoadSerafinDialog, OutputOptionPanel, GeomOutputOptionPanel, \
+                          process_output_options, process_geom_output_options
 
 
 class LoadSerafinNode(SingleOutputNode):
@@ -77,7 +76,7 @@ class LoadSerafinNode(SingleOutputNode):
 class WriteSerafinNode(OneInOneOutNode):
     def __init__(self, index):
         super().__init__(index)
-        self.in_port.data_type = ('slf', 'slf 3d')
+        self.in_port.data_type = ('slf out', 'slf', 'slf 3d')
         self.out_port.data_type = ('slf', 'slf 3d')
         self.category = 'Input/Output'
         self.label = 'Write\nSerafin'

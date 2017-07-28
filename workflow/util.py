@@ -1,17 +1,15 @@
-import os
 import datetime
-import numpy as np
+import os
+
 import matplotlib.pyplot as plt
+import numpy as np
+import pandas
 from matplotlib import cm
 from mpl_toolkits.axes_grid1 import make_axes_locatable
-import pandas
-from PyQt5.QtWidgets import *
-from PyQt5.QtCore import *
-from PyQt5.QtGui import *
 
 from gui.util import TemporalPlotViewer, PointLabelEditor
-from workflow.datatypes import SerafinData
 from slf import Serafin
+from slf.datatypes import SerafinData
 from slf.interpolation import MeshInterpolator
 from slf.volume import VolumeCalculator
 
@@ -566,9 +564,9 @@ class VolumePlotViewer(TemporalPlotViewer):
         self.toolBar.addAction(self.multi_save_act)
 
         self.poly_menu = QMenu('&Polygons', self)
-        self.poly_menu.addAction(self.selectColumnsAct)
-        self.poly_menu.addAction(self.editColumnNamesAct)
-        self.poly_menu.addAction(self.editColumColorAct)
+        self.poly_menu.addAction(self.selectColumnsAct_short)
+        self.poly_menu.addAction(self.editColumnNamesAct_short)
+        self.poly_menu.addAction(self.editColumColorAct_short)
         self.menuBar.addMenu(self.poly_menu)
 
         self.multi_menu = QMenu('&Multi', self)
@@ -672,9 +670,9 @@ class FluxPlotViewer(TemporalPlotViewer):
         self.toolBar.addAction(self.multi_save_act)
 
         self.poly_menu = QMenu('&Sections', self)
-        self.poly_menu.addAction(self.selectColumnsAct)
-        self.poly_menu.addAction(self.editColumnNamesAct)
-        self.poly_menu.addAction(self.editColumColorAct)
+        self.poly_menu.addAction(self.selectColumnsAct_short)
+        self.poly_menu.addAction(self.editColumnNamesAct_short)
+        self.poly_menu.addAction(self.editColumColorAct_short)
         self.menuBar.addMenu(self.poly_menu)
         self.multi_menu = QMenu('&Multi', self)
         self.multi_menu.addAction(self.multi_save_act)
@@ -767,6 +765,8 @@ class PointPlotViewer(TemporalPlotViewer):
                                       icon=self.style().standardIcon(QStyle.SP_DialogSaveButton))
         self.select_variable = QAction('Select\nvariable', self, triggered=self.selectVariableEvent,
                                        icon=self.style().standardIcon(QStyle.SP_FileDialogDetailedView))
+        self.select_variable_short = QAction('Select\nvariable', self, triggered=self.selectVariableEvent,
+                                             icon=self.style().standardIcon(QStyle.SP_FileDialogDetailedView))
         self.current_columns = ('Point 1',)
         self.toolBar.addAction(self.select_variable)
         self.toolBar.addAction(self.selectColumnsAct)
@@ -779,11 +779,11 @@ class PointPlotViewer(TemporalPlotViewer):
         self.toolBar.addAction(self.multi_save_act)
 
         self.data_menu = QMenu('&Data', self)
-        self.data_menu.addAction(self.select_variable)
+        self.data_menu.addAction(self.select_variable_short)
         self.data_menu.addSeparator()
-        self.data_menu.addAction(self.selectColumnsAct)
-        self.data_menu.addAction(self.editColumnNamesAct)
-        self.data_menu.addAction(self.editColumColorAct)
+        self.data_menu.addAction(self.selectColumnsAct_short)
+        self.data_menu.addAction(self.editColumnNamesAct_short)
+        self.data_menu.addAction(self.editColumColorAct_short)
         self.menuBar.addMenu(self.data_menu)
 
         self.multi_menu = QMenu('&Multi', self)

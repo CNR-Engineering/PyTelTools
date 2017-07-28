@@ -9,8 +9,8 @@ import pandas as pd
 from slf import Serafin
 from geom import Shapefile
 from gui.util import TemporalPlotViewer, MapViewer, MapCanvas, QPlainTextEditLogger, OutputThread,\
-    TableWidgetDragRows, OutputProgressDialog, LoadMeshDialog, handleOverwrite, TelToolWidget, testOpen, \
-    PointAttributeTable, PointLabelEditor
+    TableWidgetDragRows, OutputProgressDialog, LoadMeshDialog, handleOverwrite, SerafinInputTab, TelToolWidget, \
+    testOpen, PointAttributeTable, PointLabelEditor
 
 
 class WriteCSVProcess(OutputThread):
@@ -54,10 +54,9 @@ class WriteCSVProcess(OutputThread):
             QApplication.processEvents()
 
 
-class InputTab(QWidget):
+class InputTab(SerafinInputTab):
     def __init__(self, parent):
-        super().__init__()
-        self.parent = parent
+        super().__init__(parent)
         self.old_frequency = '1'
 
         canvas = MapCanvas()
@@ -81,25 +80,6 @@ class InputTab(QWidget):
         self._bindEvents()
 
     def _initWidgets(self):
-        # create a checkbox for language selection
-        self.langBox = QGroupBox('Input language')
-        hlayout = QHBoxLayout()
-        self.frenchButton = QRadioButton('French')
-        self.englishButton = QRadioButton('English')
-        hlayout.addWidget(self.frenchButton)
-        hlayout.addWidget(self.englishButton)
-        self.langBox.setLayout(hlayout)
-        self.langBox.setMaximumHeight(80)
-        if self.parent.language == 'fr':
-            self.frenchButton.setChecked(True)
-        else:
-            self.englishButton.setChecked(True)
-
-        # create the button open Serafin
-        self.btnOpenSerafin = QPushButton('Load\nSerafin', self, icon=self.style().standardIcon(QStyle.SP_DialogOpenButton))
-        self.btnOpenSerafin.setToolTip('<b>Open</b> a .slf file')
-        self.btnOpenSerafin.setFixedSize(105, 50)
-
         # create the button open points
         self.btnOpenPoints = QPushButton('Load\nPoints', self, icon=self.style().standardIcon(QStyle.SP_DialogOpenButton))
         self.btnOpenPoints.setToolTip('<b>Open</b> a .shp file')
@@ -112,12 +92,6 @@ class InputTab(QWidget):
         self.btnOpenAttributes.setEnabled(False)
 
         # create some text fields displaying the IO files info
-        self.serafinNameBox = QLineEdit()
-        self.serafinNameBox.setReadOnly(True)
-        self.serafinNameBox.setFixedHeight(30)
-        self.summaryTextBox = QPlainTextEdit()
-        self.summaryTextBox.setFixedHeight(50)
-        self.summaryTextBox.setReadOnly(True)
         self.pointsNameBox = QPlainTextEdit()
         self.pointsNameBox.setReadOnly(True)
         self.pointsNameBox.setFixedHeight(50)
@@ -156,14 +130,8 @@ class InputTab(QWidget):
         self.csvNameBox.setReadOnly(True)
         self.csvNameBox.setFixedHeight(30)
 
-        # create the widget displaying message logs
-        self.logTextBox = QPlainTextEditLogger(self)
-        self.logTextBox.setFormatter(logging.Formatter('%(asctime)s - [%(levelname)s] - \n%(message)s'))
-        logging.getLogger().addHandler(self.logTextBox)
-        logging.getLogger().setLevel(logging.INFO)
-
     def _bindEvents(self):
-        self.btnOpenSerafin.clicked.connect(self.btnOpenSerafinEvent)
+        self.btnOpen.clicked.connect(self.btnOpenSerafinEvent)
         self.btnOpenPoints.clicked.connect(self.btnOpenPointsEvent)
         self.btnOpenAttributes.clicked.connect(self.btnOpenAttributesEvent)
         self.btnMap.clicked.connect(self.btnMapEvent)
@@ -177,7 +145,7 @@ class InputTab(QWidget):
         hlayout = QHBoxLayout()
         hlayout.addItem(QSpacerItem(30, 1))
         hlayout.setAlignment(Qt.AlignLeft)
-        hlayout.addWidget(self.btnOpenSerafin)
+        hlayout.addWidget(self.btnOpen)
         hlayout.addItem(QSpacerItem(30, 1))
         hlayout.addWidget(self.langBox)
         hlayout.addItem(QSpacerItem(30, 1))
@@ -189,7 +157,7 @@ class InputTab(QWidget):
 
         glayout = QGridLayout()
         glayout.addWidget(QLabel('     Input file'), 1, 1)
-        glayout.addWidget(self.serafinNameBox, 1, 2)
+        glayout.addWidget(self.inNameBox, 1, 2)
         glayout.addWidget(QLabel('     Summary'), 2, 1)
         glayout.addWidget(self.summaryTextBox, 2, 2)
         glayout.addWidget(QLabel('     Points file'), 3, 1)
@@ -246,7 +214,7 @@ class InputTab(QWidget):
     def _reinitInput(self, filename):
         self.filename = filename
         self.has_map = False
-        self.serafinNameBox.setText(filename)
+        self.inNameBox.setText(filename)
         self.summaryTextBox.clear()
         self.header = None
         self.time = []
@@ -517,11 +485,18 @@ class ImageTab(TemporalPlotViewer):
         self.openAttributes = QAction('Attributes\nTable', self,
                                       icon=self.style().standardIcon(QStyle.SP_FileDialogListView),
                                       triggered=self.openAttributesEvent)
+        self.openAttributes_short = QAction('Attributes Table', self,
+                                            icon=self.style().standardIcon(QStyle.SP_FileDialogListView),
+                                            triggered=self.openAttributesEvent)
+
         self.locatePoints = QAction('Locate points\non map', self,
                                     icon=self.style().standardIcon(QStyle.SP_DialogHelpButton),
-                                    triggered=self.input.btnMapEvent)
-        self.input.map.closeEvent = lambda event: self.locatePoints.setEnabled(True)
-        self.input.attribute_table.closeEvent = lambda event: self.openAttributes.setEnabled(True)
+                                    triggered=self.map_event)
+        self.locatePoints_short = QAction('Locate points on map', self,
+                                          icon=self.style().standardIcon(QStyle.SP_DialogHelpButton),
+                                          triggered=self.map_event)
+        self.input.map.closeEvent = self.enable_locate
+        self.input.attribute_table.closeEvent = self.enable_attribute
 
         self.selectVariable = QAction('Select\nvariable', self, triggered=self.selectVariableEvent,
                                       icon=self.style().standardIcon(QStyle.SP_FileDialogDetailedView))
@@ -540,15 +515,28 @@ class ImageTab(TemporalPlotViewer):
         self.mapMenu = QMenu('&Map', self)
         self.mapMenu.addAction(self.locatePoints)
         self.pointsMenu = QMenu('&Data', self)
-        self.pointsMenu.addAction(self.openAttributes)
+        self.pointsMenu.addAction(self.openAttributes_short)
         self.pointsMenu.addSeparator()
         self.pointsMenu.addAction(self.selectVariable)
-        self.pointsMenu.addAction(self.selectColumnsAct)
-        self.pointsMenu.addAction(self.editColumnNamesAct)
-        self.pointsMenu.addAction(self.editColumColorAct)
+        self.pointsMenu.addAction(self.selectColumnsAct_short)
+        self.pointsMenu.addAction(self.editColumnNamesAct_short)
+        self.pointsMenu.addAction(self.editColumColorAct_short)
 
         self.menuBar.addMenu(self.mapMenu)
         self.menuBar.addMenu(self.pointsMenu)
+
+    def enable_attribute(self, event):
+        self.openAttributes.setEnabled(True)
+        self.openAttributes_short.setEnabled(True)
+
+    def enable_locate(self, event):
+        self.locatePoints.setEnabled(True)
+        self.locatePoints_short.setEnabled(True)
+
+    def map_event(self):
+        self.locatePoints.setEnabled(False)
+        self.locatePoints_short.setEnabled(False)
+        self.input.btnMapEvent()
 
     def _to_column(self, point):
         point_index = int(point.split()[1]) - 1
@@ -587,7 +575,7 @@ class ImageTab(TemporalPlotViewer):
         msg.resize(300, 150)
         msg.exec_()
         self.current_var = combo.currentText()
-        self.current_ylabel = self._defaultYLabel(self.input.language)
+        self.current_ylabel = self._defaultYLabel()
         self.replot()
 
     def getData(self, var_IDs, point_indices):
@@ -627,6 +615,7 @@ class ImageTab(TemporalPlotViewer):
 
     def openAttributesEvent(self):
         self.openAttributes.setEnabled(False)
+        self.openAttributes_short.setEnabled(False)
         self.input.attribute_table.show()
 
     def replot(self):

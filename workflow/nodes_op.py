@@ -205,11 +205,6 @@ class SelectVariablesNode(OneInOneOutNode):
 
     def _reset(self):
         self.in_data = self.in_port.mother.parentItem().data
-        if self.in_data.operator is not None:
-            self.state = Node.NOT_CONFIGURED
-            self.reconfigure_downward()
-            self.update()
-            return
         if self.selected_vars:
             known_vars = [var for var in self.in_data.header.var_IDs if var in self.in_data.selected_vars]
             new_vars = known_vars[:]
@@ -295,10 +290,6 @@ class SelectVariablesNode(OneInOneOutNode):
                                      QMessageBox.Ok)
                 return
         self.in_data = self.in_port.mother.parentItem().data
-        if self.in_data.operator is not None:
-            QMessageBox.critical(None, 'Error', 'Cannot select variables after computation!',
-                                 QMessageBox.Ok)
-            return
         if self.state != Node.SUCCESS:
             self._reset()
 
@@ -352,8 +343,8 @@ class AddRouseNode(OneInOneOutNode):
     def __init__(self, index):
         super().__init__(index)
         self.category = 'Basic operations'
-        self.label = 'Add\nRouse'
-        self.out_port.data_type = ('slf',)
+        self.label = 'Add\nRouse\nNumbers'
+        self.out_port.data_type = ('slf out',)
         self.in_port.data_type = ('slf',)
         self.in_data = None
         self.data = None
@@ -391,9 +382,6 @@ class AddRouseNode(OneInOneOutNode):
     def _reset(self):
         self.in_data = self.in_port.mother.parentItem().data
         if 'US' not in self.in_data.selected_vars:
-            self.state = Node.NOT_CONFIGURED
-            self.in_data = None
-        if self.in_data.operator is not None:
             self.state = Node.NOT_CONFIGURED
             self.in_data = None
         elif self.fall_velocities:
@@ -469,10 +457,6 @@ class AddRouseNode(OneInOneOutNode):
                     QMessageBox.critical(None, 'Error', 'US not found.',
                                          QMessageBox.Ok)
                     return
-                if self.in_data.operator is not None:
-                    QMessageBox.critical(None, 'Error', 'Cannot add Rouse after computation..',
-                                         QMessageBox.Ok)
-                    return
             else:
                 QMessageBox.critical(None, 'Error', 'Configure and run the input before configure this node!',
                                      QMessageBox.Ok)
@@ -482,10 +466,6 @@ class AddRouseNode(OneInOneOutNode):
             self.in_data = parent_node.data
             if 'US' not in self.in_data.selected_vars:
                 QMessageBox.critical(None, 'Error', 'US not found.',
-                                     QMessageBox.Ok)
-                return
-            if self.in_data.operator is not None:
-                QMessageBox.critical(None, 'Error', 'Cannot add Rouse after computation..',
                                      QMessageBox.Ok)
                 return
             self._reset()
@@ -604,9 +584,7 @@ class SelectTimeNode(OneInOneOutNode):
 
     def _reset(self):
         self.in_data = self.in_port.mother.parentItem().data
-        if self.in_data.operator is not None:
-            self.state = Node.NOT_CONFIGURED
-        elif len(self.in_data.selected_time_indices) != len(self.in_data.time):
+        if len(self.in_data.selected_time_indices) != len(self.in_data.time):
             self.state = Node.NOT_CONFIGURED
         elif self.start_date is not None:
             new_time = list(map(lambda x: x + self.in_data.start_time, self.in_data.time_second))
@@ -680,10 +658,6 @@ class SelectTimeNode(OneInOneOutNode):
                                      QMessageBox.Ok)
                 return
         self.in_data = parent_node.data
-        if self.in_data.operator is not None:
-            QMessageBox.critical(None, 'Error', 'Cannot select time after computation.',
-                                 QMessageBox.Ok)
-            return
         if len(self.in_data.selected_time_indices) != len(self.in_data.time):
             QMessageBox.critical(None, 'Error', 'Cannot re-select time.',
                                  QMessageBox.Ok)
@@ -763,9 +737,7 @@ class SelectSingleFrameNode(OneInOneOutNode):
 
     def _reset(self):
         self.in_data = self.in_port.mother.parentItem().data
-        if self.in_data.operator is not None:
-            self.state = Node.NOT_CONFIGURED
-        elif len(self.in_data.selected_time_indices) != len(self.in_data.time):
+        if len(self.in_data.selected_time_indices) != len(self.in_data.time):
             self.state = Node.NOT_CONFIGURED
         elif self.date is not None:
             new_time = list(map(lambda x: x + self.in_data.start_time, self.in_data.time_second))
@@ -825,10 +797,6 @@ class SelectSingleFrameNode(OneInOneOutNode):
                                      QMessageBox.Ok)
                 return
         self.in_data = parent_node.data
-        if self.in_data.operator is not None:
-            QMessageBox.critical(None, 'Error', 'Cannot select time after computation.',
-                                 QMessageBox.Ok)
-            return
         if len(self.in_data.selected_time_indices) != len(self.in_data.time):
             QMessageBox.critical(None, 'Error', 'Cannot re-select time.',
                                  QMessageBox.Ok)
@@ -868,7 +836,7 @@ class SynchMaxNode(OneInOneOutNode):
         super().__init__(index)
         self.category = 'Operators'
         self.label = 'SynchMax'
-        self.out_port.data_type = ('slf',)
+        self.out_port.data_type = ('slf out',)
         self.in_port.data_type = ('slf',)
         self.in_data = None
         self.data = None
@@ -965,15 +933,6 @@ class SynchMaxNode(OneInOneOutNode):
         if not self.in_data.header.is_2d:
             QMessageBox.critical(None, 'Error', 'The input file is not 2D.', QMessageBox.Ok)
             return
-        if self.in_data.operator is not None:
-            if self.in_data.operator == operations.SYNCH_MAX:
-                QMessageBox.critical(None, 'Error', 'The input data is already the result of SynchMax!',
-                                     QMessageBox.Ok)
-                return
-            else:
-                QMessageBox.critical(None, 'Error', 'The input data is already the result of another computation!',
-                                     QMessageBox.Ok)
-                return
         if self.state != Node.SUCCESS:
             self._reset()
         if super().configure():
@@ -1006,7 +965,7 @@ class UnaryOperatorNode(OneInOneOutNode):
         self.state = Node.READY
         self.data = None
         self.message = 'Nothing to configure.'
-        self.out_port.data_type = ('slf',)
+        self.out_port.data_type = ('slf out',)
         self.in_port.data_type = ('slf',)
 
     def reconfigure(self):
@@ -1034,15 +993,6 @@ class UnaryOperatorNode(OneInOneOutNode):
         if not input_data.header.is_2d:
             self.fail('the input file is not 2D')
             return
-
-        if input_data.operator is not None:
-            if input_data.operator == self.operator:
-                self.fail('the input data is already the result of %s.' % self.name())
-                return
-            else:
-                self.fail('the input data is already the result of another computation.')
-                return
-
         self.data = input_data.copy()
         self.data.operator = self.operator
         self.success()
@@ -1055,7 +1005,7 @@ class BinaryOperatorNode(TwoInOneOutNode):
         self.state = Node.READY
         self.data = None
         self.message = 'Nothing to configure.'
-        self.out_port.data_type = ('slf',)
+        self.out_port.data_type = ('slf out',)
         self.first_in_port.data_type = ('slf', 'slf reference')
         self.second_in_port.data_type = ('slf',)
 
@@ -1081,14 +1031,9 @@ class BinaryOperatorNode(TwoInOneOutNode):
             self.fail('input failed.')
             return
         input_data = self.first_in_port.mother.parentItem().data
-
-        if input_data.operator is not None:
-            if input_data.operator == self.operator:
-                self.fail('the input data is already the result of %s.' % self.name())
-                return
-            else:
-                self.fail('the input data is already the result of another computation.')
-                return
+        if not input_data.header.is_2d:
+            self.fail('the input file is not 2D')
+            return
         if input_data.filename == self.second_in_port.mother.parentItem().data.filename:
             self.fail('the two input cannot be from the same file.')
             return

@@ -6,7 +6,7 @@ from PyQt5.QtCore import *
 import numpy as np
 
 from gui.util import PlotViewer, MapViewer, PolygonMapCanvas, ColorMapCanvas, LoadMeshDialog, \
-    TimeSliderIndexOnly as TimeSlider, TelToolWidget, testOpen
+    TimeSliderIndexOnly as TimeSlider, SerafinInputTab, TelToolWidget, testOpen
 from slf import Serafin
 from geom import BlueKenue, Shapefile
 
@@ -87,11 +87,9 @@ class DoubleTimeSelection(QWidget):
         self.testIndex.clear()
 
 
-class InputTab(QWidget):
+class InputTab(SerafinInputTab):
     def __init__(self, parent):
-        super().__init__()
-        self.parent = parent
-
+        super().__init__(parent)
         self.ref_language = 'fr'
         self.test_language = 'fr'
         self.ref_filename = None
@@ -115,24 +113,8 @@ class InputTab(QWidget):
         self._bindEvents()
 
     def _initWidgets(self):
-        # create a checkbox for language selection
-        self.langBox = QGroupBox('Input language')
-        hlayout = QHBoxLayout()
-        self.frenchButton = QRadioButton('French')
-        hlayout.addWidget(self.frenchButton)
-        self.englishButton = QRadioButton('English')
-        hlayout.addWidget(self.englishButton)
-        self.langBox.setLayout(hlayout)
-        self.langBox.setMaximumHeight(80)
-        if self.parent.language == 'fr':
-            self.frenchButton.setChecked(True)
-        else:
-            self.englishButton.setChecked(True)
-
         # create the button open the reference file
-        self.btnOpenRef = QPushButton('Load\nReference', self, icon=self.style().standardIcon(QStyle.SP_DialogOpenButton))
-        self.btnOpenRef.setToolTip('<b>Open</b> a .slf file')
-        self.btnOpenRef.setFixedSize(105, 50)
+        self.btnOpen.setText('Load\nReference')
 
         # create the button open the test file
         self.btnOpenTest = QPushButton('Load\nTest', self, icon=self.style().standardIcon(QStyle.SP_DialogOpenButton))
@@ -153,15 +135,6 @@ class InputTab(QWidget):
         self.locatePolygons.setEnabled(False)
 
         # create some text fields displaying the IO files info
-        self.refNameBox = QLineEdit()
-        self.refNameBox.setReadOnly(True)
-        self.refNameBox.setFixedHeight(30)
-        self.refNameBox.setMinimumWidth(600)
-        self.refSummaryTextBox = QPlainTextEdit()
-        self.refSummaryTextBox.setMinimumHeight(40)
-        self.refSummaryTextBox.setMaximumHeight(50)
-        self.refSummaryTextBox.setMinimumWidth(600)
-        self.refSummaryTextBox.setReadOnly(True)
         self.testNameBox = QLineEdit()
         self.testNameBox.setReadOnly(True)
         self.testNameBox.setFixedHeight(30)
@@ -185,7 +158,7 @@ class InputTab(QWidget):
         self.polygonBox.setFixedSize(400, 30)
 
     def _bindEvents(self):
-        self.btnOpenRef.clicked.connect(self.btnOpenRefEvent)
+        self.btnOpen.clicked.connect(self.btnOpenRefEvent)
         self.btnOpenTest.clicked.connect(self.btnOpenTestEvent)
         self.btnOpenPolygon.clicked.connect(self.btnOpenPolygonEvent)
         self.locatePolygons.clicked.connect(self.locatePolygonsEvent)
@@ -200,7 +173,7 @@ class InputTab(QWidget):
         hlayout = QHBoxLayout()
         hlayout.setAlignment(Qt.AlignLeft)
         hlayout.addItem(QSpacerItem(50, 1))
-        hlayout.addWidget(self.btnOpenRef)
+        hlayout.addWidget(self.btnOpen)
         hlayout.addWidget(self.btnOpenTest)
         hlayout.addItem(QSpacerItem(30, 1))
         hlayout.addWidget(self.langBox)
@@ -213,9 +186,9 @@ class InputTab(QWidget):
 
         glayout = QGridLayout()
         glayout.addWidget(QLabel('     Reference'), 1, 1)
-        glayout.addWidget(self.refNameBox, 1, 2)
+        glayout.addWidget(self.inNameBox, 1, 2)
         glayout.addWidget(QLabel('     Summary'), 2, 1)
-        glayout.addWidget(self.refSummaryTextBox, 2, 2)
+        glayout.addWidget(self.summaryTextBox, 2, 2)
         glayout.addWidget(QLabel('     Test'), 3, 1)
         glayout.addWidget(self.testNameBox, 3, 2)
         glayout.addWidget(QLabel('     Summary'), 4, 1)
@@ -235,8 +208,12 @@ class InputTab(QWidget):
         glayout.addWidget(self.polygonBox, 2, 2)
         glayout.setSpacing(10)
         mainLayout.addLayout(glayout)
-        mainLayout.addItem(QSpacerItem(10, 15))
         mainLayout.setAlignment(glayout, Qt.AlignTop | Qt.AlignLeft)
+
+        mainLayout.addItem(QSpacerItem(30, 15))
+        mainLayout.addWidget(QLabel('   Message logs'))
+        mainLayout.addWidget(self.logTextBox.widget)
+        self.setLayout(mainLayout)
         self.setLayout(mainLayout)
 
     def _reinitRef(self, filename):
@@ -246,8 +223,8 @@ class InputTab(QWidget):
             self.ref_language = 'fr'
         self.ref_mesh = None
         self.ref_filename = filename
-        self.refNameBox.setText(filename)
-        self.refSummaryTextBox.clear()
+        self.inNameBox.setText(filename)
+        self.summaryTextBox.clear()
         self.ref_header = None
         self.polygon_added = False
         self.selected_polygon = None
@@ -331,7 +308,7 @@ class InputTab(QWidget):
                 return
 
             # update the file summary
-            self.refSummaryTextBox.appendPlainText(resin.get_summary())
+            self.summaryTextBox.appendPlainText(resin.get_summary())
 
             # copy to avoid reading the same data in the future
             self.ref_header = resin.header.copy()
