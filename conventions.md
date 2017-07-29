@@ -18,8 +18,7 @@ from PyQt5.QtCore import *
 ### Common abbreviations
 ```python
 import numpy as np
-import pandas as pd
-import shapely.affinity as aff
+import slf.misc as operations
 ```
 
 ## Naming conventions

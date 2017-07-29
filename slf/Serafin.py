@@ -8,7 +8,6 @@ import numpy as np
 import os
 import logging
 import copy
-import pandas as pd
 
 
 FLOAT_TYPE = {'f': np.float32, 'd': np.float64}
@@ -16,32 +15,20 @@ FLOAT_TYPE = {'f': np.float32, 'd': np.float64}
 module_logger = logging.getLogger(__name__)
 
 
-class SerafinVariableNames:
-    """!
-    @brief Manage variables names (fr/eng): loading, adding and removing
-    """
-    def __init__(self, is_2d, language):
-        self.language = language
-        base_folder = os.path.dirname(os.path.realpath(__file__))
-        index_col = {'fr': 1, 'en': 2}[language]
-        if is_2d:
-            self.var_table = pd.read_csv(os.path.join(base_folder, 'data', 'Serafin_var2D.csv'),
-                                         index_col=index_col, header=0, sep=';')
-        else:
-            self.var_table = pd.read_csv(os.path.join(base_folder, 'data', 'Serafin_var3D.csv'),
-                                         index_col=index_col, header=0, sep=';')
+VARIABLES_2D, VARIABLES_3D = {'fr': {}, 'en': {}}, {'fr': {}, 'en': {}}
 
-    def name_to_ID(self, var_name):
-        """!
-        @brief Assign an ID to variable name
-        @param var_name <bytes>: the name of the new variable
-        @return <bytes>: the unit of the new variable
-        """
-        try:
-            var_index = self.var_table.index.tolist().index(var_name)
-        except ValueError:
-            return  # handled in Serafin.Read
-        return self.var_table['varID'][var_index]
+
+def build_variables_table():
+    base_folder = os.path.dirname(os.path.realpath(__file__))
+    for dic, name in zip([VARIABLES_2D, VARIABLES_3D], ['Serafin_var2D.csv', 'Serafin_var3D.csv']):
+        with open(os.path.join(base_folder, 'data', name), 'r') as f:
+            f.readline()  # header
+            for line in f.readlines():
+                var_id, var_name_fr, var_name_en, _ = line.rstrip().split(';')
+                dic['fr'][var_name_fr] = var_id
+                dic['en'][var_name_en] = var_id
+
+build_variables_table()
 
 
 class SerafinValidationError(Exception):
@@ -138,9 +125,6 @@ class SerafinHeader:
                 raise SerafinValidationError('Unknown mesh type')
         module_logger.debug('The file is determined to be %s' % {True: '2D', False: '3D'}[self.is_2d])
 
-        # construct the variable name specifications
-        self.specifications = SerafinVariableNames(self.is_2d, self.language)
-
         # determine the number of nodes in 2D
         if self.is_2d:
             self.nb_nodes_2d = self.nb_nodes
@@ -187,14 +171,14 @@ class SerafinHeader:
             module_logger.error('ERROR: The file size is not equal to (header size) + (nb frames) * (frame size)')
             raise SerafinValidationError('Something wrong with the file size (header and frames) check')
 
-        # Deduce variable IDs (if known from specifications) from names
+        # Deduce variable IDs from names
+        var_table = VARIABLES_2D[self.language] if self.is_2d else VARIABLES_3D[language]
         for var_name, var_unit in zip(self.var_names, self.var_units):
             name = var_name.decode(encoding='utf-8').strip()
-            var_id = self.specifications.name_to_ID(name)
-            if var_id is None:
+            if name not in var_table:
                 module_logger.warn('WARNING: The variable name "%s" is not known. The complete name will be used as ID' % name)
                 var_id = name
-            self.var_IDs.append(var_id)
+            self.var_IDs.append(var_table[name])
 
         # Build ikle2d
         if not self.is_2d:

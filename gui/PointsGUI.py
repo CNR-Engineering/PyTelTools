@@ -4,12 +4,11 @@ import datetime
 
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
-import pandas as pd
 
 from slf import Serafin
 from gui.util import TemporalPlotViewer, MapViewer, MapCanvas, OutputThread,\
     VariableTable, OutputProgressDialog, LoadMeshDialog, SerafinInputTab, TelToolWidget, \
-    PointAttributeTable, PointLabelEditor, open_points, save_dialog
+    PointAttributeTable, PointLabelEditor, open_points, save_dialog, read_csv
 
 
 class WriteCSVProcess(OutputThread):
@@ -18,16 +17,17 @@ class WriteCSVProcess(OutputThread):
         self.mesh = mesh
         self.separator = separator
 
-    def write_header(self, output_stream, selected_vars, points):
+    def write_header(self, output_stream, selected_vars, indices, points):
         output_stream.write('time')
-        for x, y in points:
+        for index, (x, y) in zip(indices, points):
             for var in selected_vars:
                 output_stream.write(self.separator)
-                output_stream.write('%s (%.4f, %.4f)' % (var, x, y))
+                output_stream.write('Point %d %s (%.4f|%.4f)' % (index+1, var, x, y))
         output_stream.write('\n')
 
-    def write_csv(self, input_stream, output_time, selected_vars, output_stream, points, point_interpolators):
-        self.write_header(output_stream, selected_vars, points)
+    def write_csv(self, input_stream, output_time, selected_vars, output_stream, indices,
+                  points, point_interpolators):
+        self.write_header(output_stream, selected_vars, indices, points)
 
         nb_selected_vars = len(selected_vars)
         nb_frames = len(output_time)
@@ -367,6 +367,7 @@ class InputTab(SerafinInputTab):
             with open(filename, 'w') as output_stream:
                 progressBar.connectToThread(process)
                 process.write_csv(input_stream, selected_time, selected_var_IDs, output_stream,
+                                  indices_inside,
                                   [self.points[i] for i in indices_inside],
                                   [self.point_interpolators[i] for i in indices_inside])
         if not process.canceled:
@@ -454,7 +455,7 @@ class ImageTab(TemporalPlotViewer):
     def _to_column(self, point):
         point_index = int(point.split()[1]) - 1
         x, y = self.input.points[point_index]
-        return '%s (%.4f, %.4f)' % (self.current_var, x, y)
+        return 'Point %d %s (%.4f|%.4f)' % (point_index+1, self.current_var, x, y)
 
     def editColumns(self):
         msg = PointLabelEditor(self.column_labels, self.column_name,
@@ -497,8 +498,7 @@ class ImageTab(TemporalPlotViewer):
 
         # get the new data
         csv_file = self.input.csvNameBox.text()
-        self.data = pd.read_csv(csv_file, header=0, sep=self.input.parent.csv_separator)
-        self.data.sort_values('time', inplace=True)
+        self.data, headers = read_csv(csv_file, self.input.parent.csv_separator)
 
         if self.input.data.header.date is not None:
             year, month, day, hour, minute, second = self.input.data.header.date

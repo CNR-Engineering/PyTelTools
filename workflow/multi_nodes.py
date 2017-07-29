@@ -60,9 +60,10 @@ class MultiLoadPolygon2DNode(MultiSingleOutputNode):
         self.label = 'Load 2D\nPolygons'
 
     def load(self, options):
-        success, self.options = validate_output_options(options)
+        success, filename = validate_input_options(options)
         if not success:
             self.state = MultiNode.NOT_CONFIGURED
+        self.options = filename,
 
 
 class MultiLoadOpenPolyline2DNode(MultiSingleOutputNode):
@@ -72,9 +73,10 @@ class MultiLoadOpenPolyline2DNode(MultiSingleOutputNode):
         self.label = 'Load 2D\nOpen\nPolylines'
 
     def load(self, options):
-        success, self.options = validate_output_options(options)
+        success, filename = validate_input_options(options)
         if not success:
             self.state = MultiNode.NOT_CONFIGURED
+        self.options = filename,
 
 
 class MultiLoadPoint2DNode(MultiSingleOutputNode):
@@ -84,9 +86,10 @@ class MultiLoadPoint2DNode(MultiSingleOutputNode):
         self.label = 'Load 2D\nPoints'
 
     def load(self, options):
-        success, self.options = validate_output_options(options)
+        success, filename = validate_input_options(options)
         if not success:
             self.state = MultiNode.NOT_CONFIGURED
+        self.options = filename,
 
 
 class MultiLoadReferenceSerafinNode(MultiSingleOutputNode):
@@ -96,9 +99,10 @@ class MultiLoadReferenceSerafinNode(MultiSingleOutputNode):
         self.label = 'Load\nReference\nSerafin'
 
     def load(self, options):
-        success, self.options = validate_output_options(options)
+        success, filename = validate_input_options(options)
         if not success:
             self.state = MultiNode.NOT_CONFIGURED
+        self.options = filename,
 
 
 class MultiWriteLandXMLNode(MultiSingleInputNode):

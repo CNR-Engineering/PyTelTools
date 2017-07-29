@@ -930,19 +930,19 @@ class InterpolateOnPointsNode(TwoInOneOutNode):
             self.in_data.triangles = mesh.triangles
 
         is_inside, point_interpolators = mesh.get_point_interpolators(points)
+        indices_inside = [i for i in range(len(points)) if is_inside[i]]
         points = [p for i, p in enumerate(points) if is_inside[i]]
         point_interpolators = [p for i, p in enumerate(point_interpolators) if is_inside[i]]
         nb_inside = sum(map(int, is_inside))
-        return points, point_interpolators, is_inside, nb_inside
+        return points, point_interpolators, indices_inside, nb_inside
 
-    def _run_interpolate(self, points, point_interpolators, is_inside, selected_vars):
+    def _run_interpolate(self, points, point_interpolators, indices_inside, selected_vars):
         header = ['time']
-        for x, y in points:
+        for index, (x, y) in zip(indices_inside, points):
             for var in selected_vars:
-                header.append('%s (%.4f, %.4f)' % (var, x, y))
+                header.append('Point %d %s (%.4f|%.4f)' % (index+1, var, x, y))
         self.data = CSVData(self.in_data.filename, header)
         self.data.metadata = {'start time': self.in_data.start_time, 'var IDs': selected_vars,
-                              'point indices': [i for i in range(len(points)) if is_inside[i]],
                               'language': self.in_data.language,
                               'points': self.second_in_port.mother.parentItem().data}
 
@@ -968,6 +968,28 @@ class InterpolateOnPointsNode(TwoInOneOutNode):
                 self.progress_bar.setValue(100 * (index+1) / nb_frames)
                 QApplication.processEvents()
 
+    def is_valid_csv(self, points, selected_vars):
+        headers = self.data.table[0]
+        if not headers[0] == 'time':
+            return False
+        covered_vars = []
+        for item in headers[1:]:
+            _, index, var, coord = item.split()
+            if var not in selected_vars:
+                return False
+            covered_vars.append(var)
+            index = int(index)-1
+            if index >= len(points):
+                return False
+            x, y = points[index]
+            point_coord = '(%.4f|%.4f)' % (x, y)
+            if point_coord != coord:
+                return False
+        for var in selected_vars:
+            if var not in covered_vars:
+                return False
+        return True
+
     def run(self):
         success = super().run_upward()
         if not success:
@@ -986,11 +1008,6 @@ class InterpolateOnPointsNode(TwoInOneOutNode):
         filename = process_output_options(self.in_data.filename, self.in_data.job_id, '.csv',
                                           self.suffix, self.in_source_folder, self.dir_path, self.double_name)
 
-        points, point_interpolators, is_inside, nb_inside = self._prepare_points()
-        if is_inside == 0:
-            self.fail('no point inside the mesh.')
-            return
-
         if not self.overwrite:
             if os.path.exists(filename):
                 try:
@@ -998,13 +1015,22 @@ class InterpolateOnPointsNode(TwoInOneOutNode):
                         pass
                 except PermissionError:
                     self.fail('Access denied when reloading existing file.')
+
                 self.data = CSVData(self.in_data.filename, None, filename)
+                points = self.second_in_port.mother.parentItem().data
+                if not self.is_valid_csv(points.points, selected_vars):
+                    self.data = None
+                    self.fail('The existing file is not valid.')
+
                 self.data.metadata = {'start time': self.in_data.start_time, 'var IDs': selected_vars,
-                                      'point indices': [i for i in range(len(points)) if is_inside[i]],
-                                      'language': self.in_data.language,
-                                      'points': self.second_in_port.mother.parentItem().data}
+                                      'language': self.in_data.language, 'points': points}
                 self.success('Reload existing file.')
                 return
+
+        points, point_interpolators, indices_inside, nb_inside = self._prepare_points()
+        if nb_inside == 0:
+            self.fail('no point inside the mesh.')
+            return
         try:
             with open(filename, 'w') as f:
                 pass
@@ -1012,7 +1038,7 @@ class InterpolateOnPointsNode(TwoInOneOutNode):
             self.fail('Access denied.')
             return
 
-        self._run_interpolate(points, point_interpolators, is_inside, selected_vars)
+        self._run_interpolate(points, point_interpolators, indices_inside, selected_vars)
         self.data.write(filename, self.scene().csv_separator)
         self.success('Output saved to {}\n{} point{} inside the mesh.'.format(filename, nb_inside,
                                                                               's are' if nb_inside > 1 else ' is'))

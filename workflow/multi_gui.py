@@ -32,7 +32,7 @@ NODES = {'Input/Output': {'Load Serafin': MultiLoadSerafinNode, 'Load Serafin 3D
 
 def topological_ordering(graph):
     """!
-    topological ordering of DAG (adjacency list)
+    topological ordering of a DAG (adjacency list)
     """
     copy_graph = deepcopy(graph)
     ordered = []
@@ -162,7 +162,6 @@ class MultiScene(QGraphicsScene):
                     category, name, index, x, y = line[:5]
                     if category == 'Visualization':  # ignore all visualization nodes
                         continue
-
                     index = int(index)
                     node = NODES[category][name](index)
                     node.load(line[5:])

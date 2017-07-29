@@ -2,13 +2,12 @@ import datetime
 import os
 import matplotlib.pyplot as plt
 import numpy as np
-import pandas
 from matplotlib import cm
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 
-from gui.util import TemporalPlotViewer, PointLabelEditor
+from gui.util import TemporalPlotViewer, PointLabelEditor, read_csv
 from slf import Serafin
 from slf.datatypes import SerafinData
 from slf.interpolation import MeshInterpolator
@@ -794,7 +793,7 @@ class PointPlotViewer(TemporalPlotViewer):
     def _to_column(self, point):
         point_index = int(point.split()[1]) - 1
         x, y = self.points.points[point_index]
-        return '%s (%.4f, %.4f)' % (self.current_var, x, y)
+        return 'Point %d %s (%.4f|%.4f)' % (point_index+1, self.current_var, x, y)
 
     def editColumns(self):
         msg = PointLabelEditor(self.column_labels, self.column_name,
@@ -853,14 +852,14 @@ class PointPlotViewer(TemporalPlotViewer):
     def get_data(self, csv_data):
         self.csv_separator = csv_data.separator
         self.data = {}
-        header = csv_data.table[0]
-        for item in header:
+        headers = csv_data.table[0]
+        for item in headers:
             self.data[item] = []
         for row in csv_data.table[1:]:
-            for j, item in enumerate(row):
-                self.data[header[j]].append(float(item))
-        for item in header:
-            self.data[item] = np.array(self.data[item])
+            for header, item in zip(headers, row):
+                self.data[header].append(float(item))
+        for header in headers:
+            self.data[header] = np.array(self.data[header])
         self.time_seconds = self.data['time']
 
         self.var_IDs = csv_data.metadata['var IDs']
@@ -873,7 +872,13 @@ class PointPlotViewer(TemporalPlotViewer):
         self.str_datetime = list(map(lambda x: x.strftime('%Y/%m/%d\n%H:%M'), self.datetime))
         self.str_datetime_bis = list(map(lambda x: x.strftime('%d/%m/%y\n%H:%M'), self.datetime))
 
-        self.indices = csv_data.metadata['point indices']
+        self.indices = []
+        for header in headers[1:]:
+            _, index, _, _ = header.split()
+            index = int(index) - 1
+            if index not in self.indices:
+                self.indices.append(index)
+
         self.columns = ['Point %d' % (i+1) for i in self.indices]
         self.current_columns = self.columns[0:1]
         self.column_labels = {x: x for x in self.columns}
@@ -1282,8 +1287,8 @@ class MultiSaveTemporalPlotDialog(QDialog):
 
     def read(self, csv_file):
         try:
-            data = pandas.read_csv(csv_file, header=0, sep=self.separator)
-            if 'time' not in list(data):
+            data, headers = read_csv(csv_file, self.separator)
+            if 'time' not in headers:
                 return False, []
             if not all(p in list(data) for p in self.current_columns):
                 return False, []
@@ -1888,18 +1893,18 @@ def validate_output_options(options):
     overwrite = bool(int(options[4]))
     if not in_source_folder:
         if not os.path.exists(dir_path):
-            return False, tuple()
+            return False, ('', True, '', False, True)
     return True, (suffix, in_source_folder, dir_path, double_name, overwrite)
 
 
 def validate_input_options(options):
     filename = options[0]
     if not filename:
-        return False
+        return False, ''
     try:
         with open(filename) as f:
             pass
     except FileNotFoundError:
-        return
-    return filename,
+        return False, ''
+    return True, filename
 

@@ -404,6 +404,10 @@ def write_slf(node_id, fid, data, options):
         with open(filename, 'w') as f:
             pass
     except PermissionError:
+        try:
+            os.remove(filename)
+        except PermissionError:
+            pass
         return False, node_id, fid, None, fail_message('access denied', 'Write Serafin', data.job_id)
 
     if data.operator is None:
@@ -703,6 +707,10 @@ def compute_volume(node_id, fid, data, aux_data, options, csv_separator):
         with open(filename, 'w') as f:
             pass
     except PermissionError:
+        try:
+            os.remove(filename)
+        except PermissionError:
+            pass
         return False, node_id, fid, None, fail_message('access denied', 'Compute Volume', data.job_id)
 
     # prepare the mesh
@@ -774,6 +782,10 @@ def compute_flux(node_id, fid, data, aux_data, options, csv_separator):
         with open(filename, 'w') as f:
             pass
     except PermissionError:
+        try:
+            os.remove(filename)
+        except PermissionError:
+            pass
         return False, node_id, fid, None, fail_message('access denied', 'Compute Flux', data.job_id)
 
     # prepare the mesh
@@ -828,6 +840,10 @@ def interpolate_points(node_id, fid, data, aux_data, options, csv_separator):
         with open(filename, 'w') as f:
             pass
     except PermissionError:
+        try:
+            os.remove(filename)
+        except PermissionError:
+            pass
         return False, node_id, fid, None, fail_message('access denied', 'Interpolate on Points', data.job_id)
 
     # prepare the mesh
@@ -844,6 +860,7 @@ def interpolate_points(node_id, fid, data, aux_data, options, csv_separator):
     # process the points
     points = aux_data.points
     is_inside, point_interpolators = mesh.get_point_interpolators(points)
+    indices = [i for i in range(len(points)) if is_inside[i]]
     points = [p for i, p in enumerate(points) if is_inside[i]]
     point_interpolators = [p for i, p in enumerate(point_interpolators) if is_inside[i]]
     nb_inside = sum(map(int, is_inside))
@@ -857,9 +874,9 @@ def interpolate_points(node_id, fid, data, aux_data, options, csv_separator):
 
     # do calculation
     header = ['time']
-    for x, y in points:
+    for index, (x, y) in zip(indices, points):
         for var in selected_vars:
-            header.append('%s (%.4f, %.4f)' % (var, x, y))
+            header.append('Point %d %s (%.4f, %.4f)' % (index+1, var, x, y))
     csv_data = CSVData(data.filename, header)
 
     nb_selected_vars = len(selected_vars)
@@ -906,6 +923,10 @@ def interpolate_lines(node_id, fid, data, aux_data, options, csv_separator):
         with open(filename, 'w') as f:
             pass
     except PermissionError:
+        try:
+            os.remove(filename)
+        except PermissionError:
+            pass
         return False, node_id, fid, None, fail_message('access denied', 'Interpolate along Lines', data.job_id)
 
     # prepare the mesh
@@ -977,6 +998,10 @@ def project_lines(node_id, fid, data, aux_data, options, csv_separator):
         with open(filename, 'w') as f:
             pass
     except PermissionError:
+        try:
+            os.remove(filename)
+        except PermissionError:
+            pass
         return False, node_id, fid, None, fail_message('access denied', 'Project Lines', data.job_id)
 
     # prepare the mesh
@@ -1150,6 +1175,10 @@ def write_landxml(node_id, fid, data, options):
         with open(filename, 'w') as f:
             pass
     except PermissionError:
+        try:
+            os.remove(filename)
+        except PermissionError:
+            pass
         return False, node_id, fid, None, fail_message('access denied', 'Write LandXM', data.job_id)
 
     operations.scalar_to_xml(data.filename, data.header, filename, selected_var, selected_frame)
@@ -1162,11 +1191,11 @@ def write_shp(node_id, fid, data, options):
         return False, node_id, fid, None, fail_message('the input file is not 2D', 'Write Vector shp',
                                                        data.job_id)
     if len(data.selected_time_indices) != 1:
-        return False, node_id, fid, None, fail_message('the input data has more than one frame', 'Write Vector shp',
+        return False, node_id, fid, None, fail_message('the input data has more than one frame', 'Write shp',
                                                        data.job_id)
     available_vars = [var for var in data.selected_vars if var in data.header.var_IDs]
     if len(available_vars) == 0:
-        return False, node_id, fid, None, fail_message('no variable available', 'Write Vector shp',
+        return False, node_id, fid, None, fail_message('no variable available', 'Write shp',
                                                        data.job_id)
     selected_frame = data.selected_time_indices[0]
 
@@ -1181,11 +1210,15 @@ def write_shp(node_id, fid, data, options):
         with open(filename, 'w') as f:
             pass
     except PermissionError:
+        try:
+            os.remove(filename)
+        except PermissionError:
+            pass
         return False, node_id, fid, None, fail_message('access denied', 'Write shp', data.job_id)
 
     operations.slf_to_shp(data.filename, data.header, filename, available_vars, selected_frame)
 
-    return True, node_id, fid, None, success_message('Write Vector shp', data.job_id)
+    return True, node_id, fid, None, success_message('Write shp', data.job_id)
 
 
 FUNCTIONS = {'Select Variables': select_variables, 'Add Rouse': add_rouse, 'Select Time': select_time,

@@ -3,12 +3,11 @@ import logging
 import datetime
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
-import pandas as pd
 
 from slf import Serafin
 from slf.volume import VolumeCalculator
 from gui.util import TemporalPlotViewer, MapViewer, PolygonMapCanvas, OutputThread,\
-    OutputProgressDialog, LoadMeshDialog, SerafinInputTab, TelToolWidget, open_polygons, save_dialog
+    OutputProgressDialog, LoadMeshDialog, SerafinInputTab, TelToolWidget, open_polygons, save_dialog, read_csv
 
 
 class VolumeCalculatorThread(OutputThread):
@@ -140,8 +139,7 @@ class VolumePlotViewer(TemporalPlotViewer):
     def getData(self):
         # get the new data
         csv_file = self.input.csvNameBox.text()
-        self.data = pd.read_csv(csv_file, header=0, sep=self.input.parent.csv_separator)
-        self.data.sort_values('time', inplace=True)
+        self.data, headers = read_csv(csv_file, self.input.parent.csv_separator)
 
         self.var_ID = self.input.var_ID
         self.second_var_ID = self.input.second_var_ID
@@ -155,7 +153,7 @@ class VolumePlotViewer(TemporalPlotViewer):
         self.str_datetime = list(map(lambda x: x.strftime('%Y/%m/%d\n%H:%M'), self.datetime))
         self.str_datetime_bis = list(map(lambda x: x.strftime('%d/%m/%y\n%H:%M'), self.datetime))
 
-        self.columns = list(self.data)[1:]
+        self.columns = headers[1:]
         self.column_labels = {x: x for x in self.columns}
         self.column_colors = {x: None for x in self.columns}
         for i in range(min(len(self.columns), len(self.defaultColors))):

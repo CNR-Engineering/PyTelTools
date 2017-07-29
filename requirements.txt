@@ -4,7 +4,6 @@ numpy
 scipy
 matplotlib
 descartes
-pandas
 PyQt5
 pyshp
 pytest

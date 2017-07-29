@@ -2935,7 +2935,7 @@ class SerafinInputTab(QWidget):
         if not filename:
             return True, ''
 
-        if not testOpen(filename):
+        if not test_open(filename):
             return True, ''
 
         return False, filename
@@ -3002,7 +3002,7 @@ class TelToolWidget(QWidget):
             self.input.englishButton.setChecked(True)
 
 
-def testOpen(filename):
+def test_open(filename):
     try:
         with open(filename, 'rb') as f:
             pass
@@ -3014,7 +3014,7 @@ def testOpen(filename):
     return True
 
 
-def handleOverwrite(filename):
+def handle_overwrite(filename):
     """!
     @brief Handle manually the overwrite option when saving output file
     """
@@ -3041,12 +3041,27 @@ def handleOverwrite(filename):
     return False
 
 
+def read_csv(filename, separator):
+    data = {}
+    with open(filename, 'r') as f:
+        headers = f.readline().rstrip().split(separator)
+        for header in headers:
+            data[header] = []
+        for line in f.readlines():
+            items = line.rstrip().split(separator)
+            for header, item in zip(headers, items):
+                data[header].append(float(item))
+        for header in headers:
+            data[header] = np.array(data[header])
+    return data, headers
+
+
 def open_polygons():
     filename, _ = QFileDialog.getOpenFileName(None, 'Open a .i2s or .shp file', '', 'Line sets (*.i2s *.shp)',
                                               options=QFileDialog.Options() | QFileDialog.DontUseNativeDialog)
     if not filename:
         return False, '', []
-    if not testOpen(filename):
+    if not test_open(filename):
         return False, '', []
 
     is_i2s = filename[-4:] == '.i2s'
@@ -3076,7 +3091,7 @@ def open_polylines():
                                               options=QFileDialog.Options() | QFileDialog.DontUseNativeDialog)
     if not filename:
         return False, '', []
-    if not testOpen(filename):
+    if not test_open(filename):
         return False, '', []
 
     is_i2s = filename[-4:] == '.i2s'
@@ -3106,7 +3121,7 @@ def open_points():
                                               options=QFileDialog.Options() | QFileDialog.DontUseNativeDialog)
     if not filename:
         return False, '', [], [], []
-    if not testOpen(filename):
+    if not test_open(filename):
         return False, '', [], [], []
 
     fields, indices = Shapefile.get_attribute_names(filename)
@@ -3125,7 +3140,6 @@ def open_points():
                              QMessageBox.Ok)
         return False, '', [], [], []
     return True, filename, points, attributes, fields
-
 
 
 def save_dialog(extension, input_name='', input_names=None):
@@ -3157,7 +3171,7 @@ def save_dialog(extension, input_name='', input_names=None):
                 return True, ''
 
     # handle overwrite manually
-    overwrite = handleOverwrite(filename)
+    overwrite = handle_overwrite(filename)
     if overwrite is None:
         return True, ''
 

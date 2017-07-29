@@ -2,7 +2,6 @@ import sys
 import logging
 import datetime
 import numpy as np
-import pandas as pd
 
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
@@ -10,7 +9,7 @@ from PyQt5.QtCore import *
 from slf import Serafin
 from slf.flux import FluxCalculator
 from gui.util import TemporalPlotViewer, LineMapCanvas, MapViewer, OutputThread, \
-    OutputProgressDialog, LoadMeshDialog, SerafinInputTab, TelToolWidget, save_dialog, open_polylines
+    OutputProgressDialog, LoadMeshDialog, SerafinInputTab, TelToolWidget, save_dialog, open_polylines, read_csv
 
 
 class FluxCalculatorThread(OutputThread):
@@ -424,8 +423,7 @@ class FluxPlotViewer(TemporalPlotViewer):
 
         # get the new data
         csv_file = self.input.csvNameBox.text()
-        self.data = pd.read_csv(csv_file, header=0, sep=self.input.parent.csv_separator)
-        self.data.sort_values('time', inplace=True)
+        self.data, headers = read_csv(csv_file, self.input.parent.csv_separator)
 
         self.var_IDs = self.input.var_IDs
         if self.input.data.header.date is not None:
@@ -438,7 +436,7 @@ class FluxPlotViewer(TemporalPlotViewer):
         self.str_datetime = list(map(lambda x: x.strftime('%Y/%m/%d\n%H:%M'), self.datetime))
         self.str_datetime_bis = list(map(lambda x: x.strftime('%d/%m/%y\n%H:%M'), self.datetime))
 
-        self.columns = list(self.data)[1:]
+        self.columns = headers[1:]
         self.column_labels = {x: x for x in self.columns}
         self.column_colors = {x: None for x in self.columns}
         for i in range(min(len(self.columns), len(self.defaultColors))):

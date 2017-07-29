@@ -7,7 +7,6 @@ import numpy as np
 from gui.util import PlotViewer, MapViewer, PolygonMapCanvas, ColorMapCanvas, LoadMeshDialog, \
     TimeSliderIndexOnly as TimeSlider, SerafinInputTab, TelToolWidget, open_polygons
 from slf import Serafin
-from geom import BlueKenue, Shapefile
 
 
 class SimpleTimeSelection(QWidget):
@@ -686,7 +685,7 @@ class ErrorDistributionTab(QWidget):
     def btnColorMapEvent(self):
         if not self.has_map:
             reply = QMessageBox.question(self, 'Show distribution in 2D',
-                                         'This may take up to one minute. Are you sure to proceed?',
+                                         'This may take some time. Are you sure to proceed?',
                                          QMessageBox.Yes | QMessageBox.No)
             if reply == QMessageBox.No:
                 return

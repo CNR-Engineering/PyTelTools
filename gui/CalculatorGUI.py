@@ -8,7 +8,7 @@ from slf import Serafin
 from slf.datatypes import SerafinData
 import slf.misc as op
 from geom import Shapefile
-from gui.util import testOpen, OutputProgressDialog, OutputThread, TelToolWidget
+from gui.util import OutputProgressDialog, OutputThread, TelToolWidget, test_open
 from workflow.util import MultiLoadSerafinDialog, MultiSaveDialog, process_output_options
 
 
@@ -773,7 +773,7 @@ class InputTab(QWidget):
                                                   options=QFileDialog.Options() | QFileDialog.DontUseNativeDialog)
         if not filename:
             return
-        if not testOpen(filename):
+        if not test_open(filename):
             return
 
         polygons = []
@@ -789,8 +789,7 @@ class InputTab(QWidget):
             return
         items = ['%d - %s' % (index, name) for (index, name) in Shapefile.get_numeric_attribute_names(filename)]
         if not items:
-            QMessageBox.critical(self, 'Error', 'The polygons do not have numeric attributes.',
-                                 QMessageBox.Ok)
+            QMessageBox.critical(self, 'Error', 'The polygons do not have numeric attributes.', QMessageBox.Ok)
             return
         dlg = AttributeDialog(items)
         if dlg.exec_() != QDialog.Accepted:
