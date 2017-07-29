@@ -7,7 +7,7 @@ from workflow.MultiNode import Box, MultiLink
 from workflow.multi_nodes import *
 
 
-NODES = {'Input/Output': {'Load Serafin': MultiLoadSerafinNode, 'Load Serafin 3D': MultiLoadSerafin3DNode,
+NODES = {'Input/Output': {'Load Serafin 2D': MultiLoadSerafin2DNode, 'Load Serafin 3D': MultiLoadSerafin3DNode,
                           'Write Serafin': MultiWriteSerafinNode, 'Write LandXML': MultiWriteLandXMLNode,
                           'Load 2D Polygons': MultiLoadPolygon2DNode, 'Write shp': MultiWriteShpNode,
                           'Load 2D Open Polylines': MultiLoadOpenPolyline2DNode,
@@ -86,7 +86,7 @@ class MultiScene(QGraphicsScene):
         self.setSceneRect(QRectF(0, 0, 2400, 1000))
         self.transform = QTransform()
 
-        self.nodes = {0: MultiLoadSerafinNode(0)}
+        self.nodes = {0: MultiLoadSerafin2DNode(0)}
         self.nodes[0].moveBy(50, 50)
 
         self.has_input = False
@@ -101,7 +101,7 @@ class MultiScene(QGraphicsScene):
 
     def reinit(self):
         self.clear()
-        self.nodes = {0: MultiLoadSerafinNode(0)}
+        self.nodes = {0: MultiLoadSerafin2DNode(0)}
         self.nodes[0].moveBy(50, 50)
         self.auxiliary_input_nodes = []
 
@@ -120,7 +120,7 @@ class MultiScene(QGraphicsScene):
             if node.name() in ('Load 2D Polygons', 'Load 2D Open Polylines',
                                'Load 2D Points', 'Load Reference Serafin'):
                 self.auxiliary_input_nodes.append(node.index())
-            elif node.name() in ('Load Serafin', 'Load Serafin 3D'):
+            elif node.name() in ('Load Serafin 2D', 'Load Serafin 3D'):
                 self.inputs[node.index()] = []
                 self.ordered_input_indices.append(node.index())
 
@@ -129,7 +129,7 @@ class MultiScene(QGraphicsScene):
         target_item = self.itemAt(event.scenePos(), self.transform)
         if isinstance(target_item, Box):
             node = target_item.parentItem()
-            if node.category == 'Input/Output' and node.name() in ('Load Serafin', 'Load Serafin 3D'):
+            if node.category == 'Input/Output' and node.name() in ('Load Serafin 2D', 'Load Serafin 3D'):
                 self._handle_add_input(node)
 
     def save(self):
@@ -404,7 +404,7 @@ class MultiTable(QTableWidget):
         self.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.setFocusPolicy(Qt.NoFocus)
         self.setSelectionMode(QAbstractItemView.NoSelection)
-        self.setVerticalHeaderLabels(['Load Serafin'])
+        self.setVerticalHeaderLabels(['Load Serafin 2D'])
 
         self.row_to_node = {}
         self.node_to_row = {}
@@ -413,7 +413,7 @@ class MultiTable(QTableWidget):
 
     def reinit(self):
         self.setRowCount(1)
-        self.setVerticalHeaderLabels(['Load Serafin'])
+        self.setVerticalHeaderLabels(['Load Serafin 2D'])
         self.setColumnCount(0)
         self.input_columns = {}
         self.yellow_nodes = {}

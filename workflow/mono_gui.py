@@ -5,7 +5,7 @@ from workflow.nodes_calc import *
 from workflow.nodes_vis import *
 
 
-NODES = {'Input/Output': {'Load Serafin': LoadSerafinNode, 'Load Serafin 3D': LoadSerafin3DNode,
+NODES = {'Input/Output': {'Load Serafin 2D': LoadSerafin2DNode, 'Load Serafin 3D': LoadSerafin3DNode,
                           'Load 2D Polygons': LoadPolygon2DNode, 'Load 2D Open Polylines': LoadOpenPolyline2DNode,
                           'Load 2D Points': LoadPoint2DNode, 'Load Reference Serafin': LoadReferenceSerafinNode,
                           'Write LandXML': WriteLandXMLNode, 'Write shp': WriteShpNode,
@@ -16,9 +16,9 @@ NODES = {'Input/Output': {'Load Serafin': LoadSerafinNode, 'Load Serafin 3D': Lo
                               'Add Rouse Numbers': AddRouseNode,
                               'Convert to Single Precision': ConvertToSinglePrecisionNode,
                               'Add Transformation': AddTransformationNode},
-         'Operators': {'Max': ComputeMaxNode, 'Min': ComputeMinNode, 'Mean': ComputeMeanNode,
+         'Operators': {'Max': ComputeMaxNode, 'Min': ComputeMinNode, 'Mean': ComputeMeanNode, 'SynchMax': SynchMaxNode,
                        'Project B on A': ProjectMeshNode, 'A Minus B': MinusNode, 'B Minus A': ReverseMinusNode,
-                       'Max(A,B)': MaxBetweenNode, 'Min(A,B)': MinBetweenNode, 'SynchMax': SynchMaxNode},
+                       'Max(A,B)': MaxBetweenNode, 'Min(A,B)': MinBetweenNode},
          'Calculations': {'Compute Arrival Duration': ArrivalDurationNode,
                           'Compute Volume': ComputeVolumeNode, 'Compute Flux': ComputeFluxNode,
                           'Interpolate on Points': InterpolateOnPointsNode,
@@ -78,7 +78,7 @@ class MonoScene(QGraphicsScene):
         self.transform = QTransform()
         self.selectionChanged.connect(self.selection_changed)
 
-        self.nodes = {0: LoadSerafinNode(0)}
+        self.nodes = {0: LoadSerafin2DNode(0)}
         self.nodes[0].moveBy(50, 50)
         self.nb_nodes = 1
 
@@ -104,7 +104,7 @@ class MonoScene(QGraphicsScene):
         self.current_line.setPen(pen)
         self.current_port = None
 
-        self.nodes = {0: LoadSerafinNode(0)}
+        self.nodes = {0: LoadSerafin2DNode(0)}
         self.nodes[0].moveBy(50, 50)
         self.addItem(self.nodes[0])
         self.nb_nodes = 1
@@ -560,7 +560,6 @@ class NodeTree(QTreeWidget):
                 node.addChild(QTreeWidgetItem([node_text]))
 
         self.setDragEnabled(True)
-        self.setMaximumWidth(230)
         self.setColumnCount(1)
         self.setHeaderLabel('Add Nodes')
 
@@ -587,7 +586,6 @@ class MonoWidget(QWidget):
         left_panel = QWidget()
         config_button = QPushButton('Global\nConfiguration')
         config_button.setMinimumHeight(40)
-        config_button.setMaximumWidth(230)
         config_button.clicked.connect(self.scene.global_config)
 
         vlayout = QVBoxLayout()

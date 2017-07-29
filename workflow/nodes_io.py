@@ -17,11 +17,11 @@ from workflow.util import LoadSerafinDialog, OutputOptionPanel, GeomOutputOption
                           validate_input_options, validate_output_options
 
 
-class LoadSerafinNode(SingleOutputNode):
+class LoadSerafin2DNode(SingleOutputNode):
     def __init__(self, index):
         super().__init__(index)
         self.category = 'Input/Output'
-        self.label = 'Load\nSerafin'
+        self.label = 'Load\nSerafin 2D'
         self.out_port.data_type = ('slf', 'slf geom')
 
         self.dir_path = ''

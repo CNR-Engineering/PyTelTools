@@ -69,13 +69,13 @@ def fail_message(reason, node_name, job_id, second_job_id=''):
            reason)
 
 
-def read_slf(node_id, fid, filename, language, job_id):
+def read_slf_2d(node_id, fid, filename, language, job_id):
     data = SerafinData(job_id, filename, language)
     is_2d = data.read()
     if not is_2d:
-        success, message = False, fail_message('file is not 2D', 'Load Serafin', job_id)
+        success, message = False, fail_message('file is not 2D', 'Load Serafin 2D', job_id)
     else:
-        success, message = True, success_message('Load Serafin', job_id)
+        success, message = True, success_message('Load Serafin 2D', job_id)
     return success, node_id, fid, data, message
 
 
@@ -1233,6 +1233,6 @@ FUNCTIONS = {'Select Variables': select_variables, 'Add Rouse': add_rouse, 'Sele
              'B Minus A': reverse_minus, 'Max(A,B)': max_between,
              'Min(A,B)': min_between, 'Add Transformation': add_transform, 'Write LandXML': write_landxml,
              'Write shp': write_shp,
-             'Load Serafin': read_slf, 'Load Serafin 3D': read_slf_3d, 'Load Reference Serafin': read_slf_reference}
+             'Load Serafin 2D': read_slf_2d, 'Load Serafin 3D': read_slf_3d, 'Load Reference Serafin': read_slf_reference}
 
 

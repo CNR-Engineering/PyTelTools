@@ -9,11 +9,11 @@ import slf.misc as operations
 from geom.transformation import load_transformation_map
 
 
-class MultiLoadSerafinNode(MultiSingleOutputNode):
+class MultiLoadSerafin2DNode(MultiSingleOutputNode):
     def __init__(self, index):
         super().__init__(index)
         self.category = 'Input/Output'
-        self.label = 'Load\nSerafin'
+        self.label = 'Load\nSerafin 2D'
         self.state = MultiNode.NOT_CONFIGURED
 
     def configure(self, old_options):

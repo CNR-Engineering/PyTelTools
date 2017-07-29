@@ -1410,7 +1410,7 @@ class MultiInterpolationPlotDialog(QDialog):
         self.table.setColumnCount(4)
         self.table.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.table.horizontalHeader().setDefaultSectionSize(100)
-        self.table.setHorizontalHeaderLabels(['Job', 'Load Serafin', 'Interpolation', 'Export PNG'])
+        self.table.setHorizontalHeaderLabels(['Job', 'Load Serafin 2D', 'Interpolation', 'Export PNG'])
 
         self.red = QColor(255, 160, 160, 255)
         self.green = QColor(180, 250, 165, 255)
