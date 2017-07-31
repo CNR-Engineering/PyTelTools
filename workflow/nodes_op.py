@@ -969,13 +969,6 @@ class UnaryOperatorNode(OneInOneOutNode):
         if super().configure():
             self.reconfigure_downward()
 
-    def save(self):
-        return '|'.join([self.category, self.name(), str(self.index()),
-                         str(self.pos().x()), str(self.pos().y()), ''])
-
-    def load(self, options):
-        self.state = Node.READY
-
     def run(self):
         pass
 
@@ -999,13 +992,6 @@ class BinaryOperatorNode(TwoInOneOutNode):
     def configure(self, check=None):
         if super().configure():
             self.reconfigure_downward()
-
-    def save(self):
-        return '|'.join([self.category, self.name(), str(self.index()),
-                         str(self.pos().x()), str(self.pos().y()), ''])
-
-    def load(self, options):
-        self.state = Node.READY
 
     def run(self):
         success = super().run_upward()

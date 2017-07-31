@@ -7,11 +7,10 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 
-from gui.util import TemporalPlotViewer, PointLabelEditor, read_csv
+from gui.util import TemporalPlotViewer, VolumePlotViewer, FluxPlotViewer, PointPlotViewer, PointLabelEditor, read_csv
 from slf import Serafin
 from slf.datatypes import SerafinData
 from slf.interpolation import MeshInterpolator
-from slf.volume import VolumeCalculator
 
 
 class ConfigureDialog(QDialog):
@@ -543,17 +542,14 @@ class LoadSerafinDialog(QDialog):
         self.success = True
 
 
-class VolumePlotViewer(TemporalPlotViewer):
+class SimpleVolumePlotViewer(VolumePlotViewer):
     def __init__(self):
-        super().__init__('polygon')
+        super().__init__()
         self.csv_separator = ''
-        self.var_ID = None
-        self.second_var_ID = None
-        self.language = 'fr'
+
         self.multi_save_act = QAction('Multi-Save', self, triggered=self.multi_save,
                                       icon=self.style().standardIcon(QStyle.SP_DialogSaveButton))
 
-        self.current_columns = ('Polygon 1',)
         self.toolBar.addAction(self.selectColumnsAct)
         self.toolBar.addAction(self.editColumnNamesAct)
         self.toolBar.addAction(self.editColumColorAct)
@@ -563,40 +559,10 @@ class VolumePlotViewer(TemporalPlotViewer):
         self.toolBar.addSeparator()
         self.toolBar.addAction(self.multi_save_act)
 
-        self.poly_menu = QMenu('&Polygons', self)
-        self.poly_menu.addAction(self.selectColumnsAct_short)
-        self.poly_menu.addAction(self.editColumnNamesAct_short)
-        self.poly_menu.addAction(self.editColumColorAct_short)
         self.menuBar.addMenu(self.poly_menu)
-
         self.multi_menu = QMenu('&Multi', self)
         self.multi_menu.addAction(self.multi_save_act)
         self.menuBar.addMenu(self.multi_menu)
-
-    def _defaultYLabel(self):
-        word = {'fr': 'de', 'en': 'of'}[self.language]
-        if self.second_var_ID == VolumeCalculator.INIT_VALUE:
-            return 'Volume %s (%s - %s$_0$)' % (word, self.var_ID, self.var_ID)
-        elif self.second_var_ID is None:
-            return 'Volume %s %s' % (word, self.var_ID)
-        return 'Volume %s (%s - %s)' % (word, self.var_ID, self.second_var_ID)
-
-    def replot(self):
-        self.canvas.axes.clear()
-        for column in self.current_columns:
-            self.canvas.axes.plot(self.time[self.timeFormat], self.data[column], '-', color=self.column_colors[column],
-                                  linewidth=2, label=self.column_labels[column])
-        self.canvas.axes.legend()
-        self.canvas.axes.grid(linestyle='dotted')
-        self.canvas.axes.set_xlabel(self.current_xlabel)
-        self.canvas.axes.set_ylabel(self.current_ylabel)
-        self.canvas.axes.set_title(self.current_title)
-        if self.timeFormat in [1, 2]:
-            self.canvas.axes.set_xticklabels(self.str_datetime if self.timeFormat == 1 else self.str_datetime_bis)
-            for label in self.canvas.axes.get_xticklabels():
-                label.set_rotation(45)
-                label.set_fontsize(8)
-        self.canvas.draw()
 
     def get_data(self, csv_data):
         self.csv_separator = csv_data.separator
@@ -643,21 +609,12 @@ class VolumePlotViewer(TemporalPlotViewer):
         dlg.exec_()
 
 
-class FluxPlotViewer(TemporalPlotViewer):
+class SimpleFluxPlotViewer(FluxPlotViewer):
     def __init__(self):
-        super().__init__('section')
+        super().__init__()
         self.csv_separator = ''
-        self.language = 'fr'
-        self.flux_title = ''
-        self.var_IDs = []
-        self.cumulative = False
         self.multi_save_act = QAction('Multi-Save', self, triggered=self.multi_save,
                                       icon=self.style().standardIcon(QStyle.SP_DialogSaveButton))
-        self.cumulative_flux_act = QAction('Show\ncumulative flux', self, checkable=True,
-                                           icon=self.style().standardIcon(QStyle.SP_DialogApplyButton))
-        self.cumulative_flux_act.toggled.connect(self.changeFluxType)
-
-        self.current_columns = ('Section 1',)
         self.toolBar.addAction(self.selectColumnsAct)
         self.toolBar.addAction(self.editColumnNamesAct)
         self.toolBar.addAction(self.editColumColorAct)
@@ -669,10 +626,6 @@ class FluxPlotViewer(TemporalPlotViewer):
         self.toolBar.addSeparator()
         self.toolBar.addAction(self.multi_save_act)
 
-        self.poly_menu = QMenu('&Sections', self)
-        self.poly_menu.addAction(self.selectColumnsAct_short)
-        self.poly_menu.addAction(self.editColumnNamesAct_short)
-        self.poly_menu.addAction(self.editColumColorAct_short)
         self.menuBar.addMenu(self.poly_menu)
         self.multi_menu = QMenu('&Multi', self)
         self.multi_menu.addAction(self.multi_save_act)
@@ -752,21 +705,14 @@ class FluxPlotViewer(TemporalPlotViewer):
         dlg.exec_()
 
 
-class PointPlotViewer(TemporalPlotViewer):
+class SimplePointPlotViewer(PointPlotViewer):
     def __init__(self):
-        super().__init__('point')
+        super().__init__()
         self.csv_separator = ''
-        self.language = 'en'
-        self.var_IDs = []
-        self.current_var = ''
-        self.points = None
         self.indices = []
+
         self.multi_save_act = QAction('Multi-Save', self, triggered=self.multi_save,
                                       icon=self.style().standardIcon(QStyle.SP_DialogSaveButton))
-        self.select_variable = QAction('Select\nvariable', self, triggered=self.selectVariableEvent,
-                                       icon=self.style().standardIcon(QStyle.SP_FileDialogDetailedView))
-        self.select_variable_short = QAction('Select\nvariable', self, triggered=self.selectVariableEvent,
-                                             icon=self.style().standardIcon(QStyle.SP_FileDialogDetailedView))
         self.current_columns = ('Point 1',)
         self.toolBar.addAction(self.select_variable)
         self.toolBar.addAction(self.selectColumnsAct)
@@ -790,11 +736,6 @@ class PointPlotViewer(TemporalPlotViewer):
         self.multi_menu.addAction(self.multi_save_act)
         self.menuBar.addMenu(self.multi_menu)
 
-    def _to_column(self, point):
-        point_index = int(point.split()[1]) - 1
-        x, y = self.points.points[point_index]
-        return 'Point %d %s (%.4f|%.4f)' % (point_index+1, self.current_var, x, y)
-
     def editColumns(self):
         msg = PointLabelEditor(self.column_labels, self.column_name,
                                self.points.points, [True if i in self.indices else False
@@ -806,48 +747,6 @@ class PointPlotViewer(TemporalPlotViewer):
             return
         msg.getLabels(self.column_labels)
         self.replot()
-
-    def _defaultYLabel(self):
-        word = {'fr': 'de', 'en': 'of'}[self.language]
-        return 'Values %s %s' % (word, self.current_var)
-
-    def selectVariableEvent(self):
-        msg = QDialog()
-        combo = QComboBox()
-        for var in self.var_IDs:
-            combo.addItem(var)
-        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel,
-                                   Qt.Horizontal, msg)
-        buttons.accepted.connect(msg.accept)
-        buttons.rejected.connect(msg.reject)
-        vlayout = QVBoxLayout()
-        vlayout.addWidget(combo)
-        vlayout.addWidget(buttons)
-        msg.setLayout(vlayout)
-        msg.setWindowTitle('Select a variable to plot')
-        msg.resize(300, 150)
-        msg.exec_()
-        self.current_var = combo.currentText()
-        self.current_ylabel = self._defaultYLabel()
-        self.replot()
-
-    def replot(self):
-        self.canvas.axes.clear()
-        for point in self.current_columns:
-            self.canvas.axes.plot(self.time[self.timeFormat], self.data[self._to_column(point)], '-',
-                                  color=self.column_colors[point],
-                                  linewidth=2, label=self.column_labels[point])
-        self.canvas.axes.legend()
-        self.canvas.axes.grid(linestyle='dotted')
-        self.canvas.axes.set_xlabel(self.current_xlabel)
-        self.canvas.axes.set_ylabel(self.current_ylabel)
-        self.canvas.axes.set_title(self.current_title)
-        if self.timeFormat in [1, 2]:
-            self.canvas.axes.set_xticklabels(self.str_datetime if self.timeFormat == 1 else self.str_datetime_bis)
-            for label in self.canvas.axes.get_xticklabels():
-                label.set_rotation(45)
-                label.set_fontsize(8)
-        self.canvas.draw()
 
     def get_data(self, csv_data):
         self.csv_separator = csv_data.separator

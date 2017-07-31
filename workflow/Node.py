@@ -255,10 +255,11 @@ class Node(QGraphicsItem):
         QApplication.processEvents()
 
     def save(self):
-        return ''
+        return '|'.join([self.category, self.name(), str(self.index()),
+                         str(self.pos().x()), str(self.pos().y()), ''])
 
     def load(self, options):
-        pass
+        self.state = Node.READY
 
     def success(self, message=''):
         self.progress_bar.setVisible(False)

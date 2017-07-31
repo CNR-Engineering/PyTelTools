@@ -8,8 +8,8 @@ from PyQt5.QtWidgets import *
 from slf.mesh2D import Mesh2D
 from slf.interpolation import MeshInterpolator
 from workflow.Node import Node, SingleInputNode, DoubleInputNode
-from workflow.util import MultiLoadSerafinDialog, MultiFigureSaveDialog, VolumePlotViewer, \
-    FluxPlotViewer, PointPlotViewer, MultiSaveProjectLinesDialog, VerticalProfilePlotViewer, \
+from workflow.util import MultiLoadSerafinDialog, MultiFigureSaveDialog, SimpleVolumePlotViewer, \
+    SimpleFluxPlotViewer, SimplePointPlotViewer, MultiSaveProjectLinesDialog, VerticalProfilePlotViewer, \
     MultiSaveMultiVarLinePlotDialog, MultiSaveMultiFrameLinePlotDialog, MultiSaveVerticalProfileDialog
 from gui.util import MapCanvas, PolygonMapCanvas, LineMapCanvas, MapViewer, \
     PointAttributeTable, ProjectLinesPlotViewer, MultiVarLinePlotViewer, MultiFrameLinePlotViewer
@@ -26,13 +26,6 @@ class ShowMeshNode(SingleInputNode):
         canvas = MapCanvas()
         self.map = MapViewer(canvas)
         self.has_map = False
-
-    def save(self):
-        return '|'.join([self.category, self.name(), str(self.index()),
-                         str(self.pos().x()), str(self.pos().y()), ''])
-
-    def load(self, options):
-        self.state = Node.READY
 
     def reconfigure(self):
         super().reconfigure()
@@ -92,13 +85,6 @@ class LocateOpenLinesNode(DoubleInputNode):
         canvas = LineMapCanvas()
         self.map = MapViewer(canvas)
         self.has_map = False
-
-    def save(self):
-        return '|'.join([self.category, self.name(), str(self.index()),
-                         str(self.pos().x()), str(self.pos().y()), ''])
-
-    def load(self, options):
-        self.state = Node.READY
 
     def reconfigure(self):
         super().reconfigure()
@@ -175,13 +161,6 @@ class LocatePolygonsNode(DoubleInputNode):
         self.map = MapViewer(canvas)
         self.has_map = False
 
-    def save(self):
-        return '|'.join([self.category, self.name(), str(self.index()),
-                         str(self.pos().x()), str(self.pos().y()), ''])
-
-    def load(self, options):
-        self.state = Node.READY
-
     def reconfigure(self):
         super().reconfigure()
         self.has_map = False
@@ -253,13 +232,6 @@ class LocatePointsNode(DoubleInputNode):
         canvas = MapCanvas()
         self.map = MapViewer(canvas)
         self.has_map = False
-
-    def save(self):
-        return '|'.join([self.category, self.name(), str(self.index()),
-                         str(self.pos().x()), str(self.pos().y()), ''])
-
-    def load(self, options):
-        self.state = Node.READY
 
     def reconfigure(self):
         super().reconfigure()
@@ -344,13 +316,6 @@ class MultiVarLinePlotNode(DoubleInputNode):
         self.plot_viewer.plotViewer.toolBar.addAction(self.multi_save_act)
         self.current_vars = {}
 
-    def save(self):
-        return '|'.join([self.category, self.name(), str(self.index()),
-                         str(self.pos().x()), str(self.pos().y()), ''])
-
-    def load(self, options):
-        self.state = Node.READY
-
     def configure(self, check=None):
         if not self.first_in_port.has_mother() or not self.second_in_port.has_mother():
             QMessageBox.critical(None, 'Error', 'Connect and run the input before configure this node!',
@@ -391,6 +356,10 @@ class MultiVarLinePlotNode(DoubleInputNode):
                                      QMessageBox.Ok)
                 return
         self.plot_viewer.showMaximized()
+
+    def reconfigure(self):
+        super().reconfigure()
+        self.has_plot = False
 
     def _prepare(self):
         input_data = self.first_in_port.mother.parentItem().data
@@ -507,13 +476,6 @@ class MultiFrameLinePlotNode(DoubleInputNode):
         self.plot_viewer.plotViewer.toolBar.addAction(self.multi_save_act)
         self.current_vars = {}
 
-    def save(self):
-        return '|'.join([self.category, self.name(), str(self.index()),
-                         str(self.pos().x()), str(self.pos().y()), ''])
-
-    def load(self, options):
-        self.state = Node.READY
-
     def configure(self, check=None):
         if not self.first_in_port.has_mother() or not self.second_in_port.has_mother():
             QMessageBox.critical(None, 'Error', 'Connect and run the input before configure this node!',
@@ -554,6 +516,10 @@ class MultiFrameLinePlotNode(DoubleInputNode):
                                      QMessageBox.Ok)
                 return
         self.plot_viewer.showMaximized()
+
+    def reconfigure(self):
+        super().reconfigure()
+        self.has_plot = False
 
     def _prepare(self):
         input_data = self.first_in_port.mother.parentItem().data
@@ -670,13 +636,6 @@ class ProjectLinesPlotNode(DoubleInputNode):
         self.plot_viewer.plotViewer.toolBar.addSeparator()
         self.plot_viewer.plotViewer.toolBar.addAction(self.multi_save_act)
         self.current_vars = {}
-
-    def save(self):
-        return '|'.join([self.category, self.name(), str(self.index()),
-                         str(self.pos().x()), str(self.pos().y()), ''])
-
-    def load(self, options):
-        self.state = Node.READY
 
     def configure(self, check=None):
         if not self.first_in_port.has_mother() or not self.second_in_port.has_mother():
@@ -848,13 +807,6 @@ class VerticalTemporalProfileNode(DoubleInputNode):
         self.plot_viewer.toolBar.addSeparator()
         self.plot_viewer.toolBar.addAction(self.multi_save_act)
 
-    def save(self):
-        return '|'.join([self.category, self.name(), str(self.index()),
-                         str(self.pos().x()), str(self.pos().y()), ''])
-
-    def load(self, options):
-        self.state = Node.READY
-
     def configure(self, check=None):
         if not self.first_in_port.has_mother() or not self.second_in_port.has_mother():
             QMessageBox.critical(None, 'Error', 'Connect and run the input before configure this node!',
@@ -895,6 +847,10 @@ class VerticalTemporalProfileNode(DoubleInputNode):
                 return
         self.plot_viewer.showMaximized()
         self.success()
+
+    def reconfigure(self):
+        super().reconfigure()
+        self.has_plot = False
 
     def _prepare(self):
         input_data = self.first_in_port.mother.parentItem().data
@@ -989,15 +945,8 @@ class VolumePlotNode(SingleInputNode):
         self.label = 'Volume\nPlot'
         self.in_port.data_type = ('volume csv',)
         self.state = Node.READY
-        self.plot_viewer = VolumePlotViewer()
+        self.plot_viewer = SimpleVolumePlotViewer()
         self.has_plot = False
-
-    def save(self):
-        return '|'.join([self.category, self.name(), str(self.index()),
-                         str(self.pos().x()), str(self.pos().y()), ''])
-
-    def load(self, options):
-        self.state = Node.READY
 
     def reconfigure(self):
         super().reconfigure()
@@ -1051,15 +1000,8 @@ class FluxPlotNode(SingleInputNode):
         self.label = 'Flux\nPlot'
         self.in_port.data_type = ('flux csv',)
         self.state = Node.READY
-        self.plot_viewer = FluxPlotViewer()
+        self.plot_viewer = SimpleFluxPlotViewer()
         self.has_plot = False
-
-    def save(self):
-        return '|'.join([self.category, self.name(), str(self.index()),
-                         str(self.pos().x()), str(self.pos().y()), ''])
-
-    def load(self, options):
-        self.state = Node.READY
 
     def reconfigure(self):
         super().reconfigure()
@@ -1113,15 +1055,8 @@ class PointPlotNode(SingleInputNode):
         self.label = 'Point\nPlot'
         self.in_port.data_type = ('point csv',)
         self.state = Node.READY
-        self.plot_viewer = PointPlotViewer()
+        self.plot_viewer = SimplePointPlotViewer()
         self.has_plot = False
-
-    def save(self):
-        return '|'.join([self.category, self.name(), str(self.index()),
-                         str(self.pos().x()), str(self.pos().y()), ''])
-
-    def load(self, options):
-        self.state = Node.READY
 
     def reconfigure(self):
         super().reconfigure()
@@ -1177,13 +1112,6 @@ class PointAttributeTableNode(SingleInputNode):
         self.state = Node.READY
         self.table = PointAttributeTable()
         self.has_table = False
-
-    def save(self):
-        return '|'.join([self.category, self.name(), str(self.index()),
-                         str(self.pos().x()), str(self.pos().y()), ''])
-
-    def load(self, options):
-        self.state = Node.READY
 
     def reconfigure(self):
         super().reconfigure()

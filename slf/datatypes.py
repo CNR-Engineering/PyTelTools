@@ -89,20 +89,14 @@ class SerafinData:
 
 
 class CSVData:
-    def __init__(self, filename, header=None, out_name=''):
+    def __init__(self, filename, header=None, out_name='', separator=';'):
         self.filename = filename
         self.out_name = ''
         self.metadata = {}
         self.separator = ''
 
         if header is None:  # read existing file
-            with open(out_name, 'r') as f:
-                line = f.readline().rstrip()
-                for sep in (';', ',', '\t'):
-                    if len(line.split(sep)) > 1:
-                        self.separator = sep
-                        break
-
+            self.separator = separator
             self.table = []
             self.out_name = out_name
             with open(out_name, 'r') as f:

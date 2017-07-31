@@ -8,7 +8,7 @@ from PyQt5.QtCore import *
 
 from slf import Serafin
 from slf.flux import FluxCalculator
-from gui.util import TemporalPlotViewer, LineMapCanvas, MapViewer, OutputThread, \
+from gui.util import FluxPlotViewer, LineMapCanvas, MapViewer, OutputThread, \
     OutputProgressDialog, LoadMeshDialog, SerafinInputTab, TelToolWidget, save_dialog, open_polylines, read_csv
 
 
@@ -337,23 +337,15 @@ class InputTab(SerafinInputTab):
         self.parent.tab.setTabEnabled(1, True)
 
 
-class FluxPlotViewer(TemporalPlotViewer):
+class ImageTab(FluxPlotViewer):
     def __init__(self, inputTab):
-        super().__init__('section')
+        super().__init__()
         self.input = inputTab
 
         # initialize the map for locating sections
         canvas = LineMapCanvas()
         self.map = MapViewer(canvas)
-
-        self.setWindowTitle('Visualize the temporal evolution of volumes')
-
-        self.flux_title = ''
-        self.var_IDs = []
         self.has_map = False
-        self.language = 'fr'
-        self.cumulative = False
-
         self.locateSections = QAction('Locate sections\non map', self, icon=self.style().standardIcon(QStyle.SP_DialogHelpButton),
                                       triggered=self.locateSectionsEvent)
         self.locateSections_short = QAction('Locate sections\non map', self,
@@ -377,46 +369,12 @@ class FluxPlotViewer(TemporalPlotViewer):
 
         self.mapMenu = QMenu('&Map', self)
         self.mapMenu.addAction(self.locateSections_short)
-        self.polyMenu = QMenu('&Sections', self)
-        self.polyMenu.addAction(self.selectColumnsAct_short)
-        self.polyMenu.addAction(self.editColumnNamesAct_short)
-        self.polyMenu.addAction(self.editColumColorAct_short)
-
         self.menuBar.addMenu(self.mapMenu)
-        self.menuBar.addMenu(self.polyMenu)
+        self.menuBar.addMenu(self.poly_menu)
 
     def enable_locate(self, event):
         self.locateSections.setEnabled(True)
         self.locateSections_short.setEnabled(True)
-
-    def changeFluxType(self):
-        self.cumulative = not self.cumulative
-        self.current_ylabel = 'Cumulative ' + self.flux_title
-        self.replot()
-
-    def replot(self):
-        self.canvas.axes.clear()
-        for column in self.current_columns:
-            if not self.cumulative:
-                self.canvas.axes.plot(self.time[self.timeFormat], self.data[column], '-',
-                                      color=self.column_colors[column],
-                                      linewidth=2, label=self.column_labels[column])
-            else:
-                self.canvas.axes.plot(self.time[self.timeFormat], np.cumsum(self.data[column]), '-',
-                                      color=self.column_colors[column],
-                                      linewidth=2, label=self.column_labels[column])
-
-        self.canvas.axes.legend()
-        self.canvas.axes.grid(linestyle='dotted')
-        self.canvas.axes.set_xlabel(self.current_xlabel)
-        self.canvas.axes.set_ylabel(self.current_ylabel)
-        self.canvas.axes.set_title(self.current_title)
-        if self.timeFormat in [1, 2]:
-            self.canvas.axes.set_xticklabels(self.str_datetime if self.timeFormat == 1 else self.str_datetime_bis)
-            for label in self.canvas.axes.get_xticklabels():
-                label.set_rotation(45)
-                label.set_fontsize(8)
-        self.canvas.draw()
 
     def getData(self, flux_title):
         self.flux_title = flux_title
@@ -480,7 +438,7 @@ class ComputeFluxGUI(TelToolWidget):
         self.setWindowTitle('Compute the flux of a vector field across sections')
 
         self.input = InputTab(self)
-        self.imageTab = FluxPlotViewer(self.input)
+        self.imageTab = ImageTab(self.input)
 
         self.tab = QTabWidget()
         self.tab.addTab(self.input, 'Input')

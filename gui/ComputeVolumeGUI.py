@@ -6,7 +6,7 @@ from PyQt5.QtCore import *
 
 from slf import Serafin
 from slf.volume import VolumeCalculator
-from gui.util import TemporalPlotViewer, MapViewer, PolygonMapCanvas, OutputThread,\
+from gui.util import TemporalPlotViewer, MapViewer, PolygonMapCanvas, OutputThread, VolumePlotViewer, \
     OutputProgressDialog, LoadMeshDialog, SerafinInputTab, TelToolWidget, open_polygons, save_dialog, read_csv
 
 
@@ -63,32 +63,23 @@ class VolumeCalculatorThread(OutputThread):
         self.calculator.write_csv(result, output_stream, self.separator)
 
 
-class VolumePlotViewer(TemporalPlotViewer):
+class ImageTab(VolumePlotViewer):
     def __init__(self, inputTab):
-        super().__init__('polygon')
+        super().__init__()
         self.input = inputTab
 
         # initialize the map for locating polygons
         canvas = PolygonMapCanvas()
         self.map = MapViewer(canvas)
 
-        self.setWindowTitle('Visualize the temporal evolution of volumes')
-
-        self.var_ID = None
-        self.second_var_ID = None
         self.has_map = False
-
-        self.current_columns = ('Polygon 1',)
-
         self.locatePolygons = QAction('Locate polygons\non map', self,
                                       icon=self.style().standardIcon(QStyle.SP_DialogHelpButton),
                                       triggered=self.locatePolygonsEvent)
         self.locatePolygons_short = QAction('Locate polygons on map', self,
                                             icon=self.style().standardIcon(QStyle.SP_DialogHelpButton),
                                             triggered=self.locatePolygonsEvent)
-
         self.map.closeEvent = self.enable_locate
-
         self.toolBar.addAction(self.locatePolygons)
         self.toolBar.addSeparator()
         self.toolBar.addAction(self.selectColumnsAct)
@@ -100,41 +91,12 @@ class VolumePlotViewer(TemporalPlotViewer):
 
         self.mapMenu = QMenu('&Map', self)
         self.mapMenu.addAction(self.locatePolygons_short)
-        self.polyMenu = QMenu('&Polygons', self)
-        self.polyMenu.addAction(self.selectColumnsAct_short)
-        self.polyMenu.addAction(self.editColumnNamesAct_short)
-        self.polyMenu.addAction(self.editColumColorAct_short)
         self.menuBar.addMenu(self.mapMenu)
-        self.menuBar.addMenu(self.polyMenu)
+        self.menuBar.addMenu(self.poly_menu)
 
     def enable_locate(self, event):
         self.locatePolygons.setEnabled(True)
         self.locatePolygons_short.setEnabled(True)
-
-    def _defaultYLabel(self):
-        word = {'fr': 'de', 'en': 'of'}[self.input.data.language]
-        if self.second_var_ID == VolumeCalculator.INIT_VALUE:
-            return 'Volume %s (%s - %s$_0$)' % (word, self.var_ID, self.var_ID)
-        elif self.second_var_ID is None:
-            return 'Volume %s %s' % (word, self.var_ID)
-        return 'Volume %s (%s - %s)' % (word, self.var_ID, self.second_var_ID)
-
-    def replot(self):
-        self.canvas.axes.clear()
-        for column in self.current_columns:
-            self.canvas.axes.plot(self.time[self.timeFormat], self.data[column], '-', color=self.column_colors[column],
-                                  linewidth=2, label=self.column_labels[column])
-        self.canvas.axes.legend()
-        self.canvas.axes.grid(linestyle='dotted')
-        self.canvas.axes.set_xlabel(self.current_xlabel)
-        self.canvas.axes.set_ylabel(self.current_ylabel)
-        self.canvas.axes.set_title(self.current_title)
-        if self.timeFormat in [1, 2]:
-            self.canvas.axes.set_xticklabels(self.str_datetime if self.timeFormat == 1 else self.str_datetime_bis)
-            for label in self.canvas.axes.get_xticklabels():
-                label.set_rotation(45)
-                label.set_fontsize(8)
-        self.canvas.draw()
 
     def getData(self):
         # get the new data
@@ -437,7 +399,7 @@ class ComputeVolumeGUI(TelToolWidget):
         super().__init__(parent)
 
         self.input = InputTab(self)
-        self.imageTab = VolumePlotViewer(self.input)
+        self.imageTab = ImageTab(self.input)
         self.setWindowTitle('Compute the volume of a variable inside polygons')
 
         self.tab = QTabWidget()

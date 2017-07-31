@@ -598,42 +598,73 @@ class AttributeDialog(QDialog):
 
 
 class OutputVariableDialog(QDialog):
-    def __init__(self, items, old_names):
+    def __init__(self, pool, items, old_names):
         super().__init__()
+        self.name = ''
         self.old_names = old_names
         self.var_box = QComboBox()
         for item in items:
             self.var_box.addItem(item)
         self.var_box.setFixedHeight(30)
-        self.name_box = QLineEdit()
-        self.name_box.setFixedHeight(35)
-        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel,
-                                   Qt.Horizontal, self)
+
+        name_box = QGroupBox()
+        name_choice = QRadioButton('Use original variable name')
+        name_choice_new = QRadioButton('New variable name')
+        name_choice.setChecked(True)
+        name_choice.toggled.connect(self.toggle_name_choice)
+
+        self.name_combo = QComboBox()
+        for var, var_name in zip(pool.vars(), pool.var_names()):
+            self.name_combo.addItem('%s (%s)' % (var, var_name))
+        self.name_text.setFixedHeight(35)
+        self.name_text = QLineEdit()
+        self.name_text.setFixedHeight(35)
+        self.name_text.setEnabled(False)
+        vlayout = QVBoxLayout()
+        vlayout.addWidget(name_choice)
+        vlayout.addWidget(self.name_combo)
+        vlayout.addItem(QSpacerItem(10, 10))
+        vlayout.addWidget(name_choice_new)
+        vlayout.addWidget(self.name_text)
+        name_box.setLayout(vlayout)
+
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, Qt.Horizontal, self)
         buttons.accepted.connect(self.check)
         buttons.rejected.connect(self.reject)
 
         vlayout = QVBoxLayout()
         hlayout = QHBoxLayout()
-        hlayout.addWidget(QLabel('Expressions'))
+        hlayout.addWidget(QLabel('Output Expressions'))
         hlayout.addWidget(self.var_box)
+        hlayout.addStretch()
         vlayout.addLayout(hlayout)
         vlayout.addItem(QSpacerItem(10, 10))
-        hlayout = QHBoxLayout()
-        hlayout.addWidget(QLabel('Output variable name'))
-        hlayout.addWidget(self.name_box)
-        vlayout.addLayout(hlayout)
+        vlayout.addWidget(QLabel('Output variable name'))
+        vlayout.addWidget(name_box)
         vlayout.addStretch()
         vlayout.addWidget(buttons)
         self.setLayout(vlayout)
         self.setWindowTitle('Select output expression')
 
+    def toggle_name_choice(self, original_name):
+        if original_name:
+            self.name_combo.setEnabled(True)
+            self.name_text.clear()
+            self.name_text.setEnabled(False)
+        else:
+            self.name_combo.setEnabled(False)
+            self.name_text.setEnabled(True)
+
     def check(self):
-        name = self.name_box.text()
-        if len(name) < 2 or len(name) > 16:
-            QMessageBox.critical(None, 'Error', 'The variable names should be between 2 and 16 characters!',
-                                 QMessageBox.Ok)
-            return
-        if name in self.old_names:
+        if self.name_text.isEnabled():
+            self.name = self.name_text.text()
+            if len(self.name) < 2 or len(self.name) > 16:
+                QMessageBox.critical(None, 'Error', 'The variable names should be between 2 and 16 characters!',
+                                     QMessageBox.Ok)
+                return
+        else:
+            self.name = self.name_combo.currentText().split('(')[:-1]
+        if self.name in self.old_names:
             QMessageBox.critical(None, 'Error', 'This name is already used!', QMessageBox.Ok)
             return
         self.accept()
@@ -948,10 +979,10 @@ class SubmitTab(QWidget):
     def add_event(self):
         expressions = [(code, text) for code, text in self.editor.pool.evaluable_expressions()]
         items = ['%s: %s' % (code, text) for code, text in expressions]
-        dlg = OutputVariableDialog(items, self.old_names())
+        dlg = OutputVariableDialog(self.editor.pool, items, self.old_names())
         if dlg.exec_() == QDialog.Accepted:
             code, text = expressions[dlg.var_box.currentIndex()]
-            name = dlg.name_box.text()
+            name = dlg.name
             row = self.table.rowCount()
             self.table.insertRow(row)
             self.table.setItem(row, 0, QTableWidgetItem(code))

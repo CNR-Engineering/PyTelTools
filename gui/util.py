@@ -22,6 +22,7 @@ from matplotlib.colors import Normalize, colorConverter
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import struct
 
+from geom import BlueKenue, Shapefile
 from slf import Serafin
 from slf.datatypes import SerafinData
 from slf.volume import TruncatedTriangularPrisms
@@ -29,7 +30,321 @@ from slf.flux import TriangularVectorField
 from slf.comparison import ReferenceMesh
 from slf.interpolation import MeshInterpolator
 import slf.misc as operations
-from geom import BlueKenue, Shapefile
+from slf.volume import VolumeCalculator
+
+
+def test_open(filename):
+    try:
+        with open(filename, 'rb') as f:
+            pass
+    except PermissionError:
+        QMessageBox.critical(None, 'Permission denied',
+                             'Permission denied. (Is the file opened by another application?).',
+                             QMessageBox.Ok, QMessageBox.Ok)
+        return False
+    return True
+
+
+def handle_overwrite(filename):
+    """!
+    @brief Handle manually the overwrite option when saving output file
+    """
+    if os.path.exists(filename):
+        msg = QMessageBox.warning(None, 'Confirm overwrite',
+                                  'The file already exists. Do you want to replace it?',
+                                  QMessageBox.Ok | QMessageBox.Cancel,
+                                  QMessageBox.Ok)
+        if msg == QMessageBox.Cancel:
+            return None
+        try:
+            with open(filename, 'w') as f:
+                pass
+        except PermissionError:
+            QMessageBox.critical(None, 'Permission denied',
+                                 'Permission denied (Is the file opened by another application?).',
+                                 QMessageBox.Ok, QMessageBox.Ok)
+            return None
+        try:
+            os.remove(filename)
+        except PermissionError:
+            pass
+        return True
+    return False
+
+
+def read_csv(filename, separator):
+    data = {}
+    with open(filename, 'r') as f:
+        headers = f.readline().rstrip().split(separator)
+        for header in headers:
+            data[header] = []
+        for line in f.readlines():
+            items = line.rstrip().split(separator)
+            for header, item in zip(headers, items):
+                data[header].append(float(item))
+        for header in headers:
+            data[header] = np.array(data[header])
+    return data, headers
+
+
+def open_polygons():
+    filename, _ = QFileDialog.getOpenFileName(None, 'Open a .i2s or .shp file', '', 'Line sets (*.i2s *.shp)',
+                                              options=QFileDialog.Options() | QFileDialog.DontUseNativeDialog)
+    if not filename:
+        return False, '', []
+    if not test_open(filename):
+        return False, '', []
+
+    is_i2s = filename[-4:] == '.i2s'
+
+    polygons = []
+    if is_i2s:
+        with BlueKenue.Read(filename) as f:
+            f.read_header()
+            for poly in f.get_polygons():
+                polygons.append(poly)
+    else:
+        try:
+            for polygon in Shapefile.get_polygons(filename):
+                polygons.append(polygon)
+        except struct.error:
+            QMessageBox.critical(None, 'Error', 'Inconsistent bytes.', QMessageBox.Ok)
+            return False, '', []
+    if not polygons:
+        QMessageBox.critical(None, 'Error', 'The file does not contain any polygon.',
+                             QMessageBox.Ok)
+        return False, '', []
+    return True, filename, polygons
+
+
+def open_polylines():
+    filename, _ = QFileDialog.getOpenFileName(None, 'Open a .i2s or .shp file', '', 'Line sets (*.i2s *.shp)',
+                                              options=QFileDialog.Options() | QFileDialog.DontUseNativeDialog)
+    if not filename:
+        return False, '', []
+    if not test_open(filename):
+        return False, '', []
+
+    is_i2s = filename[-4:] == '.i2s'
+
+    polylines = []
+    if is_i2s:
+        with BlueKenue.Read(filename) as f:
+            f.read_header()
+            for polyline in f.get_open_polylines():
+                polylines.append(polyline)
+    else:
+        try:
+            for polyline in Shapefile.get_open_polylines(filename):
+                polylines.append(polyline)
+        except struct.error:
+            QMessageBox.critical(None, 'Error', 'Inconsistent bytes.', QMessageBox.Ok)
+            return False, '', []
+    if not polylines:
+        QMessageBox.critical(None, 'Error', 'The file does not contain any open polyline.',
+                             QMessageBox.Ok)
+        return False, '', []
+    return True, filename, polylines
+
+
+def open_points():
+    filename, _ = QFileDialog.getOpenFileName(None, 'Open a .shp file', '', 'Point sets (*.shp)',
+                                              options=QFileDialog.Options() | QFileDialog.DontUseNativeDialog)
+    if not filename:
+        return False, '', [], [], []
+    if not test_open(filename):
+        return False, '', [], [], []
+
+    fields, indices = Shapefile.get_attribute_names(filename)
+    points = []
+    attributes = []
+    try:
+        for point, attribute in Shapefile.get_points(filename, indices):
+            points.append(point)
+            attributes.append(attribute)
+    except struct.error:
+        QMessageBox.critical(None, 'Error', 'Inconsistent bytes.', QMessageBox.Ok)
+        return False, '', [], [], []
+
+    if not points:
+        QMessageBox.critical(None, 'Error', 'The file does not contain any open polyline.',
+                             QMessageBox.Ok)
+        return False, '', [], [], []
+    return True, filename, points, attributes, fields
+
+
+def save_dialog(extension, input_name='', input_names=None):
+    # create the save file dialog
+    options = QFileDialog.Options()
+    options |= QFileDialog.DontUseNativeDialog
+    options |= QFileDialog.DontConfirmOverwrite
+    filename, _ = QFileDialog.getSaveFileName(None, 'Choose the output file name', '',
+                                              'Serafin Files (*.slf)' if extension == '.slf'
+                                              else 'CSV Files (*.csv)', options=options)
+
+    # check the file name consistency
+    if not filename:
+        return True, ''
+    if len(filename) < 5 or filename[-4:] != extension:
+        filename += extension
+
+    # overwrite to the input file is forbidden
+    if input_name:
+        if filename == input_name:
+            QMessageBox.critical(None, 'Error', 'Cannot overwrite to the input file.',
+                                 QMessageBox.Ok)
+            return True, ''
+    elif input_names:
+        for name in input_names:
+            if filename == name:
+                QMessageBox.critical(None, 'Error', 'Cannot overwrite to the input file.',
+                                     QMessageBox.Ok)
+                return True, ''
+
+    # handle overwrite manually
+    overwrite = handle_overwrite(filename)
+    if overwrite is None:
+        return True, ''
+
+    return False, filename
+
+
+class SerafinInputTab(QWidget):
+    def __init__(self, parent=None):
+        super().__init__()
+        self.parent = parent
+
+        # create the button open
+        self.btnOpen = QPushButton('Open', self, icon=self.style().standardIcon(QStyle.SP_DialogOpenButton))
+        self.btnOpen.setToolTip('<b>Open</b> a .slf file')
+        self.btnOpen.setFixedSize(105, 50)
+
+        # create some text fields displaying the IO files info
+        self.inNameBox = QLineEdit()
+        self.inNameBox.setReadOnly(True)
+        self.summaryTextBox = QPlainTextEdit()
+        self.summaryTextBox.setFixedHeight(50)
+        self.summaryTextBox.setReadOnly(True)
+
+        # create a checkbox for language selection
+        self.langBox = QGroupBox('Input language')
+        hlayout = QHBoxLayout()
+        self.frenchButton = QRadioButton('French')
+        self.englishButton = QRadioButton('English')
+        hlayout.addWidget(self.frenchButton)
+        hlayout.addWidget(self.englishButton)
+        self.langBox.setLayout(hlayout)
+        self.langBox.setMaximumHeight(80)
+        if self.parent.language == 'fr':
+            self.frenchButton.setChecked(True)
+        else:
+            self.englishButton.setChecked(True)
+
+        # create the widget displaying message logs
+        self.logTextBox = QPlainTextEditLogger(self)
+        self.logTextBox.setFormatter(logging.Formatter('%(asctime)s - [%(levelname)s] - \n%(message)s'))
+        logging.getLogger().addHandler(self.logTextBox)
+        logging.getLogger().setLevel(logging.INFO)
+
+        self.input_layout = QVBoxLayout()
+        hlayout = QHBoxLayout()
+        hlayout.setAlignment(Qt.AlignLeft)
+        hlayout.addItem(QSpacerItem(50, 1))
+        hlayout.addWidget(self.btnOpen)
+        hlayout.addItem(QSpacerItem(30, 1))
+        hlayout.addWidget(self.langBox)
+        self.input_layout.addLayout(hlayout)
+        self.input_layout.addItem(QSpacerItem(10, 10))
+
+        glayout = QGridLayout()
+        glayout.addWidget(QLabel('Input file'), 1, 1)
+        glayout.addWidget(self.inNameBox, 1, 2)
+        glayout.addWidget(QLabel('Summary'), 2, 1)
+        glayout.addWidget(self.summaryTextBox, 2, 2)
+        glayout.setAlignment(Qt.AlignLeft)
+        glayout.setSpacing(10)
+        self.input_layout.addLayout(glayout)
+
+    def current_language(self):
+        if self.frenchButton.isChecked():
+            return 'fr'
+        return 'en'
+
+    def reset(self):
+        self.inNameBox.clear()
+        self.summaryTextBox.clear()
+
+    def open_event(self):
+        filename, _ = QFileDialog.getOpenFileName(self, 'Open a .slf file', '', 'Serafin Files (*.slf)',
+                                                  options=QFileDialog.Options() | QFileDialog.DontUseNativeDialog)
+        if not filename:
+            return True, ''
+
+        if not test_open(filename):
+            return True, ''
+
+        return False, filename
+
+    def read(self, filename):
+        self.inNameBox.setText(filename)
+        data = SerafinData('', filename, self.current_language())
+        data.read()
+        self.summaryTextBox.appendPlainText(data.header.summary())
+        logging.info('Finished reading the input file')
+        return data
+
+    def read_2d(self, filename, update=True):
+        if update:
+            self.inNameBox.setText(filename)
+        data = SerafinData('', filename, self.current_language())
+        is_2d = data.read()
+
+        if not is_2d:
+            QMessageBox.critical(self, 'Error', 'The file type (TELEMAC 3D) is currently not supported.',
+                                 QMessageBox.Ok)
+            return False, None
+        if update:
+            self.summaryTextBox.appendPlainText(data.header.summary())
+        logging.info('Finished reading the input file')
+        return True, data
+
+
+class TelToolWidget(QWidget):
+    def __init__(self, parent):
+        super().__init__()
+        self.parent = parent
+        self.input = None
+        if parent is None:
+            self.language = 'fr'
+            self.csv_separator = ';'
+        else:
+            self.language = parent.language
+            self.csv_separator = parent.csv_separator
+        self.setMinimumWidth(600)
+        self.setWindowFlags(self.windowFlags() | Qt.CustomizeWindowHint)
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+
+    def inDialog(self):
+        if self.parent is not None:
+            self.parent.inDialog()
+        else:
+            self.setWindowFlags(self.windowFlags() & ~Qt.WindowCloseButtonHint)
+            self.setEnabled(False)
+            self.show()
+
+    def outDialog(self):
+        if self.parent is not None:
+            self.parent.outDialog()
+        else:
+            self.setWindowFlags(self.windowFlags() | Qt.WindowCloseButtonHint)
+            self.setEnabled(True)
+            self.show()
+
+    def switch_language(self, language):
+        if language == 'fr':
+            self.input.frenchButton.setChecked(True)
+        else:
+            self.input.englishButton.setChecked(True)
 
 
 class TimeSlider(QSlider):
@@ -1813,6 +2128,163 @@ class PointAttributeDialog(QDialog):
         self.accept()
 
 
+class VolumePlotViewer(TemporalPlotViewer):
+    def __init__(self):
+        super().__init__('polygon')
+        self.csv_separator = ''
+        self.var_ID = None
+        self.second_var_ID = None
+        self.language = 'fr'
+
+        self.current_columns = ('Polygon 1',)
+
+        self.setWindowTitle('Visualize the temporal evolution of volumes')
+
+        self.poly_menu = QMenu('&Polygons', self)
+        self.poly_menu.addAction(self.selectColumnsAct_short)
+        self.poly_menu.addAction(self.editColumnNamesAct_short)
+        self.poly_menu.addAction(self.editColumColorAct_short)
+
+    def _defaultYLabel(self):
+        word = {'fr': 'de', 'en': 'of'}[self.language]
+        if self.second_var_ID == VolumeCalculator.INIT_VALUE:
+            return 'Volume %s (%s - %s$_0$)' % (word, self.var_ID, self.var_ID)
+        elif self.second_var_ID is None:
+            return 'Volume %s %s' % (word, self.var_ID)
+        return 'Volume %s (%s - %s)' % (word, self.var_ID, self.second_var_ID)
+
+    def replot(self):
+        self.canvas.axes.clear()
+        for column in self.current_columns:
+            self.canvas.axes.plot(self.time[self.timeFormat], self.data[column], '-', color=self.column_colors[column],
+                                  linewidth=2, label=self.column_labels[column])
+        self.canvas.axes.legend()
+        self.canvas.axes.grid(linestyle='dotted')
+        self.canvas.axes.set_xlabel(self.current_xlabel)
+        self.canvas.axes.set_ylabel(self.current_ylabel)
+        self.canvas.axes.set_title(self.current_title)
+        if self.timeFormat in [1, 2]:
+            self.canvas.axes.set_xticklabels(self.str_datetime if self.timeFormat == 1 else self.str_datetime_bis)
+            for label in self.canvas.axes.get_xticklabels():
+                label.set_rotation(45)
+                label.set_fontsize(8)
+        self.canvas.draw()
+
+
+class FluxPlotViewer(TemporalPlotViewer):
+    def __init__(self):
+        super().__init__('section')
+        self.setWindowTitle('Visualize the temporal evolution of flux')
+        self.csv_separator = ''
+        self.flux_title = ''
+        self.var_IDs = []
+        self.cumulative = False
+        self.cumulative_flux_act = QAction('Show\ncumulative flux', self, checkable=True,
+                                           icon=self.style().standardIcon(QStyle.SP_DialogApplyButton))
+        self.cumulative_flux_act.toggled.connect(self.changeFluxType)
+
+        self.current_columns = ('Section 1',)
+        self.poly_menu = QMenu('&Sections', self)
+        self.poly_menu.addAction(self.selectColumnsAct_short)
+        self.poly_menu.addAction(self.editColumnNamesAct_short)
+        self.poly_menu.addAction(self.editColumColorAct_short)
+
+    def changeFluxType(self):
+        self.cumulative = not self.cumulative
+        self.current_ylabel = 'Cumulative ' + self.flux_title
+        self.replot()
+
+    def replot(self):
+        self.canvas.axes.clear()
+        for column in self.current_columns:
+            if not self.cumulative:
+                self.canvas.axes.plot(self.time[self.timeFormat], self.data[column], '-',
+                                      color=self.column_colors[column],
+                                      linewidth=2, label=self.column_labels[column])
+            else:
+                self.canvas.axes.plot(self.time[self.timeFormat], np.cumsum(self.data[column]), '-',
+                                      color=self.column_colors[column],
+                                      linewidth=2, label=self.column_labels[column])
+
+        self.canvas.axes.legend()
+        self.canvas.axes.grid(linestyle='dotted')
+        self.canvas.axes.set_xlabel(self.current_xlabel)
+        self.canvas.axes.set_ylabel(self.current_ylabel)
+        self.canvas.axes.set_title(self.current_title)
+        if self.timeFormat in [1, 2]:
+            self.canvas.axes.set_xticklabels(self.str_datetime if self.timeFormat == 1 else self.str_datetime_bis)
+            for label in self.canvas.axes.get_xticklabels():
+                label.set_rotation(45)
+                label.set_fontsize(8)
+        self.canvas.draw()
+
+
+class PointPlotViewer(TemporalPlotViewer):
+    def __init__(self):
+        super().__init__('point')
+        self.setWindowTitle('Visualize the temporal evolution of values on points')
+        self.var_IDs = []
+        self.current_var = ''
+        self.points = None
+        self.select_variable = QAction('Select\nvariable', self, triggered=self.selectVariableEvent,
+                                       icon=self.style().standardIcon(QStyle.SP_FileDialogDetailedView))
+        self.select_variable_short = QAction('Select\nvariable', self, triggered=self.selectVariableEvent,
+                                             icon=self.style().standardIcon(QStyle.SP_FileDialogDetailedView))
+
+        self.current_columns = ('Point 1',)
+        self.poly_menu = QMenu('&Sections', self)
+        self.poly_menu.addAction(self.selectColumnsAct_short)
+        self.poly_menu.addAction(self.editColumnNamesAct_short)
+        self.poly_menu.addAction(self.editColumColorAct_short)
+
+    def _to_column(self, point):
+        point_index = int(point.split()[1]) - 1
+        x, y = self.points.points[point_index]
+        return 'Point %d %s (%.4f|%.4f)' % (point_index+1, self.current_var, x, y)
+
+    def _defaultYLabel(self):
+        word = {'fr': 'de', 'en': 'of'}[self.language]
+        return 'Values %s %s' % (word, self.current_var)
+
+    def selectVariableEvent(self):
+        msg = QDialog()
+        combo = QComboBox()
+        for var in self.var_IDs:
+            combo.addItem(var)
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel,
+                                   Qt.Horizontal, msg)
+        buttons.accepted.connect(msg.accept)
+        buttons.rejected.connect(msg.reject)
+        vlayout = QVBoxLayout()
+        vlayout.addWidget(combo)
+        vlayout.addWidget(buttons)
+        msg.setLayout(vlayout)
+        msg.setWindowTitle('Select a variable to plot')
+        msg.resize(300, 150)
+        msg.exec_()
+        self.current_var = combo.currentText()
+        self.current_ylabel = self._defaultYLabel()
+        self.replot()
+
+    def replot(self):
+        self.canvas.axes.clear()
+        for point in self.current_columns:
+            self.canvas.axes.plot(self.time[self.timeFormat], self.data[self._to_column(point)], '-',
+                                  color=self.column_colors[point],
+                                  linewidth=2, label=self.column_labels[point])
+        self.canvas.axes.legend()
+        self.canvas.axes.grid(linestyle='dotted')
+        self.canvas.axes.set_xlabel(self.current_xlabel)
+        self.canvas.axes.set_ylabel(self.current_ylabel)
+        self.canvas.axes.set_title(self.current_title)
+        if self.timeFormat in [1, 2]:
+            self.canvas.axes.set_xticklabels(self.str_datetime if self.timeFormat == 1 else self.str_datetime_bis)
+            for label in self.canvas.axes.get_xticklabels():
+                label.set_rotation(45)
+                label.set_fontsize(8)
+        self.canvas.draw()
+
+
 class PointLabelEditor(QDialog):
     def __init__(self, column_labels, name, points, is_inside, fields, all_attributes):
         super().__init__()
@@ -2862,317 +3334,3 @@ class ProjectLinesPlotViewer(QWidget):
                 self.control.lineBox.addItem('Line %s' % id_line)
                 self.line_colors[i] = self.plotViewer.defaultColors[j]   # initialize default line colors
                 j += 1
-
-
-class SerafinInputTab(QWidget):
-    def __init__(self, parent=None):
-        super().__init__()
-        self.parent = parent
-
-        # create the button open
-        self.btnOpen = QPushButton('Open', self, icon=self.style().standardIcon(QStyle.SP_DialogOpenButton))
-        self.btnOpen.setToolTip('<b>Open</b> a .slf file')
-        self.btnOpen.setFixedSize(105, 50)
-
-        # create some text fields displaying the IO files info
-        self.inNameBox = QLineEdit()
-        self.inNameBox.setReadOnly(True)
-        self.summaryTextBox = QPlainTextEdit()
-        self.summaryTextBox.setFixedHeight(50)
-        self.summaryTextBox.setReadOnly(True)
-
-        # create a checkbox for language selection
-        self.langBox = QGroupBox('Input language')
-        hlayout = QHBoxLayout()
-        self.frenchButton = QRadioButton('French')
-        self.englishButton = QRadioButton('English')
-        hlayout.addWidget(self.frenchButton)
-        hlayout.addWidget(self.englishButton)
-        self.langBox.setLayout(hlayout)
-        self.langBox.setMaximumHeight(80)
-        if self.parent.language == 'fr':
-            self.frenchButton.setChecked(True)
-        else:
-            self.englishButton.setChecked(True)
-
-        # create the widget displaying message logs
-        self.logTextBox = QPlainTextEditLogger(self)
-        self.logTextBox.setFormatter(logging.Formatter('%(asctime)s - [%(levelname)s] - \n%(message)s'))
-        logging.getLogger().addHandler(self.logTextBox)
-        logging.getLogger().setLevel(logging.INFO)
-
-        self.input_layout = QVBoxLayout()
-        hlayout = QHBoxLayout()
-        hlayout.setAlignment(Qt.AlignLeft)
-        hlayout.addItem(QSpacerItem(50, 1))
-        hlayout.addWidget(self.btnOpen)
-        hlayout.addItem(QSpacerItem(30, 1))
-        hlayout.addWidget(self.langBox)
-        self.input_layout.addLayout(hlayout)
-        self.input_layout.addItem(QSpacerItem(10, 10))
-
-        glayout = QGridLayout()
-        glayout.addWidget(QLabel('Input file'), 1, 1)
-        glayout.addWidget(self.inNameBox, 1, 2)
-        glayout.addWidget(QLabel('Summary'), 2, 1)
-        glayout.addWidget(self.summaryTextBox, 2, 2)
-        glayout.setAlignment(Qt.AlignLeft)
-        glayout.setSpacing(10)
-        self.input_layout.addLayout(glayout)
-
-    def current_language(self):
-        if self.frenchButton.isChecked():
-            return 'fr'
-        return 'en'
-
-    def reset(self):
-        self.inNameBox.clear()
-        self.summaryTextBox.clear()
-
-    def open_event(self):
-        filename, _ = QFileDialog.getOpenFileName(self, 'Open a .slf file', '', 'Serafin Files (*.slf)',
-                                                  options=QFileDialog.Options() | QFileDialog.DontUseNativeDialog)
-        if not filename:
-            return True, ''
-
-        if not test_open(filename):
-            return True, ''
-
-        return False, filename
-
-    def read(self, filename):
-        self.inNameBox.setText(filename)
-        data = SerafinData('', filename, self.current_language())
-        data.read()
-        self.summaryTextBox.appendPlainText(data.header.summary())
-        logging.info('Finished reading the input file')
-        return data
-
-    def read_2d(self, filename, update=True):
-        if update:
-            self.inNameBox.setText(filename)
-        data = SerafinData('', filename, self.current_language())
-        is_2d = data.read()
-
-        if not is_2d:
-            QMessageBox.critical(self, 'Error', 'The file type (TELEMAC 3D) is currently not supported.',
-                                 QMessageBox.Ok)
-            return False, None
-        if update:
-            self.summaryTextBox.appendPlainText(data.header.summary())
-        logging.info('Finished reading the input file')
-        return True, data
-
-
-class TelToolWidget(QWidget):
-    def __init__(self, parent):
-        super().__init__()
-        self.parent = parent
-        self.input = None
-        if parent is None:
-            self.language = 'fr'
-            self.csv_separator = ';'
-        else:
-            self.language = parent.language
-            self.csv_separator = parent.csv_separator
-        self.setMinimumWidth(600)
-        self.setWindowFlags(self.windowFlags() | Qt.CustomizeWindowHint)
-        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-
-    def inDialog(self):
-        if self.parent is not None:
-            self.parent.inDialog()
-        else:
-            self.setWindowFlags(self.windowFlags() & ~Qt.WindowCloseButtonHint)
-            self.setEnabled(False)
-            self.show()
-
-    def outDialog(self):
-        if self.parent is not None:
-            self.parent.outDialog()
-        else:
-            self.setWindowFlags(self.windowFlags() | Qt.WindowCloseButtonHint)
-            self.setEnabled(True)
-            self.show()
-
-    def switch_language(self, language):
-        if language == 'fr':
-            self.input.frenchButton.setChecked(True)
-        else:
-            self.input.englishButton.setChecked(True)
-
-
-def test_open(filename):
-    try:
-        with open(filename, 'rb') as f:
-            pass
-    except PermissionError:
-        QMessageBox.critical(None, 'Permission denied',
-                             'Permission denied. (Is the file opened by another application?).',
-                             QMessageBox.Ok, QMessageBox.Ok)
-        return False
-    return True
-
-
-def handle_overwrite(filename):
-    """!
-    @brief Handle manually the overwrite option when saving output file
-    """
-    if os.path.exists(filename):
-        msg = QMessageBox.warning(None, 'Confirm overwrite',
-                                  'The file already exists. Do you want to replace it?',
-                                  QMessageBox.Ok | QMessageBox.Cancel,
-                                  QMessageBox.Ok)
-        if msg == QMessageBox.Cancel:
-            return None
-        try:
-            with open(filename, 'w') as f:
-                pass
-        except PermissionError:
-            QMessageBox.critical(None, 'Permission denied',
-                                 'Permission denied (Is the file opened by another application?).',
-                                 QMessageBox.Ok, QMessageBox.Ok)
-            return None
-        try:
-            os.remove(filename)
-        except PermissionError:
-            pass
-        return True
-    return False
-
-
-def read_csv(filename, separator):
-    data = {}
-    with open(filename, 'r') as f:
-        headers = f.readline().rstrip().split(separator)
-        for header in headers:
-            data[header] = []
-        for line in f.readlines():
-            items = line.rstrip().split(separator)
-            for header, item in zip(headers, items):
-                data[header].append(float(item))
-        for header in headers:
-            data[header] = np.array(data[header])
-    return data, headers
-
-
-def open_polygons():
-    filename, _ = QFileDialog.getOpenFileName(None, 'Open a .i2s or .shp file', '', 'Line sets (*.i2s *.shp)',
-                                              options=QFileDialog.Options() | QFileDialog.DontUseNativeDialog)
-    if not filename:
-        return False, '', []
-    if not test_open(filename):
-        return False, '', []
-
-    is_i2s = filename[-4:] == '.i2s'
-
-    polygons = []
-    if is_i2s:
-        with BlueKenue.Read(filename) as f:
-            f.read_header()
-            for poly in f.get_polygons():
-                polygons.append(poly)
-    else:
-        try:
-            for polygon in Shapefile.get_polygons(filename):
-                polygons.append(polygon)
-        except struct.error:
-            QMessageBox.critical(None, 'Error', 'Inconsistent bytes.', QMessageBox.Ok)
-            return False, '', []
-    if not polygons:
-        QMessageBox.critical(None, 'Error', 'The file does not contain any polygon.',
-                             QMessageBox.Ok)
-        return False, '', []
-    return True, filename, polygons
-
-
-def open_polylines():
-    filename, _ = QFileDialog.getOpenFileName(None, 'Open a .i2s or .shp file', '', 'Line sets (*.i2s *.shp)',
-                                              options=QFileDialog.Options() | QFileDialog.DontUseNativeDialog)
-    if not filename:
-        return False, '', []
-    if not test_open(filename):
-        return False, '', []
-
-    is_i2s = filename[-4:] == '.i2s'
-
-    polylines = []
-    if is_i2s:
-        with BlueKenue.Read(filename) as f:
-            f.read_header()
-            for polyline in f.get_open_polylines():
-                polylines.append(polyline)
-    else:
-        try:
-            for polyline in Shapefile.get_open_polylines(filename):
-                polylines.append(polyline)
-        except struct.error:
-            QMessageBox.critical(None, 'Error', 'Inconsistent bytes.', QMessageBox.Ok)
-            return False, '', []
-    if not polylines:
-        QMessageBox.critical(None, 'Error', 'The file does not contain any open polyline.',
-                             QMessageBox.Ok)
-        return False, '', []
-    return True, filename, polylines
-
-
-def open_points():
-    filename, _ = QFileDialog.getOpenFileName(None, 'Open a .shp file', '', 'Point sets (*.shp)',
-                                              options=QFileDialog.Options() | QFileDialog.DontUseNativeDialog)
-    if not filename:
-        return False, '', [], [], []
-    if not test_open(filename):
-        return False, '', [], [], []
-
-    fields, indices = Shapefile.get_attribute_names(filename)
-    points = []
-    attributes = []
-    try:
-        for point, attribute in Shapefile.get_points(filename, indices):
-            points.append(point)
-            attributes.append(attribute)
-    except struct.error:
-        QMessageBox.critical(None, 'Error', 'Inconsistent bytes.', QMessageBox.Ok)
-        return False, '', [], [], []
-
-    if not points:
-        QMessageBox.critical(None, 'Error', 'The file does not contain any open polyline.',
-                             QMessageBox.Ok)
-        return False, '', [], [], []
-    return True, filename, points, attributes, fields
-
-
-def save_dialog(extension, input_name='', input_names=None):
-    # create the save file dialog
-    options = QFileDialog.Options()
-    options |= QFileDialog.DontUseNativeDialog
-    options |= QFileDialog.DontConfirmOverwrite
-    filename, _ = QFileDialog.getSaveFileName(None, 'Choose the output file name', '',
-                                              'Serafin Files (*.slf)' if extension == '.slf'
-                                              else 'CSV Files (*.csv)', options=options)
-
-    # check the file name consistency
-    if not filename:
-        return True, ''
-    if len(filename) < 5 or filename[-4:] != extension:
-        filename += extension
-
-    # overwrite to the input file is forbidden
-    if input_name:
-        if filename == input_name:
-            QMessageBox.critical(None, 'Error', 'Cannot overwrite to the input file.',
-                                 QMessageBox.Ok)
-            return True, ''
-    elif input_names:
-        for name in input_names:
-            if filename == name:
-                QMessageBox.critical(None, 'Error', 'Cannot overwrite to the input file.',
-                                     QMessageBox.Ok)
-                return True, ''
-
-    # handle overwrite manually
-    overwrite = handle_overwrite(filename)
-    if overwrite is None:
-        return True, ''
-
-    return False, filename

@@ -178,7 +178,9 @@ class SerafinHeader:
             if name not in var_table:
                 module_logger.warn('WARNING: The variable name "%s" is not known. The complete name will be used as ID' % name)
                 var_id = name
-            self.var_IDs.append(var_table[name])
+            else:
+                var_id = var_table[name]
+            self.var_IDs.append(var_id)
 
         # Build ikle2d
         if not self.is_2d:

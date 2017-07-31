@@ -9,7 +9,7 @@ from slf.datatypes import CSVData
 from slf.flux import TriangularVectorField, FluxCalculator
 from slf.interpolation import MeshInterpolator
 from slf.volume import TruncatedTriangularPrisms, VolumeCalculator
-from workflow.Node import Node, OneInOneOutNode, TwoInOneOutNode
+from workflow.Node import Node, OneInOneOutNode, TwoInOneOutNode, DoubleInputNode
 from workflow.util import OutputOptionPanel, process_output_options, validate_output_options
 
 
@@ -541,7 +541,19 @@ class ComputeVolumeNode(TwoInOneOutNode):
 
                 self.progress_bar.setValue(100 * (i+1) / len(calculator.time_indices))
                 QApplication.processEvents()
-                
+
+    def is_valid_csv(self):
+        polygons = self.second_in_port.mother.parentItem().data.lines
+        polygon_names = ['Polygon %d' % (i+1) for i in range(len(polygons))]
+        headers = ['time'] + polygon_names
+        if self.sup_volume:
+            for name in polygon_names:
+                headers.append(name + ' POSITIVE')
+                headers.append(name + 'NEGATIVE')
+        if not all(h in self.data.table[0] for h in headers):
+            return False
+        return True
+
     def run(self):
         success = super().run_upward()
         if not success:
@@ -558,7 +570,11 @@ class ComputeVolumeNode(TwoInOneOutNode):
                         pass
                 except PermissionError:
                     self.fail('Access denied when reloading existing file.')
-                self.data = CSVData(self.in_data.filename, None, filename)
+                self.data = CSVData(self.in_data.filename, None, filename, self.scene().csv_separator)
+                if not self.is_valid_csv():
+                    self.data = None
+                    self.fail('The existing file is not valid.')
+                    return 
                 self.data.metadata = {'var': self.first_var, 'second var': self.second_var,
                                       'start time': self.in_data.start_time, 'language': self.in_data.language}
                 self.success('Reload existing file.')
@@ -804,12 +820,11 @@ class ComputeFluxNode(TwoInOneOutNode):
             self.in_data.triangles = mesh.triangles
     
         # run the calculator
-        with Serafin.Read(self.in_data.filename, self.in_data.language) as resin:
-            resin.header = self.in_data.header
-            resin.time = self.in_data.time
+        with Serafin.Read(self.in_data.filename, self.in_data.language) as input_stream:
+            input_stream.header = self.in_data.header
+            input_stream.time = self.in_data.time
 
-            calculator = FluxCalculator(flux_type, var_IDs,
-                                        resin, section_names, sections, 1)
+            calculator = FluxCalculator(flux_type, var_IDs, input_stream, section_names, sections, 1)
             calculator.time_indices = self.in_data.selected_time_indices
             calculator.mesh = mesh
             calculator.construct_intersections()
@@ -833,6 +848,14 @@ class ComputeFluxNode(TwoInOneOutNode):
 
                 self.progress_bar.setValue(100 * (i+1) / len(calculator.time_indices))
                 QApplication.processEvents()
+    
+    def is_valid_csv(self):
+        sections = self.second_in_port.mother.parentItem().data.lines
+        section_names = ['Section %d' % (i + 1) for i in range(len(sections))]
+        headers = ['time'] + section_names
+        if not all(h in self.data.table[0] for h in headers):
+            return False
+        return True
 
     def run(self):
         success = super().run_upward()
@@ -850,7 +873,11 @@ class ComputeFluxNode(TwoInOneOutNode):
                         pass
                 except PermissionError:
                     self.fail('Access denied when reloading existing file.')
-                self.data = CSVData(self.in_data.filename, None, filename)
+                self.data = CSVData(self.in_data.filename, None, filename, self.scene().csv_separator)
+                if not self.is_valid_csv():
+                    self.data = None
+                    self.fail('The existing file is not valid.')
+                    return 
                 self.data.metadata = {'flux title': self.flux_options,
                                       'language': self.in_data.language, 'start time': self.in_data.start_time,
                                       'var IDs': list(self.flux_options.split(':')[1].split('(')[1][:-1].split(', '))}
@@ -862,7 +889,7 @@ class ComputeFluxNode(TwoInOneOutNode):
         except PermissionError:
             self.fail('Access denied.')
             return
-
+        
         self._run_flux()
         self.data.write(filename, self.scene().csv_separator)
         self.success('Output saved to %s' % filename)
@@ -975,8 +1002,6 @@ class InterpolateOnPointsNode(TwoInOneOutNode):
         covered_vars = []
         for item in headers[1:]:
             _, index, var, coord = item.split()
-            if var not in selected_vars:
-                return False
             covered_vars.append(var)
             index = int(index)-1
             if index >= len(points):
@@ -1016,12 +1041,12 @@ class InterpolateOnPointsNode(TwoInOneOutNode):
                 except PermissionError:
                     self.fail('Access denied when reloading existing file.')
 
-                self.data = CSVData(self.in_data.filename, None, filename)
+                self.data = CSVData(self.in_data.filename, None, filename, self.scene().csv_separator)
                 points = self.second_in_port.mother.parentItem().data
                 if not self.is_valid_csv(points.points, selected_vars):
                     self.data = None
                     self.fail('The existing file is not valid.')
-
+                    return 
                 self.data.metadata = {'start time': self.in_data.start_time, 'var IDs': selected_vars,
                                       'language': self.in_data.language, 'points': points}
                 self.success('Reload existing file.')
@@ -1044,12 +1069,11 @@ class InterpolateOnPointsNode(TwoInOneOutNode):
                                                                               's are' if nb_inside > 1 else ' is'))
 
 
-class InterpolateAlongLinesNode(TwoInOneOutNode):
+class InterpolateAlongLinesNode(DoubleInputNode):
     def __init__(self, index):
         super().__init__(index)
         self.category = 'Calculations'
         self.label = 'Interpolate\nalong\nLines'
-        self.out_port.data_type = ('lines csv',)
         self.first_in_port.data_type = ('slf',)
         self.second_in_port.data_type = ('polyline 2d',)
         self.in_data = None
@@ -1143,13 +1167,7 @@ class InterpolateAlongLinesNode(TwoInOneOutNode):
 
         if not self.overwrite:
             if os.path.exists(filename):
-                try:
-                    with open(filename, 'r') as f:
-                        pass
-                except PermissionError:
-                    self.fail('Access denied when reloading existing file.')
-                self.data = CSVData(self.in_data.filename, None, filename)
-                self.success('Reload existing file.')
+                self.success('File already exists.')
                 return
         try:
             with open(filename, 'w') as f:
@@ -1170,12 +1188,11 @@ class InterpolateAlongLinesNode(TwoInOneOutNode):
             self.fail(message)
 
 
-class ProjectLinesNode(TwoInOneOutNode):
+class ProjectLinesNode(DoubleInputNode):
     def __init__(self, index):
         super().__init__(index)
         self.category = 'Calculations'
         self.label = 'Project\nLines'
-        self.out_port.data_type = ('proj lines csv',)
         self.first_in_port.data_type = ('slf',)
         self.second_in_port.data_type = ('polyline 2d',)
         self.data = None
@@ -1308,13 +1325,7 @@ class ProjectLinesNode(TwoInOneOutNode):
 
         if not self.overwrite:
             if os.path.exists(filename):
-                try:
-                    with open(filename, 'r') as f:
-                        pass
-                except PermissionError:
-                    self.fail('Access denied when reloading existing file.')
-                self.data = CSVData(input_data.filename, None, filename)
-                self.success('Reload existing file.')
+                self.success('File already exists.')
                 return
         try:
             with open(filename, 'w') as f:
@@ -1366,9 +1377,8 @@ class ProjectLinesNode(TwoInOneOutNode):
             for u, row in MeshInterpolator.project_lines(input_stream, selected_vars, time_index, indices_nonempty,
                                                          max_distance, reference, line_interpolators):
                 self.data.add_row(row)
-
-            self.progress_bar.setValue(100 * (u+1) / nb_lines)
-            QApplication.processEvents()
+                self.progress_bar.setValue(100 * (u+1) / nb_lines)
+                QApplication.processEvents()
 
         self.data.write(filename, self.scene().csv_separator)
         self.success('Output saved to %s\n{} line{} the mesh continuously.'.format(filename, nb_nonempty,

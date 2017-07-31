@@ -6,7 +6,7 @@ from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 
 from slf import Serafin
-from gui.util import TemporalPlotViewer, MapViewer, MapCanvas, OutputThread,\
+from gui.util import PointPlotViewer, MapViewer, MapCanvas, OutputThread,\
     VariableTable, OutputProgressDialog, LoadMeshDialog, SerafinInputTab, TelToolWidget, \
     PointAttributeTable, PointLabelEditor, open_points, save_dialog, read_csv
 
@@ -383,9 +383,9 @@ class InputTab(SerafinInputTab):
         self.parent.tab.setTabEnabled(1, True)
 
 
-class ImageTab(TemporalPlotViewer):
+class ImageTab(PointPlotViewer):
     def __init__(self, inputTab):
-        super().__init__('point')
+        super().__init__()
         self.input = inputTab
 
         self.has_map = False
@@ -394,15 +394,12 @@ class ImageTab(TemporalPlotViewer):
 
         self.var_IDs = []
         self.current_var = ''
-        self.current_columns = ('Point 1',)
-
         self.openAttributes = QAction('Attributes\nTable', self,
                                       icon=self.style().standardIcon(QStyle.SP_FileDialogListView),
                                       triggered=self.openAttributesEvent)
         self.openAttributes_short = QAction('Attributes Table', self,
                                             icon=self.style().standardIcon(QStyle.SP_FileDialogListView),
                                             triggered=self.openAttributesEvent)
-
         self.locatePoints = QAction('Locate points\non map', self,
                                     icon=self.style().standardIcon(QStyle.SP_DialogHelpButton),
                                     triggered=self.map_event)
@@ -412,13 +409,10 @@ class ImageTab(TemporalPlotViewer):
         self.input.map.closeEvent = self.enable_locate
         self.input.attribute_table.closeEvent = self.enable_attribute
 
-        self.selectVariable = QAction('Select\nvariable', self, triggered=self.selectVariableEvent,
-                                      icon=self.style().standardIcon(QStyle.SP_FileDialogDetailedView))
-
         self.toolBar.addAction(self.locatePoints)
         self.toolBar.addAction(self.openAttributes)
         self.toolBar.addSeparator()
-        self.toolBar.addAction(self.selectVariable)
+        self.toolBar.addAction(self.select_variable)
         self.toolBar.addAction(self.selectColumnsAct)
         self.toolBar.addAction(self.editColumnNamesAct)
         self.toolBar.addAction(self.editColumColorAct)
@@ -431,7 +425,7 @@ class ImageTab(TemporalPlotViewer):
         self.pointsMenu = QMenu('&Data', self)
         self.pointsMenu.addAction(self.openAttributes_short)
         self.pointsMenu.addSeparator()
-        self.pointsMenu.addAction(self.selectVariable)
+        self.pointsMenu.addAction(self.select_variable_short)
         self.pointsMenu.addAction(self.selectColumnsAct_short)
         self.pointsMenu.addAction(self.editColumnNamesAct_short)
         self.pointsMenu.addAction(self.editColumColorAct_short)
@@ -466,30 +460,6 @@ class ImageTab(TemporalPlotViewer):
         if value == QDialog.Rejected:
             return
         msg.getLabels(self.column_labels)
-        self.replot()
-
-    def _defaultYLabel(self):
-        word = {'fr': 'de', 'en': 'of'}[self.language]
-        return 'Values %s %s' % (word, self.current_var)
-
-    def selectVariableEvent(self):
-        msg = QDialog()
-        combo = QComboBox()
-        for var in self.var_IDs:
-            combo.addItem(var)
-        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel,
-                                   Qt.Horizontal, msg)
-        buttons.accepted.connect(msg.accept)
-        buttons.rejected.connect(msg.reject)
-        vlayout = QVBoxLayout()
-        vlayout.addWidget(combo)
-        vlayout.addWidget(buttons)
-        msg.setLayout(vlayout)
-        msg.setWindowTitle('Select a variable to plot')
-        msg.resize(300, 150)
-        msg.exec_()
-        self.current_var = combo.currentText()
-        self.current_ylabel = self._defaultYLabel()
         self.replot()
 
     def getData(self, var_IDs, point_indices):
