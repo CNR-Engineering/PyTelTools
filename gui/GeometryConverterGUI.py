@@ -1,12 +1,12 @@
-import sys
+import logging
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
-
-import logging
 import shapefile
+import sys
+
+import geom.conversion as convert
 import geom.Shapefile as shp
 from geom.transformation import load_transformation_map
-import geom.conversion as convert
 from gui.util import QPlainTextEditLogger, TelToolWidget
 
 

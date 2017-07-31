@@ -1,20 +1,20 @@
 import sys
-from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
+from PyQt5.QtWidgets import *
 
-from gui.MaxMinMeanGUI import MaxMinMeanGUI
-from gui.ExtractVariablesGUI import ExtractVariablesGUI
-
-from gui.PointsGUI import PointsGUI
-from gui.LinesGUI import LinesGUI
-from gui.ProjectLinesGUI import ProjectLinesGUI
-from gui.ComputeVolumeGUI import ComputeVolumeGUI
+from conf.settings import LANG, CSV_SEPARATOR
+from gui.CalculatorGUI import CalculatorGUI
 from gui.CompareResultsGUI import CompareResultsGUI
 from gui.ComputeFluxGUI import ComputeFluxGUI
-from gui.ProjectMeshGUI import ProjectMeshGUI
+from gui.ComputeVolumeGUI import ComputeVolumeGUI
 from gui.ConfigTransformation import TransformationMap
+from gui.ExtractVariablesGUI import ExtractVariablesGUI
 from gui.GeometryConverterGUI import FileConverterGUI
-from gui.CalculatorGUI import CalculatorGUI
+from gui.LinesGUI import LinesGUI
+from gui.MaxMinMeanGUI import MaxMinMeanGUI
+from gui.PointsGUI import PointsGUI
+from gui.ProjectLinesGUI import ProjectLinesGUI
+from gui.ProjectMeshGUI import ProjectMeshGUI
 
 
 class GlobalConfigDialog(QDialog):
@@ -118,8 +118,8 @@ class MainPanel(QWidget):
 class MyMainWindow(QWidget):
     def __init__(self):
         super().__init__()
-        self.language = 'fr'
-        self.csv_separator = ';'
+        self.language = LANG
+        self.csv_separator = CSV_SEPARATOR
         self.panel = MainPanel(self)
 
         config_button = QPushButton('Global\nConfiguration')

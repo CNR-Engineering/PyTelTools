@@ -2,6 +2,8 @@ from copy import deepcopy
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
+
+from conf.settings import CSV_SEPARATOR, LANG, SCENE_WIDTH, SCENE_HEIGHT
 import workflow.multi_func as worker
 from workflow.MultiNode import Box, MultiLink
 from workflow.multi_nodes import *
@@ -80,10 +82,10 @@ class MultiScene(QGraphicsScene):
         super().__init__()
         self.table = table
 
-        self.language = 'fr'
-        self.csv_separator = ';'
+        self.language = LANG
+        self.csv_separator = CSV_SEPARATOR
 
-        self.setSceneRect(QRectF(0, 0, 2400, 1000))
+        self.setSceneRect(QRectF(0, 0, SCENE_WIDTH, SCENE_HEIGHT))
         self.transform = QTransform()
 
         self.nodes = {0: MultiLoadSerafin2DNode(0)}

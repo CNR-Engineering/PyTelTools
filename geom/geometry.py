@@ -3,6 +3,7 @@ Geometrical objects
 """
 
 import numpy as np
+
 from shapely.geometry import Point, MultiPolygon, LineString as OpenPolyline, Polygon as ClosedPolyline
 
 

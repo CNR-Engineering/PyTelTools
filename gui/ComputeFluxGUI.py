@@ -1,15 +1,13 @@
-import sys
-import logging
 import datetime
-import numpy as np
-
+import logging
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
+import sys
 
-from slf import Serafin
-from slf.flux import FluxCalculator
 from gui.util import FluxPlotViewer, LineMapCanvas, MapViewer, OutputThread, \
     OutputProgressDialog, LoadMeshDialog, SerafinInputTab, TelToolWidget, save_dialog, open_polylines, read_csv
+from slf.flux import FluxCalculator
+from slf import Serafin
 
 
 class FluxCalculatorThread(OutputThread):

@@ -2,7 +2,6 @@
 Similarity transformations between multiple coordinate systems
 """
 
-
 import numpy as np
 import scipy.optimize
 

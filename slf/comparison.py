@@ -3,6 +3,7 @@ Comparison between two .slf files with identical meshes
 """
 
 import numpy as np
+
 from slf.interpolation import  Interpolator
 from slf.volume import TruncatedTriangularPrisms
 

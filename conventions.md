@@ -8,12 +8,15 @@ Conventions
 * comment language: English
 
 ## Module imports
-No import with * except for PyQt5 :
+Avoid any import with * except for PyQt5:
 ```python
-from PyQt5.QtWidgets import *
-from PyQt5.QtGui import *
 from PyQt5.QtCore import *
+from PyQt5.QtGui import *
+from PyQt5.QtWidgets import *
 ```
+
+### Order
+Sort import lines and lists by alphabetic order.
 
 ### Common abbreviations
 ```python

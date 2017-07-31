@@ -2,11 +2,12 @@
 Simple computation/evaluation of variable values in .slf
 """
 
-import numpy as np
 import logging
+import numpy as np
 import re
 import shapefile
 from shapely.geometry import Point
+
 from slf import Serafin
 from slf.variables import get_available_variables, get_necessary_equations, do_calculation
 

@@ -1,14 +1,13 @@
-import sys
-import os
+import datetime
 import logging
-
-from PyQt5.QtWidgets import *
+import numpy as np
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
-import datetime
+from PyQt5.QtWidgets import *
 import shapely
+import struct
+import os
 
-import numpy as np
 import matplotlib
 matplotlib.use('Qt5Agg')
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
@@ -20,17 +19,16 @@ from matplotlib import cm
 import matplotlib.lines as mlines
 from matplotlib.colors import Normalize, colorConverter
 from mpl_toolkits.axes_grid1 import make_axes_locatable
-import struct
 
+from conf.settings import CSV_SEPARATOR, LANG
 from geom import BlueKenue, Shapefile
-from slf import Serafin
-from slf.datatypes import SerafinData
-from slf.volume import TruncatedTriangularPrisms
-from slf.flux import TriangularVectorField
 from slf.comparison import ReferenceMesh
+from slf.datatypes import SerafinData
+from slf.flux import TriangularVectorField
 from slf.interpolation import MeshInterpolator
 import slf.misc as operations
-from slf.volume import VolumeCalculator
+from slf import Serafin
+from slf.volume import TruncatedTriangularPrisms, VolumeCalculator
 
 
 def test_open(filename):
@@ -315,8 +313,8 @@ class TelToolWidget(QWidget):
         self.parent = parent
         self.input = None
         if parent is None:
-            self.language = 'fr'
-            self.csv_separator = ';'
+            self.language = LANG
+            self.csv_separator = CSV_SEPARATOR
         else:
             self.language = parent.language
             self.csv_separator = parent.csv_separator

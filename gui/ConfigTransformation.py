@@ -1,8 +1,8 @@
 import numpy as np
-import sys
-from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
+from PyQt5.QtWidgets import *
+import sys
 
 from geom.transformation import Transformation, is_connected, transformation_optimization as optimize
 

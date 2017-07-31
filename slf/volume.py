@@ -5,9 +5,11 @@ Volume calculations in polygons
 
 import numpy as np
 import shapely.geometry as geom
+
+from conf.settings import CSV_SEPARATOR
+from geom import geometry
 from slf.interpolation import Interpolator
 from slf.mesh2D import Mesh2D
-from geom import geometry
 
 
 class TruncatedTriangularPrisms(Mesh2D):
@@ -316,7 +318,7 @@ class VolumeCalculator:
                 header.append(name)
         return header
 
-    def write_csv(self, result, output_stream, separator=';'):
+    def write_csv(self, result, output_stream, separator=CSV_SEPARATOR):
         output_stream.write(separator.join(self.get_csv_header()))
         output_stream.write('\n')
 

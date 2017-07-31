@@ -1,14 +1,13 @@
-import sys
-import logging
 import datetime
-
-from PyQt5.QtWidgets import *
+import logging
 from PyQt5.QtCore import *
+from PyQt5.QtWidgets import *
+import sys
 
-from slf import Serafin
 from gui.util import PointPlotViewer, MapViewer, MapCanvas, OutputThread,\
     VariableTable, OutputProgressDialog, LoadMeshDialog, SerafinInputTab, TelToolWidget, \
     PointAttributeTable, PointLabelEditor, open_points, save_dialog, read_csv
+from slf import Serafin
 
 
 class WriteCSVProcess(OutputThread):

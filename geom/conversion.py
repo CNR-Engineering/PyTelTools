@@ -3,11 +3,12 @@ File format converter for geometrical objects
 """
 
 import numpy as np
-import struct
-import geom.BlueKenue as bk
-import geom.Shapefile as shp
-from geom.geometry import Polyline
 import shapefile
+import struct
+
+import geom.BlueKenue as bk
+from geom.geometry import Polyline
+import geom.Shapefile as shp
 
 
 class GeomFileConverter:

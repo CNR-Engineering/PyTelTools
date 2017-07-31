@@ -1,14 +1,14 @@
-import sys
-import logging
 import datetime
-from PyQt5.QtWidgets import *
-from PyQt5.QtCore import *
 from itertools import islice, cycle
+import logging
+import sys
+from PyQt5.QtCore import *
+from PyQt5.QtWidgets import *
 
-from slf import Serafin
 from gui.util import MapViewer, LineMapCanvas, QPlainTextEditLogger, TelToolWidget, open_polylines, save_dialog,\
     VariableTable, OutputProgressDialog, LoadMeshDialog, \
     SimpleTimeDateSelection, OutputThread, ProjectLinesPlotViewer, SerafinInputTab
+from slf import Serafin
 
 
 class WriteCSVProcess(OutputThread):

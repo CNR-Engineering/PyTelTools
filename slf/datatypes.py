@@ -1,5 +1,7 @@
 from copy import deepcopy
 import datetime
+
+from conf.settings import CSV_SEPARATOR
 from slf import Serafin
 
 
@@ -89,7 +91,7 @@ class SerafinData:
 
 
 class CSVData:
-    def __init__(self, filename, header=None, out_name='', separator=';'):
+    def __init__(self, filename, header=None, out_name='', separator=CSV_SEPARATOR):
         self.filename = filename
         self.out_name = ''
         self.metadata = {}

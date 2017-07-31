@@ -1,16 +1,16 @@
-import sys
 import datetime
+import logging
 from PyQt5.QtWidgets import *
 from PyQt5.QtGui import *
 from PyQt5.QtCore import *
+import sys
 
-import logging
-from slf import Serafin
-from slf.variables import get_available_variables, \
-    do_calculations_in_frame, get_necessary_equations, get_US_equation, add_US
 from gui.util import TableWidgetDragRows, VariableTable, QPlainTextEditLogger, FallVelocityMessage, FrictionLawMessage, \
     TimeRangeSlider, DoubleSliderBox, OutputProgressDialog, OutputThread, SerafinInputTab, \
     TelToolWidget, save_dialog
+from slf import Serafin
+from slf.variables import get_available_variables, \
+    do_calculations_in_frame, get_necessary_equations, get_US_equation, add_US
 
 
 class ExtractVariablesThread(OutputThread):

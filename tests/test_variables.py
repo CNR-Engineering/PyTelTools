@@ -2,9 +2,10 @@
 Unittest for slf.variables module
 """
 
-
 import unittest
+
 from slf.variables import *
+
 
 equation_name = lambda eqs: list(map(lambda x: x.output.ID(), eqs))
 

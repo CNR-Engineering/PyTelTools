@@ -3,6 +3,7 @@ Barycentric interpolation in triangles
 """
 
 import numpy as np
+
 from slf.mesh2D import Mesh2D
 
 

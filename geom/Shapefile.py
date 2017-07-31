@@ -2,11 +2,12 @@
 Read and write .shp files
 """
 
-import os
 import numpy as np
+import os
 import shapefile
-from .geometry import Polyline
 from struct import pack, error
+
+from .geometry import Polyline
 
 
 def get_shape_type(input_filename):

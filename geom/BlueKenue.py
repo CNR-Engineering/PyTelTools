@@ -3,6 +3,7 @@ Read and write .i2s/.i3s/.xyz files
 """
 
 import numpy as np
+
 from .geometry import Polyline
 
 

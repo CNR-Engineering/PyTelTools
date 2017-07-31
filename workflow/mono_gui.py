@@ -1,3 +1,4 @@
+from conf.settings import CSV_SEPARATOR, LANG, SCENE_WIDTH, SCENE_HEIGHT
 from workflow.Node import Port, Box, Link
 from workflow.nodes_io import *
 from workflow.nodes_op import *
@@ -71,10 +72,10 @@ class MonoScene(QGraphicsScene):
     def __init__(self):
         super().__init__()
 
-        self.language = 'fr'
-        self.csv_separator = ';'
+        self.language = LANG
+        self.csv_separator = CSV_SEPARATOR
 
-        self.setSceneRect(QRectF(0, 0, 2400, 1000))
+        self.setSceneRect(QRectF(0, 0, SCENE_WIDTH, SCENE_HEIGHT))
         self.transform = QTransform()
         self.selectionChanged.connect(self.selection_changed)
 

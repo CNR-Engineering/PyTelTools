@@ -1,8 +1,7 @@
-import sys
-from PyQt5.QtWidgets import *
-from PyQt5.QtCore import *
-
 import numpy as np
+from PyQt5.QtCore import *
+from PyQt5.QtWidgets import *
+import sys
 
 from gui.util import PlotViewer, MapViewer, PolygonMapCanvas, ColorMapCanvas, LoadMeshDialog, \
     TimeSliderIndexOnly as TimeSlider, SerafinInputTab, TelToolWidget, open_polygons

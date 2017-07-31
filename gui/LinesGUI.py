@@ -1,15 +1,14 @@
-import sys
-import logging
-
-from PyQt5.QtWidgets import *
-from PyQt5.QtCore import *
 from itertools import islice, cycle
+import logging
+from PyQt5.QtCore import *
+from PyQt5.QtWidgets import *
+import sys
 
-from slf import Serafin
-from slf.interpolation import MeshInterpolator
 from gui.util import MapViewer, LineMapCanvas, QPlainTextEditLogger, SerafinInputTab, TelToolWidget, OutputThread, \
     VariableTable, OutputProgressDialog, LoadMeshDialog, open_polylines,\
     MultiVarLinePlotViewer, MultiFrameLinePlotViewer, save_dialog
+from slf import Serafin
+from slf.interpolation import MeshInterpolator
 
 
 class WriteCSVProcess(OutputThread):

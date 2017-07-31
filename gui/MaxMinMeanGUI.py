@@ -1,14 +1,14 @@
-import sys
 import datetime
-from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
-
-import numpy as np
+from PyQt5.QtWidgets import *
 import logging
-from slf import Serafin
-import slf.misc as operations
+import numpy as np
+import sys
+
 from gui.util import VariableTable, QPlainTextEditLogger, save_dialog, \
     OutputProgressDialog, TimeRangeSlider, SerafinInputTab, TelToolWidget, OutputThread, ConditionDialog
+import slf.misc as operations
+from slf import Serafin
 
 
 class MaxMinMeanThread(OutputThread):

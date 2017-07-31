@@ -2,12 +2,11 @@
 Read/Write Serafin files and manipulate associated data
 """
 
-
-import struct
+import copy
+import logging
 import numpy as np
 import os
-import logging
-import copy
+import struct
 
 
 FLOAT_TYPE = {'f': np.float32, 'd': np.float64}

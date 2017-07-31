@@ -2,15 +2,15 @@
 Unittest for slf.variables module
 """
 
+import numpy as np
 import os
 
 HOME = os.path.expanduser('~')
 import unittest
-import numpy as np
 
-from slf import Serafin
 from geom.geometry import Polyline
 from slf.flux import FluxCalculator
+from slf import Serafin
 
 
 class TestHeader:

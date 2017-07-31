@@ -1,14 +1,14 @@
-import sys
 import os
-import struct
-from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
+from PyQt5.QtWidgets import *
+import sys
+import struct
 
-from slf import Serafin
-from slf.datatypes import SerafinData
-import slf.misc as op
 from geom import Shapefile
 from gui.util import OutputProgressDialog, OutputThread, TelToolWidget, test_open
+from slf.datatypes import SerafinData
+from slf import Serafin
+import slf.misc as operations
 from workflow.util import MultiLoadSerafinDialog, MultiSaveDialog, process_output_options
 
 
@@ -841,7 +841,7 @@ class EditorTab(QWidget):
     def __init__(self, input_tab):
         super().__init__()
         self.input = input_tab
-        self.pool = op.ComplexExpressionMultiPool()
+        self.pool = operations.ComplexExpressionMultiPool()
 
         self.add_expression_button = QPushButton('Add Expression')
         self.add_condition_button = QPushButton('Add Condition')

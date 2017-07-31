@@ -2,14 +2,14 @@
 Unittest for slf.volume module
 """
 
+import numpy as np
 import os
 
 HOME = os.path.expanduser('~')
 import unittest
-import numpy as np
 
-from slf import Serafin
 from geom.geometry import Polyline
+from slf import Serafin
 from slf.volume import VolumeCalculator
 
 

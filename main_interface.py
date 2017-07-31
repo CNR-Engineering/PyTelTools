@@ -1,6 +1,6 @@
+from PyQt5.QtWidgets import *
 import sys
 
-from PyQt5.QtWidgets import *
 from gui.MainWindow import MyMainWindow as GUIWindow
 from workflow.interface import ProjectWelcome
 

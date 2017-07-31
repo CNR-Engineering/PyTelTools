@@ -1,13 +1,12 @@
-import sys
-import logging
 import datetime
-
-from PyQt5.QtWidgets import *
+import logging
 from PyQt5.QtCore import *
-import slf.misc as operations
+from PyQt5.QtWidgets import *
+import sys
 
 from gui.util import LoadMeshDialog, OutputProgressDialog, OutputThread, \
     VariableTable, QPlainTextEditLogger, SerafinInputTab, TelToolWidget, save_dialog
+import slf.misc as operations
 from slf import Serafin
 
 

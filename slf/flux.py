@@ -4,6 +4,8 @@ Flux calculations across sections
 
 
 import numpy as np
+
+from conf.settings import CSV_SEPARATOR
 from slf.interpolation import Interpolator
 from slf.mesh2D import Mesh2D
 
@@ -253,7 +255,7 @@ class FluxCalculator:
             result.append(i_result)
         return result
 
-    def write_csv(self, result, output_stream, separator=';'):
+    def write_csv(self, result, output_stream, separator=CSV_SEPARATOR):
         output_stream.write('time')
         for name in self.section_names:
             output_stream.write(separator)
