@@ -24,3 +24,6 @@ $ source venv/bin/activate
 ```bash
 $ python main_interface.py
 ```
+
+## Configure
+Modify `conf/settings.py` to change default parameters.
