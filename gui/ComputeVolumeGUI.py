@@ -253,7 +253,7 @@ class InputTab(SerafinInputTab):
                                  QMessageBox.Ok)
             self.timeSampling.setText('1')
             return
-        if sampling_frequency < 1 or sampling_frequency > len(self.time):
+        if sampling_frequency < 1 or sampling_frequency > len(self.data.time):
             QMessageBox.critical(self, 'Error', 'The sampling frequency must be in the range [1; nbFrames]!',
                                  QMessageBox.Ok)
             self.timeSampling.setText('1')
