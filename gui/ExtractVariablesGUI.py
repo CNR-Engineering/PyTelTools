@@ -5,6 +5,7 @@ from PyQt5.QtGui import *
 from PyQt5.QtCore import *
 import sys
 
+from conf.settings import LOGGING_LEVEL
 from gui.util import TableWidgetDragRows, VariableTable, QPlainTextEditLogger, FallVelocityMessage, FrictionLawMessage, \
     TimeRangeSlider, DoubleSliderBox, OutputProgressDialog, OutputThread, SerafinInputTab, \
     TelToolWidget, save_dialog
@@ -582,7 +583,7 @@ class SubmitTab(QWidget):
         self.logTextBox = QPlainTextEditLogger(self)
         self.logTextBox.setFormatter(logging.Formatter('%(asctime)s - [%(levelname)s] - \n%(message)s'))
         logging.getLogger().addHandler(self.logTextBox)
-        logging.getLogger().setLevel(logging.INFO)
+        logging.getLogger().setLevel(LOGGING_LEVEL)
 
         # create a check box for output file format (simple or double precision)
         self.singlePrecisionBox = QCheckBox('Convert to SERAFIN \n(single precision)', self)

@@ -8,8 +8,6 @@ import shapely
 import struct
 import os
 
-import matplotlib
-matplotlib.use('Qt5Agg')
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT
 from matplotlib.figure import Figure
@@ -20,7 +18,7 @@ import matplotlib.lines as mlines
 from matplotlib.colors import Normalize, colorConverter
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
-from conf.settings import CSV_SEPARATOR, LANG
+from conf.settings import CSV_SEPARATOR, LANG, LOGGING_LEVEL
 from geom import BlueKenue, Shapefile
 from slf.comparison import ReferenceMesh
 from slf.datatypes import SerafinData
@@ -242,7 +240,7 @@ class SerafinInputTab(QWidget):
         self.logTextBox = QPlainTextEditLogger(self)
         self.logTextBox.setFormatter(logging.Formatter('%(asctime)s - [%(levelname)s] - \n%(message)s'))
         logging.getLogger().addHandler(self.logTextBox)
-        logging.getLogger().setLevel(logging.INFO)
+        logging.getLogger().setLevel(LOGGING_LEVEL)
 
         self.input_layout = QVBoxLayout()
         hlayout = QHBoxLayout()

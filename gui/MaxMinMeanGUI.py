@@ -5,6 +5,7 @@ import logging
 import numpy as np
 import sys
 
+from conf.settings import LOGGING_LEVEL
 from gui.util import VariableTable, QPlainTextEditLogger, save_dialog, \
     OutputProgressDialog, TimeRangeSlider, SerafinInputTab, TelToolWidget, OutputThread, ConditionDialog
 import slf.misc as operations
@@ -249,7 +250,7 @@ class MaxMinMeanTab(QWidget):
         self.logTextBox = QPlainTextEditLogger(self)
         self.logTextBox.setFormatter(logging.Formatter('%(asctime)s - [%(levelname)s] - \n%(message)s'))
         logging.getLogger().addHandler(self.logTextBox)
-        logging.getLogger().setLevel(logging.INFO)
+        logging.getLogger().setLevel(LOGGING_LEVEL)
 
         # create a check box for output file format (simple or double precision)
         self.singlePrecisionBox = QCheckBox('Convert to SERAFIN \n(single precision)', self)
@@ -461,7 +462,7 @@ class ArrivalDurationTab(QWidget):
         self.logTextBox = QPlainTextEditLogger(self)
         self.logTextBox.setFormatter(logging.Formatter('%(asctime)s - [%(levelname)s] - \n%(message)s'))
         logging.getLogger().addHandler(self.logTextBox)
-        logging.getLogger().setLevel(logging.INFO)
+        logging.getLogger().setLevel(LOGGING_LEVEL)
 
         # create a combo box for time unit
         self.unitBox = QComboBox()
@@ -723,7 +724,7 @@ class SynchMaxTab(QWidget):
         self.logTextBox = QPlainTextEditLogger(self)
         self.logTextBox.setFormatter(logging.Formatter('%(asctime)s - [%(levelname)s] - \n%(message)s'))
         logging.getLogger().addHandler(self.logTextBox)
-        logging.getLogger().setLevel(logging.INFO)
+        logging.getLogger().setLevel(LOGGING_LEVEL)
 
         # create a check box for output file format (simple or double precision)
         self.singlePrecisionBox = QCheckBox('Convert to SERAFIN \n(single precision)', self)

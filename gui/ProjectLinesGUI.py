@@ -5,6 +5,7 @@ import sys
 from PyQt5.QtCore import *
 from PyQt5.QtWidgets import *
 
+from conf.settings import LOGGING_LEVEL
 from gui.util import MapViewer, LineMapCanvas, QPlainTextEditLogger, TelToolWidget, open_polylines, save_dialog,\
     VariableTable, OutputProgressDialog, LoadMeshDialog, \
     SimpleTimeDateSelection, OutputThread, ProjectLinesPlotViewer, SerafinInputTab
@@ -281,7 +282,7 @@ class CSVTab(QWidget):
         self.logTextBox = QPlainTextEditLogger(self)
         self.logTextBox.setFormatter(logging.Formatter('%(asctime)s - [%(levelname)s] - \n%(message)s'))
         logging.getLogger().addHandler(self.logTextBox)
-        logging.getLogger().setLevel(logging.INFO)
+        logging.getLogger().setLevel(LOGGING_LEVEL)
 
     def _setLayout(self):
         mainLayout = QVBoxLayout()
