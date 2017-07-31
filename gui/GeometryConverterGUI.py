@@ -4,6 +4,7 @@ from PyQt5.QtCore import *
 import shapefile
 import sys
 
+from conf.settings import LOGGING_LEVEL
 import geom.conversion as convert
 import geom.Shapefile as shp
 from geom.transformation import load_transformation_map
@@ -59,7 +60,7 @@ class FileConverterInputTab(QWidget):
         self.logTextBox = QPlainTextEditLogger(self)
         self.logTextBox.setFormatter(logging.Formatter('%(asctime)s - [%(levelname)s] - \n%(message)s'))
         logging.getLogger().addHandler(self.logTextBox)
-        logging.getLogger().setLevel(logging.INFO)
+        logging.getLogger().setLevel(LOGGING_LEVEL)
 
     def _setLayout(self):
         mainLayout = QVBoxLayout()
@@ -281,7 +282,7 @@ class FileConverterOutputTab(QWidget):
         self.logTextBox = QPlainTextEditLogger(self)
         self.logTextBox.setFormatter(logging.Formatter('%(asctime)s - [%(levelname)s] - \n%(message)s'))
         logging.getLogger().addHandler(self.logTextBox)
-        logging.getLogger().setLevel(logging.INFO)
+        logging.getLogger().setLevel(LOGGING_LEVEL)
 
         # create a combo box for output file type
         self.outTypeBox = QComboBox()
