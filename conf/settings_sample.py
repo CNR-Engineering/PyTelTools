@@ -1,3 +1,5 @@
+import logging
+
 
 # Langage (for variables detection)
 LANG = 'fr'
@@ -10,3 +12,7 @@ CSV_SEPARATOR = ';'
 
 # Window size for workflow interface
 SCENE_WIDTH, SCENE_HEIGHT = (2400, 1000)
+
+# Logging level
+# logging.DEBUG, logging.INFO, logging.ERROR
+LOGGING_LEVEL = logging.INFO
