@@ -131,6 +131,9 @@ class Node(QGraphicsItem):
     def set_index(self, index):
         self._index = index
 
+    def name(self):
+        return ' '.join(self.label.split())
+
     def add_port(self, port):
         self.ports.append(port)
         port.setParentItem(self)
@@ -189,9 +192,6 @@ class Node(QGraphicsItem):
         menu = QMenu()
         menu.addAction(self.help_action)
         menu.exec_(event.screenPos())
-
-    def name(self):
-        return ' '.join(self.label.split())
 
     def get_option_panel(self):
         return QWidget()

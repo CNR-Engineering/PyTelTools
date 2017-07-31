@@ -25,7 +25,7 @@ NODES = {'Input/Output': {'Load Serafin 2D': LoadSerafin2DNode, 'Load Serafin 3D
                           'Interpolate on Points': InterpolateOnPointsNode,
                           'Interpolate along Lines': InterpolateAlongLinesNode,
                           'Project Lines': ProjectLinesNode},
-         'Visualization': {'Show Mesh': ShowMeshNode,
+         'Visualization': {'Show Mesh': ShowMeshNode, 'Visualize Scalars': VisualizeScalarsValuesNode,
                            'Locate Open Lines': LocateOpenLinesNode, 'Locate Polygons': LocatePolygonsNode,
                            'Locate Points': LocatePointsNode,
                            'Volume Plot': VolumePlotNode, 'Flux Plot': FluxPlotNode, 'Point Plot': PointPlotNode,

@@ -1,16 +1,76 @@
 import datetime
 import os
-import matplotlib.pyplot as plt
 import numpy as np
+import matplotlib
+matplotlib.use('Qt5Agg')
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT
+import matplotlib.pyplot as plt
 from matplotlib import cm
 from mpl_toolkits.axes_grid1 import make_axes_locatable
-from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
+from PyQt5.QtGui import *
+from PyQt5.QtWidgets import *
 
-from gui.util import TemporalPlotViewer, VolumePlotViewer, FluxPlotViewer, PointPlotViewer, PointLabelEditor, read_csv
+from gui.util import TemporalPlotViewer, VolumePlotViewer, MapCanvas,\
+    FluxPlotViewer, PointPlotViewer, PointLabelEditor, SimpleTimeDateSelection, read_csv
 from slf import Serafin
 from slf.datatypes import SerafinData
 from slf.interpolation import MeshInterpolator
+
+
+def process_output_options(input_file, job_id, extension, suffix, in_source_folder, dir_path, double_name):
+    input_path, input_name = os.path.split(input_file)
+    input_name = input_name[:-4]
+    if double_name:
+        output_name = input_name + '_' + job_id + suffix + extension
+    else:
+        output_name = input_name + suffix + extension
+    if in_source_folder:
+        filename = os.path.join(input_path, output_name)
+    else:
+        filename = os.path.join(dir_path, output_name)
+    return filename
+
+
+def process_geom_output_options(input_file, job_id, extension, suffix, in_source_folder, dir_path, double_name):
+    input_path, input_name = os.path.split(input_file)
+    if double_name:
+        output_name = input_name + '_' + job_id + suffix + extension
+    else:
+        output_name = input_name + suffix + extension
+    if in_source_folder:
+        path = os.path.join(input_path, 'gis')
+        if not os.path.exists(path):
+            os.mkdir(path)
+        filename = os.path.join(path, output_name)
+    else:
+        filename = os.path.join(dir_path, output_name)
+    return filename
+
+
+def validate_output_options(options):
+    suffix = options[0]
+    in_source_folder = bool(int(options[1]))
+    dir_path = options[2]
+    double_name = bool(int(options[3]))
+    overwrite = bool(int(options[4]))
+    if not in_source_folder:
+        if not os.path.exists(dir_path):
+            return False, ('', True, '', False, True)
+    return True, (suffix, in_source_folder, dir_path, double_name, overwrite)
+
+
+def validate_input_options(options):
+    filename = options[0]
+    if not filename:
+        return False, ''
+    try:
+        with open(filename) as f:
+            pass
+    except FileNotFoundError:
+        return False, ''
+    return True, filename
 
 
 class ConfigureDialog(QDialog):
@@ -847,15 +907,9 @@ class VerticalProfilePlotViewer(TemporalPlotViewer):
                              'Greys', 'Purples', 'Blues', 'Greens', 'Oranges', 'Reds',
                              'YlOrBr', 'YlOrRd', 'OrRd', 'PuRd', 'RdPu', 'BuPu',
                              'GnBu', 'PuBu', 'YlGnBu', 'PuBuGn', 'BuGn', 'YlGn']
-
-        self.select_variable = QAction('Select\nvariable', self, triggered=self.selectVariableEvent,
-                                       icon=self.style().standardIcon(QStyle.SP_FileDialogDetailedView))
-        self.change_color_style_act = QAction('Change\ncolor style', self, triggered=self.change_color_style,
-                                              icon=self.style().standardIcon(QStyle.SP_DialogHelpButton))
-        self.change_color_range_act = QAction('Change\ncolor range', self, triggered=self.change_color_range,
-                                              icon=self.style().standardIcon(QStyle.SP_DialogHelpButton))
+        self.create_actions()
         self.current_columns = ('Point 1',)
-        self.toolBar.addAction(self.select_variable)
+        self.toolBar.addAction(self.select_variable_act)
         self.toolBar.addAction(self.selectColumnsAct)
         self.toolBar.addSeparator()
         self.toolBar.addAction(self.change_color_style_act)
@@ -865,14 +919,29 @@ class VerticalProfilePlotViewer(TemporalPlotViewer):
         self.toolBar.addAction(self.changeDateAct)
 
         self.data_menu = QMenu('&Data', self)
-        self.data_menu.addAction(self.select_variable)
-        self.data_menu.addAction(self.selectColumnsAct)
+        self.data_menu.addAction(self.select_variable_act_short)
+        self.data_menu.addAction(self.selectColumnsAct_short)
         self.menuBar.addMenu(self.data_menu)
 
         self.color_menu = QMenu('&Colors', self)
-        self.color_menu.addAction(self.change_color_style_act)
-        self.color_menu.addAction(self.change_color_range_act)
+        self.color_menu.addAction(self.change_color_style_act_short)
+        self.color_menu.addAction(self.change_color_range_act_short)
         self.menuBar.addMenu(self.color_menu)
+
+    def create_actions(self):
+        self.select_variable_act = QAction('Select\nvariable', self, triggered=self.select_variable,
+                                           icon=self.style().standardIcon(QStyle.SP_FileDialogDetailedView))
+        self.change_color_style_act = QAction('Change\ncolor style', self, triggered=self.change_color_style,
+                                              icon=self.style().standardIcon(QStyle.SP_DialogHelpButton))
+        self.change_color_range_act = QAction('Change\ncolor range', self, triggered=self.change_color_range,
+                                              icon=self.style().standardIcon(QStyle.SP_DialogHelpButton))
+
+        self.select_variable_act_short = QAction('Select variable', self, triggered=self.select_variable,
+                                                 icon=self.style().standardIcon(QStyle.SP_FileDialogDetailedView))
+        self.change_color_style_act_short = QAction('Change color style', self, triggered=self.change_color_style,
+                                                    icon=self.style().standardIcon(QStyle.SP_DialogHelpButton))
+        self.change_color_range_act_short = QAction('Change color range', self, triggered=self.change_color_range,
+                                                    icon=self.style().standardIcon(QStyle.SP_DialogHelpButton))
 
     def selectColumns(self, unique_selection=False):
         super().selectColumns(True)
@@ -886,7 +955,7 @@ class VerticalProfilePlotViewer(TemporalPlotViewer):
     def _defaultYLabel(self):
         return {'fr': 'Cote Z', 'en': 'Elevation Z'}[self.language]
 
-    def selectVariableEvent(self):
+    def select_variable(self):
         msg = QDialog()
         combo = QComboBox()
         combo.setFixedHeight(30)
@@ -1754,56 +1823,182 @@ class MultiSaveVerticalProfileDialog(MultiInterpolationPlotDialog):
         self.finishing_up(nb_successes)
 
 
-def process_output_options(input_file, job_id, extension, suffix, in_source_folder, dir_path, double_name):
-    input_path, input_name = os.path.split(input_file)
-    input_name = input_name[:-4]
-    if double_name:
-        output_name = input_name + '_' + job_id + suffix + extension
-    else:
-        output_name = input_name + suffix + extension
-    if in_source_folder:
-        filename = os.path.join(input_path, output_name)
-    else:
-        filename = os.path.join(dir_path, output_name)
-    return filename
+class ScalarMapCanvas(MapCanvas):
+    def __init__(self):
+        super().__init__(12, 12, 110)
+        self.cmap = None
+
+    def replot(self, mesh, values, color_style, limits):
+        self.fig.clear()   # remove the old color bar
+        self.axes = self.fig.add_subplot(111)
+        self.axes.set_aspect('equal', adjustable='box')
+
+        if limits is not None:
+            self.axes.tripcolor(mesh.x, mesh.y, mesh.ikle, values,
+                                cmap=color_style, vmin=limits[0], vmax=limits[1])
+        else:
+            self.axes.tripcolor(mesh.x, mesh.y, mesh.ikle, values, cmap=color_style)
+
+        # add colorbar
+        divider = make_axes_locatable(self.axes)
+        cax = divider.append_axes('right', size='5%', pad=0.2)
+        self.cmap = cm.ScalarMappable(cmap=color_style)
+        if limits is not None:
+            self.cmap.set_array(np.linspace(limits[0], limits[1], 1000))
+        else:
+            self.cmap.set_array(np.linspace(min(values), max(values), 1000))
+        self.fig.colorbar(self.cmap, cax=cax)
+        self.draw()
 
 
-def process_geom_output_options(input_file, job_id, extension, suffix, in_source_folder, dir_path, double_name):
-    input_path, input_name = os.path.split(input_file)
-    if double_name:
-        output_name = input_name + '_' + job_id + suffix + extension
-    else:
-        output_name = input_name + suffix + extension
-    if in_source_folder:
-        path = os.path.join(input_path, 'gis')
-        if not os.path.exists(path):
-            os.mkdir(path)
-        filename = os.path.join(path, output_name)
-    else:
-        filename = os.path.join(dir_path, output_name)
-    return filename
+class ScalarMapViewer(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.current_var = ''
+        self.time_index = -1
+        self.data = None
+        self.mesh = None
+        self.values = []
 
+        self.current_style = 'viridis'
+        self.color_limits = None
+        self.cmap = None
 
-def validate_output_options(options):
-    suffix = options[0]
-    in_source_folder = bool(int(options[1]))
-    dir_path = options[2]
-    double_name = bool(int(options[3]))
-    overwrite = bool(int(options[4]))
-    if not in_source_folder:
-        if not os.path.exists(dir_path):
-            return False, ('', True, '', False, True)
-    return True, (suffix, in_source_folder, dir_path, double_name, overwrite)
+        self.canvas = ScalarMapCanvas()
+        self.slider = SimpleTimeDateSelection()
+        self.slider.index.editingFinished.connect(self.select_frame)
+        self.slider.value.textChanged.connect(self.select_frame_dummy)
 
+        # add the the default tool bar
+        self.default_toolbar = NavigationToolbar2QT(self.canvas, self)
+        self.default_toolbar.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
+        self.second_toolbar = QToolBar()
+        self.second_toolbar.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
 
-def validate_input_options(options):
-    filename = options[0]
-    if not filename:
-        return False, ''
-    try:
-        with open(filename) as f:
-            pass
-    except FileNotFoundError:
-        return False, ''
-    return True, filename
+        self.color_styles = ['viridis', 'plasma', 'inferno', 'magma',
+                             'Greys', 'Purples', 'Blues', 'Greens', 'Oranges', 'Reds',
+                             'YlOrBr', 'YlOrRd', 'OrRd', 'PuRd', 'RdPu', 'BuPu',
+                             'GnBu', 'PuBu', 'YlGnBu', 'PuBuGn', 'BuGn', 'YlGn']
+
+        self.select_variable_act = QAction('Select\nvariable', self, triggered=self.select_variable,
+                                           icon=self.style().standardIcon(QStyle.SP_FileDialogDetailedView))
+        self.change_color_style_act = QAction('Change\ncolor style', self, triggered=self.change_color_style,
+                                              icon=self.style().standardIcon(QStyle.SP_DialogHelpButton))
+        self.change_color_range_act = QAction('Change\ncolor range', self, triggered=self.change_color_range,
+                                              icon=self.style().standardIcon(QStyle.SP_DialogHelpButton))
+        self.second_toolbar.addAction(self.select_variable_act)
+        self.second_toolbar.addSeparator()
+        self.second_toolbar.addAction(self.change_color_style_act)
+        self.second_toolbar.addAction(self.change_color_range_act)
+        self.second_toolbar.addSeparator()
+        self.second_toolbar.addWidget(self.slider)
+
+        self.scrollArea = QScrollArea()
+        self.scrollArea.setBackgroundRole(QPalette.Dark)
+        self.scrollArea.setWidget(self.canvas)
+
+        vlayout = QVBoxLayout()
+        vlayout.addWidget(self.default_toolbar)
+        vlayout.addWidget(self.second_toolbar)
+        vlayout.addWidget(self.scrollArea)
+        vlayout.setSpacing(0)
+        vlayout.setContentsMargins(0, 0, 0, 0)
+        self.setLayout(vlayout)
+
+        self.setWindowTitle('Scalar Map Viewer')
+        self.resize(self.sizeHint())
+
+    def select_variable(self):
+        msg = QDialog()
+        combo = QComboBox()
+        combo.setFixedHeight(30)
+        for var, name in zip(self.data.header.var_IDs, self.data.header.var_names):
+            combo.addItem(var + ' (%s)' % name.decode('utf-8').strip())
+        combo.setCurrentIndex(self.data.header.var_IDs.index(self.current_var))
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel,
+                                   Qt.Horizontal, msg)
+        buttons.accepted.connect(msg.accept)
+        buttons.rejected.connect(msg.reject)
+        vlayout = QVBoxLayout()
+        vlayout.setSpacing(10)
+        vlayout.addWidget(QLabel('Select a variable'))
+        vlayout.addWidget(combo)
+        vlayout.addStretch()
+        vlayout.addWidget(buttons)
+        msg.setLayout(vlayout)
+        msg.setWindowTitle('Select a variable to plot')
+        msg.resize(300, 150)
+        msg.exec_()
+        self.current_var = combo.currentText().split(' (')[0]
+        self.color_limits = None
+        self.replot(compute=True)
+
+    def change_color(self, style):
+        self.current_style = style
+        self.replot(compute=False)
+
+    def change_color_style(self):
+        msg = ColorMapStyleDialog(self)
+        if msg.exec_() == QDialog.Accepted:
+            self.change_color(msg.color_box.currentText())
+
+    def change_color_range(self):
+        value, ok = QInputDialog.getText(None, 'Change color bar range',
+                                         'Enter the new color range',
+                                         text=', '.join(map(lambda x: '{:+f}'.format(x),
+                                                            self.canvas.cmap.get_clim())))
+        if not ok:
+            return
+        try:
+            cmin, cmax = map(float, value.split(','))
+        except ValueError:
+            QMessageBox.critical(self, 'Error', 'Invalid input.', QMessageBox.Ok)
+            return
+
+        self.color_limits = (cmin, cmax)
+        self.replot(False)
+
+    def select_frame(self):
+        text = self.slider.index.text()
+        try:
+            index = int(text) - 1
+        except ValueError:
+            self.slider.index.setText(str(self.time_index)+1)
+            self.slider.slider.enterIndexEvent()
+            return
+        if 0 <= index < len(self.data.time):
+            self.time_index = index
+            self.replot(compute=True)
+
+    def select_frame_dummy(self, dummy):
+        text = self.slider.index.text()
+        try:
+            index = int(text) - 1
+        except ValueError:
+            self.slider.index.setText(str(self.time_index)+1)
+            self.slider.slider.enterIndexEvent()
+            return
+        if 0 <= index < len(self.data.time):
+            self.time_index = index
+            self.replot(compute=True)
+
+    def get_data(self, input_data, input_mesh):
+        self.data = input_data
+        self.mesh = input_mesh
+
+        self.color_limits = None
+        self.current_var = self.data.header.var_IDs[0]
+        self.slider.initTime(self.data.time, list(map(lambda x: x + self.data.start_time, self.data.time_second)))
+        self.replot(True)
+
+    def compute(self):
+        with Serafin.Read(self.data.filename, self.data.language) as input_stream:
+            input_stream.header = self.data.header
+            values = input_stream.read_var_in_frame(self.time_index, self.current_var)
+        return values
+
+    def replot(self, compute):
+        if compute:
+            self.values = self.compute()
+        self.canvas.replot(self.mesh, self.values, self.current_style, self.color_limits)
 

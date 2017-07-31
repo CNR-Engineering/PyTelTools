@@ -546,9 +546,9 @@ class SimpleTimeDateSelection(QWidget):
         self.value.setReadOnly(True)
         self.date.setReadOnly(True)
 
-        self.index.setMaximumWidth(30)
-        self.value.setMaximumWidth(80)
-        self.date.setMaximumWidth(120)
+        self.index.setMaximumWidth(50)
+        self.value.setMaximumWidth(100)
+        self.date.setMaximumWidth(150)
 
         mainLayout = QVBoxLayout()
         mainLayout.addWidget(self.slider)

@@ -1195,7 +1195,8 @@ class AddTransformationNode(OneInOneOutNode):
     def __init__(self, index):
         super().__init__(index)
         self.category = 'Basic operations'
-        self.label = 'Add\nTransformation'
+        self.label = 'Add\nTrans-\nformation'
+        self.name_ = 'Add Transformation'
         self.in_port.data_type = ('slf', 'slf 3d')
         self.out_port.data_type = ('slf geom', 'slf', 'slf 3d')
         self.filename = ''
@@ -1211,6 +1212,9 @@ class AddTransformationNode(OneInOneOutNode):
         self.to_box = None
         self.new_transformation = None
         self.new_options = tuple()
+
+    def name(self):
+        return self.name_
 
     def get_option_panel(self):
         self.new_transformation = self.transformation
