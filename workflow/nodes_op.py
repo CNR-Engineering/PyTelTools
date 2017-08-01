@@ -4,12 +4,13 @@ from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 
-from workflow.Node import Node, OneInOneOutNode, TwoInOneOutNode
-from gui.util import VariableTable, SimpleTimeDateSelection,\
-    TimeRangeSlider, DoubleSliderBox, FrictionLawMessage, FallVelocityMessage
+from gui.util import DoubleSliderBox, FallVelocityMessage, FrictionLawMessage, SimpleTimeDateSelection,\
+    TimeRangeSlider, VariableTable
+import slf.misc as operations
 from geom.transformation import load_transformation_map
 from slf.variables import get_available_variables, get_necessary_equations, add_US, get_US_equation
-import slf.misc as operations
+from workflow.Node import Node, OneInOneOutNode, TwoInOneOutNode
+from workflow.util import logger
 
 
 class SelectVariablesNode(OneInOneOutNode):
@@ -1003,7 +1004,7 @@ class BinaryOperatorNode(TwoInOneOutNode):
             self.fail('the input file is not 2D')
             return
         if input_data.filename == self.second_in_port.mother.parentItem().data.filename:
-            self.fail('the two input cannot be from the same file.')
+            self.fail('the two inputs cannot be from the same file.')
             return
 
         self.data = input_data.copy()
@@ -1231,9 +1232,7 @@ class AddTransformationNode(OneInOneOutNode):
         self.to_box = QComboBox()
         self.to_box.setFixedWidth(150)
 
-        print(self.filename)
         if self.transformation is not None:
-            print('yo')
             for label in self.new_transformation.labels:
                 self.from_box.addItem(label)
                 self.to_box.addItem(label)

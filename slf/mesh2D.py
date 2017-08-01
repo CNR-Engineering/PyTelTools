@@ -3,8 +3,8 @@ Representation of the 2D mesh in a 2D Serafin file.
 """
 
 import numpy as np
-from shapely.geometry import Polygon
 from rtree.index import Index
+from shapely.geometry import Polygon
 
 
 class Mesh2D:

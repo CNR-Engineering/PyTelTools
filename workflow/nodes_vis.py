@@ -74,6 +74,9 @@ class ShowMeshNode(SingleInputNode):
 
 
 class LocateOpenLinesNode(DoubleInputNode):
+    """!
+    Locate open lines on a mesh from a top view
+    """
     def __init__(self, index):
         super().__init__(index)
         self.category = 'Visualization'
@@ -149,6 +152,9 @@ class LocateOpenLinesNode(DoubleInputNode):
 
 
 class LocatePolygonsNode(DoubleInputNode):
+    """!
+    Locate polygons (closed lines) on a mesh from a top view
+    """
     def __init__(self, index):
         super().__init__(index)
         self.category = 'Visualization'
@@ -221,6 +227,9 @@ class LocatePolygonsNode(DoubleInputNode):
 
 
 class LocatePointsNode(DoubleInputNode):
+    """!
+    Locate points on a mesh from a top view
+    """
     def __init__(self, index):
         super().__init__(index)
         self.category = 'Visualization'
@@ -300,6 +309,9 @@ class LocatePointsNode(DoubleInputNode):
 
 
 class MultiVarLinePlotNode(DoubleInputNode):
+    """!
+    Plot multiple variables at a single frame on a longitudinal profile
+    """
     def __init__(self, index):
         super().__init__(index)
         self.category = 'Visualization'
@@ -460,6 +472,9 @@ class MultiVarLinePlotNode(DoubleInputNode):
 
 
 class MultiFrameLinePlotNode(DoubleInputNode):
+    """!
+    Plot a variable at multiple frames on a longitudinal profile
+    """
     def __init__(self, index):
         super().__init__(index)
         self.category = 'Visualization'
@@ -621,6 +636,9 @@ class MultiFrameLinePlotNode(DoubleInputNode):
 
 
 class ProjectLinesPlotNode(DoubleInputNode):
+    """!
+    Plot values along lines projected on a reference line
+    """
     def __init__(self, index):
         super().__init__(index)
         self.category = 'Visualization'
@@ -792,6 +810,9 @@ class ProjectLinesPlotNode(DoubleInputNode):
 
 
 class VerticalTemporalProfileNode(DoubleInputNode):
+    """!
+    Temporal plot of a scalar vertical profile
+    """
     def __init__(self, index):
         super().__init__(index)
         self.category = 'Visualization'
@@ -938,6 +959,9 @@ class VerticalTemporalProfileNode(DoubleInputNode):
 
 
 class VolumePlotNode(SingleInputNode):
+    """!
+    Temporal plot of volumes within polygons
+    """
     def __init__(self, index):
         super().__init__(index)
         self.category = 'Visualization'
@@ -993,6 +1017,9 @@ class VolumePlotNode(SingleInputNode):
 
 
 class FluxPlotNode(SingleInputNode):
+    """!
+    Temporal plot of fluxes through open lines
+    """
     def __init__(self, index):
         super().__init__(index)
         self.category = 'Visualization'
@@ -1048,6 +1075,9 @@ class FluxPlotNode(SingleInputNode):
 
 
 class PointPlotNode(SingleInputNode):
+    """!
+    Temporal plot of a variable at points
+    """
     def __init__(self, index):
         super().__init__(index)
         self.category = 'Visualization'
@@ -1103,6 +1133,9 @@ class PointPlotNode(SingleInputNode):
 
 
 class PointAttributeTableNode(SingleInputNode):
+    """!
+    Display attributes table of a points set
+    """
     def __init__(self, index):
         super().__init__(index)
         self.category = 'Visualization'

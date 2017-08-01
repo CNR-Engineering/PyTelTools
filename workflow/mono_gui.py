@@ -1,9 +1,14 @@
+import logging
+import sys
+from time import time
+
 from conf.settings import CSV_SEPARATOR, LANG, SCENE_WIDTH, SCENE_HEIGHT
 from workflow.Node import Port, Box, Link
 from workflow.nodes_io import *
 from workflow.nodes_op import *
 from workflow.nodes_calc import *
 from workflow.nodes_vis import *
+from workflow.util import logger
 
 
 NODES = {'Input/Output': {'Load Serafin 2D': LoadSerafin2DNode, 'Load Serafin 3D': LoadSerafin3DNode,
@@ -94,6 +99,7 @@ class MonoScene(QGraphicsScene):
 
         for node in self.nodes.values():
             self.addItem(node)
+            logger.debug("Node %s" % node)
 
     def reinit(self):
         self.clear()
@@ -186,6 +192,7 @@ class MonoScene(QGraphicsScene):
             yield link
 
     def load(self, filename):
+        logger.debug("Loading project in MONO: %s" % filename)
         self.clear()
         self.current_line = QGraphicsLineItem()
         self.addItem(self.current_line)
@@ -518,8 +525,11 @@ class MonoPanel(QWidget):
             QMessageBox.information(None, 'Success', 'Project saved.', QMessageBox.Ok)
 
     def run_all(self):
+        logger.debug("Start running project")
+        start_time = time()
         self.view.scene().run_all()
         self.view.scene().update()
+        logger.debug("Execution time %d s" % (time() - start_time))
 
     def configure_node(self):
         self.view.current_node.configure()
@@ -578,7 +588,7 @@ class NodeTree(QTreeWidget):
 
 
 class MonoWidget(QWidget):
-    def __init__(self, parent):
+    def __init__(self, parent=None, project_path=None):
         super().__init__()
         mono = MonoPanel(parent)
         node_list = NodeTree()
@@ -606,3 +616,25 @@ class MonoWidget(QWidget):
         mainLayout = QHBoxLayout()
         mainLayout.addWidget(splitter)
         self.setLayout(mainLayout)
+
+        if project_path is not None:
+            self.scene.load(project_path)
+            logger.debug("Start running project")
+            start_time = time()
+            self.scene.run_all()
+            logger.debug("Execution time %d s" %(time() - start_time))
+
+
+if __name__ == '__main__':
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-i", "--workspace", help="workflow project file")
+    parser.add_argument("-v", "--verbose", action="store_true")
+    parser.parse_args()
+    args = parser.parse_args()
+
+    if args.verbose: logger.setLevel(logging.DEBUG)
+
+    QApp = QCoreApplication.instance()
+    QApp = QApplication(sys.argv)
+    cmd = MonoWidget(project_path=args.workspace)

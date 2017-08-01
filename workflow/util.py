@@ -1,5 +1,5 @@
 import datetime
-import os
+import logging
 import numpy as np
 import matplotlib
 matplotlib.use('Qt5Agg')
@@ -8,15 +8,25 @@ from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT
 import matplotlib.pyplot as plt
 from matplotlib import cm
 from mpl_toolkits.axes_grid1 import make_axes_locatable
+import os
+from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 from PyQt5.QtWidgets import *
 
+from conf.settings import LOGGING_LEVEL
 from gui.util import TemporalPlotViewer, VolumePlotViewer, MapCanvas,\
     FluxPlotViewer, PointPlotViewer, PointLabelEditor, SimpleTimeDateSelection, read_csv
-from slf import Serafin
 from slf.datatypes import SerafinData
 from slf.interpolation import MeshInterpolator
+from slf import Serafin
+
+
+logger = logging.getLogger(__name__)
+hdlr = logging.StreamHandler()
+hdlr.setFormatter(logging.Formatter('%(asctime)s %(levelname)s %(message)s'))
+logger.addHandler(hdlr)
+logger.setLevel(LOGGING_LEVEL)
 
 
 def process_output_options(input_file, job_id, extension, suffix, in_source_folder, dir_path, double_name):
