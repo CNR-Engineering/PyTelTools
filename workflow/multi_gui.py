@@ -1,12 +1,15 @@
 from copy import deepcopy
-from PyQt5.QtWidgets import *
+import logging
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
+import sys
+from time import time
 
 from conf.settings import CSV_SEPARATOR, LANG, SCENE_WIDTH, SCENE_HEIGHT
 import workflow.multi_func as worker
 from workflow.MultiNode import Box, MultiLink
 from workflow.multi_nodes import *
+from workflow.util import logger
 
 
 NODES = {'Input/Output': {'Load Serafin 2D': MultiLoadSerafin2DNode, 'Load Serafin 3D': MultiLoadSerafin3DNode,
@@ -145,6 +148,7 @@ class MultiScene(QGraphicsScene):
             yield '|'.join(line)
 
     def load(self, filename):
+        logger.debug("Loading project in MULTI: %s" % filename)
         self.clear()
         self.has_input = False
         self.inputs = {}
@@ -509,8 +513,14 @@ class MultiTable(QTableWidget):
             self.item(self.node_to_row[node_id], fid).setBackground(self.red)
 
 
+class CmdMessage(QPlainTextEdit):
+    def appendPlainText(self, message):
+        super().appendPlainText(message)
+        logger.info(message)
+
+
 class MultiWidget(QWidget):
-    def __init__(self, parent):
+    def __init__(self, parent=None, project_path=None):
         super().__init__()
         self.parent = parent
         self.table = MultiTable()
@@ -522,9 +532,22 @@ class MultiWidget(QWidget):
         self.run_act = QAction('Run\n(F5)', self, triggered=self.run, shortcut='F5')
         self.init_toolbar()
 
-        self.message_box = QPlainTextEdit()
+        if project_path is not None:
+            self.message_box = CmdMessage()
+        else:
+            self.message_box = QPlainTextEdit()
         self.message_box.setReadOnly(True)
 
+        # right panel with table and message_box
+        right_panel = QSplitter(Qt.Vertical)
+        right_panel.addWidget(self.table)
+        right_panel.addWidget(self.message_box)
+        right_panel.setHandleWidth(10)
+        right_panel.setCollapsible(0, False)
+        right_panel.setCollapsible(1, False)
+        right_panel.setStretchFactor(1, 1)
+
+        # left panel
         left_panel = QWidget()
         layout = QVBoxLayout()
         layout.addWidget(self.toolbar)
@@ -532,14 +555,7 @@ class MultiWidget(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         left_panel.setLayout(layout)
 
-        right_panel = QWidget()
-        layout = QVBoxLayout()
-        layout.addWidget(self.table)
-        layout.addWidget(self.message_box)
-        layout.setContentsMargins(0, 0, 0, 0)
-        right_panel.setLayout(layout)
-
-        splitter = QSplitter()
+        splitter = QSplitter(Qt.Horizontal)
         splitter.addWidget(left_panel)
         splitter.addWidget(right_panel)
         splitter.setHandleWidth(10)
@@ -552,6 +568,10 @@ class MultiWidget(QWidget):
         self.setLayout(mainLayout)
 
         self.worker = worker.Workers()
+
+        if project_path is not None:
+            self.scene.load(project_path)
+            self.run()
 
     def init_toolbar(self):
         for act in [self.save_act, self.run_act]:
@@ -567,16 +587,19 @@ class MultiWidget(QWidget):
         if not self.scene.has_input:
             QMessageBox.critical(None, 'Error', 'Configure all input nodes before saving.', QMessageBox.Ok)
             return
-        self.parent.save()
+        if self.parent: self.parent.save()
         QMessageBox.information(None, 'Success', 'Project saved.', QMessageBox.Ok)
 
     def run(self):
+        logger.debug("Start running project")
+        start_time = time()
+
         if not self.scene.all_configured():
             QMessageBox.critical(None, 'Error', 'Configure all nodes first!', QMessageBox.Ok)
             return
 
         self.scene.prepare_to_run()
-        self.parent.save()
+        if self.parent: self.parent.save()
         self.setEnabled(False)
         csv_separator = self.scene.csv_separator
 
@@ -600,6 +623,8 @@ class MultiWidget(QWidget):
         self.message_box.appendPlainText('Done!')
         self.setEnabled(True)
         self.worker = worker.Workers()
+
+        logger.debug("Execution time %d s" % (time() - start_time))
 
     def _prepare_auxiliary_tasks(self):
         # auxiliary input tasks for N-1 type of double input nodes
@@ -716,3 +741,17 @@ class MultiWidget(QWidget):
 
         return nb_tasks
 
+
+if __name__ == '__main__':
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-i", "--workspace", help="workflow project file")
+    parser.add_argument("-v", "--verbose", action="store_true")
+    parser.parse_args()
+    args = parser.parse_args()
+
+    if args.verbose: logger.setLevel(logging.DEBUG)
+
+    QApp = QCoreApplication.instance()
+    QApp = QApplication(sys.argv)
+    cmd = MultiWidget(project_path=args.workspace)

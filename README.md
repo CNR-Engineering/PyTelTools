@@ -21,9 +21,27 @@ $ source venv/bin/activate
 ```
 
 ## Usage
+
+### Open interface
 ```bash
 $ python main_interface.py
+$ python outil_carto.py
 ```
+
+### Use command line for workflow
+**Load** a workflow project file in the **GUI** (in mono tab):
+```bash
+$ python workflow/interface.py -i path_to_workflow_project_file.txt
+```
+
+**Load** and **run** a workflow project from the **command line**:
+```bash
+$ python workflow/mono_gui.py -i path_to_workflow_project_file.txt
+$ python workflow/multi_gui.py -i path_to_workflow_project_file.txt
+```
+
+The argument `-h` provides a **help** message for the corresponding script and specify its **usage**.
+Output **verbosity** can be increased (debug mode) with `-v` argument.
 
 ## Configure
 Modify `conf/settings.py` to change default parameters.

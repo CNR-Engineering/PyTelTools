@@ -71,21 +71,27 @@ def fail_message(reason, node_name, job_id, second_job_id=''):
 
 def read_slf_2d(node_id, fid, filename, language, job_id):
     data = SerafinData(job_id, filename, language)
-    is_2d = data.read()
-    if not is_2d:
-        success, message = False, fail_message('file is not 2D', 'Load Serafin 2D', job_id)
-    else:
-        success, message = True, success_message('Load Serafin 2D', job_id)
+    try:
+        is_2d = data.read()
+        if not is_2d:
+            success, message = False, fail_message('file is not 2D', 'Load Serafin 2D', job_id)
+        else:
+            success, message = True, success_message('Load Serafin 2D', job_id)
+    except FileNotFoundError:
+        success, message = False, fail_message('file not found', 'Load Serafin 2D', job_id)
     return success, node_id, fid, data, message
 
 
 def read_slf_3d(node_id, fid, filename, language, job_id):
     data = SerafinData(job_id, filename, language)
-    is_2d = data.read()
-    if is_2d:
-        success, message = False, fail_message('file is not 3D', 'Load Serafin 3D', job_id)
-    else:
-        success, message = True, success_message('Load Serafin 3D', job_id)
+    try:
+        is_2d = data.read()
+        if is_2d:
+            success, message = False, fail_message('file is not 3D', 'Load Serafin 3D', job_id)
+        else:
+            success, message = True, success_message('Load Serafin 3D', job_id)
+    except FileNotFoundError:
+        success, message = False, fail_message('file not found', 'Load Serafin 3D', job_id)
     return success, node_id, fid, data, message
 
 

@@ -1,7 +1,11 @@
-import sys
+import logging
+import os.path
 from PyQt5.QtWidgets import *
+import sys
+
 from workflow.mono_gui import MonoWidget
 from workflow.multi_gui import MultiWidget
+from workflow.util import logger
 
 
 class ProjectWindow(QWidget):
@@ -155,11 +159,33 @@ if __name__ == '__main__':
     sys._excepthook = sys.excepthook
     sys.excepthook = exception_hook
 
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-i", "--workspace", help="workflow project file")
+    parser.add_argument("-v", "--verbose", action="store_true")
+    parser.parse_args()
+    args = parser.parse_args()
+
+    if args.verbose:
+        logger.setLevel(logging.DEBUG)
+
     app = QApplication(sys.argv)
     widget = ProjectWelcome()
-    widget.show()
+
+    loaded = False
+    if args.workspace is not None:
+        if os.path.exists(args.workspace):
+            window = widget.window
+            if window.load(args.workspace):
+                window.tab.setCurrentIndex(0)
+                window.showMaximized()
+                loaded = True
+            else:
+                QMessageBox.critical(None, 'Error', 'The project file is not valid.', QMessageBox.Ok)
+        else:
+            QMessageBox.critical(None, 'Error', "The project file '%s' could not be found." % args.workspace, QMessageBox.Ok)
+
+    if not loaded:
+        widget.show()
+
     app.exec_()
-
-
-
-

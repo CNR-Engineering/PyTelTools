@@ -12,7 +12,7 @@ from slf.datatypes import SerafinData, PointData, PolylineData
 from slf.interpolation import MeshInterpolator
 from slf.variables import do_calculations_in_frame
 from workflow.Node import Node, SingleInputNode, SingleOutputNode, OneInOneOutNode
-from workflow.util import LoadSerafinDialog, OutputOptionPanel, GeomOutputOptionPanel, \
+from workflow.util import LoadSerafinDialog, logger, OutputOptionPanel, GeomOutputOptionPanel, \
                           process_output_options, process_geom_output_options, \
                           validate_input_options, validate_output_options
 
@@ -837,7 +837,8 @@ class WriteLandXMLNode(SingleInputNode):
                          str(int(self.double_name)), str(int(self.overwrite))])
 
     def load(self, options):
-        print(options)
+        logger.debug("Calling WriteLandXMLNode.load with options:")
+        logger.debug(options)
         success, (suffix, in_source_folder, dir_path, double_name, overwrite) = validate_output_options(options)
         if success:
             self.state = Node.READY

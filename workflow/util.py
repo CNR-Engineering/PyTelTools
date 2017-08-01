@@ -1,16 +1,25 @@
 import datetime
-import os
+import logging
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib import cm
 from mpl_toolkits.axes_grid1 import make_axes_locatable
+import os
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 
+from conf.settings import LOGGING_LEVEL
 from gui.util import TemporalPlotViewer, VolumePlotViewer, FluxPlotViewer, PointPlotViewer, PointLabelEditor, read_csv
-from slf import Serafin
 from slf.datatypes import SerafinData
 from slf.interpolation import MeshInterpolator
+from slf import Serafin
+
+
+logger = logging.getLogger(__name__)
+hdlr = logging.StreamHandler()
+hdlr.setFormatter(logging.Formatter('%(asctime)s %(levelname)s %(message)s'))
+logger.addHandler(hdlr)
+logger.setLevel(LOGGING_LEVEL)
 
 
 class ConfigureDialog(QDialog):
@@ -1806,4 +1815,3 @@ def validate_input_options(options):
     except FileNotFoundError:
         return False, ''
     return True, filename
-
