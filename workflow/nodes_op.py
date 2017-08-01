@@ -1004,7 +1004,7 @@ class BinaryOperatorNode(TwoInOneOutNode):
             self.fail('the input file is not 2D')
             return
         if input_data.filename == self.second_in_port.mother.parentItem().data.filename:
-            self.fail('the two input cannot be from the same file.')
+            self.fail('the two inputs cannot be from the same file.')
             return
 
         self.data = input_data.copy()
