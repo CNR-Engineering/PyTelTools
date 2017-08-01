@@ -161,8 +161,8 @@ if __name__ == '__main__':
 
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument("-i", "--workspace", help="workflow project file")
-    parser.add_argument("-v", "--verbose", action="store_true")
+    parser.add_argument('-i', '--workspace', help='workflow project file')
+    parser.add_argument('-v', '--verbose', action='store_true')
     parser.parse_args()
     args = parser.parse_args()
 
@@ -183,7 +183,8 @@ if __name__ == '__main__':
             else:
                 QMessageBox.critical(None, 'Error', 'The project file is not valid.', QMessageBox.Ok)
         else:
-            QMessageBox.critical(None, 'Error', "The project file '%s' could not be found." % args.workspace, QMessageBox.Ok)
+            QMessageBox.critical(None, 'Error', "The project file '%s' could not be found." % args.workspace, 
+                                 QMessageBox.Ok)
 
     if not loaded:
         widget.show()

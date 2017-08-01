@@ -1868,12 +1868,12 @@ class PlotViewer(QWidget):
         self.current_ylabel = value
 
     def createMenus(self):
-        self.fileMenu = QMenu("&File", self)
+        self.fileMenu = QMenu('&File', self)
         self.fileMenu.addAction(self.saveAct)
         self.fileMenu.addSeparator()
         self.fileMenu.addAction(self.exitAct)
 
-        self.editMenu = QMenu("&Edit", self)
+        self.editMenu = QMenu('&Edit', self)
         self.editMenu.addAction(self.titleAct)
         self.editMenu.addAction(self.xLabelAct)
         self.editMenu.addAction(self.yLabelAct)

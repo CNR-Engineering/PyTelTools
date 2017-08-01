@@ -255,6 +255,7 @@ def scalar_to_xml(slf_name, slf_header, xml_name, scalar, time_index):
     @param <slf.Serafin.SerafinHeader> slf_header: input Serafin header
     @param <str> xml_name: output LandXML filename
     @param <str> scalar: variable to write
+    @param <int> time_index: the index of the frame (0-based)
     """
     with Serafin.Read(slf_name, slf_header.language) as slf:
         slf.header = slf_header

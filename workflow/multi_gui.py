@@ -148,7 +148,7 @@ class MultiScene(QGraphicsScene):
             yield '|'.join(line)
 
     def load(self, filename):
-        logger.debug("Loading project in MULTI: %s" % filename)
+        logger.debug('Loading project in MULTI: %s' % filename)
         self.clear()
         self.has_input = False
         self.inputs = {}
@@ -591,7 +591,7 @@ class MultiWidget(QWidget):
         QMessageBox.information(None, 'Success', 'Project saved.', QMessageBox.Ok)
 
     def run(self):
-        logger.debug("Start running project")
+        logger.debug('Start running project')
         start_time = time()
 
         if not self.scene.all_configured():
@@ -624,7 +624,7 @@ class MultiWidget(QWidget):
         self.setEnabled(True)
         self.worker = worker.Workers()
 
-        logger.debug("Execution time %d s" % (time() - start_time))
+        logger.debug('Execution time %d s' % (time() - start_time))
 
     def _prepare_auxiliary_tasks(self):
         # auxiliary input tasks for N-1 type of double input nodes
@@ -745,12 +745,13 @@ class MultiWidget(QWidget):
 if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument("-i", "--workspace", help="workflow project file")
-    parser.add_argument("-v", "--verbose", action="store_true")
+    parser.add_argument('-i', '--workspace', help='workflow project file')
+    parser.add_argument('-v', '--verbose', action='store_true')
     parser.parse_args()
     args = parser.parse_args()
 
-    if args.verbose: logger.setLevel(logging.DEBUG)
+    if args.verbose: 
+        logger.setLevel(logging.DEBUG)
 
     QApp = QCoreApplication.instance()
     QApp = QApplication(sys.argv)

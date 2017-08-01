@@ -837,7 +837,7 @@ class WriteLandXMLNode(SingleInputNode):
                          str(int(self.double_name)), str(int(self.overwrite))])
 
     def load(self, options):
-        logger.debug("Calling WriteLandXMLNode.load with options:")
+        logger.debug('Calling WriteLandXMLNode.load with options:')
         logger.debug(options)
         success, (suffix, in_source_folder, dir_path, double_name, overwrite) = validate_output_options(options)
         if success:

@@ -1,18 +1,17 @@
 import datetime
 import logging
 import numpy as np
-import matplotlib
-matplotlib.use('Qt5Agg')
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
-from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT
-import matplotlib.pyplot as plt
-from matplotlib import cm
-from mpl_toolkits.axes_grid1 import make_axes_locatable
 import os
-from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 from PyQt5.QtWidgets import *
+
+from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT
+from matplotlib import cm
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+import matplotlib.pyplot as plt
+import warnings
+warnings.filterwarnings('ignore', category=RuntimeWarning, module='matplotlib')
 
 from conf.settings import LOGGING_LEVEL
 from gui.util import TemporalPlotViewer, VolumePlotViewer, MapCanvas,\
@@ -23,9 +22,9 @@ from slf import Serafin
 
 
 logger = logging.getLogger(__name__)
-hdlr = logging.StreamHandler()
-hdlr.setFormatter(logging.Formatter('%(asctime)s %(levelname)s %(message)s'))
-logger.addHandler(hdlr)
+handler = logging.StreamHandler()
+handler.setFormatter(logging.Formatter('%(asctime)s %(levelname)s %(message)s'))
+logger.addHandler(handler)
 logger.setLevel(LOGGING_LEVEL)
 
 
@@ -1877,7 +1876,7 @@ class ScalarMapViewer(QWidget):
         self.canvas = ScalarMapCanvas()
         self.slider = SimpleTimeDateSelection()
         self.slider.index.editingFinished.connect(self.select_frame)
-        self.slider.value.textChanged.connect(self.select_frame_dummy)
+        self.slider.value.textChanged.connect(lambda text: self.select_frame())
 
         # add the the default tool bar
         self.default_toolbar = NavigationToolbar2QT(self.canvas, self)
@@ -1973,19 +1972,7 @@ class ScalarMapViewer(QWidget):
         try:
             index = int(text) - 1
         except ValueError:
-            self.slider.index.setText(str(self.time_index)+1)
-            self.slider.slider.enterIndexEvent()
-            return
-        if 0 <= index < len(self.data.time):
-            self.time_index = index
-            self.replot(compute=True)
-
-    def select_frame_dummy(self, dummy):
-        text = self.slider.index.text()
-        try:
-            index = int(text) - 1
-        except ValueError:
-            self.slider.index.setText(str(self.time_index)+1)
+            self.slider.index.setText(str(self.time_index+1))
             self.slider.slider.enterIndexEvent()
             return
         if 0 <= index < len(self.data.time):
@@ -1997,7 +1984,11 @@ class ScalarMapViewer(QWidget):
         self.mesh = input_mesh
 
         self.color_limits = None
-        self.current_var = self.data.header.var_IDs[0]
+        if 'B' in self.data.header.var_IDs:
+            self.current_var = 'B'
+        else:
+            self.current_var = self.data.header.var_IDs[0]
+
         self.slider.initTime(self.data.time, list(map(lambda x: x + self.data.start_time, self.data.time_second)))
         self.replot(True)
 
@@ -2012,3 +2003,112 @@ class ScalarMapViewer(QWidget):
             self.values = self.compute()
         self.canvas.replot(self.mesh, self.values, self.current_style, self.color_limits)
 
+
+class VectorMapCanvas(MapCanvas):
+    def __init__(self):
+        super().__init__(12, 12, 110)
+        self.cmap = None
+
+    def replot(self, mesh, values):
+        self.initFigure(mesh)
+        self.axes.quiver(mesh.x, mesh.y, values[0], values[1], color='Teal')
+        self.draw()
+
+
+class VectorMapViewer(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.current_couple = ('', '')
+        self.time_index = -1
+        self.data = None
+        self.couples = []
+        self.mesh = None
+        self.values = ([], [])
+
+        self.canvas = VectorMapCanvas()
+        self.slider = SimpleTimeDateSelection()
+        self.slider.index.editingFinished.connect(self.select_frame)
+        self.slider.value.textChanged.connect(lambda text: self.select_frame())
+
+        # add the the default tool bar
+        self.default_toolbar = NavigationToolbar2QT(self.canvas, self)
+        self.default_toolbar.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
+        self.second_toolbar = QToolBar()
+        self.second_toolbar.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
+
+        self.select_variable_act = QAction('Select\nvariable', self, triggered=self.select_variable,
+                                           icon=self.style().standardIcon(QStyle.SP_FileDialogDetailedView))
+        self.second_toolbar.addAction(self.select_variable_act)
+        self.second_toolbar.addSeparator()
+        self.second_toolbar.addWidget(self.slider)
+
+        self.scrollArea = QScrollArea()
+        self.scrollArea.setBackgroundRole(QPalette.Dark)
+        self.scrollArea.setWidget(self.canvas)
+
+        vlayout = QVBoxLayout()
+        vlayout.addWidget(self.default_toolbar)
+        vlayout.addWidget(self.second_toolbar)
+        vlayout.addWidget(self.scrollArea)
+        vlayout.setSpacing(0)
+        vlayout.setContentsMargins(0, 0, 0, 0)
+        self.setLayout(vlayout)
+
+        self.setWindowTitle('Vector Map Viewer')
+        self.resize(self.sizeHint())
+
+    def select_variable(self):
+        msg = QDialog()
+        combo = QComboBox()
+        combo.setFixedHeight(30)
+        for brother, sister in self.couples:
+            combo.addItem('(%s, %s)' % (brother, sister))
+        combo.setCurrentIndex(self.couples.index(self.current_couple))
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel,
+                                   Qt.Horizontal, msg)
+        buttons.accepted.connect(msg.accept)
+        buttons.rejected.connect(msg.reject)
+        vlayout = QVBoxLayout()
+        vlayout.setSpacing(10)
+        vlayout.addWidget(QLabel('Select a vector field'))
+        vlayout.addWidget(combo)
+        vlayout.addStretch()
+        vlayout.addWidget(buttons)
+        msg.setLayout(vlayout)
+        msg.setWindowTitle('Select a vector field to plot')
+        msg.resize(300, 150)
+        msg.exec_()
+        self.current_couple = combo.currentText()[1:-1].split(', ')
+        self.replot(compute=True)
+
+    def select_frame(self):
+        text = self.slider.index.text()
+        try:
+            index = int(text) - 1
+        except ValueError:
+            self.slider.index.setText(str(self.time_index+1))
+            self.slider.slider.enterIndexEvent()
+            return
+        if 0 <= index < len(self.data.time):
+            self.time_index = index
+            self.replot(compute=True)
+
+    def get_data(self, input_data, input_mesh, couples):
+        self.data = input_data
+        self.mesh = input_mesh
+        self.couples = couples
+        self.current_couple = self.couples[0]
+        self.slider.initTime(self.data.time, list(map(lambda x: x + self.data.start_time, self.data.time_second)))
+        self.replot(True)
+
+    def compute(self):
+        with Serafin.Read(self.data.filename, self.data.language) as input_stream:
+            input_stream.header = self.data.header
+            values = (input_stream.read_var_in_frame(self.time_index, self.current_couple[0]),
+                      input_stream.read_var_in_frame(self.time_index, self.current_couple[1]))
+        return values
+
+    def replot(self, compute):
+        if compute:
+            self.values = self.compute()
+        self.canvas.replot(self.mesh, self.values)

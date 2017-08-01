@@ -30,7 +30,8 @@ NODES = {'Input/Output': {'Load Serafin 2D': LoadSerafin2DNode, 'Load Serafin 3D
                           'Interpolate on Points': InterpolateOnPointsNode,
                           'Interpolate along Lines': InterpolateAlongLinesNode,
                           'Project Lines': ProjectLinesNode},
-         'Visualization': {'Show Mesh': ShowMeshNode, 'Visualize Scalars': VisualizeScalarsValuesNode,
+         'Visualization': {'Show Mesh': ShowMeshNode, 'Visualize Scalars': VisualizeScalarValuesNode,
+                           'Visualize Vectors': VisualizeVectorValuesNode,
                            'Locate Open Lines': LocateOpenLinesNode, 'Locate Polygons': LocatePolygonsNode,
                            'Locate Points': LocatePointsNode,
                            'Volume Plot': VolumePlotNode, 'Flux Plot': FluxPlotNode, 'Point Plot': PointPlotNode,
@@ -99,7 +100,7 @@ class MonoScene(QGraphicsScene):
 
         for node in self.nodes.values():
             self.addItem(node)
-            logger.debug("Node %s" % node)
+            logger.debug('Node %s' % node)
 
     def reinit(self):
         self.clear()
@@ -192,7 +193,7 @@ class MonoScene(QGraphicsScene):
             yield link
 
     def load(self, filename):
-        logger.debug("Loading project in MONO: %s" % filename)
+        logger.debug('Loading project in MONO: %s' % filename)
         self.clear()
         self.current_line = QGraphicsLineItem()
         self.addItem(self.current_line)
@@ -525,11 +526,11 @@ class MonoPanel(QWidget):
             QMessageBox.information(None, 'Success', 'Project saved.', QMessageBox.Ok)
 
     def run_all(self):
-        logger.debug("Start running project")
+        logger.debug('Start running project')
         start_time = time()
         self.view.scene().run_all()
         self.view.scene().update()
-        logger.debug("Execution time %d s" % (time() - start_time))
+        logger.debug('Execution time %d s' % (time() - start_time))
 
     def configure_node(self):
         self.view.current_node.configure()
@@ -619,21 +620,22 @@ class MonoWidget(QWidget):
 
         if project_path is not None:
             self.scene.load(project_path)
-            logger.debug("Start running project")
+            logger.debug('Start running project')
             start_time = time()
             self.scene.run_all()
-            logger.debug("Execution time %d s" %(time() - start_time))
+            logger.debug('Execution time %d s' % (time() - start_time))
 
 
 if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument("-i", "--workspace", help="workflow project file")
-    parser.add_argument("-v", "--verbose", action="store_true")
+    parser.add_argument('-i', '--workspace', help='workflow project file')
+    parser.add_argument('-v', '--verbose', action='store_true')
     parser.parse_args()
     args = parser.parse_args()
 
-    if args.verbose: logger.setLevel(logging.DEBUG)
+    if args.verbose: 
+        logger.setLevel(logging.DEBUG)
 
     QApp = QCoreApplication.instance()
     QApp = QApplication(sys.argv)

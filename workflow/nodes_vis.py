@@ -7,10 +7,12 @@ from PyQt5.QtWidgets import *
 
 from slf.mesh2D import Mesh2D
 from slf.interpolation import MeshInterpolator
+from slf.misc import detect_vector_couples
 from workflow.Node import Node, SingleInputNode, DoubleInputNode
-from workflow.util import ScalarMapViewer, MultiLoadSerafinDialog, MultiFigureSaveDialog, SimpleVolumePlotViewer, \
-    SimpleFluxPlotViewer, SimplePointPlotViewer, MultiSaveProjectLinesDialog, VerticalProfilePlotViewer, \
-    MultiSaveMultiVarLinePlotDialog, MultiSaveMultiFrameLinePlotDialog, MultiSaveVerticalProfileDialog
+from workflow.util import ScalarMapViewer, VectorMapViewer, MultiLoadSerafinDialog, MultiFigureSaveDialog, \
+    SimpleVolumePlotViewer, SimpleFluxPlotViewer, SimplePointPlotViewer, VerticalProfilePlotViewer, \
+    MultiSaveProjectLinesDialog, MultiSaveMultiVarLinePlotDialog, MultiSaveMultiFrameLinePlotDialog, \
+    MultiSaveVerticalProfileDialog
 from gui.util import MapCanvas, PolygonMapCanvas, LineMapCanvas, MapViewer, \
     PointAttributeTable, ProjectLinesPlotViewer, MultiVarLinePlotViewer, MultiFrameLinePlotViewer
 
@@ -71,6 +73,123 @@ class ShowMeshNode(SingleInputNode):
             self.map.canvas.draw()
         self.map.showMaximized()
         self.success()
+
+
+class VisualizeScalarValuesNode(SingleInputNode):
+    def __init__(self, index):
+        super().__init__(index)
+        self.category = 'Visualization'
+        self.label = 'Visualize\nScalars'
+        self.in_port.data_type = ('slf',)
+        self.plot_viewer = ScalarMapViewer()
+        self.state = Node.READY
+        self.has_plot = False
+
+    def configure(self, check=None):
+        if not self.in_port.has_mother():
+            QMessageBox.critical(None, 'Error', 'Connect and run the input before configure this node!', QMessageBox.Ok)
+            return
+        parent_node = self.in_port.mother.parentItem()
+        if parent_node.state != Node.SUCCESS:
+            if parent_node.ready_to_run():
+                parent_node.run()
+            else:
+                QMessageBox.critical(None, 'Error', 'Configure and run the input before configure this node!',
+                                     QMessageBox.Ok)
+                return
+            if parent_node.state != Node.SUCCESS:
+                QMessageBox.critical(None, 'Error', 'Configure and run the input before configure this node!',
+                                     QMessageBox.Ok)
+                return
+        if not parent_node.data.header.is_2d:
+            QMessageBox.critical(None, 'Error', 'The input file is not 2D!', QMessageBox.Ok)
+            return
+        if not self.has_plot:
+            self._prepare()
+        self.plot_viewer.showMaximized()
+        self.success()
+
+    def reconfigure(self):
+        super().reconfigure()
+        self.has_plot = False
+
+    def _prepare(self):
+        input_data = self.in_port.mother.parentItem().data
+        mesh = Mesh2D(input_data.header, False)
+        self.plot_viewer.get_data(input_data, mesh)
+        self.has_plot = True
+
+    def run(self):
+        success = super().run_upward()
+        if not success:
+            self.fail('input failed.')
+            return
+        if not self.has_plot:
+            self._prepare()
+        self.plot_viewer.showMaximized()
+
+
+class VisualizeVectorValuesNode(SingleInputNode):
+    def __init__(self, index):
+        super().__init__(index)
+        self.category = 'Visualization'
+        self.label = 'Visualize\nVectors'
+        self.in_port.data_type = ('slf',)
+        self.plot_viewer = VectorMapViewer()
+        self.state = Node.READY
+        self.has_plot = False
+
+    def configure(self, check=None):
+        if not self.in_port.has_mother():
+            QMessageBox.critical(None, 'Error', 'Connect and run the input before configure this node!', QMessageBox.Ok)
+            return
+        parent_node = self.in_port.mother.parentItem()
+        if parent_node.state != Node.SUCCESS:
+            if parent_node.ready_to_run():
+                parent_node.run()
+            else:
+                QMessageBox.critical(None, 'Error', 'Configure and run the input before configure this node!',
+                                     QMessageBox.Ok)
+                return
+            if parent_node.state != Node.SUCCESS:
+                QMessageBox.critical(None, 'Error', 'Configure and run the input before configure this node!',
+                                     QMessageBox.Ok)
+                return
+        if not parent_node.data.header.is_2d:
+            QMessageBox.critical(None, 'Error', 'The input file is not 2D!', QMessageBox.Ok)
+            return
+        if not self.has_plot:
+            if not self._prepare():
+                QMessageBox.critical(None, 'Error', 'No vector field available.', QMessageBox.Ok)
+                return
+        self.plot_viewer.showMaximized()
+        self.success()
+
+    def reconfigure(self):
+        super().reconfigure()
+        self.has_plot = False
+
+    def _prepare(self):
+        input_data = self.in_port.mother.parentItem().data
+        _, _, _, couples = detect_vector_couples(input_data.header.var_IDs, input_data.header.var_IDs)
+        if not couples:
+            return False
+        mesh = Mesh2D(input_data.header, False)
+        self.plot_viewer.get_data(input_data, mesh, couples)
+        self.has_plot = True
+        return True
+
+    def run(self):
+        success = super().run_upward()
+        if not success:
+            self.fail('input failed.')
+            return
+        if not self.has_plot:
+            if not self._prepare():
+                QMessageBox.critical(None, 'Error', 'No vector field available.', QMessageBox.Ok)
+                self.fail('No vector field available.')
+                return
+        self.plot_viewer.showMaximized()
 
 
 class LocateOpenLinesNode(DoubleInputNode):
@@ -1188,59 +1307,5 @@ class PointAttributeTableNode(SingleInputNode):
                                parent_node.data.attributes_decoded)
             self.has_table = True
         self.success()
-
-
-class VisualizeScalarsValuesNode(SingleInputNode):
-    def __init__(self, index):
-        super().__init__(index)
-        self.category = 'Visualization'
-        self.label = 'Visualize\nScalars'
-        self.in_port.data_type = ('slf',)
-        self.plot_viewer = ScalarMapViewer()
-        self.state = Node.READY
-        self.has_plot = False
-
-    def configure(self, check=None):
-        if not self.in_port.has_mother():
-            QMessageBox.critical(None, 'Error', 'Connect and run the input before configure this node!', QMessageBox.Ok)
-            return
-        parent_node = self.in_port.mother.parentItem()
-        if parent_node.state != Node.SUCCESS:
-            if parent_node.ready_to_run():
-                parent_node.run()
-            else:
-                QMessageBox.critical(None, 'Error', 'Configure and run the input before configure this node!',
-                                     QMessageBox.Ok)
-                return
-            if parent_node.state != Node.SUCCESS:
-                QMessageBox.critical(None, 'Error', 'Configure and run the input before configure this node!',
-                                     QMessageBox.Ok)
-                return
-        if not parent_node.data.header.is_2d:
-            QMessageBox.critical(None, 'Error', 'The input file is not 2D!', QMessageBox.Ok)
-            return
-        if not self.has_plot:
-            self._prepare()
-        self.plot_viewer.showMaximized()
-        self.success()
-
-    def reconfigure(self):
-        super().reconfigure()
-        self.has_plot = False
-
-    def _prepare(self):
-        input_data = self.in_port.mother.parentItem().data
-        mesh = Mesh2D(input_data.header, False)
-        self.plot_viewer.get_data(input_data, mesh)
-        self.has_plot = True
-
-    def run(self):
-        success = super().run_upward()
-        if not success:
-            self.fail('input failed.')
-            return
-        if not self.has_plot:
-            self._prepare()
-        self.plot_viewer.showMaximized()
 
 
