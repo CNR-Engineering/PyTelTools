@@ -30,11 +30,11 @@ logger.setLevel(LOGGING_LEVEL)
 
 def process_output_options(input_file, job_id, extension, suffix, in_source_folder, dir_path, double_name):
     input_path, input_name = os.path.split(input_file)
-    input_name = input_name[:-4]
+    input_rootname = os.path.splitext(input_name)[0]
     if double_name:
-        output_name = input_name + '_' + job_id + suffix + extension
+        output_name = input_rootname + '_' + job_id + suffix + extension
     else:
-        output_name = input_name + suffix + extension
+        output_name = input_rootname + suffix + extension
     if in_source_folder:
         filename = os.path.join(input_path, output_name)
     else:
@@ -44,10 +44,11 @@ def process_output_options(input_file, job_id, extension, suffix, in_source_fold
 
 def process_geom_output_options(input_file, job_id, extension, suffix, in_source_folder, dir_path, double_name):
     input_path, input_name = os.path.split(input_file)
+    input_rootname = os.path.splitext(input_name)[0]
     if double_name:
-        output_name = input_name + '_' + job_id + suffix + extension
+        output_name = input_rootname + '_' + job_id + suffix + extension
     else:
-        output_name = input_name + suffix + extension
+        output_name = input_rootname + suffix + extension
     if in_source_folder:
         path = os.path.join(input_path, 'gis')
         if not os.path.exists(path):
@@ -453,6 +454,11 @@ class MultiLoadDialog(QDialog):
             self.file_box.addItem(slf)
 
         self.table.setRowCount(self.nb_files)
+
+        # Remove common prefix
+        common_prefix = os.path.commonprefix(dir_names)
+        dir_names = [name[len(common_prefix):] for name in dir_names]
+
         for i, name in enumerate(dir_names):
             filtered_name = ''.join(c for c in name if c.isalnum() or c == '_')
             if not filtered_name:   # please do not name a directory with only special letters :D

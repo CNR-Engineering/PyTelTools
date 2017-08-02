@@ -545,7 +545,7 @@ class MultiWidget(QWidget):
         right_panel.setHandleWidth(10)
         right_panel.setCollapsible(0, False)
         right_panel.setCollapsible(1, False)
-        right_panel.setStretchFactor(1, 1)
+        right_panel.setSizes([200, 200])
 
         # left panel
         left_panel = QWidget()
@@ -561,7 +561,7 @@ class MultiWidget(QWidget):
         splitter.setHandleWidth(10)
         splitter.setCollapsible(0, False)
         splitter.setCollapsible(1, False)
-        splitter.setStretchFactor(1, 1)
+        splitter.setSizes([500, 300])
 
         mainLayout = QHBoxLayout()
         mainLayout.addWidget(splitter)
