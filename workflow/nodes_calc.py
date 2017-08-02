@@ -249,7 +249,7 @@ class ArrivalDurationNode(OneInOneOutNode):
             QMessageBox.critical(None, 'Error', 'The input file is not 2D.',
                                  QMessageBox.Ok)
             return
-        if not len(self.in_data.selected_time_indices) == 1:
+        if len(self.in_data.selected_time_indices) <= 1:
             QMessageBox.critical(None, 'Error', 'The input file must have more than one frame.', QMessageBox.Ok)
             return
         if self.state != Node.SUCCESS:
