@@ -14,7 +14,7 @@ from slf.datatypes import SerafinData, PolylineData, PointData, CSVData
 from slf.flux import TriangularVectorField, FluxCalculator
 from slf.interpolation import MeshInterpolator
 from slf.volume import TruncatedTriangularPrisms, VolumeCalculator
-from workflow.util import process_output_options, process_geom_output_options
+from workflow.util import process_output_options, process_geom_output_options, process_vtk_output_options
 
 
 class Workers:
@@ -1194,7 +1194,7 @@ def write_landxml(node_id, fid, data, options):
 
 def write_shp(node_id, fid, data, options):
     if not data.header.is_2d:
-        return False, node_id, fid, None, fail_message('the input file is not 2D', 'Write Vector shp',
+        return False, node_id, fid, None, fail_message('the input file is not 2D', 'Write shp',
                                                        data.job_id)
     if len(data.selected_time_indices) != 1:
         return False, node_id, fid, None, fail_message('the input data has more than one frame', 'Write shp',
@@ -1227,6 +1227,52 @@ def write_shp(node_id, fid, data, options):
     return True, node_id, fid, None, success_message('Write shp', data.job_id)
 
 
+def write_vtk(node_id, fid, data, options):
+    if data.header.is_2d:
+        return False, node_id, fid, None, fail_message('the input file is not 3D', 'Write vtk', data.job_id)
+    if 'Z' not in data.header.var_IDs:
+        return False, node_id, fid, None, fail_message('the variable Z is not found', 'Write vtk', data.job_id)
+
+    available_vars = [var for var in data.selected_vars if var in data.header.var_IDs and var != 'Z']
+    if len(available_vars) == 0:
+        return False, node_id, fid, None, fail_message('no variable available', 'Write vtk', data.job_id)
+
+    suffix, in_source_folder, dir_path, double_name, overwrite = options
+    filenames = []
+    skip = []
+    for time_index in data.selected_time_indices:
+        filename = process_vtk_output_options(data.filename, data.job_id, time_index,
+                                              suffix, in_source_folder, dir_path, double_name)
+        filenames.append(filename)
+        if not overwrite:
+            if os.path.exists(filename):
+                skip.append(True)
+            else:
+                skip.append(False)
+        else:
+            try:
+                with open(filename, 'w') as f:
+                    pass
+            except PermissionError:
+                try:
+                    os.remove(filename)
+                except PermissionError:
+                    pass
+                return False, node_id, fid, None, fail_message('access denied', 'Write vtk', data.job_id)
+            skip.append(False)
+    if all(skip):
+        return True, node_id, fid, None, success_message('Write vtk', data.job_id, 'file already exists')
+
+    scalars, vectors, vtk_var_names = operations.detect_vector_triples(available_vars, data.selected_vars_names,
+                                                                       data.language)
+    for to_skip, filename, time_index in zip(skip, filenames, data.selected_time_indices):
+        if to_skip:
+            continue
+        operations.slf_to_vtk(data.filename, data.header, filename, scalars, vectors, vtk_var_names, time_index)
+
+    return True, node_id, fid, None, success_message('Write shp', data.job_id)
+
+
 FUNCTIONS = {'Select Variables': select_variables, 'Add Rouse': add_rouse, 'Select Time': select_time,
              'Select Single Frame': select_single_frame,
              'Select First Frame': select_first_frame, 'Select Last Frame': select_last_frame,
@@ -1238,7 +1284,8 @@ FUNCTIONS = {'Select Variables': select_variables, 'Add Rouse': add_rouse, 'Sele
              'Project Lines': project_lines, 'Project B on A': project_mesh, 'A Minus B': minus,
              'B Minus A': reverse_minus, 'Max(A,B)': max_between,
              'Min(A,B)': min_between, 'Add Transformation': add_transform, 'Write LandXML': write_landxml,
-             'Write shp': write_shp,
-             'Load Serafin 2D': read_slf_2d, 'Load Serafin 3D': read_slf_3d, 'Load Reference Serafin': read_slf_reference}
+             'Write shp': write_shp, 'Write vtk': write_vtk,
+             'Load Serafin 2D': read_slf_2d, 'Load Serafin 3D': read_slf_3d,
+             'Load Reference Serafin': read_slf_reference}
 
 

@@ -210,6 +210,9 @@ class SelectVariablesNode(OneInOneOutNode):
                 self.selected_vars = intersection
                 self.selected_vars_names = {var_id: self.selected_vars_names[var_id]
                                             for var_id in intersection}
+                if not self.in_data.header.is_2d and 'Z' not in intersection:
+                    self.selected_vars = ['Z'] + intersection
+                    self.selected_vars_names['Z'] = self.in_data.selected_vars_names['Z']
                 self.state = Node.READY
                 self.reconfigure_downward()
                 self.update()

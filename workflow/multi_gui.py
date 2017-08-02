@@ -15,6 +15,7 @@ from workflow.util import logger
 NODES = {'Input/Output': {'Load Serafin 2D': MultiLoadSerafin2DNode, 'Load Serafin 3D': MultiLoadSerafin3DNode,
                           'Write Serafin': MultiWriteSerafinNode, 'Write LandXML': MultiWriteLandXMLNode,
                           'Load 2D Polygons': MultiLoadPolygon2DNode, 'Write shp': MultiWriteShpNode,
+                          'Write vtk': MultiWriteVtkNode,
                           'Load 2D Open Polylines': MultiLoadOpenPolyline2DNode,
                           'Load 2D Points': MultiLoadPoint2DNode,
                           'Load Reference Serafin': MultiLoadReferenceSerafinNode},

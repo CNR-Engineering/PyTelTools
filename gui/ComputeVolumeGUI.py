@@ -361,16 +361,16 @@ class InputTab(SerafinInputTab):
 
         names = ['Polygon %d' % (i+1) for i in range(len(self.polygons))]
 
-        with Serafin.Read(self.data.filename, self.data.language) as resin:
-            resin.header = self.data.header
-            resin.time = self.data.time
+        with Serafin.Read(self.data.filename, self.data.language) as input_stream:
+            input_stream.header = self.data.header
+            input_stream.time = self.data.time
             if self.supVolumeBox.isChecked():
                 calculator = VolumeCalculatorThread(VolumeCalculator.POSITIVE, self.var_ID, self.second_var_ID,
-                                                    resin, names, self.polygons, sampling_frequency,
+                                                    input_stream, names, self.polygons, sampling_frequency,
                                                     self.mesh, self.parent.csv_separator)
             else:
                 calculator = VolumeCalculatorThread(VolumeCalculator.NET, self.var_ID, self.second_var_ID,
-                                                    resin, names, self.polygons, sampling_frequency,
+                                                    input_stream, names, self.polygons, sampling_frequency,
                                                     self.mesh, self.parent.csv_separator)
 
             progressBar.setValue(5)

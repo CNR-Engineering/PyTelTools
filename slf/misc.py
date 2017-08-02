@@ -28,6 +28,9 @@ _VECTORS = {'U': ('V', 'M'), 'V': ('U', 'M'), 'QSX': ('QSY', 'QS'), 'QSY': ('QSX
             'I': ('J', 'Q'), 'J': ('I', 'Q')}
 _VECTORS_BROTHERS = {('U', 'V'): 'M', ('I', 'J'): 'Q', ('X', 'Y'): '.', ('QSX', 'QSY'): 'QS',
                      ('QSBLX', 'QSBLY'): 'QSBL', ('QSSUSPX', 'QSSUSPY'): 'QSSUSP'}
+_VECTORS_3D = {('U', 'V', 'W'): {'fr': 'VITESSE', 'en': 'VELOCITY'},
+               ('NUX', 'NUY', 'NUZ'): {'fr': 'NU_POUR_VITESSE', 'en': 'NU_FOR_VELOCITY'},
+               ('UCONV', 'VCONV', 'WCONV'): {'fr': 'CONVECTION', 'en': 'ADVECTION'}}
 
 
 def scalars_vectors(known_vars, selected_vars, us_equation=None):
@@ -213,16 +216,37 @@ def detect_vector_couples(variables, available_variables):
     return coupled, non_coupled, mothers, angles
 
 
+def detect_vector_triples(variables, variable_names, language):
+    scalars, vectors, names = [], [], {}
+    for triple, name_dic in _VECTORS_3D.items():
+        if all(u in variables for u in triple):
+            vectors.append(triple)
+            names[triple] = name_dic[language]
+    var_vectors = sum(vectors, ())
+    for var in variables:
+        if var not in var_vectors:
+            scalars.append(var)
+            names[var] = variable_name_to_vtk(variable_names[var][0].decode('utf-8').strip())
+    return scalars, vectors, names
+
+
+def variable_name_to_vtk(name):
+    # replace whitespaces by underscores
+    return ''.join([s for s in name if s != ' '])
+
+
 def slf_to_shp(slf_name, slf_header, shp_name, variables, time_index):
+    # separate vectors from scalars
     coupled, non_coupled, mothers, angles = detect_vector_couples(variables, slf_header.var_IDs)
 
+    # fetch all variables values
     values = {}
-    with Serafin.Read(slf_name, slf_header.language) as slf:
-        slf.header = slf_header
+    with Serafin.Read(slf_name, slf_header.language) as input_stream:
+        input_stream.header = slf_header
         for var in variables:
-            values[var] = slf.read_var_in_frame(time_index, var)
+            values[var] = input_stream.read_var_in_frame(time_index, var)
 
-    # compute mother not in file
+    # compute mothers not in the file
     for mother, brother, sister in mothers:
         values[mother] = np.sqrt(np.square(values[brother]) + np.square(values[sister]))
 
@@ -248,20 +272,19 @@ def slf_to_shp(slf_name, slf_header, shp_name, variables, time_index):
     w.save(shp_name)
 
 
-def scalar_to_xml(slf_name, slf_header, xml_name, scalar, time_index):
+def slf_to_xml(slf_name, slf_header, xml_name, scalar, time_index):
     """!
-    @brief Write LandXML file from a scalar variable of a .slf file (and its first frame)
+    @brief Write LandXML file from a scalar variable of a .slf file
     @param <str> slf_name: path to the input .slf file
     @param <slf.Serafin.SerafinHeader> slf_header: input Serafin header
     @param <str> xml_name: output LandXML filename
     @param <str> scalar: variable to write
     @param <int> time_index: the index of the frame (0-based)
     """
-    with Serafin.Read(slf_name, slf_header.language) as slf:
-        slf.header = slf_header
-
-        # fetch scalar variable values
-        scalar_values = slf.read_var_in_frame(time_index, scalar)
+    # fetch scalar variable values
+    with Serafin.Read(slf_name, slf_header.language) as input_stream:
+        input_stream.header = slf_header
+        scalar_values = input_stream.read_var_in_frame(time_index, scalar)
 
     # write shp
     with open(xml_name, 'w') as xml:
@@ -282,6 +305,70 @@ def scalar_to_xml(slf_name, slf_header, xml_name, scalar, time_index):
         xml.write('    </Surface>\n')
         xml.write('  </Surfaces>\n')
         xml.write('</LandXML>\n')
+
+
+def slf_to_vtk(slf_name, slf_header, vtk_name, scalars, vectors, variable_names, time_index):
+    """!
+    @brief Write vtk file from a scalar variable of a .slf file
+    @param <str> slf_name: path to the input .slf file
+    @param <slf.Serafin.SerafinHeader> slf_header: input Serafin header
+    @param <str> vtk_name: output vtk filename
+    @param <str> scalars: scalar variables
+    @param <tuple of str> vectors: vector variables
+    @param <int> time_index: the index of the frame (0-based)
+    """
+    with Serafin.Read(slf_name, slf_header.language) as input_stream:
+        input_stream.header = slf_header
+
+        with open(vtk_name, 'w') as output_stream:
+            # write header
+            header = '# vtk DataFile Version 2.0\nMesh export\nASCII\nDATASET UNSTRUCTURED_GRID\n\n'
+            output_stream.write(header)
+
+            # read z values
+            z = input_stream.read_var_in_frame(time_index, 'Z')
+            
+            # write vertices
+            output_stream.write('POINTS %d float\n' % slf_header.nb_nodes)
+            for ix, iy, iz in zip(slf_header.x, slf_header.y, z):
+                output_stream.write('%.6f %.6f %.6f\n' % (ix, iy, iz))
+            output_stream.write('\n')
+
+            # write cells
+            output_stream.write('CELLS %d %d\n' % (slf_header.nb_elements, slf_header.nb_elements * 7))
+
+            ikle = slf_header.ikle.reshape(slf_header.nb_elements, 6) - 1
+            for k1, k2, k3, k4, k5, k6 in ikle:
+                output_stream.write('6 %d %d %d %d %d %d\n' % (k1, k2, k3, k4, k5, k6))
+            output_stream.write('\n')
+
+            output_stream.write('CELL_TYPES %d\n' % slf_header.nb_elements)
+            for _ in range(slf_header.nb_elements):
+                output_stream.write('13\n')
+            output_stream.write('\n')
+
+            # write scalar and vector data
+            output_stream.write('POINT_DATA %d\n' % slf_header.nb_nodes)
+
+            for scalar in scalars:
+                values = input_stream.read_var_in_frame(time_index, scalar)
+                name = variable_names[scalar]
+
+                output_stream.write('SCALARS %s float\nLOOKUP_TABLE default\n' % name)
+                for v in values:
+                    output_stream.write('%.6f\n' % v)
+                output_stream.write('\n')
+
+            for triple in vectors:
+                u_values = input_stream.read_var_in_frame(time_index, triple[0])
+                v_values = input_stream.read_var_in_frame(time_index, triple[1])
+                w_values = input_stream.read_var_in_frame(time_index, triple[2])
+                name = variable_names[triple]
+
+                output_stream.write('VECTORS %s float\n' % name)
+                for u, v, w in zip(u_values, v_values, w_values):
+                    output_stream.write('%.6f %.6f %.6f\n' % (u, v, w))
+                output_stream.write('\n')
 
 
 class ScalarMaxMinMeanCalculator:

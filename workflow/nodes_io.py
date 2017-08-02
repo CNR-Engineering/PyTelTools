@@ -12,8 +12,8 @@ from slf.datatypes import SerafinData, PointData, PolylineData
 from slf.interpolation import MeshInterpolator
 from slf.variables import do_calculations_in_frame
 from workflow.Node import Node, SingleInputNode, SingleOutputNode, OneInOneOutNode
-from workflow.util import LoadSerafinDialog, logger, OutputOptionPanel, GeomOutputOptionPanel, \
-                          process_output_options, process_geom_output_options, \
+from workflow.util import LoadSerafinDialog, logger, OutputOptionPanel, GeomOutputOptionPanel, VtkOutputOptionPanel, \
+                          process_output_options, process_geom_output_options, process_vtk_output_options, \
                           validate_input_options, validate_output_options
 
 
@@ -879,11 +879,15 @@ class WriteLandXMLNode(SingleInputNode):
             with open(filename, 'w') as f:
                 pass
         except PermissionError:
+            try:
+                os.remove(filename)
+            except PermissionError:
+                pass
             self.fail('Access denied.')
             return
 
-        operations.scalar_to_xml(input_data.filename, input_data.header, filename, selected_var,
-                                 selected_frame)
+        operations.slf_to_xml(input_data.filename, input_data.header, filename, selected_var, selected_frame)
+
         self.success()
 
 
@@ -955,9 +959,114 @@ class WriteShpNode(SingleInputNode):
             with open(filename, 'w') as f:
                 pass
         except PermissionError:
+            try:
+                os.remove(filename)
+            except PermissionError:
+                pass
             self.fail('Access denied.')
             return
 
-        operations.slf_to_shp(input_data.filename, input_data.header, filename, available_vars,
-                              selected_frame)
+        operations.slf_to_shp(input_data.filename, input_data.header, filename, available_vars, selected_frame)
+
         self.success()
+
+
+class WriteVtkNode(SingleInputNode):
+    def __init__(self, index):
+        super().__init__(index)
+        self.in_port.data_type = ('slf 3d',)
+        self.category = 'Input/Output'
+        self.label = 'Write vtk'
+        self.state = Node.READY
+
+        self.panel = None
+        self.suffix = '_vtk'
+        self.double_name = False
+        self.overwrite = False
+        self.in_source_folder = True
+        self.dir_path = ''
+
+    def get_option_panel(self):
+        return self.panel
+
+    def configure(self, check=None):
+        old_options = (self.suffix, self.in_source_folder, self.dir_path, self.double_name, self.overwrite)
+        self.panel = VtkOutputOptionPanel(old_options)
+        if super().configure(self.panel.check):
+            self.suffix, self.in_source_folder, self.dir_path, \
+                         self.double_name, self.overwrite = self.panel.get_options()
+
+    def save(self):
+        return '|'.join([self.category, self.name(), str(self.index()),
+                         str(self.pos().x()), str(self.pos().y()), self.suffix,
+                         str(int(self.in_source_folder)), self.dir_path,
+                         str(int(self.double_name)), str(int(self.overwrite))])
+
+    def load(self, options):
+        success, (suffix, in_source_folder, dir_path, double_name, overwrite) = validate_output_options(options)
+        if success:
+            self.state = Node.READY
+            self.suffix, self.in_source_folder, self.dir_path, self.double_name, self.overwrite = \
+                suffix, in_source_folder, dir_path, double_name, overwrite
+
+    def run(self):
+        success = super().run_upward()
+        if not success:
+            self.fail('input failed.')
+            return
+
+        input_data = self.in_port.mother.parentItem().data
+        if input_data.header.is_2d:
+            self.fail('the input file is not 3D')
+            return
+        if 'Z' not in input_data.header.var_IDs:
+            self.fail('the variable Z is not found')
+            return
+
+        available_vars = [var for var in input_data.selected_vars if var in input_data.header.var_IDs and var != 'Z']
+        if len(available_vars) == 0:
+            self.fail('no variable available')
+            return
+
+        # construct vtk filenames
+        filenames = []
+        skip = []
+        for time_index in input_data.selected_time_indices:
+            filename = process_vtk_output_options(input_data.filename, input_data.job_id, time_index,
+                                                   self.suffix, self.in_source_folder, self.dir_path, self.double_name)
+            filenames.append(filename)
+            if not self.overwrite:
+                if os.path.exists(filename):
+                    skip.append(True)
+                else:
+                    skip.append(False)
+            else:
+                try:
+                    with open(filename, 'w') as f:
+                        pass
+                except PermissionError:
+                    try:
+                        os.remove(filename)
+                    except PermissionError:
+                        pass
+                    self.fail('Access denied.')
+                    return
+                skip.append(False)
+        if all(skip):
+            self.success('File already exists.')
+            return
+
+        # separate vectors from scalars
+        scalars, vectors, vtk_var_names = operations.detect_vector_triples(available_vars,
+                                                                           input_data.selected_vars_names,
+                                                                           input_data.language)
+
+        # write vtk
+        for to_skip, filename, time_index in zip(skip, filenames, input_data.selected_time_indices):
+            if to_skip:
+                continue
+            operations.slf_to_vtk(input_data.filename, input_data.header, filename,
+                                  scalars, vectors, vtk_var_names, time_index)
+
+        self.success()
+

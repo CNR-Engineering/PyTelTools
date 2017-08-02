@@ -14,7 +14,7 @@ from workflow.util import logger
 NODES = {'Input/Output': {'Load Serafin 2D': LoadSerafin2DNode, 'Load Serafin 3D': LoadSerafin3DNode,
                           'Load 2D Polygons': LoadPolygon2DNode, 'Load 2D Open Polylines': LoadOpenPolyline2DNode,
                           'Load 2D Points': LoadPoint2DNode, 'Load Reference Serafin': LoadReferenceSerafinNode,
-                          'Write LandXML': WriteLandXMLNode, 'Write shp': WriteShpNode,
+                          'Write LandXML': WriteLandXMLNode, 'Write shp': WriteShpNode, 'Write vtk': WriteVtkNode,
                           'Write Serafin': WriteSerafinNode},
          'Basic operations': {'Select Variables': SelectVariablesNode,
                               'Select Time': SelectTimeNode, 'Select Single Frame': SelectSingleFrameNode,

@@ -967,6 +967,9 @@ class VerticalTemporalProfileNode(DoubleInputNode):
         if parent_node.data.header.is_2d:
             QMessageBox.critical(None, 'Error', 'The input file is not 3D!', QMessageBox.Ok)
             return
+        if 'Z' not in parent_node.data.header.var_IDs:
+            QMessageBox.critical(None, 'Error', 'The variable Z is not found.', QMessageBox.Ok)
+            return
         point_node = self.second_in_port.mother.parentItem()
         if point_node.state != Node.SUCCESS:
             if point_node.ready_to_run():
@@ -1018,6 +1021,14 @@ class VerticalTemporalProfileNode(DoubleInputNode):
         success = super().run_upward()
         if not success:
             self.fail('input failed.')
+            return
+        if parent_node.data.header.is_2d:
+            QMessageBox.critical(None, 'Error', 'The input file is not 3D!', QMessageBox.Ok)
+            self.fail('The input file is not 3D.')
+            return
+        if 'Z' not in parent_node.data.header.var_IDs:
+            QMessageBox.critical(None, 'Error', 'The variable Z is not found.', QMessageBox.Ok)
+            self.fail('The variable Z is not found.')
             return
         if not self.has_plot:
             if not self._prepare():

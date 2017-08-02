@@ -59,6 +59,23 @@ def process_geom_output_options(input_file, job_id, extension, suffix, in_source
     return filename
 
 
+def process_vtk_output_options(input_file, job_id, time_index, suffix, in_source_folder, dir_path, double_name):
+    input_path, input_name = os.path.split(input_file)
+    input_rootname = os.path.splitext(input_name)[0]
+    if double_name:
+        output_name = input_rootname + '_' + job_id + suffix + '_' + str(time_index) + '.vtk'
+    else:
+        output_name = input_rootname + suffix + '_' + str(time_index) + '.vtk'
+    if in_source_folder:
+        path = os.path.join(input_path, 'vtk')
+        if not os.path.exists(path):
+            os.mkdir(path)
+        filename = os.path.join(path, output_name)
+    else:
+        filename = os.path.join(dir_path, output_name)
+    return filename
+
+
 def validate_output_options(options):
     suffix = options[0]
     in_source_folder = bool(int(options[1]))
@@ -260,6 +277,16 @@ class GeomOutputOptionPanel(OutputOptionPanel):
         self.source_folder_button.setEnabled(True)
 
 
+class VtkOutputOptionPanel(OutputOptionPanel):
+    def __init__(self, old_options):
+        super().__init__(old_options)
+        self.source_folder_button.setText('Input_folder/vtk')
+        self.simple_name_button.setText('input_name + suffix + time')
+        self.double_name_button.setText('input_name + job_id + suffix + time')
+        for bt in (self.source_folder_button, self.simple_name_button, self.double_name_button):
+            bt.setEnabled(True)
+
+
 class MultiSaveDialog(QDialog):
     def __init__(self, suffix):
         super().__init__()
@@ -455,9 +482,10 @@ class MultiLoadDialog(QDialog):
 
         self.table.setRowCount(self.nb_files)
 
-        # Remove common prefix
-        common_prefix = os.path.commonprefix(dir_names)
-        dir_names = [name[len(common_prefix):] for name in dir_names]
+        # remove common prefix
+        if len(dir_names) > 1:
+            common_prefix = os.path.commonprefix(dir_names)
+            dir_names = [name[len(common_prefix):] for name in dir_names]
 
         for i, name in enumerate(dir_names):
             filtered_name = ''.join(c for c in name if c.isalnum() or c == '_')
