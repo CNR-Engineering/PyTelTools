@@ -1022,6 +1022,7 @@ class VerticalTemporalProfileNode(DoubleInputNode):
         if not success:
             self.fail('input failed.')
             return
+        parent_node = self.first_in_port.mother.parentItem()
         if parent_node.data.header.is_2d:
             QMessageBox.critical(None, 'Error', 'The input file is not 3D!', QMessageBox.Ok)
             self.fail('The input file is not 3D.')
