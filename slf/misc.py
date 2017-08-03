@@ -9,7 +9,8 @@ import shapefile
 from shapely.geometry import Point
 
 from slf import Serafin
-from slf.variables import get_available_variables, get_necessary_equations, do_calculation
+from slf.variables_2d import do_2d_calculation, get_available_2d_variables, get_necessary_2d_equations
+
 
 module_logger = logging.getLogger(__name__)
 
@@ -42,8 +43,8 @@ def scalars_vectors(known_vars, selected_vars, us_equation=None):
     """
     scalars = []
     vectors = []
-    computable_variables = list(map(lambda x: x.ID(), get_available_variables(known_vars)))
-    additional_equations = get_necessary_equations(known_vars, list(map(lambda x: x[0], selected_vars)), us_equation)
+    computable_variables = list(map(lambda x: x.ID(), get_available_2d_variables(known_vars)))
+    additional_equations = get_necessary_2d_equations(known_vars, list(map(lambda x: x[0], selected_vars)), us_equation)
     for var, name, unit in selected_vars:
         if var in _VECTORS:
             brother, mother = _VECTORS[var]
@@ -51,11 +52,11 @@ def scalars_vectors(known_vars, selected_vars, us_equation=None):
                 vectors.append((var, name, unit))
             elif brother in known_vars:  # if the magnitude is unknown but the orthogonal field is known
                 vectors.append((var, name, unit))
-                additional_equations.extend(get_necessary_equations(known_vars, [mother], us_equation))
+                additional_equations.extend(get_necessary_2d_equations(known_vars, [mother], us_equation))
             else:
                 if mother in computable_variables:
                     vectors.append((var, name, unit))
-                    additional_equations.extend(get_necessary_equations(known_vars, [mother], us_equation))
+                    additional_equations.extend(get_necessary_2d_equations(known_vars, [mother], us_equation))
                     continue
                 # if the magnitude is not computable, use scalar operation instead
                 module_logger.warn('The variable %s will be considered to be scalar instead of vector.' % var)
@@ -373,7 +374,7 @@ def slf_to_vtk(slf_name, slf_header, vtk_name, scalars, vectors, variable_names,
 
 class ScalarMaxMinMeanCalculator:
     """!
-    Compute max/min/mean of scalar variables from a .slf input stream
+    Compute max/min/mean of 2D scalar variables from a .slf input stream
     """
     def __init__(self, max_min_type, input_stream, selected_scalars, time_indices, additional_equations=None):
         self.maxmin = max_min_type
@@ -402,7 +403,7 @@ class ScalarMaxMinMeanCalculator:
                 if input_var_ID not in computed_values:
                     computed_values[input_var_ID] = self.input_stream.read_var_in_frame(time_index, input_var_ID)
             # compute additional variables
-            output_values = do_calculation(equation, [computed_values[var_ID] for var_ID in input_var_IDs])
+            output_values = do_2d_calculation(equation, [computed_values[var_ID] for var_ID in input_var_IDs])
             computed_values[equation.output.ID()] = output_values
         return computed_values
 

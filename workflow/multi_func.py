@@ -2,17 +2,17 @@ import os
 import struct
 from datetime import datetime
 from multiprocessing import Process, Queue, cpu_count
-
 import numpy as np
 from shapely.geometry import Polygon
 
-import slf.misc as operations
-import slf.variables as variables
 from geom import BlueKenue, Shapefile
-from slf import Serafin
 from slf.datatypes import SerafinData, PolylineData, PointData, CSVData
 from slf.flux import TriangularVectorField, FluxCalculator
 from slf.interpolation import MeshInterpolator
+import slf.misc as operations
+from slf import Serafin
+from slf.variables_2d import add_US, do_2d_calculations_in_frame, get_available_2d_variables, get_necessary_2d_equations
+from slf.variables_3d import do_3d_calculations_in_frame, get_available_3d_variables, get_necessary_3d_equations
 from slf.volume import TruncatedTriangularPrisms, VolumeCalculator
 from workflow.util import process_output_options, process_geom_output_options, process_vtk_output_options
 
@@ -205,18 +205,25 @@ def select_variables(node_id, fid, data, options):
     # check if all selected variables are computable
     known_vars = [var for var in data.header.var_IDs if var in data.selected_vars]
     new_vars = known_vars[:]
-    new_vars.extend(list(map(lambda x: x.ID(), variables.get_available_variables(new_vars))))
-    if us_equation is not None:
-        us_vars = []
-        variables.add_US(us_vars, known_vars)
-        new_vars.extend([x.ID() for x in us_vars])
+    if data.header.is_2d:
+        new_vars.extend(list(map(lambda x: x.ID(), get_available_2d_variables(new_vars))))
+        if us_equation is not None:
+            us_vars = []
+            add_US(us_vars, known_vars)
+            new_vars.extend([x.ID() for x in us_vars])
+    else:
+        new_vars.extend(list(map(lambda x: x.ID(), get_available_3d_variables(new_vars))))
+
     if not all(var in new_vars for var in selected_vars):
         return False, node_id, fid, None, fail_message('not all selected variables are available',
                                                        'Select Variables', data.job_id)
 
     new_data = data.copy()
     new_data.us_equation = us_equation
-    new_data.equations = variables.get_necessary_equations(data.header.var_IDs, selected_vars, us_equation)
+    if data.header.is_2d:
+        new_data.equations = get_necessary_2d_equations(data.header.var_IDs, selected_vars, us_equation)
+    else:
+        new_data.equations = get_necessary_3d_equations(data.header.var_IDs, selected_vars)
     new_data.selected_vars = selected_vars
     new_data.selected_vars_names = {}
     for var_ID, (var_name, var_unit) in selected_vars_names.items():
@@ -248,8 +255,7 @@ def add_rouse(node_id, fid, data, options):
     for i in range(len(rouse_table)):
         new_data.selected_vars_names[rouse_table[i][0]] = (bytes(rouse_table[i][1], 'utf-8').ljust(16),
                                                            bytes(rouse_table[i][2], 'utf-8').ljust(16))
-    new_data.equations = variables.get_necessary_equations(data.header.var_IDs, new_data.selected_vars,
-                                                           data.us_equation)
+    new_data.equations = get_necessary_2d_equations(data.header.var_IDs, new_data.selected_vars, data.us_equation)
     return True, node_id, fid, new_data, success_message('Add Rouse', data.job_id)
 
 
@@ -449,9 +455,14 @@ def write_simple_slf(input_data, filename):
         with Serafin.Write(filename, input_data.language) as output_stream:
             output_stream.write_header(output_header)
             for i, time_index in enumerate(input_data.selected_time_indices):
-                values = variables.do_calculations_in_frame(input_data.equations, input_data.us_equation,
-                                                            input_stream, time_index, input_data.selected_vars,
-                                                            output_header.np_float_type)
+                if output_header.is_2d:
+                    values = do_2d_calculations_in_frame(input_data.equations, input_data.us_equation, input_stream,
+                                                         time_index, input_data.selected_vars,
+                                                         output_header.np_float_type)
+                else:
+                    values = do_3d_calculations_in_frame(input_data.equations, input_stream,
+                                                         time_index, input_data.selected_vars,
+                                                         output_header.np_float_type)
                 output_stream.write_entire_frame(output_header, input_data.time[time_index], values)
     return True, success_message('Write Serafin', input_data.job_id)
 

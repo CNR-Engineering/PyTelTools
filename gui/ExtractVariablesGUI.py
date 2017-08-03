@@ -10,8 +10,10 @@ from gui.util import TableWidgetDragRows, VariableTable, QPlainTextEditLogger, F
     TimeRangeSlider, DoubleSliderBox, OutputProgressDialog, OutputThread, SerafinInputTab, \
     TelToolWidget, save_dialog
 from slf import Serafin
-from slf.variables import get_available_variables, \
-    do_calculations_in_frame, get_necessary_equations, get_US_equation, add_US
+from slf.variables_2d import do_2d_calculations_in_frame, get_available_2d_variables,\
+    get_necessary_2d_equations, get_US_equation, add_US
+from slf.variables_3d import do_3d_calculations_in_frame, get_available_3d_variables,\
+    get_necessary_3d_equations
 
 
 class ExtractVariablesThread(OutputThread):
@@ -30,8 +32,14 @@ class ExtractVariablesThread(OutputThread):
         for i, time_index in enumerate(self.time_indices):
             if self.canceled:
                 return
-            values = do_calculations_in_frame(self.necessary_equations, self.us_equation, self.input_stream, time_index,
-                                             self.output_header.var_IDs, self.output_header.np_float_type)
+            if self.output_header.is_2d:
+                values = do_2d_calculations_in_frame(self.necessary_equations, self.us_equation, self.input_stream,
+                                                     time_index, self.output_header.var_IDs,
+                                                     self.output_header.np_float_type)
+            else:
+                values = do_3d_calculations_in_frame(self.necessary_equations, self.input_stream,
+                                                     time_index, self.output_header.var_IDs,
+                                                     self.output_header.np_float_type)
             self.output_stream.write_entire_frame(self.output_header, self.input_stream.time[time_index], values)
             self.tick.emit(5 + int(95 * (i+1) / self.nb_frames))
 
@@ -295,19 +303,22 @@ class InputTab(SerafinInputTab):
                 self.firstTable.setItem(row, j, item)
 
         if self.data.header.is_2d:
-            # find new computable variables (stored as slf.variables.Variable objects)
-            self.available_vars = get_available_variables(self.data.header.var_IDs)
+            # find new 2D computable variables (stored as slf.variables.Variable objects)
+            self.available_vars = get_available_2d_variables(self.data.header.var_IDs)
+        else:
+            # find new 3D computable variables (stored as slf.variables.Variable objects)
+            self.available_vars = get_available_3d_variables(self.data.header.var_IDs)
 
-            # add new variables to the table
-            for var in self.available_vars:
-                row = self.firstTable.rowCount()
-                self.firstTable.insertRow(row)
-                id_item = QTableWidgetItem(var.ID())
-                name_item = QTableWidgetItem(var.name(self.data.language))
-                unit_item = QTableWidgetItem(var.unit())
-                for j, item in enumerate([id_item, name_item, unit_item]):
-                    self.firstTable.setItem(row, j, item)
-                    self.firstTable.item(row, j).setBackground(self.YELLOW)  # set new variables colors to yellow
+        # add new variables to the table
+        for var in self.available_vars:
+            row = self.firstTable.rowCount()
+            self.firstTable.insertRow(row)
+            id_item = QTableWidgetItem(var.ID())
+            name_item = QTableWidgetItem(var.name(self.data.language))
+            unit_item = QTableWidgetItem(var.unit())
+            for j, item in enumerate([id_item, name_item, unit_item]):
+                self.firstTable.setItem(row, j, item)
+                self.firstTable.item(row, j).setBackground(self.YELLOW)  # set new variables colors to yellow
 
     def _reinitInput(self):
         """!
@@ -679,9 +690,11 @@ class SubmitTab(QWidget):
                 output_stream.write_header(output_header)
 
                 # do some additional computations
-                necessary_equations = get_necessary_equations(self.data.header.var_IDs, output_header.var_IDs,
-                                                              self.data.us_equation)
-
+                if output_header.is_2d:
+                    necessary_equations = get_necessary_2d_equations(self.data.header.var_IDs, output_header.var_IDs,
+                                                                     self.data.us_equation)
+                else:
+                    necessary_equations = get_necessary_3d_equations(self.data.header.var_IDs, output_header.var_IDs)
                 process = ExtractVariablesThread(necessary_equations, self.data.us_equation, input_stream,
                                                  output_stream, output_header, output_time_indices)
                 progressBar.connectToThread(process)

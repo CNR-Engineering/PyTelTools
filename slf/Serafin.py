@@ -274,8 +274,8 @@ class Serafin:
         try:
             index = self.header.var_IDs.index(var_ID)
         except ValueError:
-            module_logger.error('ERROR: Variable ID not found')
-            raise SerafinRequestError('Variable ID not found')
+            module_logger.error('ERROR: Variable ID %s not found' % var_ID)
+            raise SerafinRequestError('Variable ID %s not found' % var_ID)
         return index
 
     def time_to_index(self, time_request):

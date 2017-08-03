@@ -4,7 +4,7 @@ from PyQt5.QtWidgets import *
 from workflow.MultiNode import MultiNode, MultiOneInOneOutNode, MultiSingleInputNode, \
                                MultiSingleOutputNode, MultiDoubleInputNode, MultiTwoInOneOutNode
 from workflow.util import MultiLoadSerafinDialog, validate_output_options, validate_input_options
-import slf.variables as variables
+from slf.variables_2d import get_US_equation
 import slf.misc as operations
 from geom.transformation import load_transformation_map
 
@@ -377,7 +377,7 @@ class MultiSelectVariablesNode(MultiOneInOneOutNode):
         friction_law, vars, names, units = options
         friction_law = int(friction_law)
         if friction_law > -1:
-            us_equation = variables.get_US_equation(friction_law)
+            us_equation = get_US_equation(friction_law)
         else:
             us_equation = None
 

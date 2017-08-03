@@ -8,7 +8,8 @@ from gui.util import DoubleSliderBox, FallVelocityMessage, FrictionLawMessage, S
     TimeRangeSlider, VariableTable
 import slf.misc as operations
 from geom.transformation import load_transformation_map
-from slf.variables import get_available_variables, get_necessary_equations, add_US, get_US_equation
+from slf.variables_2d import add_US, get_available_2d_variables, get_necessary_2d_equations, get_US_equation
+from slf.variables_3d import get_available_3d_variables, get_necessary_3d_equations
 from workflow.Node import Node, OneInOneOutNode, TwoInOneOutNode
 from workflow.util import logger
 
@@ -68,33 +69,37 @@ class SelectVariablesNode(OneInOneOutNode):
         vlayout.addWidget(self.first_table)
 
         if self.in_data.header.is_2d:
-            computable_vars = get_available_variables(self.in_data.selected_vars)
-            for var in computable_vars:
-                if var.ID() not in self.selected_vars:
-                    row = self.first_table.rowCount()
-                    self.first_table.insertRow(self.first_table.rowCount())
-                    id_item = QTableWidgetItem(var.ID())
-                    name_item = QTableWidgetItem(var.name(self.in_data.language))
-                    unit_item = QTableWidgetItem(var.unit())
-                    self.first_table.setItem(row, 0, id_item)
-                    self.first_table.setItem(row, 1, name_item)
-                    self.first_table.setItem(row, 2, unit_item)
-                    self.first_table.item(row, 0).setBackground(self.YELLOW)  # set new variables colors to yellow
-                    self.first_table.item(row, 1).setBackground(self.YELLOW)
-                    self.first_table.item(row, 2).setBackground(self.YELLOW)
-                else:
-                    row = self.second_table.rowCount()
-                    self.second_table.insertRow(self.second_table.rowCount())
-                    id_item = QTableWidgetItem(var.ID())
-                    name_item = QTableWidgetItem(var.name(self.in_data.language))
-                    unit_item = QTableWidgetItem(var.unit())
-                    self.second_table.setItem(row, 0, id_item)
-                    self.second_table.setItem(row, 1, name_item)
-                    self.second_table.setItem(row, 2, unit_item)
-                    self.second_table.item(row, 0).setBackground(self.YELLOW)
-                    self.second_table.item(row, 1).setBackground(self.YELLOW)
-                    self.second_table.item(row, 2).setBackground(self.YELLOW)
+            computable_vars = get_available_2d_variables(self.in_data.selected_vars)
+        else:
+            computable_vars = get_available_3d_variables(self.in_data.selected_vars)
 
+        for var in computable_vars:
+            if var.ID() not in self.selected_vars:
+                row = self.first_table.rowCount()
+                self.first_table.insertRow(self.first_table.rowCount())
+                id_item = QTableWidgetItem(var.ID())
+                name_item = QTableWidgetItem(var.name(self.in_data.language))
+                unit_item = QTableWidgetItem(var.unit())
+                self.first_table.setItem(row, 0, id_item)
+                self.first_table.setItem(row, 1, name_item)
+                self.first_table.setItem(row, 2, unit_item)
+                self.first_table.item(row, 0).setBackground(self.YELLOW)  # set new variables colors to yellow
+                self.first_table.item(row, 1).setBackground(self.YELLOW)
+                self.first_table.item(row, 2).setBackground(self.YELLOW)
+            else:
+                row = self.second_table.rowCount()
+                self.second_table.insertRow(self.second_table.rowCount())
+                id_item = QTableWidgetItem(var.ID())
+                name_item = QTableWidgetItem(var.name(self.in_data.language))
+                unit_item = QTableWidgetItem(var.unit())
+                self.second_table.setItem(row, 0, id_item)
+                self.second_table.setItem(row, 1, name_item)
+                self.second_table.setItem(row, 2, unit_item)
+                self.second_table.item(row, 0).setBackground(self.YELLOW)
+                self.second_table.item(row, 1).setBackground(self.YELLOW)
+                self.second_table.item(row, 2).setBackground(self.YELLOW)
+
+        if self.in_data.header.is_2d:
             self.us_button = QPushButton('Add US from friction law')
             self.us_button.setToolTip('Compute <b>US</b> based on a friction law')
             self.us_button.setEnabled(False)
@@ -199,7 +204,7 @@ class SelectVariablesNode(OneInOneOutNode):
         if self.selected_vars:
             known_vars = [var for var in self.in_data.header.var_IDs if var in self.in_data.selected_vars]
             new_vars = known_vars[:]
-            new_vars.extend(list(map(lambda x: x.ID(), get_available_variables(new_vars))))
+            new_vars.extend(list(map(lambda x: x.ID(), get_available_2d_variables(new_vars))))
             if self.us_equation is not None:
                 us_vars = []
                 add_US(us_vars, known_vars)
@@ -210,7 +215,7 @@ class SelectVariablesNode(OneInOneOutNode):
                 self.selected_vars = intersection
                 self.selected_vars_names = {var_id: self.selected_vars_names[var_id]
                                             for var_id in intersection}
-                if not self.in_data.header.is_2d and 'Z' not in intersection:
+                if not self.in_data.header.is_2d and 'Z' not in intersection and 'Z' in self.in_data.header.var_IDs:
                     self.selected_vars = ['Z'] + intersection
                     self.selected_vars_names['Z'] = self.in_data.selected_vars_names['Z']
                 self.state = Node.READY
@@ -324,8 +329,8 @@ class SelectVariablesNode(OneInOneOutNode):
         input_data = self.in_port.mother.parentItem().data
         self.data = input_data.copy()
         self.data.us_equation = self.us_equation
-        self.data.equations = get_necessary_equations(self.in_data.header.var_IDs, self.selected_vars,
-                                                      self.us_equation)
+        self.data.equations = get_necessary_2d_equations(self.in_data.header.var_IDs, self.selected_vars,
+                                                         self.us_equation)
         self.data.selected_vars = self.selected_vars
         self.data.selected_vars_names = {}
         for var_ID, (var_name, var_unit) in self.selected_vars_names.items():
@@ -502,8 +507,8 @@ class AddRouseNode(OneInOneOutNode):
         for i in range(len(self.table)):
             self.data.selected_vars_names[self.table[i][0]] = (bytes(self.table[i][1], 'utf-8').ljust(16),
                                                                bytes(self.table[i][2], 'utf-8').ljust(16))
-        self.data.equations = get_necessary_equations(self.in_data.header.var_IDs, self.data.selected_vars,
-                                                      self.data.us_equation)
+        self.data.equations = get_necessary_2d_equations(self.in_data.header.var_IDs, self.data.selected_vars,
+                                                         self.data.us_equation)
         self.success()
 
 

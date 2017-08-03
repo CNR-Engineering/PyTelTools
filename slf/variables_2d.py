@@ -1,57 +1,19 @@
 """!
-Handle variables and their relationships in .slf files for additional variable computation
+Handle 2D variables and their relationships in .slf files for additional variable computation
 """
 
-
 import numpy as np
+
+from slf.variables_utils import cubic_root, build_variables, COMMON_OPERATIONS, Equation, get_available_variables,\
+    MINUS, NORM2, PLUS, square_root, TIMES, Variable
+
 
 KARMAN = 0.4
 RHO_WATER = 1000.
 GRAVITY = 9.80665
 
 
-class Variable():
-    """!
-    @brief Data type for a single variable with ID (short name), Name (fr or en) and Unit
-    """
-    def __init__(self, ID, name_fr, name_en, unit, order):
-        self._ID = ID
-        self.name_fr = name_fr
-        self.name_en = name_en
-        self._unit = unit
-        self.order = order
-
-    def __repr__(self):
-        return ', '.join([self.ID(), self.name_fr,
-                          self.name_en, self.unit()])
-
-    def name(self, language):
-        if language == 'fr':
-            return self.name_fr
-        return self.name_en
-
-    def ID(self):
-        return self._ID
-
-    def unit(self):
-        return self._unit
-
-
-class Equation():
-    """!
-    @brief Data type for an equation consisting of N input variables, 1 output variables and (N-1) operators
-    """
-    def __init__(self, input_variables, output_variable, operator):
-        self.input = input_variables
-        self.output = output_variable
-        self.operator = operator
-
-
-def build_variables():
-    """!
-    @brief Initialize the BASIC_VARIABLES constant
-    """
-    spec = """S,SURFACE LIBRE,FREE SURFACE,M
+spec = """S,SURFACE LIBRE,FREE SURFACE,M
 B,FOND,BOTTOM,M
 H,HAUTEUR D'EAU,WATER DEPTH,M
 M,VITESSE SCALAIRE,SCALAR VELOCITY,M/S
@@ -83,77 +45,59 @@ EF,FLUX D'EROSION,EROSION FLUX,KG/M2/S
 DF,FLUX DE DEPOT,DEPOSITION FLUX,KG/M2/S
 MU,CORR FROTT PEAU,FROT. PEAU MU,"""
 
-    for i, row in enumerate(spec.split('\n')):
-        ID, name_fr, name_en, unit = row.split(',')
-        VARIABLES[ID] = Variable(ID, name_fr, name_en, unit, i)
+# all 2D variable entities involved in computations are stored as constants in a dictionary with ordered keys
+basic_2D_vars_IDs = ['H', 'U', 'V', 'M', 'S', 'B', 'I', 'J', 'Q', 'C', 'F', 'US', 'TAU', 'DMAX', 'HD', 'RB',
+                     'QS', 'QSX', 'QSY', 'QSBL', 'QSBLX', 'QSBLY', 'QSSUSP', 'QSSUSPX', 'QSSUSPY', 'EF',
+                     'DF', 'MU', 'FROTP']
+VARIABLES_2D = build_variables(spec)
 
-
-# all variable entities involved in computations are stored as constants in a dictionary with ordered keys
-VARIABLES = {}
-basic_vars_IDs = ['H', 'U', 'V', 'M', 'S', 'B', 'I', 'J', 'Q', 'C', 'F', 'US', 'TAU', 'DMAX', 'HD', 'RB',
-                  'QS', 'QSX', 'QSY', 'QSBL', 'QSBLX', 'QSBLY', 'QSSUSP', 'QSSUSPX', 'QSSUSPY', 'EF',
-                  'DF', 'MU', 'FROTP']
-
-build_variables()
 H, U, V, M, S, B, I, J, Q, C, F, US, TAU, DMAX, HD, RB, \
 QS, QSX, QSY, QSBL, QSBLX, QSBLY, QSSUSP, QSSUSPX, QSSUSPY, EF, DF, MU, FROTP, W, ROUSE =\
-    [VARIABLES[var] for var in basic_vars_IDs + ['W', 'ROUSE']]
+    [VARIABLES_2D[var] for var in basic_2D_vars_IDs + ['W', 'ROUSE']]
 
 
 # define some special operators
-def compute_DMAX(tau):
-    return np.where(tau > 0.34, 1.4593 * np.power(tau, 0.979),
-                                np.where(tau > 0.1, 1.2912 * np.power(tau, 2) + 1.3572 * tau - 0.1154,
-                                                    0.9055 * np.power(tau, 1.3178)))
-
-
-def square_root(x):
-    with np.errstate(invalid='ignore'):
-        return np.sqrt(x)
-
-
-def cubic_root(x):
-    with np.errstate(invalid='ignore'):
-        return np.where(x < 0, np.power(-x, 1/3.), np.power(x, 1/3.))
-
-
 def compute_NIKURADSE(w, h, m):
     with np.errstate(divide='ignore', invalide='ignore'):
         return np.sqrt(np.power(m, 2) * KARMAN**2 / np.power(np.log(30 * h / np.exp(1) / w), 2))
 
 
-# define the operators (relations between variables) as constants
-PLUS, MINUS, TIMES, NORM2 = 1, 2, 3, 4
+def compute_DMAX(tau):
+    return np.where(tau > 0.34, 1.4593 * np.power(tau, 0.979),
+                    np.where(tau > 0.1, 1.2912 * np.power(tau, 2) + 1.3572 * tau - 0.1154,
+                             0.9055 * np.power(tau, 1.3178)))
+
+
 COMPUTE_TAU, COMPUTE_DMAX = 5, 6
 COMPUTE_CHEZY, COMPUTE_STRICKLER, COMPUTE_MANNING, COMPUTE_NIKURADSE = 7, 8, 9, 10
 COMPUTE_C, COMPUTE_F = 11, 12
-OPERATIONS = {PLUS: lambda a, b: a+b,
-              MINUS: lambda a, b: a-b,
-              TIMES: lambda a, b: a*b,
-              NORM2: lambda a, b: np.sqrt(np.square(a) + np.square(b)),
-              COMPUTE_TAU: lambda x: RHO_WATER * np.square(x),
-              COMPUTE_DMAX: compute_DMAX,
-              COMPUTE_CHEZY: lambda w, h, m: np.sqrt(np.power(m, 2) * GRAVITY / np.square(w)),
-              COMPUTE_STRICKLER: lambda w, h, m: np.sqrt(np.power(m, 2) * GRAVITY / np.square(w) / cubic_root(h)),
-              COMPUTE_MANNING: lambda w, h, m: np.sqrt(np.power(m, 2) * GRAVITY * np.power(w, 2) / cubic_root(h)),
-              COMPUTE_NIKURADSE: compute_NIKURADSE,
-              COMPUTE_C: lambda h: square_root(GRAVITY * h),
-              COMPUTE_F: lambda m, c: m / c}
+
+OPERATIONS_2D = {
+    COMPUTE_TAU: lambda x: RHO_WATER * np.square(x),
+    COMPUTE_DMAX: compute_DMAX,
+    COMPUTE_CHEZY: lambda w, h, m: np.sqrt(np.power(m, 2) * GRAVITY / np.square(w)),
+    COMPUTE_STRICKLER: lambda w, h, m: np.sqrt(np.power(m, 2) * GRAVITY / np.square(w) / cubic_root(h)),
+    COMPUTE_MANNING: lambda w, h, m: np.sqrt(np.power(m, 2) * GRAVITY * np.power(w, 2) / cubic_root(h)),
+    COMPUTE_NIKURADSE: compute_NIKURADSE,
+    COMPUTE_C: lambda h: square_root(GRAVITY * h),
+    COMPUTE_F: lambda m, c: m / c
+}
+OPERATIONS_2D.update(COMMON_OPERATIONS)
 
 # define basic equations
-BASIC_EQUATIONS = {'H': Equation((S, B), H, MINUS), 'S': Equation((H, B), S, PLUS),
-                   'B': Equation((S, H), B, MINUS), 'M': Equation((U, V), M, NORM2),
-                   'I': Equation((H, U), I, TIMES), 'J': Equation((H, V), J, TIMES),
-                   'Q': Equation((I, J), Q, NORM2), 'C': Equation((H,), C, COMPUTE_C),
-                   'F': Equation((M, C), F, COMPUTE_F), 'HD': Equation((B, RB), HD, MINUS),
-                   'RB': Equation((B, HD), RB, MINUS), 'Bbis': Equation((HD, RB), B, PLUS),
-                   'QS': Equation((QSX, QSY), QS, NORM2),
-                   'QSbis': Equation((EF, DF), QS, PLUS),
-                   'QSBL': Equation((QSBLX, QSBLY), QSBL, NORM2),
-                   'QSSUSP': Equation((QSSUSP, QSSUSPY), QSSUSP, NORM2),
-                   'TAU': Equation((US,), TAU, COMPUTE_TAU),
-                   'DMAX': Equation((TAU,), DMAX, COMPUTE_DMAX),
-                   'FROTP': Equation((TAU, MU), FROTP, TIMES)}
+BASIC_2D_EQUATIONS = {'H': Equation((S, B), H, MINUS), 'S': Equation((H, B), S, PLUS),
+                      'B': Equation((S, H), B, MINUS), 'M': Equation((U, V), M, NORM2),
+                      'I': Equation((H, U), I, TIMES), 'J': Equation((H, V), J, TIMES),
+                      'Q': Equation((I, J), Q, NORM2), 'C': Equation((H,), C, COMPUTE_C),
+                      'F': Equation((M, C), F, COMPUTE_F), 'HD': Equation((B, RB), HD, MINUS),
+                      'RB': Equation((B, HD), RB, MINUS), 'Bbis': Equation((HD, RB), B, PLUS),
+                      'QS': Equation((QSX, QSY), QS, NORM2),
+                      'QSbis': Equation((EF, DF), QS, PLUS),
+                      'QSBL': Equation((QSBLX, QSBLY), QSBL, NORM2),
+                      'QSSUSP': Equation((QSSUSP, QSSUSPY), QSSUSP, NORM2),
+                      'TAU': Equation((US,), TAU, COMPUTE_TAU),
+                      'DMAX': Equation((TAU,), DMAX, COMPUTE_DMAX),
+                      'FROTP': Equation((TAU, MU), FROTP, TIMES)}
 
 # define special equations
 CHEZY_EQUATION = Equation((W, H, M), US, COMPUTE_CHEZY)
@@ -179,23 +123,23 @@ class RouseEquation():
             return np.where(us != 0, self.ws / us / KARMAN, float('Inf'))
 
 
-def is_basic_variable(var_ID):
+def is_basic_2d_variable(var_ID):
     """!
-    @brief Determine if the input variable is a basic variable
+    @brief Determine if the input variable is a basic 2D variable
     @param var_ID <str>: the ID (short name) of the variable
     @return <bool>: True if the variable is one of the basic variables
     """
-    return var_ID in basic_vars_IDs
+    return var_ID in basic_2D_vars_IDs
 
 
-def do_calculation(equation, input_values):
+def do_2d_calculation(equation, input_values):
     """!
     @brief Apply an equation on input values
     @param equation <Equation>: an equation object
     @param input_values <[numpy 1D-array]>: the values of the input variables
     @return <numpy 1D-array>: the values of the output variable
     """
-    operation = OPERATIONS[equation.operator]
+    operation = OPERATIONS_2D[equation.operator]
     nb_operands = len(input_values)
     if nb_operands == 1:
         return operation(input_values[0])
@@ -204,35 +148,19 @@ def do_calculation(equation, input_values):
     return operation(input_values[0], input_values[1], input_values[2])
 
 
-def get_available_variables(input_var_IDs):
+def get_available_2d_variables(input_var_IDs):
     """!
-    @brief Determine the list of new variables computable from the input variables by basic relations
-    @param input_var_IDs <[str]>: the list of variable IDs contained in the input file
+    @brief Determine the list of new 2D variables computable from the input variables by basic relations
+    @param input_var_IDs <[str]>: the list of 2D variable IDs contained in the input file
     @return <[Variable]>: the list of variables computable from the input variables by basic relations
     """
-    available_vars = []
-    computables = list(map(VARIABLES.get, filter(is_basic_variable, input_var_IDs)))
-
-    while True:
-        found_new_computable = False
-        for equation in BASIC_EQUATIONS.values():
-            unknown = equation.output
-            needed_variables = equation.input
-            if unknown in computables:  # not a new variable
-                continue
-            is_solvable = all(map(lambda x: x in computables, needed_variables))
-            if is_solvable:
-                found_new_computable = True
-                computables.append(unknown)
-                available_vars.append(equation.output)
-        if not found_new_computable:
-            break
-    return available_vars
+    computables = list(map(VARIABLES_2D.get, filter(is_basic_2d_variable, input_var_IDs)))
+    return get_available_variables(computables, BASIC_2D_EQUATIONS)
 
 
-def get_necessary_equations(known_var_IDs, needed_var_IDs, us_equation):
+def get_necessary_2d_equations(known_var_IDs, needed_var_IDs, us_equation):
     """!
-    @brief Determine the list of equations needed to compute all user-selected variables, with precedence handling
+    @brief Determine the list of 2D equations needed to compute all user-selected variables, with precedence handling
     @param known_var_IDs <[str]>: the list of variable IDs contained in the input file
     @param needed_var_IDs <[str]>: the list of variable IDs selected by the user
     @return <[Equation]>: the list of equations needed to compute all user-selected variables
@@ -243,80 +171,80 @@ def get_necessary_equations(known_var_IDs, needed_var_IDs, us_equation):
 
     # add S
     if 'S' in selected_unknown_var_IDs:
-        necessary_equations.append(BASIC_EQUATIONS['S'])
+        necessary_equations.append(BASIC_2D_EQUATIONS['S'])
 
     # add B
     if 'B' in selected_unknown_var_IDs:
         if 'S' in known_var_IDs:
-            necessary_equations.append(BASIC_EQUATIONS['B'])
+            necessary_equations.append(BASIC_2D_EQUATIONS['B'])
         else:
-            necessary_equations.append(BASIC_EQUATIONS['Bbis'])
+            necessary_equations.append(BASIC_2D_EQUATIONS['Bbis'])
 
     # add H
     if 'H' in selected_unknown_var_IDs:
-        necessary_equations.append(BASIC_EQUATIONS['H'])
+        necessary_equations.append(BASIC_2D_EQUATIONS['H'])
     elif 'H' not in known_var_IDs:
         if 'I' in selected_unknown_var_IDs \
                 or 'J' in selected_unknown_var_IDs \
                 or 'C' in selected_unknown_var_IDs:
-            necessary_equations.append(BASIC_EQUATIONS['H'])
+            necessary_equations.append(BASIC_2D_EQUATIONS['H'])
         elif 'Q' in selected_unknown_var_IDs and ('I' not in known_var_IDs or 'J' not in known_var_IDs):
-            necessary_equations.append(BASIC_EQUATIONS['H'])
+            necessary_equations.append(BASIC_2D_EQUATIONS['H'])
         elif 'C' not in known_var_IDs and 'F' in selected_unknown_var_IDs:
-            necessary_equations.append(BASIC_EQUATIONS['H'])
+            necessary_equations.append(BASIC_2D_EQUATIONS['H'])
         elif 'US' in selected_unknown_var_IDs:
-            necessary_equations.append(BASIC_EQUATIONS['H'])
+            necessary_equations.append(BASIC_2D_EQUATIONS['H'])
         elif 'US' not in known_var_IDs:
             if 'TAU' in selected_unknown_var_IDs:
-                necessary_equations.append(BASIC_EQUATIONS['H'])
+                necessary_equations.append(BASIC_2D_EQUATIONS['H'])
             elif 'TAU' not in known_var_IDs:
                 if 'FROTP' in selected_unknown_var_IDs or 'DMAX' in selected_unknown_var_IDs:
-                    necessary_equations.append(BASIC_EQUATIONS['H'])
+                    necessary_equations.append(BASIC_2D_EQUATIONS['H'])
             elif is_rouse:
-                necessary_equations.append(BASIC_EQUATIONS['H'])
+                necessary_equations.append(BASIC_2D_EQUATIONS['H'])
 
     # add M
     if 'M' in selected_unknown_var_IDs:
-        necessary_equations.append(BASIC_EQUATIONS['M'])
+        necessary_equations.append(BASIC_2D_EQUATIONS['M'])
     elif 'M' not in known_var_IDs:
         if 'F' in selected_unknown_var_IDs:
-            necessary_equations.append(BASIC_EQUATIONS['M'])
+            necessary_equations.append(BASIC_2D_EQUATIONS['M'])
         elif 'US' in selected_unknown_var_IDs:
-            necessary_equations.append(BASIC_EQUATIONS['M'])
+            necessary_equations.append(BASIC_2D_EQUATIONS['M'])
         elif 'US' not in known_var_IDs:
             if 'TAU' in selected_unknown_var_IDs:
-                necessary_equations.append(BASIC_EQUATIONS['M'])
+                necessary_equations.append(BASIC_2D_EQUATIONS['M'])
             elif 'TAU' not in known_var_IDs:
                 if 'FROTP' in selected_unknown_var_IDs or 'DMAX' in selected_unknown_var_IDs:
-                    necessary_equations.append(BASIC_EQUATIONS['M'])
+                    necessary_equations.append(BASIC_2D_EQUATIONS['M'])
             elif is_rouse:
-                necessary_equations.append(BASIC_EQUATIONS['M'])
+                necessary_equations.append(BASIC_2D_EQUATIONS['M'])
 
     # add C
     if 'C' in selected_unknown_var_IDs:
-        necessary_equations.append(BASIC_EQUATIONS['C'])
+        necessary_equations.append(BASIC_2D_EQUATIONS['C'])
     elif 'C' not in known_var_IDs and 'F' in selected_unknown_var_IDs:
-        necessary_equations.append(BASIC_EQUATIONS['C'])
+        necessary_equations.append(BASIC_2D_EQUATIONS['C'])
 
     # add F
     if 'F' in selected_unknown_var_IDs:
-        necessary_equations.append(BASIC_EQUATIONS['F'])
+        necessary_equations.append(BASIC_2D_EQUATIONS['F'])
 
     # add I and J
     if 'I' in selected_unknown_var_IDs:
-        necessary_equations.append(BASIC_EQUATIONS['I'])
+        necessary_equations.append(BASIC_2D_EQUATIONS['I'])
     else:
         if 'Q' in selected_unknown_var_IDs and 'I' not in known_var_IDs:
-            necessary_equations.append(BASIC_EQUATIONS['I'])
+            necessary_equations.append(BASIC_2D_EQUATIONS['I'])
     if 'J' in selected_unknown_var_IDs:
-        necessary_equations.append(BASIC_EQUATIONS['J'])
+        necessary_equations.append(BASIC_2D_EQUATIONS['J'])
     else:
         if 'Q' in selected_unknown_var_IDs and 'J' not in known_var_IDs:
-            necessary_equations.append(BASIC_EQUATIONS['J'])
+            necessary_equations.append(BASIC_2D_EQUATIONS['J'])
 
     # add Q
     if 'Q' in selected_unknown_var_IDs:
-        necessary_equations.append(BASIC_EQUATIONS['Q'])
+        necessary_equations.append(BASIC_2D_EQUATIONS['Q'])
 
     # add US
     if 'US' in selected_unknown_var_IDs:
@@ -332,18 +260,18 @@ def get_necessary_equations(known_var_IDs, needed_var_IDs, us_equation):
 
     # add TAU
     if 'TAU' in selected_unknown_var_IDs:
-        necessary_equations.append(BASIC_EQUATIONS['TAU'])
+        necessary_equations.append(BASIC_2D_EQUATIONS['TAU'])
     elif 'TAU' not in known_var_IDs:
         if 'FROTP' in selected_unknown_var_IDs or 'DMAX' in selected_unknown_var_IDs:
-            necessary_equations.append(BASIC_EQUATIONS['TAU'])
+            necessary_equations.append(BASIC_2D_EQUATIONS['TAU'])
 
     # add DMAX
     if 'DMAX' in selected_unknown_var_IDs:
-        necessary_equations.append(BASIC_EQUATIONS['DMAX'])
+        necessary_equations.append(BASIC_2D_EQUATIONS['DMAX'])
 
     # add FROTP
     if 'FROTP' in selected_unknown_var_IDs:
-        necessary_equations.append(BASIC_EQUATIONS['FROTP'])
+        necessary_equations.append(BASIC_2D_EQUATIONS['FROTP'])
 
     # add ROUSE
     for var_ID in selected_unknown_var_IDs:
@@ -354,17 +282,17 @@ def get_necessary_equations(known_var_IDs, needed_var_IDs, us_equation):
     # add QS
     if 'QS' in selected_unknown_var_IDs:
         if 'QSX' in known_var_IDs:
-            necessary_equations.append(BASIC_EQUATIONS['QS'])
+            necessary_equations.append(BASIC_2D_EQUATIONS['QS'])
         else:
-            necessary_equations.append(BASIC_EQUATIONS['QSbis'])
+            necessary_equations.append(BASIC_2D_EQUATIONS['QSbis'])
 
     # add QSBL
     if 'QSBL' in selected_unknown_var_IDs:
-        necessary_equations.append(BASIC_EQUATIONS['QSBL'])
+        necessary_equations.append(BASIC_2D_EQUATIONS['QSBL'])
 
     # add QSSUSP
     if 'QSSUSP' in selected_unknown_var_IDs:
-        necessary_equations.append(BASIC_EQUATIONS['QSSUSP'])
+        necessary_equations.append(BASIC_2D_EQUATIONS['QSSUSP'])
 
     return necessary_equations
 
@@ -397,9 +325,10 @@ def add_US(available_vars, known_vars):
         available_vars.append(FROTP)
 
 
-def do_calculations_in_frame(equations, us_equation, input_serafin, time_index, selected_output_IDs, output_float_type):
+def do_2d_calculations_in_frame(equations, us_equation, input_serafin, time_index, selected_output_IDs, \
+                                output_float_type):
     """!
-    @brief Return the selected variables values in a single time frame
+    @brief Return the selected 2D variables values in a single time frame
     @param equations <[Equation]>: list of all equations necessary to compute selected variables
     @param us_equation <Equation>: user-specified friction law equation
     @param input_serafin <Serafin.Read>: input stream for reading necessary variables
@@ -419,16 +348,16 @@ def do_calculations_in_frame(equations, us_equation, input_serafin, time_index, 
 
         # handle the special case for US (user-specified equation)
         if equation.output.ID() == 'US':
-            computed_values['US'] = do_calculation(us_equation, [computed_values['W'],
-                                                                 computed_values['H'],
-                                                                 computed_values['M']])
+            computed_values['US'] = do_2d_calculation(us_equation, [computed_values['W'],
+                                                                    computed_values['H'],
+                                                                    computed_values['M']])
         # handle the very special case for ROUSE (equation depending on user-specified value)
         elif equation.output.ID() == 'ROUSE':
             computed_values[equation.input[0].ID()] = equation.operator(computed_values['US'])
             continue
 
         # handle the normal case
-        output_values = do_calculation(equation, [computed_values[var_ID] for var_ID in input_var_IDs])
+        output_values = do_2d_calculation(equation, [computed_values[var_ID] for var_ID in input_var_IDs])
         computed_values[equation.output.ID()] = output_values
 
     # reconstruct the output values array in the order of the selected IDs
@@ -443,5 +372,3 @@ def do_calculations_in_frame(equations, us_equation, input_serafin, time_index, 
         else:
             output_values[i, :] = computed_values[var_ID]
     return output_values
-
-
