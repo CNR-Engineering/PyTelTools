@@ -5,7 +5,7 @@ Handle 2D variables and their relationships in .slf files for additional variabl
 import numpy as np
 
 from slf.variables_utils import cubic_root, build_variables, COMMON_OPERATIONS, Equation, get_available_variables,\
-    MINUS, NORM2, PLUS, square_root, TIMES, Variable
+    MINUS, NORM2, PLUS, square_root, TIMES, Variable, do_calculation
 
 
 KARMAN = 0.4
@@ -107,7 +107,7 @@ NIKURADSE_EQUATION = Equation((W, H, M), US, COMPUTE_NIKURADSE)
 
 
 # a very special equation
-class RouseEquation():
+class RouseEquation:
     """!
     needed a pickle-able top-level equation object when computing Rouse in multi-process
     """
@@ -126,7 +126,7 @@ class RouseEquation():
 def is_basic_2d_variable(var_ID):
     """!
     @brief Determine if the input variable is a basic 2D variable
-    @param var_ID <str>: the ID (short name) of the variable
+    @param <str> var_ID: the ID (short name) of the variable
     @return <bool>: True if the variable is one of the basic variables
     """
     return var_ID in basic_2D_vars_IDs
@@ -135,23 +135,17 @@ def is_basic_2d_variable(var_ID):
 def do_2d_calculation(equation, input_values):
     """!
     @brief Apply an equation on input values
-    @param equation <Equation>: an equation object
-    @param input_values <[numpy 1D-array]>: the values of the input variables
+    @param <Equation> equation: an equation object
+    @param <[numpy 1D-array]> input_values: the values of the input variables
     @return <numpy 1D-array>: the values of the output variable
     """
-    operation = OPERATIONS_2D[equation.operator]
-    nb_operands = len(input_values)
-    if nb_operands == 1:
-        return operation(input_values[0])
-    elif nb_operands == 2:
-        return operation(input_values[0], input_values[1])
-    return operation(input_values[0], input_values[1], input_values[2])
+    return do_calculation(OPERATIONS_2D, equation, input_values)
 
 
 def get_available_2d_variables(input_var_IDs):
     """!
     @brief Determine the list of new 2D variables computable from the input variables by basic relations
-    @param input_var_IDs <[str]>: the list of 2D variable IDs contained in the input file
+    @param <[str]> input_var_IDs: the list of 2D variable IDs contained in the input file
     @return <[Variable]>: the list of variables computable from the input variables by basic relations
     """
     computables = list(map(VARIABLES_2D.get, filter(is_basic_2d_variable, input_var_IDs)))
@@ -161,8 +155,9 @@ def get_available_2d_variables(input_var_IDs):
 def get_necessary_2d_equations(known_var_IDs, needed_var_IDs, us_equation):
     """!
     @brief Determine the list of 2D equations needed to compute all user-selected variables, with precedence handling
-    @param known_var_IDs <[str]>: the list of variable IDs contained in the input file
-    @param needed_var_IDs <[str]>: the list of variable IDs selected by the user
+    @param <[str]> known_var_IDs: the list of variable IDs contained in the input file
+    @param <[str]> needed_var_IDs: the list of variable IDs selected by the user
+    @param <Equation> us_equation: user-specified equation for friction velocity
     @return <[Equation]>: the list of equations needed to compute all user-selected variables
     """
     selected_unknown_var_IDs = list(filter(lambda x: x not in known_var_IDs, needed_var_IDs))
@@ -300,7 +295,7 @@ def get_necessary_2d_equations(known_var_IDs, needed_var_IDs, us_equation):
 def get_US_equation(friction_law):
     """!
     @brief Convert integer code to friction law equation
-    @param friction_law <int>: an integer specifying the friction law to use
+    @param <int>  friction_law: an integer specifying the friction law to use
     @return <Equation>: the corresponding friction law equation
     """
     if friction_law == 0:
@@ -314,9 +309,9 @@ def get_US_equation(friction_law):
 
 def add_US(available_vars, known_vars):
     """!
-    @brief Add US, TAU and DMAX Variable objects to the list
-    @param available_vars <[Variable]>: the target list
-    @param known_vars <[str]>: known variables IDs
+    @brief Add US, TAU and DMAX and eventually FROTP Variable objects to the list
+    @param <[Variable]> available_vars: the target list
+    @param <[str]> known_vars: known variables IDs
     """
     available_vars.append(US)
     available_vars.append(TAU)
@@ -329,12 +324,12 @@ def do_2d_calculations_in_frame(equations, us_equation, input_serafin, time_inde
                                 output_float_type):
     """!
     @brief Return the selected 2D variables values in a single time frame
-    @param equations <[Equation]>: list of all equations necessary to compute selected variables
-    @param us_equation <Equation>: user-specified friction law equation
-    @param input_serafin <Serafin.Read>: input stream for reading necessary variables
-    @param time_index <int>: the position of time frame to read
-    @param selected_output_IDs <[str]>: the short names of the selected output variables
-    @param output_float_type <numpy.dtype>: float32 or float64 according to the output file type
+    @param <[Equation]> equations: list of all equations necessary to compute selected variables
+    @param <Equation> us_equation: user-specified friction law equation
+    @param <Serafin.Read> input_serafin: input stream for reading necessary variables
+    @param <int> time_index: the position of time frame to read
+    @param <[str]> selected_output_IDs: the short names of the selected output variables
+    @param  <numpy.dtype> output_float_type: float32 or float64 according to the output file type
     @return <numpy.ndarray>: the values of the selected output variables
     """
     computed_values = {}

@@ -65,15 +65,31 @@ def cubic_root(x):
 
 
 # define the operators (relations between variables) as constants
-PLUS, MINUS, TIMES, NORM2, NORM3 = 1, 2, 3, 4, 104
+PLUS, MINUS, TIMES, NORM2, NORM2_3D = 1, 2, 3, 4, 104
 
 COMMON_OPERATIONS = {
     PLUS: lambda a, b: a + b,
     MINUS: lambda a, b: a-b,
     TIMES: lambda a, b: a*b,
     NORM2: lambda a, b: np.sqrt(np.square(a) + np.square(b)),
-    NORM3: lambda a, b, c: np.sqrt(np.square(a) + np.square(b) + np.square(c)),
+    NORM2_3D: lambda a, b, c: np.sqrt(np.square(a) + np.square(b) + np.square(c)),
 }
+
+
+def do_calculation(operation_dict, equation, input_values):
+    """!
+    @brief Apply an equation on input values
+    @param <Equation> equation: an equation object
+    @param <[numpy 1D-array]> input_values: the values of the input variables
+    @return <numpy 1D-array>: the values of the output variable
+    """
+    operation = operation_dict[equation.operator]
+    nb_operands = len(input_values)
+    if nb_operands == 1:
+        return operation(input_values[0])
+    elif nb_operands == 2:
+        return operation(input_values[0], input_values[1])
+    return operation(input_values[0], input_values[1], input_values[2])
 
 
 def get_available_variables(computables, basic_equations):
@@ -97,3 +113,4 @@ def get_available_variables(computables, basic_equations):
         if not found_new_computable:
             break
     return available_vars
+
