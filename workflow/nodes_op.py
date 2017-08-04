@@ -675,7 +675,7 @@ class SelectTimeNode(OneInOneOutNode):
             str_end_date = ''
         else:
             str_start_date = self.start_date.strftime('%Y/%m/%d %H:%M:%S')
-            str_end_date = self.start_date.strftime('%Y/%m/%d %H:%M:%S')
+            str_end_date = self.end_date.strftime('%Y/%m/%d %H:%M:%S')
 
         return '|'.join([self.category, self.name(), str(self.index()),
                          str(self.pos().x()), str(self.pos().y()),
@@ -685,7 +685,7 @@ class SelectTimeNode(OneInOneOutNode):
         start_date, end_date = options[0:2]
         if start_date:
             self.start_date = datetime.datetime.strptime(start_date, '%Y/%m/%d %H:%M:%S')
-            self.end_date = datetime.datetime.strptime(start_date, '%Y/%m/%d %H:%M:%S')
+            self.end_date = datetime.datetime.strptime(end_date, '%Y/%m/%d %H:%M:%S')
         self.sampling_frequency = int(options[2])
 
     def run(self):
