@@ -1239,9 +1239,7 @@ def write_shp(node_id, fid, data, options):
 
 
 def write_vtk(node_id, fid, data, options):
-    if data.header.is_2d:
-        return False, node_id, fid, None, fail_message('the input file is not 3D', 'Write vtk', data.job_id)
-    if 'Z' not in data.header.var_IDs:
+    if not data.header.is_2d and 'Z' not in data.header.var_IDs:
         return False, node_id, fid, None, fail_message('the variable Z is not found', 'Write vtk', data.job_id)
 
     available_vars = [var for var in data.selected_vars if var in data.header.var_IDs and var != 'Z']
@@ -1274,12 +1272,13 @@ def write_vtk(node_id, fid, data, options):
     if all(skip):
         return True, node_id, fid, None, success_message('Write vtk', data.job_id, 'file already exists')
 
-    scalars, vectors, vtk_var_names = operations.detect_vector_triples(available_vars, data.selected_vars_names,
-                                                                       data.language)
+    scalars, vectors, vtk_var_names = operations.detect_vector_vtk(data.header.is_2d, available_vars,
+                                                                   data.selected_vars_names, data.language)
     for to_skip, filename, time_index in zip(skip, filenames, data.selected_time_indices):
         if to_skip:
             continue
-        operations.slf_to_vtk(data.filename, data.header, filename, scalars, vectors, vtk_var_names, time_index)
+        operations.slf_to_vtk(data.header.is_2d, data.filename, data.header, filename,
+                              scalars, vectors, vtk_var_names, time_index)
 
     return True, node_id, fid, None, success_message('Write shp', data.job_id)
 

@@ -29,6 +29,12 @@ _VECTORS = {'U': ('V', 'M'), 'V': ('U', 'M'), 'QSX': ('QSY', 'QS'), 'QSY': ('QSX
             'I': ('J', 'Q'), 'J': ('I', 'Q')}
 _VECTORS_BROTHERS = {('U', 'V'): 'M', ('I', 'J'): 'Q', ('X', 'Y'): '.', ('QSX', 'QSY'): 'QS',
                      ('QSBLX', 'QSBLY'): 'QSBL', ('QSSUSPX', 'QSSUSPY'): 'QSSUSP'}
+
+_VECTORS_2D = {('U', 'V'): {'fr': 'VITESSE', 'en': 'VELOCITY'},
+               ('I', 'J'): {'fr': 'DEBIT', 'en': 'FLOWRATE'}, ('X', 'Y'): {'fr': 'VENT', 'en': 'WIND'},
+               ('QSX', 'QSY'): {'fr': 'DEBIT_SOLIDE', 'en': 'SOLID_DISCHARGE'},
+               ('QSBLX', 'QSBLY'): {'fr': 'QS_CHARRIAGE', 'en': 'QS_BEDLOAD'},
+               ('QSSUPSX', 'QSSUSPY'): {'fr': 'QS_SUSPENSION', 'en': 'QS_SUSPENSION'}}
 _VECTORS_3D = {('U', 'V', 'W'): {'fr': 'VITESSE', 'en': 'VELOCITY'},
                ('NUX', 'NUY', 'NUZ'): {'fr': 'NU_POUR_VITESSE', 'en': 'NU_FOR_VELOCITY'},
                ('UCONV', 'VCONV', 'WCONV'): {'fr': 'CONVECTION', 'en': 'ADVECTION'}}
@@ -217,12 +223,18 @@ def detect_vector_couples(variables, available_variables):
     return coupled, non_coupled, mothers, angles
 
 
-def detect_vector_triples(variables, variable_names, language):
+def detect_vector_vtk(is_2d, variables, variable_names, language):
     scalars, vectors, names = [], [], {}
-    for triple, name_dic in _VECTORS_3D.items():
-        if all(u in variables for u in triple):
-            vectors.append(triple)
-            names[triple] = name_dic[language]
+    if is_2d:
+        for couple, name_dic in _VECTORS_2D.items():
+            if all(u in variables for u in couple):
+                vectors.append(couple)
+                names[couple] = name_dic[language]
+    else:
+        for triple, name_dic in _VECTORS_3D.items():
+            if all(u in variables for u in triple):
+                vectors.append(triple)
+                names[triple] = name_dic[language]
     var_vectors = sum(vectors, ())
     for var in variables:
         if var not in var_vectors:
@@ -308,9 +320,10 @@ def slf_to_xml(slf_name, slf_header, xml_name, scalar, time_index):
         xml.write('</LandXML>\n')
 
 
-def slf_to_vtk(slf_name, slf_header, vtk_name, scalars, vectors, variable_names, time_index):
+def slf_to_vtk(is_2d, slf_name, slf_header, vtk_name, scalars, vectors, variable_names, time_index):
     """!
     @brief Write vtk file from a scalar variable of a .slf file
+    @param is_2d <bool>: True if the input file is 2D
     @param slf_name <str>: path to the input .slf file
     @param slf_header <slf.Serafin.SerafinHeader>: input Serafin header
     @param vtk_name <str>: output vtk filename
@@ -318,6 +331,64 @@ def slf_to_vtk(slf_name, slf_header, vtk_name, scalars, vectors, variable_names,
     @param vectors <tuple of str>: vector variables
     @param time_index <int>: the index of the frame (0-based)
     """
+    if is_2d:
+        slf_to_vtk_2d(slf_name, slf_header, vtk_name, scalars, vectors, variable_names, time_index)
+    else:
+        slf_to_vtk_3d(slf_name, slf_header, vtk_name, scalars, vectors, variable_names, time_index)
+
+
+def slf_to_vtk_2d(slf_name, slf_header, vtk_name, scalars, vectors, variable_names, time_index):
+    with Serafin.Read(slf_name, slf_header.language) as input_stream:
+        input_stream.header = slf_header
+
+        with open(vtk_name, 'w') as output_stream:
+            # write header
+            header = '# vtk DataFile Version 2.0\nMesh export\nASCII\nDATASET UNSTRUCTURED_GRID\n\n'
+            output_stream.write(header)
+
+            # write vertices
+            output_stream.write('POINTS %d float\n' % slf_header.nb_nodes)
+            for ix, iy in zip(slf_header.x, slf_header.y):
+                output_stream.write('%.6f %.6f 0.\n' % (ix, iy))
+            output_stream.write('\n')
+
+            # write cells
+            output_stream.write('CELLS %d %d\n' % (slf_header.nb_elements, slf_header.nb_elements * 4))
+
+            ikle = slf_header.ikle_2d - 1
+            for k1, k2, k3 in ikle:
+                output_stream.write('3 %d %d %d\n' % (k1, k2, k3))
+            output_stream.write('\n')
+
+            output_stream.write('CELL_TYPES %d\n' % slf_header.nb_elements)
+            for _ in range(slf_header.nb_elements):
+                output_stream.write('5\n')
+            output_stream.write('\n')
+
+            # write scalar and vector data
+            output_stream.write('POINT_DATA %d\n' % slf_header.nb_nodes)
+
+            for scalar in scalars:
+                values = input_stream.read_var_in_frame(time_index, scalar)
+                name = variable_names[scalar]
+
+                output_stream.write('SCALARS %s float\nLOOKUP_TABLE default\n' % name)
+                for v in values:
+                    output_stream.write('%.6f\n' % v)
+                output_stream.write('\n')
+
+            for triple in vectors:
+                u_values = input_stream.read_var_in_frame(time_index, triple[0])
+                v_values = input_stream.read_var_in_frame(time_index, triple[1])
+                name = variable_names[triple]
+
+                output_stream.write('VECTORS %s float\n' % name)
+                for u, v in zip(u_values, v_values):
+                    output_stream.write('%.6f %.6f 0.\n' % (u, v))
+                output_stream.write('\n')
+
+
+def slf_to_vtk_3d(slf_name, slf_header, vtk_name, scalars, vectors, variable_names, time_index):
     with Serafin.Read(slf_name, slf_header.language) as input_stream:
         input_stream.header = slf_header
 

@@ -1022,12 +1022,10 @@ class WriteVtkNode(SingleInputNode):
             return
 
         input_data = self.in_port.mother.parentItem().data
-        if input_data.header.is_2d:
-            self.fail('the input file is not 3D')
-            return
-        if 'Z' not in input_data.header.var_IDs:
-            self.fail('the variable Z is not found')
-            return
+        if not input_data.header.is_2d:
+            if 'Z' not in input_data.header.var_IDs:
+                self.fail('the variable Z is not found')
+                return
 
         available_vars = [var for var in input_data.selected_vars if var in input_data.header.var_IDs and var != 'Z']
         if len(available_vars) == 0:
@@ -1063,15 +1061,15 @@ class WriteVtkNode(SingleInputNode):
             return
 
         # separate vectors from scalars
-        scalars, vectors, vtk_var_names = operations.detect_vector_triples(available_vars,
-                                                                           input_data.selected_vars_names,
-                                                                           input_data.language)
+        scalars, vectors, vtk_var_names = operations.detect_vector_vtk(input_data.header.is_2d, available_vars,
+                                                                       input_data.selected_vars_names,
+                                                                       input_data.language)
 
         # write vtk
         for to_skip, filename, time_index in zip(skip, filenames, input_data.selected_time_indices):
             if to_skip:
                 continue
-            operations.slf_to_vtk(input_data.filename, input_data.header, filename,
+            operations.slf_to_vtk(input_data.header.is_2d, input_data.filename, input_data.header, filename,
                                   scalars, vectors, vtk_var_names, time_index)
 
         self.success()
