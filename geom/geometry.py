@@ -101,7 +101,7 @@ class Polyline:
     def polygon_intersection(self, triangle):
         """!
         @brief (Used in volume calculation) Return the polygon or multipolygon intersection with the triangle
-        @param <shapely.geometry.Polygon> triangle: A triangle
+        @param triangle <shapely.geometry.Polygon>: A triangle
         @return <bool, shapely.geometry.Polygon or shapely.geometry.Multipolygon>: The intersection with the triangle
         """
         inter = self._polyline.intersection(triangle)
@@ -118,8 +118,8 @@ class Polyline:
     def triangle_difference(triangle, polygon):
         """!
         @brief (Used in volume calculation) Return the polygon or multipolygon in triangle but not in polygon
-        @param <shapely.geometry.Polygon> triangle: A triangle
-        @param <Polyline> polygon: A polygon
+        @param triangle <shapely.geometry.Polygon>: A triangle
+        @param polygon <shapely.geometry.Polygon>: A polygon
         @return <bool, shapely.geometry.Polygon or shapely.geometry.Multipolygon>: The difference between triangle and polygon
         """
         diff = triangle.difference(polygon.polyline())
@@ -135,7 +135,7 @@ class Polyline:
     def linestring_intersection(self, triangle):
         """!
         @brief (Used in flux calculation) Return the linearString intersection with the triangle
-        @param <shapely.geometry.Polygon> triangle: A triangle
+        @param triangle <shapely.geometry.Polygon>: A triangle
         @return <bool, [shapely.geometry.LinearString]>: The intersection with the triangle
         """
         inter = triangle.intersection(self._polyline)

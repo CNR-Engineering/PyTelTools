@@ -52,7 +52,7 @@ class InputTab(SerafinInputTab):
         self._bindEvents()
 
     def _initWidgets(self):
-        self.btnOpen.setText('Loaf\nFile A')
+        self.btnOpen.setText('Load\nFile A')
 
         # create the button open the test file
         self.btnOpenSecond = QPushButton('Load\nFile B', self, icon=self.style().standardIcon(QStyle.SP_DialogOpenButton))

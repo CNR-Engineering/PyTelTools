@@ -37,8 +37,8 @@ _VECTORS_3D = {('U', 'V', 'W'): {'fr': 'VITESSE', 'en': 'VELOCITY'},
 def scalars_vectors(known_vars, selected_vars, us_equation=None):
     """!
     @brief Separate the scalars from vectors, allowing different max/min computations
-    @param <list> known_vars: the list of variable IDs with known values
-    @param <str> selected_vars: the selected variables IDs
+    @param known_vars <list>: the list of variable IDs with known values
+    @param selected_vars <str>: the selected variables IDs
     @return <tuple>: the list of scalars, the list of vectors, the list of additional equations for magnitudes
     """
     scalars = []
@@ -165,9 +165,9 @@ def is_valid_postfix(expression):
 def evaluate_expression(input_stream, time_index, expression):
     """!
     @brief Evaluate a postfix expression on the input stream for a single frame
-    @param <slf.Serafin.Read> input_stream: the input .slf
-    @param <int> time_index: the index of the frame
-    @param <list> expression: the expression to evaluate in postfix format
+    @param input_stream <slf.Serafin.Read>: the input .slf
+    @param time_index <int>: the index of the frame
+    @param expression <list>: the expression to evaluate in postfix format
     @return <numpy.1D-array>: the value of the expression
     """
     stack = []
@@ -276,11 +276,11 @@ def slf_to_shp(slf_name, slf_header, shp_name, variables, time_index):
 def slf_to_xml(slf_name, slf_header, xml_name, scalar, time_index):
     """!
     @brief Write LandXML file from a scalar variable of a .slf file
-    @param <str> slf_name: path to the input .slf file
-    @param <slf.Serafin.SerafinHeader> slf_header: input Serafin header
-    @param <str> xml_name: output LandXML filename
-    @param <str> scalar: variable to write
-    @param <int> time_index: the index of the frame (0-based)
+    @param slf_name <str>: path to the input .slf file
+    @param slf_header <slf.Serafin.SerafinHeader>: input Serafin header
+    @param xml_name <str>: output LandXML filename
+    @param scalar <str>: variable to write
+    @param time_index <int>: the index of the frame (0-based)
     """
     # fetch scalar variable values
     with Serafin.Read(slf_name, slf_header.language) as input_stream:
@@ -311,12 +311,12 @@ def slf_to_xml(slf_name, slf_header, xml_name, scalar, time_index):
 def slf_to_vtk(slf_name, slf_header, vtk_name, scalars, vectors, variable_names, time_index):
     """!
     @brief Write vtk file from a scalar variable of a .slf file
-    @param <str> slf_name: path to the input .slf file
-    @param <slf.Serafin.SerafinHeader> slf_header: input Serafin header
-    @param <str> vtk_name: output vtk filename
-    @param <str> scalars: scalar variables
-    @param <tuple of str> vectors: vector variables
-    @param <int> time_index: the index of the frame (0-based)
+    @param slf_name <str>: path to the input .slf file
+    @param slf_header <slf.Serafin.SerafinHeader>: input Serafin header
+    @param vtk_name <str>: output vtk filename
+    @param scalars <str>: scalar variables
+    @param vectors <tuple of str>: vector variables
+    @param time_index <int>: the index of the frame (0-based)
     """
     with Serafin.Read(slf_name, slf_header.language) as input_stream:
         input_stream.header = slf_header
@@ -472,7 +472,7 @@ class VectorMaxMinMeanCalculator:
                 if input_var_ID not in computed_values:
                     computed_values[input_var_ID] = self.input_stream.read_var_in_frame(time_index, input_var_ID)
             # compute additional variables
-            output_values = do_calculation(equation, [computed_values[var_ID] for var_ID in input_var_IDs])
+            output_values = do_2d_calculation(equation, [computed_values[var_ID] for var_ID in input_var_IDs])
             computed_values[equation.output.ID()] = output_values
         return computed_values
 

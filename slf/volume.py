@@ -36,7 +36,7 @@ class TruncatedTriangularPrisms(Mesh2D):
     def polygon_intersection_strict(self, polygon):
         """!
         @brief Return the weight carried by the triangle nodes entirely contained in polygon
-        @param <geom.geometry.Polyline> polygon: A polygon
+        @param polygon <geom.geometry.Polyline>: A polygon
         @return <numpy.1D-array>: The weight carried by the triangle nodes
         """
         potential_elements = self.get_intersecting_elements(polygon.bounds())
@@ -50,7 +50,7 @@ class TruncatedTriangularPrisms(Mesh2D):
     def polygon_intersection(self, polygon):
         """!
         @brief Return the weight carried by the triangle nodes entirely contained in polygon and info about boundary triangles
-        @param <geom.geometry.Polyline> polygon: A polygon
+        @param polygon <geom.geometry.Polyline>: A polygon
         @return <numpy.1D-array, dict>: The weight carried by the triangle nodes, and the dictionary of tuple (area, centroid value) for boundary triangles
         """
         potential_elements = self.get_intersecting_elements(polygon.bounds())
@@ -71,7 +71,7 @@ class TruncatedTriangularPrisms(Mesh2D):
     def polygon_intersection_all(self, polygon):
         """!
         @brief Return all triangles entirely contained in polygon and all boundary triangle-polygon intersections
-        @param <geom.geometry.Polyline> polygon: A polygon
+        @param polygon <geom.geometry.Polyline>: A polygon
         @return <dict, dict>: The dictionaries of all triangles contained in polygon, and of tuples (base triangle, intersection) for boundary triangles
         """
         potential_elements = self.get_intersecting_elements(polygon.bounds())
@@ -101,8 +101,8 @@ class TruncatedTriangularPrisms(Mesh2D):
     def boundary_volume_in_polygon(triangle_polygon_intersection, variable):
         """!
         @brief Return the total volume in all triangle-polygon intersections
-        @param <dict> triangle_polygon_intersection: All triangle-polygon intersections defined by boundary triangles
-        @param <numpy.1D-array> variable: The values of the variable on all nodes
+        @param triangle_polygon_intersection <dict>: All triangle-polygon intersections defined by boundary triangles
+        @param variable <numpy.1D-array>: The values of the variable on all nodes
         @return <numpy.float>: The total volume in all triangle-polygon intersections
         """
         volume = 0
@@ -115,9 +115,9 @@ class TruncatedTriangularPrisms(Mesh2D):
     def superior_prism_volume(vertices, area, values):
         """!
         @brief Return the volume in the half-space z > 0 of the prism with the given base triangle and values
-        @param <list> vertices: The coordinates of the three vertices defining the base triangle
-        @param <float> area: The area of the base triangle
-        @param <numpy.1D-array> values: The values of the variable on the three nodes of the triangle
+        @param vertices <list>: The coordinates of the three vertices defining the base triangle
+        @param area <float>: The area of the base triangle
+        @param values <numpy.1D-array>: The values of the variable on the three nodes of the triangle
         @return <float>: The volume of the prism in the half-space z > 0
         """
         # eliminate special cases
@@ -142,10 +142,10 @@ class TruncatedTriangularPrisms(Mesh2D):
     def superior_prism_volume_in_intersection(polygon, vertices, area, intersection, values):
         """!
         @brief Return the volume of the prism in the half-space z > 0 and inside the polygon
-        @param <shapely.geometry.Polygon> polygon: The volume-defining polygon
-        @param <list> vertices: The coordinates of the three vertices defining the base triangle
-        @param <float> area: The area of the base triangle
-        @param <numpy.1D-array> values: The values of the variable on the three nodes of the triangle
+        @param polygon <shapely.geometry.Polygon>: The volume-defining polygon
+        @param vertices <list>: The coordinates of the three vertices defining the base triangle
+        @param area <float>: The area of the base triangle
+        @param values <numpy.1D-array>: The values of the variable on the three nodes of the triangle
         @return <float>: The volume of the prism in the half-space z > 0 and inside the polygon
         """
         # eliminate special cases
@@ -245,9 +245,9 @@ class VolumeCalculator:
     def volume_in_frame_in_polygon(self, weight, values, polygon):
         """!
         @brief Do the volume computation in a single frame, depending on the volume type
-        @param <tuple> weight: the point weights/intersections etc. depending on the polygon and on the volume type
-        @param <numpy.1D-array> values: the values of the variable for which the volume will be computed
-        @param <geom.geometry.Polylin> polygon: the polygon in which the volume will be computed
+        @param weight <tuple>: the point weights/intersections etc. depending on the polygon and on the volume type
+        @param values <numpy.1D-array>: the values of the variable for which the volume will be computed
+        @param polygon <geom.geometry.Polygon>: the polygon in which the volume will be computed
         @return <float>: The value of the volume
         """
         if self.volume_type == VolumeCalculator.NET_STRICT:

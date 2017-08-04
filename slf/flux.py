@@ -25,7 +25,7 @@ class TriangularVectorField(Mesh2D):
     def section_intersection(self, section):
         """!
         @brief Return the intersections (normal vectors and interpolators) of the mesh with a open polyline
-        @param <geom.geometry.Polyline> section: An open polyline
+        @param section <geom.geometry.Polyline>: An open polyline
         @return <dict>: The list of tuples (normal vector, interpolator) of every intersected segments in triangles
         """
         intersections = {}
@@ -223,7 +223,7 @@ class FluxCalculator:
     def flux_in_frame(self, intersections, values):
         """!
         @brief Do the flux computation in a single frame, depending on the flux type
-        @param <numpy.1D-array> values: The values of the scalar/vector fields
+        @param values <numpy.1D-array>: The values of the scalar/vector fields
         @return <float>: The value of the flux
         """
         if self.flux_type == FluxCalculator.LINE_INTEGRAL:

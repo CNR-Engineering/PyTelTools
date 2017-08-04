@@ -329,7 +329,7 @@ class Read(Serafin):
         # appropriate warning when trying to exact a single variable
         if not isinstance(var_ID, str):
             raise SerafinRequestError('Cannot read multiple variables')
-
+        module_logger.debug("Reading variable %s at frame %i" %(var_ID, time_index))
         nb_values = '>%i%s' % (self.header.nb_nodes, self.header.float_type)
         pos_var = self.var_ID_to_index(var_ID)
         self.file.seek(self.header.header_size + time_index * self.header.frame_size

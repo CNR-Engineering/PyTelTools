@@ -163,7 +163,7 @@ def open_points():
         return False, '', [], [], []
 
     if not points:
-        QMessageBox.critical(None, 'Error', 'The file does not contain any open polyline.',
+        QMessageBox.critical(None, 'Error', 'The file does not contain any point.',
                              QMessageBox.Ok)
         return False, '', [], [], []
     return True, filename, points, attributes, fields

@@ -140,9 +140,9 @@ class TransformationMap:
     def get_transformation(self, from_index, to_index):
         """!
         @brief Get the series of transformations needed to transform coordinates in the first system to the second
-        @param <int> from_index: the index of the first coordinate system
-        @param <int> to_index: the index of the second coordinate system
-        @return <list of Transformation>: the list of transformations from the first system to the second
+        @param from_index <int>: the index of the first coordinate system
+        @param to_index <int>: the index of the second coordinate system
+        @return <[Transformation]>: the list of transformations from the first system to the second
         """
         if from_index == to_index:
             return [IDENTITY]
@@ -153,9 +153,9 @@ class TransformationMap:
 def transformation_optimization(from_points, to_points, ignore_z):
     """!
     @brief Wrapper for optimization methods for transformations from one coordinate system to another
-    @param <list> from_points: coordinates of points in the first coordinate system
-    @param <list> to_points: the coordinates of the same points in the second coordinate system
-    @param <bool> ignore_z: if True, optimize for 4 parameters instead of 6 (identity along z-axis)
+    @param from_points <list>: coordinates of points in the first coordinate system
+    @param to_points <list>: the coordinates of the same points in the second coordinate system
+    @param ignore_z <bool>: if True, optimize for 4 parameters instead of 6 (identity along z-axis)
     @return <tuple>: the final transformation, final cost function value, boolean indicating success and a message
     """
     if ignore_z:
@@ -166,8 +166,8 @@ def transformation_optimization(from_points, to_points, ignore_z):
 def four_parameters_optimization(from_points, to_points):
     """!
     @brief Optimize four parameters of the transformation from one coordinate system to another (identity along z-axis)
-    @param <list> from_points: coordinates of points in the first coordinate system
-    @param <list> to_points: the coordinates of the same points in the second coordinate system
+    @param from_points <list>: coordinates of points in the first coordinate system
+    @param to_points <list>: the coordinates of the same points in the second coordinate system
     @return <tuple>: the final transformation, final cost function value, boolean indicating success and a message
     """
     def sum_square_error(x):
@@ -206,8 +206,8 @@ def four_parameters_optimization(from_points, to_points):
 def six_parameters_optimization(from_points, to_points):
     """!
     @brief Optimize all six parameters of the transformation from one coordinate system to another
-    @param <list> from_points: coordinates of points in the first coordinate system
-    @param <list> to_points: the coordinates of the same points in the second coordinate system
+    @param from_points <list>: coordinates of points in the first coordinate system
+    @param to_points <list>: the coordinates of the same points in the second coordinate system
     @return <tuple>: the final transformation, final cost function value, boolean indicating success and a message
     """
     def sum_square_error(x):
@@ -248,8 +248,8 @@ def six_parameters_optimization(from_points, to_points):
 def is_connected(nodes, edge_list):
     """!
     @brief ad hoc function for checking if an undirected graph is connected
-    @param <list> nodes: the list of nodes in the graph
-    @param <iterable> edge_list: edges in the graph
+    @param nodes <list>: the list of nodes in the graph
+    @param edge_list <iterable>: edges in the graph
     @return <bool>: True if the graph is connected
     """
     adj = {}
@@ -275,7 +275,7 @@ def is_connected(nodes, edge_list):
 def load_transformation_map(filename):
     """!
     @brief Load and build the transformation map from configuration file
-    @param <str> filename: path to the input file
+    @param filename <str>: path to the input file
     @return <tuple>: boolean indicating if the file is valid, and the TransformationMap object
     """
     try:

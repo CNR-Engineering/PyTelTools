@@ -79,8 +79,8 @@ COMMON_OPERATIONS = {
 def do_calculation(operation_dict, equation, input_values):
     """!
     @brief Apply an equation on input values
-    @param <Equation> equation: an equation object
-    @param <[numpy 1D-array]> input_values: the values of the input variables
+    @param equation <Equation>: an equation object
+    @param input_values <[numpy 1D-array]>: the values of the input variables
     @return <numpy 1D-array>: the values of the output variable
     """
     operation = operation_dict[equation.operator]
