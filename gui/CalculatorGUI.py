@@ -8,7 +8,7 @@ from geom import Shapefile
 from gui.util import OutputProgressDialog, OutputThread, TelToolWidget, test_open
 from slf.datatypes import SerafinData
 from slf import Serafin
-import slf.misc as operations
+from slf.expression.pool import ComplexExpressionMultiPool
 from workflow.util import MultiLoadSerafinDialog, MultiSaveDialog, process_output_options
 
 
@@ -616,7 +616,7 @@ class OutputVariableDialog(QDialog):
         self.name_combo = QComboBox()
         for var, var_name in zip(pool.vars(), pool.var_names()):
             self.name_combo.addItem('%s (%s)' % (var, var_name))
-        self.name_text.setFixedHeight(35)
+        self.name_combo.setFixedHeight(35)
         self.name_text = QLineEdit()
         self.name_text.setFixedHeight(35)
         self.name_text.setEnabled(False)
@@ -663,7 +663,7 @@ class OutputVariableDialog(QDialog):
                                      QMessageBox.Ok)
                 return
         else:
-            self.name = self.name_combo.currentText().split('(')[:-1]
+            self.name = self.name_combo.currentText().split('(')[1][:-1]
         if self.name in self.old_names:
             QMessageBox.critical(None, 'Error', 'This name is already used!', QMessageBox.Ok)
             return
@@ -841,7 +841,7 @@ class EditorTab(QWidget):
     def __init__(self, input_tab):
         super().__init__()
         self.input = input_tab
-        self.pool = operations.ComplexExpressionMultiPool()
+        self.pool = ComplexExpressionMultiPool()
 
         self.add_expression_button = QPushButton('Add Expression')
         self.add_condition_button = QPushButton('Add Condition')

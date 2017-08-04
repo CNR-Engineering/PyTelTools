@@ -2,10 +2,9 @@
 Handle 3D variables and their relationships in .slf files for additional variable computation
 """
 
-from slf.variables_utils import *
+from slf.variable.variables_utils import *
 
 # define variables
-
 spec = """U,VITESSE U,VELOCITY U,M/S
 V,VITESSE V,VELOCITY V,M/S
 W,VITESSE W,VELOCITY W,M/S

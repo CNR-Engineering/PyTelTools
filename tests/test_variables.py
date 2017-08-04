@@ -4,7 +4,7 @@ Unittest for slf.variables module
 
 import unittest
 
-from slf.variables_2d import get_necessary_2d_equations, \
+from slf.variables.variables_2d import get_necessary_2d_equations, \
     CHEZY_EQUATION, MANNING_EQUATION, NIKURADSE_EQUATION, STRICKLER_EQUATION
 
 

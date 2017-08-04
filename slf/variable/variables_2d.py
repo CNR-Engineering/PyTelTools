@@ -2,10 +2,9 @@
 Handle 2D variables and their relationships in .slf files for additional variable computation
 """
 
-from slf.variables_utils import *
+from slf.variable.variables_utils import *
 
 # define variables
-
 spec = """S,SURFACE LIBRE,FREE SURFACE,M
 B,FOND,BOTTOM,M
 H,HAUTEUR D'EAU,WATER DEPTH,M
