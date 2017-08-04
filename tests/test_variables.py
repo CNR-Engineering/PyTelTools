@@ -4,7 +4,8 @@ Unittest for slf.variables module
 
 import unittest
 
-from slf.variables_2d import CHEZY_EQUATION, get_necessary_2d_equations, MANNING_EQUATION, NIKURADSE_EQUATION, STRICKLER_EQUATION
+from slf.variables_2d import get_necessary_2d_equations, \
+    CHEZY_EQUATION, MANNING_EQUATION, NIKURADSE_EQUATION, STRICKLER_EQUATION
 
 
 eq_name = lambda eqs: list(map(lambda x: x.output.ID(), eqs))

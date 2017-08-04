@@ -10,8 +10,7 @@ from geom import BlueKenue, Shapefile
 from slf import Serafin
 from slf.datatypes import SerafinData, PointData, PolylineData
 from slf.interpolation import MeshInterpolator
-from slf.variables_2d import do_2d_calculations_in_frame
-from slf.variables_3d import do_3d_calculations_in_frame
+from slf.variables import do_calculations_in_frame
 from workflow.Node import Node, SingleInputNode, SingleOutputNode, OneInOneOutNode
 from workflow.util import LoadSerafinDialog, logger, OutputOptionPanel, GeomOutputOptionPanel, VtkOutputOptionPanel, \
                           process_output_options, process_geom_output_options, process_vtk_output_options, \
@@ -128,14 +127,9 @@ class WriteSerafinNode(OneInOneOutNode):
             with Serafin.Write(self.filename, input_data.language) as output_stream:
                 output_stream.write_header(output_header)
                 for i, time_index in enumerate(input_data.selected_time_indices):
-                    if output_header.is_2d:
-                        values = do_2d_calculations_in_frame(input_data.equations, input_data.us_equation,
-                                                             input_stream, time_index, input_data.selected_vars,
-                                                             output_header.np_float_type)
-                    else:
-                        values = do_3d_calculations_in_frame(input_data.equations,
-                                                             input_stream, time_index, input_data.selected_vars,
-                                                             output_header.np_float_type)
+                    values = do_calculations_in_frame(input_data.equations, input_stream, time_index,
+                                                      input_data.selected_vars, output_header.np_float_type,
+                                                      is_2d=output_header.is_2d, us_equation=input_data.us_equation)
                     output_stream.write_entire_frame(output_header, input_data.time[time_index], values)
 
                     self.progress_bar.setValue(100 * (i+1) / len(input_data.selected_time_indices))

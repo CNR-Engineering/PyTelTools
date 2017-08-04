@@ -175,7 +175,8 @@ class SerafinHeader:
         for var_name, var_unit in zip(self.var_names, self.var_units):
             name = var_name.decode(encoding='utf-8').strip()
             if name not in var_table:
-                module_logger.warn('WARNING: The variable name "%s" is not known. The complete name will be used as ID' % name)
+                module_logger.warning('WARNING: The variable name "%s" is not known. '
+                                      'The complete name will be used as ID' % name)
                 var_id = name
             else:
                 var_id = var_table[name]

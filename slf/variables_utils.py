@@ -4,8 +4,13 @@ Handle 2D and 3D additional variables
 
 import numpy as np
 
+# define constants
+KARMAN = 0.4
+RHO_WATER = 1000.
+GRAVITY = 9.80665
 
-class Variable():
+
+class Variable:
     """!
     @brief Data type for a single variable with ID (short name), Name (fr or en) and Unit
     """
@@ -32,7 +37,7 @@ class Variable():
         return self._unit
 
 
-class Equation():
+class Equation:
     """!
     @brief Data type for an equation consisting of N input variables, 1 output variables and (N-1) operators
     """
@@ -53,7 +58,6 @@ def build_variables(spec):
     return variables
 
 
-# define common operators
 def square_root(x):
     with np.errstate(invalid='ignore'):
         return np.sqrt(x)
@@ -64,26 +68,47 @@ def cubic_root(x):
         return np.where(x < 0, np.power(-x, 1/3.), np.power(x, 1/3.))
 
 
-# define the operators (relations between variables) as constants
-PLUS, MINUS, TIMES, NORM2, NORM2_3D = 1, 2, 3, 4, 104
+def compute_NIKURADSE(w, h, m):
+    with np.errstate(divide='ignore', invalide='ignore'):
+        return np.sqrt(np.power(m, 2) * KARMAN**2 / np.power(np.log(30 * h / np.exp(1) / w), 2))
 
-COMMON_OPERATIONS = {
+
+def compute_DMAX(tau):
+    return np.where(tau > 0.34, 1.4593 * np.power(tau, 0.979),
+                    np.where(tau > 0.1, 1.2912 * np.power(tau, 2) + 1.3572 * tau - 0.1154,
+                             0.9055 * np.power(tau, 1.3178)))
+
+
+PLUS, MINUS, TIMES, NORM2, NORM2_3D = 1, 2, 3, 4, 104
+COMPUTE_TAU, COMPUTE_DMAX = 5, 6
+COMPUTE_CHEZY, COMPUTE_STRICKLER, COMPUTE_MANNING, COMPUTE_NIKURADSE = 7, 8, 9, 10
+COMPUTE_C, COMPUTE_F = 11, 12
+
+OPERATIONS = {
     PLUS: lambda a, b: a + b,
     MINUS: lambda a, b: a-b,
     TIMES: lambda a, b: a*b,
     NORM2: lambda a, b: np.sqrt(np.square(a) + np.square(b)),
     NORM2_3D: lambda a, b, c: np.sqrt(np.square(a) + np.square(b) + np.square(c)),
+    COMPUTE_TAU: lambda x: RHO_WATER * np.square(x),
+    COMPUTE_DMAX: compute_DMAX,
+    COMPUTE_CHEZY: lambda w, h, m: np.sqrt(np.power(m, 2) * GRAVITY / np.square(w)),
+    COMPUTE_STRICKLER: lambda w, h, m: np.sqrt(np.power(m, 2) * GRAVITY / np.square(w) / cubic_root(h)),
+    COMPUTE_MANNING: lambda w, h, m: np.sqrt(np.power(m, 2) * GRAVITY * np.power(w, 2) / cubic_root(h)),
+    COMPUTE_NIKURADSE: compute_NIKURADSE,
+    COMPUTE_C: lambda h: square_root(GRAVITY * h),
+    COMPUTE_F: lambda m, c: m / c
 }
 
 
-def do_calculation(operation_dict, equation, input_values):
+def do_calculation(equation, input_values):
     """!
     @brief Apply an equation on input values
     @param equation <Equation>: an equation object
     @param input_values <[numpy 1D-array]>: the values of the input variables
     @return <numpy 1D-array>: the values of the output variable
     """
-    operation = operation_dict[equation.operator]
+    operation = OPERATIONS[equation.operator]
     nb_operands = len(input_values)
     if nb_operands == 1:
         return operation(input_values[0])

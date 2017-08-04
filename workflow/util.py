@@ -372,6 +372,7 @@ class MultiLoadDialog(QDialog):
                 else:
                     all_slfs.intersection_update(slfs)
             all_slfs = list(all_slfs)
+            all_slfs.sort()
             for slf in all_slfs:
                 self.file_box.addItem(slf)
             self.file_box.setCurrentIndex(all_slfs.index(self.slf_name))
@@ -475,7 +476,8 @@ class MultiLoadDialog(QDialog):
                 self.dir_paths = []
                 return
         self.nb_files = len(dir_names)
-
+        all_slfs = list(all_slfs)
+        all_slfs.sort()
         self.file_box.clear()
         for slf in all_slfs:
             self.file_box.addItem(slf)
@@ -549,6 +551,7 @@ class LoadSerafinDialog(QDialog):
                     slfs.add(f)
 
             slfs = list(slfs)
+            slfs.sort()
             for slf in slfs:
                 self.file_box.addItem(slf)
             self.file_box.setCurrentIndex(slfs.index(self.slf_name))
@@ -633,6 +636,8 @@ class LoadSerafinDialog(QDialog):
             return
 
         self.file_box.clear()
+        slfs = list(slfs)
+        slfs.sort()
         for slf in slfs:
             self.file_box.addItem(slf)
 
