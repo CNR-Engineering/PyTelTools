@@ -8,7 +8,8 @@ from gui.util import DoubleSliderBox, FallVelocityMessage, FrictionLawMessage, S
     TimeRangeSlider, VariableTable
 import slf.misc as operations
 from geom.transformation import load_transformation_map
-from slf.variables import get_available_variables, get_necessary_equations, new_variables_from_US, get_US_equation
+from slf.variables import get_available_variables, get_necessary_equations
+from slf.variable.variables_2d import get_US_equation, new_variables_from_US
 from workflow.Node import Node, OneInOneOutNode, TwoInOneOutNode
 
 

@@ -11,8 +11,8 @@ from slf.flux import TriangularVectorField, FluxCalculator
 from slf.interpolation import MeshInterpolator
 import slf.misc as operations
 from slf import Serafin
-from slf.variables import do_calculations_in_frame, get_necessary_equations, get_available_variables, \
-                          new_variables_from_US
+from slf.variables import do_calculations_in_frame, get_available_variables, get_necessary_equations
+from slf.variable.variables_2d import new_variables_from_US
 from slf.volume import TruncatedTriangularPrisms, VolumeCalculator
 from workflow.util import process_output_options, process_geom_output_options, process_vtk_output_options
 
