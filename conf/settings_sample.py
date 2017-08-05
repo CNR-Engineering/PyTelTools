@@ -16,3 +16,12 @@ SCENE_WIDTH, SCENE_HEIGHT = (2400, 1000)
 # Logging level
 # logging.DEBUG, logging.INFO, logging.ERROR
 LOGGING_LEVEL = logging.INFO
+
+
+# Number of color levels to plot
+NB_COLOR_LEVELS = 512
+
+# Color style
+DEFAULT_COLOR_STYLE = 'viridis'
+COLOR_SYLES = ['viridis', 'plasma', 'inferno', 'magma', 'Greys', 'Purples', 'Blues', 'Greens', 'Oranges', 'Reds',
+               'YlOrBr', 'YlOrRd', 'OrRd', 'PuRd', 'RdPu', 'BuPu', 'GnBu', 'PuBu', 'YlGnBu', 'PuBuGn', 'BuGn', 'YlGn']

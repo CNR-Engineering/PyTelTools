@@ -934,6 +934,7 @@ class VerticalTemporalProfileNode(DoubleInputNode):
     """
     def __init__(self, index):
         super().__init__(index)
+        print("INIT VerticalTemporalProfileNode")
         self.category = 'Visualization'
         self.label = 'Vertical\nTemporal\nProfile 3D'
         self.first_in_port.data_type = ('slf 3d',)
@@ -1042,17 +1043,17 @@ class VerticalTemporalProfileNode(DoubleInputNode):
         fig, axes = plt.subplots(1)
         fig.set_size_inches(8, 6)
 
-        if self.plot_viewer.clim is not None:
+        if self.plot_viewer.color_limits is not None:
             axes.tripcolor(time[self.plot_viewer.timeFormat], y, triangles, z, cmap=self.plot_viewer.current_style,
-                           vmin=self.plot_viewer.clim[0], vmax=self.plot_viewer.clim[1])
+                           vmin=self.plot_viewer.color_limits[0], vmax=self.plot_viewer.color_limits[1])
         else:
             axes.tripcolor(time[self.plot_viewer.timeFormat], y, triangles, z, cmap=self.plot_viewer.current_style)
 
         divider = make_axes_locatable(axes)
         cax = divider.append_axes('right', size='5%', pad=0.2)
         cmap = cm.ScalarMappable(cmap=self.plot_viewer.current_style)
-        if self.plot_viewer.clim is not None:
-            cmap.set_array(np.linspace(self.plot_viewer.clim[0], self.plot_viewer.clim[1], 1000))
+        if self.plot_viewer.color_limits is not None:
+            cmap.set_array(np.linspace(self.plot_viewer.color_limits[0], self.plot_viewer.color_limits[1], 1000))
         else:
             cmap.set_array(np.linspace(np.min(z), np.max(z), 1000))
         fig.colorbar(cmap, cax=cax)

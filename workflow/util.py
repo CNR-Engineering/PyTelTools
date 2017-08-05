@@ -10,10 +10,11 @@ from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT
 from matplotlib import cm
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import matplotlib.pyplot as plt
+import matplotlib.tri as mtri
 import warnings
 warnings.filterwarnings('ignore', category=RuntimeWarning, module='matplotlib')
 
-from conf.settings import LOGGING_LEVEL
+from conf.settings import COLOR_SYLES, DEFAULT_COLOR_STYLE, LOGGING_LEVEL, NB_COLOR_LEVELS
 from gui.util import TemporalPlotViewer, VolumePlotViewer, MapCanvas,\
     FluxPlotViewer, PointPlotViewer, PointLabelEditor, SimpleTimeDateSelection, read_csv
 from slf.datatypes import SerafinData
@@ -948,13 +949,12 @@ class VerticalProfilePlotViewer(TemporalPlotViewer):
         self.y, self.z = [], []
         self.triangles = []
         self.n, self.k, self.m = -1, -1, -1
-        self.clim = None
+
+        self.color_limits = None
         self.cmap = None
-        self.current_style = 'viridis'
-        self.color_styles = ['viridis', 'plasma', 'inferno', 'magma',
-                             'Greys', 'Purples', 'Blues', 'Greens', 'Oranges', 'Reds',
-                             'YlOrBr', 'YlOrRd', 'OrRd', 'PuRd', 'RdPu', 'BuPu',
-                             'GnBu', 'PuBu', 'YlGnBu', 'PuBuGn', 'BuGn', 'YlGn']
+        self.current_style = DEFAULT_COLOR_STYLE
+        self.color_styles = COLOR_SYLES
+
         self.create_actions()
         self.current_columns = ('Point 1',)
         self.toolBar.addAction(self.select_variable_act)
@@ -983,7 +983,6 @@ class VerticalProfilePlotViewer(TemporalPlotViewer):
                                               icon=self.style().standardIcon(QStyle.SP_DialogHelpButton))
         self.change_color_range_act = QAction('Change\ncolor range', self, triggered=self.change_color_range,
                                               icon=self.style().standardIcon(QStyle.SP_DialogHelpButton))
-
         self.select_variable_act_short = QAction('Select variable', self, triggered=self.select_variable,
                                                  icon=self.style().standardIcon(QStyle.SP_FileDialogDetailedView))
         self.change_color_style_act_short = QAction('Change color style', self, triggered=self.change_color_style,
@@ -1029,7 +1028,7 @@ class VerticalProfilePlotViewer(TemporalPlotViewer):
         msg.exec_()
         self.current_var = combo.currentText().split(' (')[0]
         self.current_ylabel = self._defaultYLabel()
-        self.clim = None
+        self.color_limits = None
         self.replot()
 
     def change_color(self, style):
@@ -1054,7 +1053,7 @@ class VerticalProfilePlotViewer(TemporalPlotViewer):
             QMessageBox.critical(self, 'Error', 'Invalid input.', QMessageBox.Ok)
             return
 
-        self.clim = (cmin, cmax)
+        self.color_limits = (cmin, cmax)
         self.replot(False)
 
     def compute(self):
@@ -1085,21 +1084,20 @@ class VerticalProfilePlotViewer(TemporalPlotViewer):
 
         self.canvas.figure.clear()   # remove the old color bar
         self.canvas.axes = self.canvas.figure.add_subplot(111)
-        if self.clim is not None:
-            self.canvas.axes.tripcolor(self.time[self.timeFormat], self.y, self.triangles, self.z,
-                                       cmap=self.current_style,
-                                       vmin=self.clim[0], vmax=self.clim[1])
+        triang = mtri.Triangulation(self.time[self.timeFormat], self.y, self.triangles)
+
+        if self.color_limits is not None:
+            levels = np.linspace(self.color_limits[0], self.color_limits[1], NB_COLOR_LEVELS)
+            self.canvas.axes.tricontourf(triang, self.z, cmap=self.current_style, levels=levels, extend="both",
+                                         vmin=self.color_limits[0], vmax=self.color_limits[1])
         else:
-            self.canvas.axes.tripcolor(self.time[self.timeFormat], self.y, self.triangles, self.z,
-                                       cmap=self.current_style)
+            levels = np.linspace(np.amin(self.z), np.amax(self.z), 2048)
+            self.canvas.axes.tricontourf(triang, self.z, cmap=self.current_style, levels=levels, extend="both")
 
         divider = make_axes_locatable(self.canvas.axes)
         cax = divider.append_axes('right', size='5%', pad=0.2)
         self.cmap = cm.ScalarMappable(cmap=self.current_style)
-        if self.clim is not None:
-            self.cmap.set_array(np.linspace(self.clim[0], self.clim[1], 1000))
-        else:
-            self.cmap.set_array(np.linspace(np.min(self.z), np.max(self.z), 1000))
+        self.cmap.set_array(levels)
         self.canvas.figure.colorbar(self.cmap, cax=cax)
 
         self.canvas.axes.set_xlabel(self.current_xlabel)
@@ -1881,20 +1879,20 @@ class ScalarMapCanvas(MapCanvas):
         self.axes = self.fig.add_subplot(111)
         self.axes.set_aspect('equal', adjustable='box')
 
+        triang = mtri.Triangulation(mesh.x, mesh.y, mesh.ikle)
         if limits is not None:
-            self.axes.tripcolor(mesh.x, mesh.y, mesh.ikle, values,
-                                cmap=color_style, vmin=limits[0], vmax=limits[1])
+            levels = np.linspace(limits[0], limits[1], NB_COLOR_LEVELS)
+            self.axes.tricontourf(triang, values, cmap=color_style, levels=levels, extend="both",
+                                  vmin=limits[0], vmax=limits[1])
         else:
-            self.axes.tripcolor(mesh.x, mesh.y, mesh.ikle, values, cmap=color_style)
+            levels = np.linspace(min(values), max(values), NB_COLOR_LEVELS)
+            self.axes.tricontourf(triang, values, cmap=color_style, levels=levels, extend="both")
 
         # add colorbar
         divider = make_axes_locatable(self.axes)
         cax = divider.append_axes('right', size='5%', pad=0.2)
         self.cmap = cm.ScalarMappable(cmap=color_style)
-        if limits is not None:
-            self.cmap.set_array(np.linspace(limits[0], limits[1], 1000))
-        else:
-            self.cmap.set_array(np.linspace(min(values), max(values), 1000))
+        self.cmap.set_array(levels)
         self.fig.colorbar(self.cmap, cax=cax)
         self.draw()
 
@@ -1902,15 +1900,16 @@ class ScalarMapCanvas(MapCanvas):
 class ScalarMapViewer(QWidget):
     def __init__(self):
         super().__init__()
+        self.data = None
         self.current_var = ''
         self.time_index = -1
-        self.data = None
         self.mesh = None
         self.values = []
 
-        self.current_style = 'viridis'
         self.color_limits = None
         self.cmap = None
+        self.current_style = DEFAULT_COLOR_STYLE
+        self.color_styles = COLOR_SYLES
 
         self.canvas = ScalarMapCanvas()
         self.slider = SimpleTimeDateSelection()
@@ -1922,11 +1921,6 @@ class ScalarMapViewer(QWidget):
         self.default_toolbar.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
         self.second_toolbar = QToolBar()
         self.second_toolbar.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
-
-        self.color_styles = ['viridis', 'plasma', 'inferno', 'magma',
-                             'Greys', 'Purples', 'Blues', 'Greens', 'Oranges', 'Reds',
-                             'YlOrBr', 'YlOrRd', 'OrRd', 'PuRd', 'RdPu', 'BuPu',
-                             'GnBu', 'PuBu', 'YlGnBu', 'PuBuGn', 'BuGn', 'YlGn']
 
         self.select_variable_act = QAction('Select\nvariable', self, triggered=self.select_variable,
                                            icon=self.style().standardIcon(QStyle.SP_FileDialogDetailedView))
