@@ -1,10 +1,9 @@
-import os
 from datetime import datetime
 from PyQt5.QtWidgets import *
 from workflow.MultiNode import MultiNode, MultiOneInOneOutNode, MultiSingleInputNode, \
                                MultiSingleOutputNode, MultiDoubleInputNode, MultiTwoInOneOutNode
 from workflow.util import MultiLoadSerafinDialog, validate_output_options, validate_input_options
-from slf.variable.variables_2d import get_US_equation
+from slf.variables import get_US_equation
 import slf.misc as operations
 from geom.transformation import load_transformation_map
 
