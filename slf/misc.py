@@ -291,20 +291,22 @@ def slf_to_xml(slf_name, slf_header, xml_name, scalar, time_index):
         input_stream.header = slf_header
         scalar_values = input_stream.read_var_in_frame(time_index, scalar)
 
-    # write shp
+    # write LandXML
     with open(xml_name, 'w') as xml:
         xml.write('<?xml version="1.0" ?>\n')
+        xml.write('<!-- Title: %s -->\n' % slf_header.title.decode('utf-8').strip())
+        xml.write('<!-- This file contains x and y reversed in purpose (because arcpy is buggy) -->\n')
         xml.write('<LandXML version="1.2" xmlns="http://www.landxml.org/schema/LandXML-1.2" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.landxml.org/schema/LandXML-1.2 http://www.landxml.org/schema/LandXML-1.2/LandXML-1.2.xsd">\n')
         xml.write('  <Surfaces>\n')
-        xml.write('    <Surface name="My TIN">\n')
+        xml.write('    <Surface name="%s at frame %i/%i">\n' % (scalar, time_index+1, slf_header.nb_frames))
         xml.write('      <Definition surfType="TIN">\n')
-        xml.write('        <Pnts>')
+        xml.write('        <Pnts>\n')
         for i, (x, y, z) in enumerate(zip(slf_header.x, slf_header.y, scalar_values)):
-            xml.write('        <P id="%d">%.4f %.4f %.4f</P>\n' % (i+1, y, x, z))
+            xml.write('          <P id="%d">%.4f %.4f %.4f</P>\n' % (i+1, y, x, z))
         xml.write('        </Pnts>\n')
-        xml.write('        <Faces>')
+        xml.write('        <Faces>\n')
         for i, (a, b, c) in enumerate(slf_header.ikle_2d):
-            xml.write('        <F id="%d">%d %d %d</F>\n' % (i+1, a, b, c))
+            xml.write('          <F id="%d">%d %d %d</F>\n' % (i+1, a, b, c))
         xml.write('        </Faces>\n')
         xml.write('      </Definition>\n')
         xml.write('    </Surface>\n')

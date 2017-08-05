@@ -267,7 +267,7 @@ class Serafin:
         """!
         @brief Handle data request by variable ID
         @param var_ID <str>: the ID of the requested variable
-        @return index <int> the index of the requested variable
+        @return index <int> the index (0-based) of the requested variable
         """
         if self.header is None:
             module_logger.error('ERROR: (forgot read_header ?) var_IDs is empty')
@@ -282,12 +282,12 @@ class Serafin:
     def time_to_index(self, time_request):
         """!
         @brief Handle data request by time value
-        @param time_request <str>: the ID of the requested time
-        @return index <int> the index of the requested time in the time series
+        @param time_request <float>: requested time in seconds
+        @return index <int>: the index (0-based) of the requested time in the time series
         """
         if not self.time:
             module_logger.error('ERROR: (forgot get_time ?) time is empty')
-            raise SerafinRequestError('(forgot get_time r ?) Cannot find the requested time from empty list.')
+            raise SerafinRequestError('(forgot get_time ?) Cannot find the requested time from empty list.')
         try:
             index = self.time.index(time_request)
         except ValueError:
