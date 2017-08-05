@@ -4,7 +4,8 @@ API for computing additional variables
 
 import numpy as np
 
-from slf.variable.variables_2d import get_available_2d_variables, get_necessary_2d_equations
+from slf.variable.variables_2d import get_available_2d_variables, get_necessary_2d_equations, \
+                                      get_US_equation, new_variables_from_US
 from slf.variable.variables_3d import get_available_3d_variables, get_necessary_3d_equations
 from slf.variable.variables_utils import do_calculation
 

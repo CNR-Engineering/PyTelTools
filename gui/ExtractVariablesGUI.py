@@ -10,8 +10,8 @@ from gui.util import TableWidgetDragRows, VariableTable, QPlainTextEditLogger, F
     TimeRangeSlider, DoubleSliderBox, OutputProgressDialog, OutputThread, SerafinInputTab, \
     TelToolWidget, save_dialog
 from slf import Serafin
-from slf.variables import get_available_variables, do_calculations_in_frame, get_necessary_equations
-from slf.variable.variables_2d import get_US_equation, new_variables_from_US
+from slf.variables import get_available_variables, do_calculations_in_frame, get_necessary_equations, \
+                          get_US_equation, new_variables_from_US
 
 
 class ExtractVariablesThread(OutputThread):
