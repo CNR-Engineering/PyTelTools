@@ -1084,15 +1084,15 @@ class VerticalProfilePlotViewer(TemporalPlotViewer):
 
         self.canvas.figure.clear()   # remove the old color bar
         self.canvas.axes = self.canvas.figure.add_subplot(111)
-        triang = mtri.Triangulation(self.time[self.timeFormat], self.y, self.triangles)
 
+        triang = mtri.Triangulation(self.time[self.timeFormat], self.y, self.triangles)
         if self.color_limits is not None:
             levels = np.linspace(self.color_limits[0], self.color_limits[1], NB_COLOR_LEVELS)
-            self.canvas.axes.tricontourf(triang, self.z, cmap=self.current_style, levels=levels, extend="both",
+            self.canvas.axes.tricontourf(triang, self.z, cmap=self.current_style, levels=levels, extend='both',
                                          vmin=self.color_limits[0], vmax=self.color_limits[1])
         else:
-            levels = np.linspace(np.amin(self.z), np.amax(self.z), 2048)
-            self.canvas.axes.tricontourf(triang, self.z, cmap=self.current_style, levels=levels, extend="both")
+            levels = np.linspace(np.namin(self.z), np.namax(self.z), 2048)
+            self.canvas.axes.tricontourf(triang, self.z, cmap=self.current_style, levels=levels, extend='both')
 
         divider = make_axes_locatable(self.canvas.axes)
         cax = divider.append_axes('right', size='5%', pad=0.2)
@@ -1882,11 +1882,11 @@ class ScalarMapCanvas(MapCanvas):
         triang = mtri.Triangulation(mesh.x, mesh.y, mesh.ikle)
         if limits is not None:
             levels = np.linspace(limits[0], limits[1], NB_COLOR_LEVELS)
-            self.axes.tricontourf(triang, values, cmap=color_style, levels=levels, extend="both",
+            self.axes.tricontourf(triang, values, cmap=color_style, levels=levels, extend='both',
                                   vmin=limits[0], vmax=limits[1])
         else:
-            levels = np.linspace(min(values), max(values), NB_COLOR_LEVELS)
-            self.axes.tricontourf(triang, values, cmap=color_style, levels=levels, extend="both")
+            levels = np.linspace(np.namin(values), np.namax(values), NB_COLOR_LEVELS)
+            self.axes.tricontourf(triang, values, cmap=color_style, levels=levels, extend='both')
 
         # add colorbar
         divider = make_axes_locatable(self.axes)

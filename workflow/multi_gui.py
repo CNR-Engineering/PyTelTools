@@ -3,9 +3,10 @@ import logging
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 import sys
+import os
 from time import time
 
-from conf.settings import CSV_SEPARATOR, LANG, SCENE_WIDTH, SCENE_HEIGHT
+from conf.settings import CSV_SEPARATOR, LANG, DIGITS, SCENE_WIDTH, SCENE_HEIGHT
 import workflow.multi_func as worker
 from workflow.MultiNode import Box, MultiLink
 from workflow.multi_nodes import *
@@ -88,6 +89,7 @@ class MultiScene(QGraphicsScene):
 
         self.language = LANG
         self.csv_separator = CSV_SEPARATOR
+        self.digits = DIGITS
 
         self.setSceneRect(QRectF(0, 0, SCENE_WIDTH, SCENE_HEIGHT))
         self.transform = QTransform()
@@ -227,6 +229,17 @@ class MultiScene(QGraphicsScene):
                         slf_name = split_line[2]
                         paths = split_line[3:3+nb_files]
                         job_ids = split_line[3+nb_files:]
+
+                        # check if file exists:
+                        for path in paths:
+                            if not os.path.exists(os.path.join(path, slf_name)):
+                                for node_index in self.inputs:
+                                    self.inputs[node_index] = []
+                                self.has_input = False
+                                self.update()
+                                QApplication.processEvents()
+                                return True
+
                         self.inputs[node_index] = [paths, slf_name, job_ids]
                         self._handle_load_input(node_index)
                     self.update()
@@ -603,6 +616,7 @@ class MultiWidget(QWidget):
         if self.parent: self.parent.save()
         self.setEnabled(False)
         csv_separator = self.scene.csv_separator
+        format_string = '{0:.%df}' % self.scene.digits
 
         # first get auxiliary tasks done
         success = self._prepare_auxiliary_tasks()
@@ -617,7 +631,7 @@ class MultiWidget(QWidget):
         nb_tasks = self._prepare_input_tasks()
 
         while not self.worker.stopped:
-            nb_tasks = self._listen(nb_tasks, csv_separator)
+            nb_tasks = self._listen(nb_tasks, csv_separator, format_string)
             if nb_tasks == 0:
                 self.worker.stop()
 
@@ -697,7 +711,7 @@ class MultiWidget(QWidget):
                 node.pending_data[fid] = data
                 return False
 
-    def _listen(self, nb_tasks, csv_separator):
+    def _listen(self, nb_tasks, csv_separator, format_string):
         # get one task result
         success, node_id, fid, data, message = self.worker.get_result()
         nb_tasks -= 1
@@ -714,7 +728,7 @@ class MultiWidget(QWidget):
                 fun = worker.FUNCTIONS[next_node.name()]
                 if next_node.double_input:
                     self.worker.add_task((fun, (next_node_id, fid, data, next_node.auxiliary_data,
-                                                next_node.options, csv_separator)))
+                                                next_node.options, csv_separator, format_string)))
                     nb_tasks += 1
                 elif next_node.two_in_one_out:
                     if current_node.second_parent:

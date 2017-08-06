@@ -4,7 +4,6 @@ from PyQt5.QtCore import *
 import shapefile
 import sys
 
-from conf.settings import LOGGING_LEVEL
 import geom.conversion as convert
 import geom.Shapefile as shp
 from geom.transformation import load_transformation_map
@@ -60,7 +59,7 @@ class FileConverterInputTab(QWidget):
         self.logTextBox = QPlainTextEditLogger(self)
         self.logTextBox.setFormatter(logging.Formatter('%(asctime)s - [%(levelname)s] - \n%(message)s'))
         logging.getLogger().addHandler(self.logTextBox)
-        logging.getLogger().setLevel(LOGGING_LEVEL)
+        logging.getLogger().setLevel(self.parent.logging_level)
 
     def _setLayout(self):
         mainLayout = QVBoxLayout()

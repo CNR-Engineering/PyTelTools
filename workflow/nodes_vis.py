@@ -934,7 +934,6 @@ class VerticalTemporalProfileNode(DoubleInputNode):
     """
     def __init__(self, index):
         super().__init__(index)
-        print("INIT VerticalTemporalProfileNode")
         self.category = 'Visualization'
         self.label = 'Vertical\nTemporal\nProfile 3D'
         self.first_in_port.data_type = ('slf 3d',)

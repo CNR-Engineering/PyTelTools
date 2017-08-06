@@ -79,8 +79,8 @@ class VariableList(QListWidget):
         self.red = '#CC0066'
 
     def colorful_text(self, text, color):
-        self.editor.insertHtml("<span style=\" font-size:8pt; font-weight:600; color:%s;\" "
-                               ">[%s]</span>" % (color, text))
+        self.editor.insertHtml('<span style=\" font-size:8pt; font-weight:600; color:%s;\" '
+                               '>[%s]</span>' % (color, text))
         self.editor.setCurrentCharFormat(self.old_format)
 
     def mouseDoubleClickEvent(self, *args, **kwargs):

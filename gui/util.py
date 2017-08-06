@@ -18,7 +18,7 @@ import matplotlib.lines as mlines
 from matplotlib.colors import Normalize, colorConverter
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
-from conf.settings import CSV_SEPARATOR, LANG, LOGGING_LEVEL
+from conf.settings import CSV_SEPARATOR, LANG, DIGITS, LOGGING_LEVEL
 from geom import BlueKenue, Shapefile
 from slf.comparison import ReferenceMesh
 from slf.datatypes import SerafinData
@@ -206,7 +206,7 @@ def save_dialog(extension, input_name='', input_names=None):
 
 
 class SerafinInputTab(QWidget):
-    def __init__(self, parent=None):
+    def __init__(self, parent):
         super().__init__()
         self.parent = parent
 
@@ -240,7 +240,7 @@ class SerafinInputTab(QWidget):
         self.logTextBox = QPlainTextEditLogger(self)
         self.logTextBox.setFormatter(logging.Formatter('%(asctime)s - [%(levelname)s] - \n%(message)s'))
         logging.getLogger().addHandler(self.logTextBox)
-        logging.getLogger().setLevel(LOGGING_LEVEL)
+        logging.getLogger().setLevel(self.parent.logging_level)
 
         self.input_layout = QVBoxLayout()
         hlayout = QHBoxLayout()
@@ -313,9 +313,13 @@ class TelToolWidget(QWidget):
         if parent is None:
             self.language = LANG
             self.csv_separator = CSV_SEPARATOR
+            self.digits = DIGITS
+            self.logging_level = LOGGING_LEVEL
         else:
             self.language = parent.language
             self.csv_separator = parent.csv_separator
+            self.digits = parent.digits
+            self.logging_level = parent.logging_level
         self.setMinimumWidth(600)
         self.setWindowFlags(self.windowFlags() | Qt.CustomizeWindowHint)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
@@ -1364,9 +1368,9 @@ class ConditionDialog(QDialog):
 
     def addButtonEvent(self):
         var_ID = self.varBox.currentText().split(' (')[0]
-        self.expressionBox.insertHtml("<span style=\" font-size:8pt; "
-                                      "font-weight:600; color:#554DF7;\" "
-                                      ">[%s]</span>" % var_ID)
+        self.expressionBox.insertHtml('<span style=\" font-size:8pt; '
+                                      'font-weight:600; color:#554DF7;\" '
+                                      '>[%s]</span>' % var_ID)
         self.expressionBox.setCurrentCharFormat(self.old_format)
 
     def checkCondition(self):
@@ -1502,7 +1506,7 @@ class HTMLDelegate(QStyledItemDelegate):
         doc = QTextDocument()
         doc.setHtml(options.text)
 
-        options.text = ""
+        options.text = ''
         style.drawControl(QStyle.CE_ItemViewItem, options, painter)
 
         ctx = QAbstractTextDocumentLayout.PaintContext()
@@ -1541,7 +1545,7 @@ class SelectedColorTable(TableWidgetDropRows):
             label = column_labels[column]
             color = column_colors[column]
             color_name = color_to_name[color]
-            color_display = "<span style=\"color:%s;\">%s</span> " % (color, u"\u2B1B")
+            color_display = '<span style=\"color:%s;\">%s</span> ' % (color, u'\u2B1B')
             self.insertRow(row)
             lab = QTableWidgetItem(label)
             col = QTableWidgetItem(color_display + color_name)
@@ -1567,7 +1571,7 @@ class AvailableColorTable(TableWidgetDragRows):
         row = 0
         for color in colors:
             color_name = color_to_name[color]
-            color_display = "<span style=\"color:%s;\">%s</span> " % (color, u"\u2B1B")
+            color_display = '<span style=\"color:%s;\">%s</span> ' % (color, u'\u2B1B')
             self.insertRow(row)
             col = QTableWidgetItem(color_display + color_name)
             self.setItem(row, 0, col)

@@ -5,7 +5,6 @@ import sys
 from PyQt5.QtCore import *
 from PyQt5.QtWidgets import *
 
-from conf.settings import LOGGING_LEVEL
 from gui.util import MapViewer, LineMapCanvas, QPlainTextEditLogger, TelToolWidget, open_polylines, save_dialog,\
     VariableTable, OutputProgressDialog, LoadMeshDialog, \
     SimpleTimeDateSelection, OutputThread, ProjectLinesPlotViewer, SerafinInputTab
@@ -13,9 +12,10 @@ from slf import Serafin
 
 
 class WriteCSVProcess(OutputThread):
-    def __init__(self, separator, mesh):
+    def __init__(self, separator, digits, mesh):
         super().__init__()
         self.mesh = mesh
+        self.format_string = '{0:.%df}' % digits
         self.separator = separator
 
     def write_header(self, output_stream, selected_vars):
@@ -50,16 +50,16 @@ class WriteCSVProcess(OutputThread):
                     continue
                 output_stream.write(str(id_line+1))
                 output_stream.write(self.separator)
-                output_stream.write('%.6f' % x)
+                output_stream.write(self.format_string.format(x))
                 output_stream.write(self.separator)
-                output_stream.write('%.6f' % y)
+                output_stream.write(self.format_string.format(y))
                 output_stream.write(self.separator)
-                output_stream.write('%.6f' % distance)
+                output_stream.write(self.format_string.format(distance))
 
                 for i_var, var in enumerate(selected_vars):
                     values = var_values[i_var]
                     output_stream.write(self.separator)
-                    output_stream.write('%.6f' % interpolator.dot(values[[i, j, k]]))
+                    output_stream.write(self.format_string.format(interpolator.dot(values[[i, j, k]])))
                 output_stream.write('\n')
 
             self.tick.emit(int(100 * (u+1) / nb_lines))
@@ -282,7 +282,7 @@ class CSVTab(QWidget):
         self.logTextBox = QPlainTextEditLogger(self)
         self.logTextBox.setFormatter(logging.Formatter('%(asctime)s - [%(levelname)s] - \n%(message)s'))
         logging.getLogger().addHandler(self.logTextBox)
-        logging.getLogger().setLevel(LOGGING_LEVEL)
+        logging.getLogger().setLevel(self.parent.logging_level)
 
     def _setLayout(self):
         mainLayout = QVBoxLayout()
@@ -391,7 +391,7 @@ class CSVTab(QWidget):
         time_index = int(self.timeSelection.index.text()) - 1
 
         # initialize the progress bar
-        process = WriteCSVProcess(self.parent.csv_separator, self.input.mesh)
+        process = WriteCSVProcess(self.parent.csv_separator, self.parent.digits, self.input.mesh)
         progressBar = OutputProgressDialog()
 
         with Serafin.Read(self.input.data.filename, self.input.data.language) as input_stream:

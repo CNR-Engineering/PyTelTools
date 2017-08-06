@@ -6,7 +6,6 @@ Volume calculations in polygons
 import numpy as np
 import shapely.geometry as geom
 
-from conf.settings import CSV_SEPARATOR
 from geom import geometry
 from slf.interpolation import Interpolator
 from slf.mesh2D import Mesh2D
@@ -286,7 +285,7 @@ class VolumeCalculator:
                 values -= second_values
         return values
 
-    def run(self):
+    def run(self, format_string='{0:.6f}'):
         """!
         Separate the major part of the computation, allowing a GUI override
         """
@@ -300,9 +299,9 @@ class VolumeCalculator:
                 volume = self.volume_in_frame_in_polygon(weight, values, self.polygons[j])
                 if self.volume_type == VolumeCalculator.POSITIVE:
                     for v in volume:
-                        i_result.append('%.6f' % v)
+                        i_result.append(format_string.format(v))
                 else:
-                    i_result.append('%.6f' % volume)
+                    i_result.append(format_string.format(volume))
             result.append(i_result)
         return result
 
@@ -318,7 +317,7 @@ class VolumeCalculator:
                 header.append(name)
         return header
 
-    def write_csv(self, result, output_stream, separator=CSV_SEPARATOR):
+    def write_csv(self, result, output_stream, separator):
         output_stream.write(separator.join(self.get_csv_header()))
         output_stream.write('\n')
 

@@ -24,4 +24,4 @@ class myargparse(argparse.ArgumentParser):
             elif arg == 'verbose':
                 self.add_argument('--verbose', '-v', help='increase output verbosity', action='count', default=0)
             else:
-                sys.exit("Unknown argument: '{}'".format(arg))
+                sys.exit('Unknown argument: "{}"'.format(arg))

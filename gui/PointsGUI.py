@@ -11,9 +11,10 @@ from slf import Serafin
 
 
 class WriteCSVProcess(OutputThread):
-    def __init__(self, separator, mesh):
+    def __init__(self, separator, digits, mesh):
         super().__init__()
         self.mesh = mesh
+        self.format_string = '{0:.%df}' % digits
         self.separator = separator
 
     def write_header(self, output_stream, selected_vars, indices, points):
@@ -45,7 +46,7 @@ class WriteCSVProcess(OutputThread):
                     return
                 for index_var in range(nb_selected_vars):
                     output_stream.write(self.separator)
-                    output_stream.write('%.6f' % interpolator.dot(var_values[index_var][[i, j, k]]))
+                    output_stream.write(self.format_string.format(interpolator.dot(var_values[index_var][[i, j, k]])))
 
             output_stream.write('\n')
             self.tick.emit(int(100 * (index+1) / nb_frames))

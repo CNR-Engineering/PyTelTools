@@ -71,27 +71,21 @@ def fail_message(reason, node_name, job_id, second_job_id=''):
 
 def read_slf_2d(node_id, fid, filename, language, job_id):
     data = SerafinData(job_id, filename, language)
-    try:
-        is_2d = data.read()
-        if not is_2d:
-            success, message = False, fail_message('file is not 2D', 'Load Serafin 2D', job_id)
-        else:
-            success, message = True, success_message('Load Serafin 2D', job_id)
-    except FileNotFoundError:
-        success, message = False, fail_message('file not found', 'Load Serafin 2D', job_id)
+    is_2d = data.read()
+    if not is_2d:
+        success, message = False, fail_message('file is not 2D', 'Load Serafin 2D', job_id)
+    else:
+        success, message = True, success_message('Load Serafin 2D', job_id)
     return success, node_id, fid, data, message
 
 
 def read_slf_3d(node_id, fid, filename, language, job_id):
     data = SerafinData(job_id, filename, language)
-    try:
-        is_2d = data.read()
-        if is_2d:
-            success, message = False, fail_message('file is not 3D', 'Load Serafin 3D', job_id)
-        else:
-            success, message = True, success_message('Load Serafin 3D', job_id)
-    except FileNotFoundError:
-        success, message = False, fail_message('file not found', 'Load Serafin 3D', job_id)
+    is_2d = data.read()
+    if is_2d:
+        success, message = False, fail_message('file is not 3D', 'Load Serafin 3D', job_id)
+    else:
+        success, message = True, success_message('Load Serafin 3D', job_id)
     return success, node_id, fid, data, message
 
 
@@ -685,7 +679,7 @@ def construct_mesh(mesh):
         mesh.index.insert(i, t.bounds, obj=(i, j, k))
 
 
-def compute_volume(node_id, fid, data, aux_data, options, csv_separator):
+def compute_volume(node_id, fid, data, aux_data, options, csv_separator, format_string):
     if not data.header.is_2d:
         return False, node_id, fid, None, fail_message('the input file is not 2d', 'Compute Volume',
                                                        data.job_id)
@@ -746,7 +740,7 @@ def compute_volume(node_id, fid, data, aux_data, options, csv_separator):
 
         csv_data = CSVData(data.filename, calculator.get_csv_header())
 
-        result = calculator.run()
+        result = calculator.run(format_string)
         for row in result:
             csv_data.add_row(row)
 
@@ -754,7 +748,7 @@ def compute_volume(node_id, fid, data, aux_data, options, csv_separator):
     return True, node_id, fid, None, success_message('Compute Volume', data.job_id)
 
 
-def compute_flux(node_id, fid, data, aux_data, options, csv_separator):
+def compute_flux(node_id, fid, data, aux_data, options, csv_separator, format_string):
     if not data.header.is_2d:
         return False, node_id, fid, None, fail_message('the input file is not 2d', 'Compute Flux',
                                                        data.job_id)
@@ -820,7 +814,7 @@ def compute_flux(node_id, fid, data, aux_data, options, csv_separator):
         calculator.construct_intersections()
 
         csv_data = CSVData(data.filename, ['time'] + section_names)
-        result = calculator.run()
+        result = calculator.run(format_string)
         for row in result:
             csv_data.add_row(row)
 
@@ -828,7 +822,7 @@ def compute_flux(node_id, fid, data, aux_data, options, csv_separator):
     return True, node_id, fid, None, success_message('Compute Flux', data.job_id)
 
 
-def interpolate_points(node_id, fid, data, aux_data, options, csv_separator):
+def interpolate_points(node_id, fid, data, aux_data, options, csv_separator, format_string):
     if not data.header.is_2d:
         return False, node_id, fid, None, fail_message('the input file is not 2d', 'Interpolate on Points',
                                                        data.job_id)
@@ -903,7 +897,7 @@ def interpolate_points(node_id, fid, data, aux_data, options, csv_separator):
 
             for (i, j, k), interpolator in point_interpolators:
                 for index_var in range(nb_selected_vars):
-                    row.append('%.6f' % interpolator.dot(var_values[index_var][[i, j, k]]))
+                    row.append(format_string.format(interpolator.dot(var_values[index_var][[i, j, k]])))
             csv_data.add_row(row)
 
     csv_data.write(filename, csv_separator)
@@ -912,7 +906,7 @@ def interpolate_points(node_id, fid, data, aux_data, options, csv_separator):
                                  '%s point%s inside the mesh' % (nb_inside, 's are' if nb_inside > 1 else ' is'))
 
 
-def interpolate_lines(node_id, fid, data, aux_data, options, csv_separator):
+def interpolate_lines(node_id, fid, data, aux_data, options, csv_separator, format_string):
     if not data.header.is_2d:
         return False, node_id, fid, None, fail_message('the input file is not 2d', 'Interpolate along Lines',
                                                        data.job_id)
@@ -969,7 +963,7 @@ def interpolate_lines(node_id, fid, data, aux_data, options, csv_separator):
 
         for _, _, row in MeshInterpolator.interpolate_along_lines(input_stream, selected_vars,
                                                                   data.selected_time_indices, indices_nonempty,
-                                                                  line_interpolators):
+                                                                  line_interpolators, format_string):
             csv_data.add_row(row)
 
     csv_data.write(filename, csv_separator)
@@ -979,7 +973,7 @@ def interpolate_lines(node_id, fid, data, aux_data, options, csv_separator):
                                                                 's intersect' if nb_nonempty > 1 else ' intersects'))
 
 
-def project_lines(node_id, fid, data, aux_data, options, csv_separator):
+def project_lines(node_id, fid, data, aux_data, options, csv_separator, format_string):
     if not data.header.is_2d:
         return False, node_id, fid, None, fail_message('the input file is not 2d', 'Project Lines',
                                                        data.job_id)
@@ -1053,7 +1047,7 @@ def project_lines(node_id, fid, data, aux_data, options, csv_separator):
         input_stream.time = data.time
 
         for _, row in MeshInterpolator.project_lines(input_stream, selected_vars, time_index, indices_nonempty,
-                                                     max_distance, reference, line_interpolators):
+                                                     max_distance, reference, line_interpolators, format_string):
             csv_data.add_row(row)
 
     csv_data.write(filename, csv_separator)

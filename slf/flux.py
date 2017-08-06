@@ -5,7 +5,6 @@ Flux calculations across sections
 
 import numpy as np
 
-from conf.settings import CSV_SEPARATOR
 from slf.interpolation import Interpolator
 from slf.mesh2D import Mesh2D
 
@@ -237,7 +236,7 @@ class FluxCalculator:
         else:
             return TriangularVectorField.mass_flux(intersections, values[0], values[1], values[2], values[3])
 
-    def run(self):
+    def run(self, format_string='{0:.6f}'):
         """!
         Separate the major part of the computation, allowing a GUI override
         """
@@ -251,11 +250,11 @@ class FluxCalculator:
             for j in range(len(self.sections)):
                 intersections = self.intersections[j]
                 flux = self.flux_in_frame(intersections, values)
-                i_result.append('%.6f' % flux)
+                i_result.append(format_string.format(flux))
             result.append(i_result)
         return result
 
-    def write_csv(self, result, output_stream, separator=CSV_SEPARATOR):
+    def write_csv(self, result, output_stream, separator):
         output_stream.write('time')
         for name in self.section_names:
             output_stream.write(separator)

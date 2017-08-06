@@ -2,7 +2,7 @@ import sys
 from PyQt5.QtCore import *
 from PyQt5.QtWidgets import *
 
-from conf.settings import LANG, CSV_SEPARATOR
+from conf.settings import LANG, CSV_SEPARATOR, DIGITS, LOGGING_LEVEL
 from gui.CalculatorGUI import CalculatorGUI
 from gui.CompareResultsGUI import CompareResultsGUI
 from gui.ComputeFluxGUI import ComputeFluxGUI
@@ -120,15 +120,15 @@ class MyMainWindow(QWidget):
         super().__init__()
         self.language = LANG
         self.csv_separator = CSV_SEPARATOR
+        self.digits = DIGITS
+        self.logging_level = LOGGING_LEVEL
         self.panel = MainPanel(self)
 
         config_button = QPushButton('Global\nConfiguration')
         config_button.setMinimumHeight(40)
-        # config_button.setMaximumWidth(250)
         config_button.clicked.connect(self.global_config)
 
         pageList = QListWidget()
-        # pageList.setMaximumWidth(200)
         for name in ['Start', 'Extract variables', 'Max/Min/Mean/Arrival/Duration', 'Interpolate on points',
                      'Interpolate along lines', 'Project along lines', 'Project mesh',
                      'Compute volume', 'Compute flux', 'Compare two results',

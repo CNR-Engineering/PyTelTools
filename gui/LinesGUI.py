@@ -4,7 +4,6 @@ from PyQt5.QtCore import *
 from PyQt5.QtWidgets import *
 import sys
 
-from conf.settings import LOGGING_LEVEL
 from gui.util import MapViewer, LineMapCanvas, QPlainTextEditLogger, SerafinInputTab, TelToolWidget, OutputThread, \
     VariableTable, OutputProgressDialog, LoadMeshDialog, open_polylines,\
     MultiVarLinePlotViewer, MultiFrameLinePlotViewer, save_dialog
@@ -13,9 +12,10 @@ from slf.interpolation import MeshInterpolator
 
 
 class WriteCSVProcess(OutputThread):
-    def __init__(self, separator, mesh):
+    def __init__(self, separator, digits, mesh):
         super().__init__()
         self.separator = separator
+        self.format_string = '{0:.%df}' % digits
         self.mesh = mesh
 
     def write_header(self, output_stream, selected_vars):
@@ -32,7 +32,8 @@ class WriteCSVProcess(OutputThread):
         inv_steps = 1 / len(indices_nonempty) / nb_frames
 
         for u, v, row in MeshInterpolator.interpolate_along_lines(input_stream, selected_vars, (len(input_stream.time)),
-                                                                  indices_nonempty, line_interpolators):
+                                                                  indices_nonempty, line_interpolators,
+                                                                  self.format_string):
             output_stream.write(self.separator.join(row))
             output_stream.write('\n')
             self.tick.emit(100 * (v+1+u*nb_frames) * inv_steps)
@@ -249,7 +250,7 @@ class CSVTab(QWidget):
         self.logTextBox = QPlainTextEditLogger(self)
         self.logTextBox.setFormatter(logging.Formatter('%(asctime)s - [%(levelname)s] - \n%(message)s'))
         logging.getLogger().addHandler(self.logTextBox)
-        logging.getLogger().setLevel(LOGGING_LEVEL)
+        logging.getLogger().setLevel(self.parent.logging_level)
 
     def _setLayout(self):
         mainLayout = QVBoxLayout()
@@ -333,7 +334,7 @@ class CSVTab(QWidget):
         indices_nonempty = [i for i in range(len(self.input.lines)) if self.input.line_interpolators[i][0]]
 
         # initialize the progress bar
-        process = WriteCSVProcess(self.parent.csv_separator, self.input.mesh)
+        process = WriteCSVProcess(self.parent.csv_separator, self.parent.digits, self.input.mesh)
         progressBar = OutputProgressDialog()
 
         with Serafin.Read(self.input.data.filename, self.input.data.language) as input_stream:

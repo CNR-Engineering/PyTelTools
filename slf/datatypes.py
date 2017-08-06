@@ -2,11 +2,10 @@ from copy import deepcopy
 import datetime
 import logging
 
-from conf.settings import CSV_SEPARATOR
 from slf import Serafin
 
-
 module_logger = logging.getLogger(__name__)
+
 
 class SerafinData:
     def __init__(self, job_id, filename, language):
@@ -39,11 +38,11 @@ class SerafinData:
             self.time = input_stream.time[:]
 
         if self.header.date is not None:
-            year, month, day, hour, minute, second = self.header.date
             try:
+                year, month, day, hour, minute, second = self.header.date
                 self.start_time = datetime.datetime(year, month, day, hour, minute, second)
             except ValueError:
-                module_logger.warning("Date seems invalid, replaced by default date.")
+                module_logger.warning('Date seems invalid, replaced by default date.')
         if self.start_time is None:
             self.start_time = datetime.datetime(1900, 1, 1, 0, 0, 0)
         self.time_second = list(map(lambda x: datetime.timedelta(seconds=x), self.time))
@@ -97,7 +96,7 @@ class SerafinData:
 
 
 class CSVData:
-    def __init__(self, filename, header=None, out_name='', separator=CSV_SEPARATOR):
+    def __init__(self, filename, header=None, out_name='', separator=''):
         self.filename = filename
         self.out_name = ''
         self.metadata = {}
