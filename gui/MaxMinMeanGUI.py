@@ -342,7 +342,7 @@ class MaxMinMeanTab(QWidget):
         self.btnSubmit.setEnabled(True)
 
         # unlock convert to single precision
-        if self.data.header.float_type == 'd':
+        if self.data.header.is_double_precision():
             self.singlePrecisionBox.setEnabled(True)
 
         if self.data.header.date is not None:
@@ -585,7 +585,7 @@ class ArrivalDurationTab(QWidget):
         self.data = data
 
         # unlock convert to single precision
-        if self.data.header.float_type == 'd':
+        if self.data.header.is_double_precision():
             self.singlePrecisionBox.setEnabled(True)
 
         if self.data.header.date is not None:
@@ -831,7 +831,7 @@ class SynchMaxTab(QWidget):
         self.btnSubmit.setEnabled(True)
 
         # unlock convert to single precision
-        if self.data.header.float_type == 'd':
+        if self.data.header.is_double_precision():
             self.singlePrecisionBox.setEnabled(True)
 
         if self.data.header.date is not None:

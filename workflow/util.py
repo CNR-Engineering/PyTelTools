@@ -22,8 +22,6 @@ from slf.interpolation import MeshInterpolator
 from slf import Serafin
 
 
-SERAFIN_GLOB = ['.' + ext for ext in SERAFIN_EXT]
-
 logger = logging.getLogger(__name__)
 handler = logging.StreamHandler()
 handler.setFormatter(logging.Formatter('%(asctime)s %(levelname)s %(message)s'))
@@ -327,15 +325,10 @@ class MultiFigureSaveDialog(MultiSaveDialog):
 
 
 class MultiLoadDialog(QDialog):
-    def __init__(self, file_format, old_options):
+    def __init__(self, file_format, extensions, old_options):
         super().__init__()
         self.file_format = file_format
-        if file_format == 'Serafin':
-            self.extensions = SERAFIN_GLOB
-        elif file_format == 'CSV':
-            self.extensions = ['.csv']
-        else:
-            raise NotImplementedError('File format %s is not supported' % file_format)
+        self.extensions = extensions
         self.dir_paths = []
         self.slf_name = ''
         self.job_ids = []
@@ -393,7 +386,7 @@ class MultiLoadDialog(QDialog):
         hlayout.addWidget(self.open_button)
         vlayout.addLayout(hlayout)
         hlayout = QHBoxLayout()
-        hlayout.addWidget(QLabel('Select %s file name' % file_format))
+        hlayout.addWidget(QLabel('Select %s file name' % self.file_format))
         hlayout.addWidget(self.file_box, Qt.AlignRight)
         vlayout.addLayout(hlayout)
         vlayout.addWidget(self.table)
@@ -412,8 +405,7 @@ class MultiLoadDialog(QDialog):
         for row in range(self.table.rowCount()):
             job_id = self.table.item(row, 1).text()
             if not job_id:
-                QMessageBox.critical(None, 'Error', 'Job ID cannot be empty.',
-                                     QMessageBox.Ok)
+                QMessageBox.critical(None, 'Error', 'Job ID cannot be empty.', QMessageBox.Ok)
                 return
 
             if not all(c.isalnum() or c == '_' for c in job_id):
@@ -422,8 +414,7 @@ class MultiLoadDialog(QDialog):
                 return
             self.job_ids.append(job_id)
         if len(set(self.job_ids)) != len(self.job_ids):
-            QMessageBox.critical(None, 'Error', 'Each Job ID must be different!',
-                                 QMessageBox.Ok)
+            QMessageBox.critical(None, 'Error', 'Each Job ID must be different!', QMessageBox.Ok)
             return
         self.accept()
 
@@ -431,8 +422,7 @@ class MultiLoadDialog(QDialog):
         if self.dir_paths:
             msg = QMessageBox.warning(None, 'Confirm load',
                                       'Do you want to re-open source folders?\n(Your current selection will be cleared)',
-                                      QMessageBox.Ok | QMessageBox.Cancel,
-                                      QMessageBox.Ok)
+                                      QMessageBox.Ok | QMessageBox.Cancel, QMessageBox.Ok)
             if msg == QMessageBox.Cancel:
                 return
         w = QFileDialog()
@@ -471,8 +461,7 @@ class MultiLoadDialog(QDialog):
                     slfs.add(f)
             if not slfs:
                 QMessageBox.critical(None, 'Error', "The folder %s doesn't have any %s file (%s)!"
-                                     % (name, self.file_format, ', '.join(self.extensions)),
-                                     QMessageBox.Ok)
+                                     % (name, self.file_format, ', '.join(self.extensions)), QMessageBox.Ok)
                 self.dir_paths = []
                 return
             if not all_slfs:
@@ -512,12 +501,12 @@ class MultiLoadDialog(QDialog):
 
 class MultiLoadSerafinDialog(MultiLoadDialog):
     def __init__(self, old_options):
-        super().__init__('Serafin', old_options)
+        super().__init__('Serafin', SERAFIN_EXT, old_options)
 
 
 class MultiLoadCSVDialog(MultiLoadDialog):
     def __init__(self, old_options):
-        super().__init__('CSV', old_options)
+        super().__init__('CSV', ('.csv',), old_options)
 
 
 class LoadSerafinDialog(QDialog):
@@ -557,7 +546,7 @@ class LoadSerafinDialog(QDialog):
 
             slfs = set()
             for f in os.listdir(self.dir_path):
-                if os.path.isfile(os.path.join(self.dir_path, f)) and os.path.splitext(f)[1] in SERAFIN_GLOB:
+                if os.path.isfile(os.path.join(self.dir_path, f)) and os.path.splitext(f)[1] in SERAFIN_EXT:
                     slfs.add(f)
 
             slfs = list(slfs)
@@ -637,10 +626,10 @@ class LoadSerafinDialog(QDialog):
 
         slfs = set()
         for f in os.listdir(self.dir_path):
-            if os.path.isfile(os.path.join(self.dir_path, f)) and os.path.splitext(f)[1] in SERAFIN_GLOB:
+            if os.path.isfile(os.path.join(self.dir_path, f)) and os.path.splitext(f)[1] in SERAFIN_EXT:
                 slfs.add(f)
         if not slfs:
-            QMessageBox.critical(None, 'Error', "The folder %s doesn't have any Serafin file!" % name,
+            QMessageBox.critical(None, 'Error', "The folder %s doesn't have any Serafin file!" % dir_name,
                                  QMessageBox.Ok)
             self.dir_path = ''
             return

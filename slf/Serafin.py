@@ -8,13 +8,6 @@ import numpy as np
 import os
 import struct
 
-from conf.settings import SERAFIN_EXT
-
-
-SERAFIN_FILTER = 'Serafin Files (%s)' % ' '.join(['*.%s' % ext for ext in SERAFIN_EXT])
-
-FLOAT_TYPE = {'f': np.float32, 'd': np.float64}
-
 module_logger = logging.getLogger(__name__)
 
 
@@ -66,10 +59,11 @@ class SerafinHeader:
         if self.file_type.decode('utf-8') == 'SERAFIND':
             self.float_type = 'd'
             self.float_size = 8
+            self.np_float_type = np.float64
         else:
             self.float_type = 'f'
             self.float_size = 4
-        self.np_float_type = FLOAT_TYPE[self.float_type]
+            self.np_float_type = np.float32
 
         # Read the number of linear and quadratic variables
         file.read(4)
@@ -213,11 +207,14 @@ class SerafinHeader:
     def copy(self):
         return copy.deepcopy(self)
 
+    def is_double_precision(self):
+        return self.float_type == 'd'
+
     def to_single_precision(self):
         self.file_type = bytes('SERAFIN', 'utf-8').ljust(8)
         self.float_type = 'f'
         self.float_size = 4
-        self.np_float_type = FLOAT_TYPE[self.float_type]
+        self.np_float_type = np.float32
 
         nb_ikle_values = self.nb_elements * self.nb_nodes_per_elem
         coord_size = self.nb_nodes * self.float_size
@@ -261,13 +258,37 @@ class Serafin:
         self.file.close()
         return False
 
+
+class Read(Serafin):
+    """!
+    @brief Serafin file input stream
+    """
+    def __init__(self, filename, language):
+        super().__init__(filename, 'rb', language)
+        self.header = None
+        self.time = []
+        self.file_size = os.path.getsize(self.filename)
+        module_logger.info('Reading the input file: "%s" of size %d bytes' % (filename, self.file_size))
+
     def read_header(self):
         """!
         @brief Read the file header and check the file consistency
         """
         self.header = SerafinHeader(self.file, self.file_size, self.language)
 
-    def var_ID_to_index(self, var_ID):
+    def get_time(self):
+        """!
+        @brief Read the time in the Serafin file
+        """
+        module_logger.debug('Reading the time series from the file')
+        self.file.seek(self.header.header_size, 0)
+        for i in range(self.header.nb_frames):
+            self.file.read(4)
+            self.time.append(struct.unpack('>%s' % self.header.float_type, self.file.read(self.header.float_size))[0])
+            self.file.read(4)
+            self.file.seek(self.header.frame_size - 8 - self.header.float_size, 1)
+
+    def _get_var_index(self, var_ID):
         """!
         @brief Handle data request by variable ID
         @param var_ID <str>: the ID of the requested variable
@@ -283,47 +304,6 @@ class Serafin:
             raise SerafinRequestError('Variable ID %s not found' % var_ID)
         return index
 
-    def time_to_index(self, time_request):
-        """!
-        @brief Handle data request by time value
-        @param time_request <float>: requested time in seconds
-        @return index <int>: the index (0-based) of the requested time in the time series
-        """
-        if not self.time:
-            module_logger.error('ERROR: (forgot get_time ?) time is empty')
-            raise SerafinRequestError('(forgot get_time ?) Cannot find the requested time from empty list.')
-        try:
-            index = self.time.index(time_request)
-        except ValueError:
-            module_logger.error('ERROR: Requested time not found')
-            raise SerafinRequestError('Requested time not found')
-        return index
-
-
-class Read(Serafin):
-    """!
-    @brief Serafin file input stream
-    """
-    def __init__(self, filename, language):
-        super().__init__(filename, 'rb', language)
-        self.header = None
-        self.time = []
-        # additional attribute
-        self.file_size = os.path.getsize(self.filename)
-        module_logger.info('Reading the input file: "%s" of size %d bytes' % (filename, self.file_size))
-
-    def get_time(self):
-        """!
-        @brief Read the time in the Serafin file
-        """
-        module_logger.debug('Reading the time series from the file')
-        self.file.seek(self.header.header_size, 0)
-        for i in range(self.header.nb_frames):
-            self.file.read(4)
-            self.time.append(struct.unpack('>%s' % self.header.float_type, self.file.read(self.header.float_size))[0])
-            self.file.read(4)
-            self.file.seek(self.header.frame_size - 8 - self.header.float_size, 1)
-
     def read_var_in_frame(self, time_index, var_ID):
         """!
         @brief Read a single variable in a frame
@@ -331,12 +311,9 @@ class Read(Serafin):
         @param var_ID <str>: variable ID
         @return <numpy 1D-array>: values of the variables, of length equal to the number of nodes
         """
-        # appropriate warning when trying to exact a single variable
-        if not isinstance(var_ID, str):
-            raise SerafinRequestError('Cannot read multiple variables')
-        module_logger.debug("Reading variable %s at frame %i" %(var_ID, time_index))
+        module_logger.debug('Reading variable %s at frame %i' % (var_ID, time_index))
         nb_values = '>%i%s' % (self.header.nb_nodes, self.header.float_type)
-        pos_var = self.var_ID_to_index(var_ID)
+        pos_var = self._get_var_index(var_ID)
         self.file.seek(self.header.header_size + time_index * self.header.frame_size
                        + 8 + self.header.float_size + pos_var * (8 + self.header.float_size * self.header.nb_nodes), 0)
         self.file.read(4)

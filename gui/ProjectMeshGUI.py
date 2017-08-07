@@ -369,7 +369,7 @@ class SubmitTab(QWidget):
             self.firstTable.setRowCount(0)
             self.secondTable.setRowCount(0)
             self._initVarTables(common_vars)
-            if self.input.first_data.header.float_type == 'd':
+            if self.input.first_data.header.is_double_precision():
                 self.singlePrecisionBox.setEnabled(True)
         self._updateInfo()
 

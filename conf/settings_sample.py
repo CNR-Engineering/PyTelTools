@@ -1,7 +1,7 @@
 import logging
 
 # Serafin extensions for file name filtering (default extension is the first)
-SERAFIN_EXT = ['srf', 'slf', 'res', 'geo']
+SERAFIN_EXT = ['.srf', '.slf', '.res', '.geo']
 
 # Langage (for variables detection)
 LANG = 'fr'

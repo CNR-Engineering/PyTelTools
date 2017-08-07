@@ -5,6 +5,7 @@ import numpy as np
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 
+from conf.settings import SERAFIN_EXT
 import slf.misc as operations
 from geom import BlueKenue, Shapefile
 from slf import Serafin
@@ -701,8 +702,9 @@ class LoadReferenceSerafinNode(SingleOutputNode):
         return option_panel
 
     def _open(self):
-        filename, _ = QFileDialog.getOpenFileName(None, 'Open a Serafin file', '',
-                                                  Serafin.SERAFIN_FILTER, QDir.currentPath(),
+        filename, _ = QFileDialog.getOpenFileName(None, 'Open a Serafin file', '', 'Serafin Files (%s)' %
+                                                  ' '.join(['*%s' % extension for extension in SERAFIN_EXT]),
+                                                  QDir.currentPath(),
                                                   options=QFileDialog.Options() | QFileDialog.DontUseNativeDialog)
         if filename:
             self.filename = filename

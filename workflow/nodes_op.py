@@ -1014,7 +1014,7 @@ class ConvertToSinglePrecisionNode(UnaryOperatorNode):
             self.fail('input failed.')
             return
         input_data = self.in_port.mother.parentItem().data
-        if input_data.header.float_type != 'd':
+        if not input_data.header.is_double_precision():
             self.fail('the input file is not of double-precision format.')
             return
         if input_data.to_single:

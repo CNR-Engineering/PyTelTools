@@ -175,14 +175,14 @@ def save_dialog(file_format, input_name='', input_names=None):
     options |= QFileDialog.DontUseNativeDialog
     options |= QFileDialog.DontConfirmOverwrite
     if file_format == 'Serafin':
-        extensions = ['.' + ext for ext in SERAFIN_EXT]
-        filter = Serafin.SERAFIN_FILTER
+        extensions = SERAFIN_EXT
+        file_filter = 'Serafin Files (%s)' % ' '.join(['*%s' % extension for extension in SERAFIN_EXT])
     elif file_format == 'CSV':
         extensions = ['.csv']
-        filter = 'CSV Files (*.csv)'
+        file_filter = 'CSV Files (*.csv)'
     else:
         raise NotImplementedError('File format %s is not supported' % file_format)
-    filename, _ = QFileDialog.getSaveFileName(None, 'Choose the output file name', '', filter, options=options)
+    filename, _ = QFileDialog.getSaveFileName(None, 'Choose the output file name', '', file_filter, options=options)
 
     # check the file name consistency
     if not filename:
@@ -195,14 +195,12 @@ def save_dialog(file_format, input_name='', input_names=None):
     # overwrite to the input file is forbidden
     if input_name:
         if filename == input_name:
-            QMessageBox.critical(None, 'Error', 'Cannot overwrite to the input file.',
-                                 QMessageBox.Ok)
+            QMessageBox.critical(None, 'Error', 'Cannot overwrite to the input file.', QMessageBox.Ok)
             return True, ''
     elif input_names:
         for name in input_names:
             if filename == name:
-                QMessageBox.critical(None, 'Error', 'Cannot overwrite to the input file.',
-                                     QMessageBox.Ok)
+                QMessageBox.critical(None, 'Error', 'Cannot overwrite to the input file.', QMessageBox.Ok)
                 return True, ''
 
     # handle overwrite manually
@@ -279,7 +277,8 @@ class SerafinInputTab(QWidget):
         self.summaryTextBox.clear()
 
     def open_event(self):
-        filename, _ = QFileDialog.getOpenFileName(self, 'Open a Serafin file', '', Serafin.SERAFIN_FILTER,
+        filename, _ = QFileDialog.getOpenFileName(self, 'Open a Serafin file', '', 'Serafin Files (%s)' %
+                                                  ' '.join(['*%s' % extension for extension in SERAFIN_EXT]),
                                                   options=QFileDialog.Options() | QFileDialog.DontUseNativeDialog)
         if not filename:
             return True, ''

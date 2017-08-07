@@ -375,7 +375,7 @@ def arrival_duration(node_id, fid, data, options):
 
 
 def convert_to_single(node_id, fid, data, options):
-    if data.header.float_type != 'd':
+    if not data.header.is_double_precision():
         return False, node_id, fid, None, fail_message('the input file is not of double-precision format',
                                                        'Convert to Single Precision', data.job_id)
     if data.to_single:
