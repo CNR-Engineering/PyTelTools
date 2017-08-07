@@ -1050,7 +1050,7 @@ class VerticalTemporalProfileNode(DoubleInputNode):
             axes.tricontourf(triang, z, cmap=self.plot_viewer.current_style, levels = levels,
                            vmin=self.plot_viewer.color_limits[0], vmax=self.plot_viewer.color_limits[1])
         else:
-            levels = np.linspace(np.min(z), np.max(z), NB_COLOR_LEVELS)
+            levels = np.linspace(np.nanmin(z), np.nanmax(z), NB_COLOR_LEVELS)
             axes.tricontourf(triang, z, cmap=self.plot_viewer.current_style, levels=levels)
 
         divider = make_axes_locatable(axes)
