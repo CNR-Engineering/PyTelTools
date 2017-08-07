@@ -672,7 +672,6 @@ class FileConverterOutputTab(QWidget):
 class FileConverterGUI(TelToolWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.logging_level = parent.logging_level
 
         self.input = FileConverterInputTab(self)
         self.output = FileConverterOutputTab(self.input)
