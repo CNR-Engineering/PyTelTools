@@ -14,11 +14,11 @@ from matplotlib.figure import Figure
 from matplotlib.collections import PatchCollection
 from descartes import PolygonPatch
 from matplotlib import cm
-import matplotlib.lines as mlines
 from matplotlib.colors import Normalize, colorConverter
+import matplotlib.lines as mlines
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
-from conf.settings import CSV_SEPARATOR, LANG, DIGITS, LOGGING_LEVEL
+from conf.settings import CSV_SEPARATOR, DIGITS, LANG, LOGGING_LEVEL, NB_COLOR_LEVELS
 from geom import BlueKenue, Shapefile
 from slf.comparison import ReferenceMesh
 from slf.datatypes import SerafinData
@@ -1742,7 +1742,7 @@ class ColorMapCanvas(MapCanvas):
         divider = make_axes_locatable(self.axes)
         cax = divider.append_axes('right', size='5%', pad=0.2)
         cmap = cm.ScalarMappable(cmap='coolwarm', norm=Normalize(xmin, xmax))
-        cmap.set_array(np.linspace(xmin, xmax, 1000))
+        cmap.set_array(np.linspace(xmin, xmax, NB_COLOR_LEVELS))
         self.fig.colorbar(cmap, cax=cax)
 
         self.draw()

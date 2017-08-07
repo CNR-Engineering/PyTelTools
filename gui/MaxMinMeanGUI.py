@@ -461,7 +461,7 @@ class ArrivalDurationTab(QWidget):
         self.logTextBox = QPlainTextEditLogger(self)
         self.logTextBox.setFormatter(logging.Formatter('%(asctime)s - [%(levelname)s] - \n%(message)s'))
         logging.getLogger().addHandler(self.logTextBox)
-        logging.getLogger().setLevel(LOGGING_LEVEL)
+        logging.getLogger().setLevel(self.parent.logging_level)
 
         # create a combo box for time unit
         self.unitBox = QComboBox()
@@ -723,7 +723,7 @@ class SynchMaxTab(QWidget):
         self.logTextBox = QPlainTextEditLogger(self)
         self.logTextBox.setFormatter(logging.Formatter('%(asctime)s - [%(levelname)s] - \n%(message)s'))
         logging.getLogger().addHandler(self.logTextBox)
-        logging.getLogger().setLevel(LOGGING_LEVEL)
+        logging.getLogger().setLevel(self.parent.logging_level)
 
         # create a check box for output file format (simple or double precision)
         self.singlePrecisionBox = QCheckBox('Convert to SERAFIN \n(single precision)', self)

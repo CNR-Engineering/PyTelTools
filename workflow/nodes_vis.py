@@ -1,20 +1,22 @@
-from itertools import islice, cycle
+from itertools import cycle, islice
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import cm
+import matplotlib.tri as mtri
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from PyQt5.QtWidgets import *
 
-from slf.mesh2D import Mesh2D
+from conf.settings import NB_COLOR_LEVELS
+from gui.util import MapCanvas, PolygonMapCanvas, LineMapCanvas, MapViewer, \
+    PointAttributeTable, ProjectLinesPlotViewer, MultiVarLinePlotViewer, MultiFrameLinePlotViewer
 from slf.interpolation import MeshInterpolator
+from slf.mesh2D import Mesh2D
 from slf.misc import detect_vector_couples
 from workflow.Node import Node, SingleInputNode, DoubleInputNode
 from workflow.util import ScalarMapViewer, VectorMapViewer, MultiLoadSerafinDialog, MultiFigureSaveDialog, \
     SimpleVolumePlotViewer, SimpleFluxPlotViewer, SimplePointPlotViewer, VerticalProfilePlotViewer, \
     MultiSaveProjectLinesDialog, MultiSaveMultiVarLinePlotDialog, MultiSaveMultiFrameLinePlotDialog, \
     MultiSaveVerticalProfileDialog
-from gui.util import MapCanvas, PolygonMapCanvas, LineMapCanvas, MapViewer, \
-    PointAttributeTable, ProjectLinesPlotViewer, MultiVarLinePlotViewer, MultiFrameLinePlotViewer
 
 
 class ShowMeshNode(SingleInputNode):
@@ -1042,19 +1044,19 @@ class VerticalTemporalProfileNode(DoubleInputNode):
         fig, axes = plt.subplots(1)
         fig.set_size_inches(8, 6)
 
+        triang = mtri.Triangulation(time[self.timeFormat], y, triangles)
         if self.plot_viewer.color_limits is not None:
-            axes.tripcolor(time[self.plot_viewer.timeFormat], y, triangles, z, cmap=self.plot_viewer.current_style,
+            levels = np.linspace(self.plot_viewer.color_limits[0], self.plot_viewer.color_limits[1], NB_COLOR_LEVELS)
+            axes.tricontourf(triang, z, cmap=self.plot_viewer.current_style, levels = levels,
                            vmin=self.plot_viewer.color_limits[0], vmax=self.plot_viewer.color_limits[1])
         else:
-            axes.tripcolor(time[self.plot_viewer.timeFormat], y, triangles, z, cmap=self.plot_viewer.current_style)
+            levels = np.linspace(np.min(z), np.max(z), NB_COLOR_LEVELS)
+            axes.tricontourf(triang, z, cmap=self.plot_viewer.current_style, levels=levels)
 
         divider = make_axes_locatable(axes)
         cax = divider.append_axes('right', size='5%', pad=0.2)
         cmap = cm.ScalarMappable(cmap=self.plot_viewer.current_style)
-        if self.plot_viewer.color_limits is not None:
-            cmap.set_array(np.linspace(self.plot_viewer.color_limits[0], self.plot_viewer.color_limits[1], 1000))
-        else:
-            cmap.set_array(np.linspace(np.min(z), np.max(z), 1000))
+        cmap.set_array(levels)
         fig.colorbar(cmap, cax=cax)
 
         axes.set_xlabel(self.plot_viewer.current_xlabel)

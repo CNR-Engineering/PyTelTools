@@ -281,7 +281,7 @@ class FileConverterOutputTab(QWidget):
         self.logTextBox = QPlainTextEditLogger(self)
         self.logTextBox.setFormatter(logging.Formatter('%(asctime)s - [%(levelname)s] - \n%(message)s'))
         logging.getLogger().addHandler(self.logTextBox)
-        logging.getLogger().setLevel(LOGGING_LEVEL)
+        logging.getLogger().setLevel(self.input.parent.logging_level)
 
         # create a combo box for output file type
         self.outTypeBox = QComboBox()
@@ -672,6 +672,7 @@ class FileConverterOutputTab(QWidget):
 class FileConverterGUI(TelToolWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.logging_level = parent.logging_level
 
         self.input = FileConverterInputTab(self)
         self.output = FileConverterOutputTab(self.input)

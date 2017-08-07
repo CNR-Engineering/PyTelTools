@@ -41,9 +41,8 @@ def do_calculations_in_frame(equations, input_serafin, time_index, selected_outp
 
         # read (if needed) input variables values
         for input_var_ID in input_var_IDs:
-            if is_2d:  # check for ROUSE variable
-                if input_var_ID not in computed_values and input_var_ID[:5] != 'ROUSE':
-                    computed_values[input_var_ID] = input_serafin.read_var_in_frame(time_index, input_var_ID)
+            if input_var_ID not in computed_values and input_var_ID[:5] != 'ROUSE':
+                computed_values[input_var_ID] = input_serafin.read_var_in_frame(time_index, input_var_ID)
 
         if is_2d:
             # handle the special case for US (user-specified equation)
