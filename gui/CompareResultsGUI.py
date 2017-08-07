@@ -111,7 +111,7 @@ class InputTab(SerafinInputTab):
 
         # create the button open the test file
         self.btnOpenTest = QPushButton('Load\nTest', self, icon=self.style().standardIcon(QStyle.SP_DialogOpenButton))
-        self.btnOpenTest.setToolTip('<b>Open</b> a .slf file')
+        self.btnOpenTest.setToolTip('<b>Open</b> a Serafin file')
         self.btnOpenTest.setFixedSize(105, 50)
         self.btnOpenTest.setEnabled(False)
 

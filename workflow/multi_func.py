@@ -389,7 +389,7 @@ def convert_to_single(node_id, fid, data, options):
 def write_slf(node_id, fid, data, options):
     suffix, in_source_folder, dir_path, double_name, overwrite = options
 
-    filename = process_output_options(data.filename, data.job_id, '.slf',
+    filename = process_output_options(data.filename, data.job_id, os.path.splitext(data.filename)[1],
                                       suffix, in_source_folder, dir_path, double_name)
     if not overwrite:
         if os.path.exists(filename):

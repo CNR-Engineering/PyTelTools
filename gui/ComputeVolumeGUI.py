@@ -338,7 +338,7 @@ class InputTab(SerafinInputTab):
         self.parent.tab.setTabEnabled(1, False)
 
     def btnSubmitEvent(self):
-        canceled, filename = save_dialog('.csv')
+        canceled, filename = save_dialog('CSV')
         if canceled:
             return
 

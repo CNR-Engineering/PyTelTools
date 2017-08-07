@@ -1,5 +1,5 @@
 """!
-Handle 2D variables and their relationships in .slf files for additional variable computation
+Handle 2D variables and their relationships in Serafin files for additional variable computation
 """
 
 from slf.variable.variables_utils import *

@@ -1,5 +1,5 @@
 """!
-Simple computation/evaluation of variable values in .slf
+Simple computation/evaluation of variable values in Serafin
 """
 
 import logging
@@ -163,7 +163,7 @@ def is_valid_postfix(expression):
 def evaluate_expression(input_stream, time_index, expression):
     """!
     @brief Evaluate a postfix expression on the input stream for a single frame
-    @param input_stream <slf.Serafin.Read>: the input .slf
+    @param input_stream <slf.Serafin.Read>: the input Serafin
     @param time_index <int>: the index of the frame
     @param expression <list>: the expression to evaluate in postfix format
     @return <numpy.1D-array>: the value of the expression
@@ -279,8 +279,8 @@ def slf_to_shp(slf_name, slf_header, shp_name, variables, time_index):
 
 def slf_to_xml(slf_name, slf_header, xml_name, scalar, time_index):
     """!
-    @brief Write LandXML file from a scalar variable of a .slf file
-    @param slf_name <str>: path to the input .slf file
+    @brief Write LandXML file from a scalar variable of a Serafin file
+    @param slf_name <str>: path to the input Serafin file
     @param slf_header <slf.Serafin.SerafinHeader>: input Serafin header
     @param xml_name <str>: output LandXML filename
     @param scalar <str>: variable to write
@@ -316,9 +316,9 @@ def slf_to_xml(slf_name, slf_header, xml_name, scalar, time_index):
 
 def slf_to_vtk(is_2d, slf_name, slf_header, vtk_name, scalars, vectors, variable_names, time_index):
     """!
-    @brief Write vtk file from a scalar variable of a .slf file
+    @brief Write vtk file from a scalar variable of a Serafin file
     @param is_2d <bool>: True if the input file is 2D
-    @param slf_name <str>: path to the input .slf file
+    @param slf_name <str>: path to the input Serafin file
     @param slf_header <slf.Serafin.SerafinHeader>: input Serafin header
     @param vtk_name <str>: output vtk filename
     @param scalars <str>: scalar variables
@@ -439,7 +439,7 @@ def slf_to_vtk_3d(slf_name, slf_header, vtk_name, scalars, vectors, variable_nam
 
 class ScalarMaxMinMeanCalculator:
     """!
-    Compute max/min/mean of 2D scalar variables from a .slf input stream
+    Compute max/min/mean of 2D scalar variables from a Serafin input stream
     """
     def __init__(self, max_min_type, input_stream, selected_scalars, time_indices, additional_equations=None):
         self.maxmin = max_min_type
@@ -504,7 +504,7 @@ class ScalarMaxMinMeanCalculator:
 
 class VectorMaxMinMeanCalculator:
     """!
-    Compute max/min/mean of vector variables from a .slf input stream
+    Compute max/min/mean of vector variables from a Serafin input stream
     """
     def __init__(self, max_min_type, input_stream, selected_vectors, time_indices, additional_equations):
         self.maxmin = max_min_type
@@ -580,7 +580,7 @@ class VectorMaxMinMeanCalculator:
 
 class ArrivalDurationCalculator:
     """!
-    Compute arrival/duration of conditions from a .slf input stream
+    Compute arrival/duration of conditions from a Serafin input stream
     """
     def __init__(self, input_stream, time_indices, condition):
         self.input_stream = input_stream

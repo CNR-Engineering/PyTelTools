@@ -8,6 +8,10 @@ import numpy as np
 import os
 import struct
 
+from conf.settings import SERAFIN_EXT
+
+
+SERAFIN_FILTER = 'Serafin Files (%s)' % ' '.join(['*.%s' % ext for ext in SERAFIN_EXT])
 
 FLOAT_TYPE = {'f': np.float32, 'd': np.float64}
 
@@ -32,21 +36,21 @@ build_variables_table()
 
 class SerafinValidationError(Exception):
     """!
-    @brief Custom exception for .slf file content check
+    @brief Custom exception for Serafin file content check
     """
     pass
 
 
 class SerafinRequestError(Exception):
     """!
-    @brief Custom exception for requesting invalid values from .slf object
+    @brief Custom exception for requesting invalid values from Serafin object
     """
     pass
 
 
 class SerafinHeader:
     """!
-    @brief A data type for reading and storing the .slf file header
+    @brief A data type for reading and storing the Serafin file header
     """
 
     def __init__(self, file, file_size, language):
@@ -238,7 +242,7 @@ class SerafinHeader:
 
 class Serafin:
     """!
-    @brief A Serafin object corresponds to a single .slf in file IO stream
+    @brief A Serafin object corresponds to a single Serafin in file IO stream
     """
     def __init__(self, filename, mode, language):
         self.language = language
@@ -298,7 +302,7 @@ class Serafin:
 
 class Read(Serafin):
     """!
-    @brief .slf file input stream
+    @brief Serafin file input stream
     """
     def __init__(self, filename, language):
         super().__init__(filename, 'rb', language)
@@ -310,7 +314,7 @@ class Read(Serafin):
 
     def get_time(self):
         """!
-        @brief Read the time in the .slf file
+        @brief Read the time in the Serafin file
         """
         module_logger.debug('Reading the time series from the file')
         self.file.seek(self.header.header_size, 0)
@@ -342,7 +346,7 @@ class Read(Serafin):
 
 class Write(Serafin):
     """!
-    @brief .slf file output stream
+    @brief Serafin file output stream
     """
     def __init__(self, filename, language):
         super().__init__(filename, 'wb', language)

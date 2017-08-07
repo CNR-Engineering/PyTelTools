@@ -18,7 +18,7 @@ from matplotlib.colors import Normalize, colorConverter
 import matplotlib.lines as mlines
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
-from conf.settings import CSV_SEPARATOR, DIGITS, LANG, LOGGING_LEVEL, NB_COLOR_LEVELS
+from conf.settings import CSV_SEPARATOR, DIGITS, LANG, LOGGING_LEVEL, NB_COLOR_LEVELS, SERAFIN_EXT
 from geom import BlueKenue, Shapefile
 from slf.comparison import ReferenceMesh
 from slf.datatypes import SerafinData
@@ -169,20 +169,28 @@ def open_points():
     return True, filename, points, attributes, fields
 
 
-def save_dialog(extension, input_name='', input_names=None):
+def save_dialog(file_format, input_name='', input_names=None):
     # create the save file dialog
     options = QFileDialog.Options()
     options |= QFileDialog.DontUseNativeDialog
     options |= QFileDialog.DontConfirmOverwrite
-    filename, _ = QFileDialog.getSaveFileName(None, 'Choose the output file name', '',
-                                              'Serafin Files (*.slf)' if extension == '.slf'
-                                              else 'CSV Files (*.csv)', options=options)
+    if file_format == 'Serafin':
+        extensions = ['.' + ext for ext in SERAFIN_EXT]
+        filter = Serafin.SERAFIN_FILTER
+    elif file_format == 'CSV':
+        extensions = ['.csv']
+        filter = 'CSV Files (*.csv)'
+    else:
+        raise NotImplementedError('File format %s is not supported' % file_format)
+    filename, _ = QFileDialog.getSaveFileName(None, 'Choose the output file name', '', filter, options=options)
 
     # check the file name consistency
     if not filename:
         return True, ''
-    if len(filename) < 5 or filename[-4:] != extension:
-        filename += extension
+
+    # add default extension (taken as first) if missing
+    if os.path.splitext(filename)[1] not in extensions:
+        filename += extensions[0]
 
     # overwrite to the input file is forbidden
     if input_name:
@@ -212,7 +220,7 @@ class SerafinInputTab(QWidget):
 
         # create the button open
         self.btnOpen = QPushButton('Open', self, icon=self.style().standardIcon(QStyle.SP_DialogOpenButton))
-        self.btnOpen.setToolTip('<b>Open</b> a .slf file')
+        self.btnOpen.setToolTip('<b>Open</b> a Serafin file')
         self.btnOpen.setFixedSize(105, 50)
 
         # create some text fields displaying the IO files info
@@ -271,7 +279,7 @@ class SerafinInputTab(QWidget):
         self.summaryTextBox.clear()
 
     def open_event(self):
-        filename, _ = QFileDialog.getOpenFileName(self, 'Open a .slf file', '', 'Serafin Files (*.slf)',
+        filename, _ = QFileDialog.getOpenFileName(self, 'Open a Serafin file', '', Serafin.SERAFIN_FILTER,
                                                   options=QFileDialog.Options() | QFileDialog.DontUseNativeDialog)
         if not filename:
             return True, ''

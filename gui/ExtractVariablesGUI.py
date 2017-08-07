@@ -590,7 +590,7 @@ class SubmitTab(QWidget):
 
         # create the submit button
         self.btnSubmit = QPushButton('Submit', self, icon=self.style().standardIcon(QStyle.SP_DialogSaveButton))
-        self.btnSubmit.setToolTip('<b>Submit</b> to write a .slf output')
+        self.btnSubmit.setToolTip('<b>Submit</b> to write a Serafin output')
         self.btnSubmit.setFixedSize(105, 50)
         self.btnSubmit.setEnabled(False)
 
@@ -639,7 +639,7 @@ class SubmitTab(QWidget):
         self.btnSubmit.setEnabled(True)
 
     def btnSubmitEvent(self):
-        canceled, filename = save_dialog('.slf', self.data.filename)
+        canceled, filename = save_dialog('Serafin', self.data.filename)
         if canceled:
             return
 

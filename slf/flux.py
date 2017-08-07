@@ -191,7 +191,7 @@ class TriangularVectorField(Mesh2D):
 
 class FluxCalculator:
     """!
-    Compute flux across sections (integral along lines) from a .slf input stream
+    Compute flux across sections (integral along lines) from a Serafin input stream
     """
 
     LINE_INTEGRAL, DOUBLE_LINE_INTEGRAL, LINE_FLUX, AREA_FLUX, MASS_FLUX = 0, 1, 2, 3, 4

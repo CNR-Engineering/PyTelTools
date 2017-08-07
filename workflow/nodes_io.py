@@ -374,7 +374,8 @@ class WriteSerafinNode(OneInOneOutNode):
             return
 
         input_data = self.in_port.mother.parentItem().data
-        self.filename = process_output_options(input_data.filename, input_data.job_id, '.slf',
+        self.filename = process_output_options(input_data.filename, input_data.job_id,
+                                               os.path.splitext(input_data.filename)[1],
                                                self.suffix, self.in_source_folder, self.dir_path, self.double_name)
         if not self.overwrite:
             if os.path.exists(self.filename):
@@ -684,7 +685,7 @@ class LoadReferenceSerafinNode(SingleOutputNode):
     def get_option_panel(self):
         open_button = QPushButton(QWidget().style().standardIcon(QStyle.SP_DialogOpenButton),
                                   'Load Single Frame Serafin')
-        open_button.setToolTip('<b>Open</b> a .slf file')
+        open_button.setToolTip('<b>Open</b> a Serafin file')
         open_button.setFixedHeight(30)
 
         option_panel = QWidget()
@@ -700,8 +701,8 @@ class LoadReferenceSerafinNode(SingleOutputNode):
         return option_panel
 
     def _open(self):
-        filename, _ = QFileDialog.getOpenFileName(None, 'Open a .slf ile', '',
-                                                  'Serafin file (*.slf)', QDir.currentPath(),
+        filename, _ = QFileDialog.getOpenFileName(None, 'Open a Serafin file', '',
+                                                  Serafin.SERAFIN_FILTER, QDir.currentPath(),
                                                   options=QFileDialog.Options() | QFileDialog.DontUseNativeDialog)
         if filename:
             self.filename = filename

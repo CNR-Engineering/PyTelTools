@@ -1,5 +1,5 @@
 """!
-Comparison between two .slf files with identical meshes
+Comparison between two Serafin files with identical meshes
 """
 
 import numpy as np

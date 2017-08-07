@@ -998,7 +998,7 @@ class SubmitTab(QWidget):
 
         out_names = []
         for data in self.editor.pool.input_data:
-            name = process_output_options(data.filename, data.job_id, '.slf',
+            name = process_output_options(data.filename, data.job_id, os.path.splitext(data.filename)[1],
                                           suffix, in_source_folder, dir_path, double_name)
             out_names.append(name)
 

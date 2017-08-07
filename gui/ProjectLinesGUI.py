@@ -378,7 +378,7 @@ class CSVTab(QWidget):
                                  QMessageBox.Ok)
             return
 
-        canceled, filename = save_dialog('.csv')
+        canceled, filename = save_dialog('CSV')
         if canceled:
             return
 

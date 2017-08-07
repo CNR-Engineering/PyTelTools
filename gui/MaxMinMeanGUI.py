@@ -257,7 +257,7 @@ class MaxMinMeanTab(QWidget):
 
         # create the submit button
         self.btnSubmit = QPushButton('Submit', self, icon=self.style().standardIcon(QStyle.SP_DialogSaveButton))
-        self.btnSubmit.setToolTip('<b>Submit</b> to write a .slf output')
+        self.btnSubmit.setToolTip('<b>Submit</b> to write a Serafin output')
         self.btnSubmit.setFixedSize(105, 50)
         self.btnSubmit.setEnabled(False)
 
@@ -364,7 +364,7 @@ class MaxMinMeanTab(QWidget):
                                  QMessageBox.Ok)
             return
 
-        canceled, filename = save_dialog('.slf', self.data.filename)
+        canceled, filename = save_dialog('Serafin', self.data.filename)
         if canceled:
             return
 
@@ -476,7 +476,7 @@ class ArrivalDurationTab(QWidget):
 
         # create the submit button
         self.btnSubmit = QPushButton('Submit', self, icon=self.style().standardIcon(QStyle.SP_DialogSaveButton))
-        self.btnSubmit.setToolTip('<b>Submit</b> to write a .slf output')
+        self.btnSubmit.setToolTip('<b>Submit</b> to write a Serafin output')
         self.btnSubmit.setFixedSize(105, 50)
         self.btnSubmit.setEnabled(False)
 
@@ -651,7 +651,7 @@ class ArrivalDurationTab(QWidget):
                                  QMessageBox.Ok)
             return
 
-        canceled, filename = save_dialog('.slf', self.data.filename)
+        canceled, filename = save_dialog('Serafin', self.data.filename)
         if canceled:
             return
         
@@ -731,7 +731,7 @@ class SynchMaxTab(QWidget):
 
         # create the submit button
         self.btnSubmit = QPushButton('Submit', self, icon=self.style().standardIcon(QStyle.SP_DialogSaveButton))
-        self.btnSubmit.setToolTip('<b>Submit</b> to write a .slf output')
+        self.btnSubmit.setToolTip('<b>Submit</b> to write a Serafin output')
         self.btnSubmit.setFixedSize(105, 50)
         self.btnSubmit.setEnabled(False)
 
@@ -853,7 +853,7 @@ class SynchMaxTab(QWidget):
                                  QMessageBox.Ok)
             return
 
-        canceled, filename = save_dialog('.slf', self.data.filename)
+        canceled, filename = save_dialog('Serafin', self.data.filename)
         if canceled:
             return
 

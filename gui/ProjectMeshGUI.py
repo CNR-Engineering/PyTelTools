@@ -55,7 +55,7 @@ class InputTab(SerafinInputTab):
 
         # create the button open the test file
         self.btnOpenSecond = QPushButton('Load\nFile B', self, icon=self.style().standardIcon(QStyle.SP_DialogOpenButton))
-        self.btnOpenSecond.setToolTip('<b>Open</b> a .slf file')
+        self.btnOpenSecond.setToolTip('<b>Open</b> a Serafin file')
         self.btnOpenSecond.setFixedSize(105, 50)
         self.btnOpenSecond.setEnabled(False)
 
@@ -242,7 +242,7 @@ class SubmitTab(QWidget):
 
         # create the submit button
         self.btnSubmit = QPushButton('Submit', self, icon=self.style().standardIcon(QStyle.SP_DialogSaveButton))
-        self.btnSubmit.setToolTip('<b>Submit</b> to write a .slf output')
+        self.btnSubmit.setToolTip('<b>Submit</b> to write a Serafin output')
         self.btnSubmit.setFixedSize(105, 50)
 
     def _bindEvents(self):
@@ -379,8 +379,8 @@ class SubmitTab(QWidget):
                                  QMessageBox.Ok)
             return
 
-        canceled, filename = save_dialog('.slf', input_names=[self.input.first_data.filename,
-                                                              self.input.second_data.filename])
+        canceled, filename = save_dialog('Serafin', input_names=[self.input.first_data.filename,
+                                                                 self.input.second_data.filename])
         if canceled:
             return
 

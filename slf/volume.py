@@ -198,7 +198,7 @@ class TruncatedTriangularPrisms(Mesh2D):
 
 class VolumeCalculator:
     """!
-    Compute volumes inside polygons from a .slf input stream
+    Compute volumes inside polygons from a Serafin input stream
     """
 
     NET_STRICT, NET, POSITIVE = 0, 1, 2
