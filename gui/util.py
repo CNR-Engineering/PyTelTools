@@ -18,7 +18,8 @@ from matplotlib.colors import Normalize, colorConverter
 import matplotlib.lines as mlines
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
-from conf.settings import CSV_SEPARATOR, DIGITS, LANG, LOGGING_LEVEL, NB_COLOR_LEVELS, SERAFIN_EXT
+from conf.settings import CSV_SEPARATOR, DIGITS, FIG_SIZE, FIG_OUT_DPI, LANG, LOGGING_LEVEL, NB_COLOR_LEVELS,\
+    SERAFIN_EXT
 from geom import BlueKenue, Shapefile
 from slf.comparison import ReferenceMesh
 from slf.datatypes import SerafinData

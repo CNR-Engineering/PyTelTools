@@ -6,7 +6,7 @@ import sys
 import os
 from time import time
 
-from conf.settings import CSV_SEPARATOR, LANG, DIGITS, SCENE_WIDTH, SCENE_HEIGHT
+from conf.settings import CSV_SEPARATOR, LANG, DIGITS, SCENE_SIZE
 import workflow.multi_func as worker
 from workflow.MultiNode import Box, MultiLink
 from workflow.multi_nodes import *
@@ -91,7 +91,7 @@ class MultiScene(QGraphicsScene):
         self.csv_separator = CSV_SEPARATOR
         self.digits = DIGITS
 
-        self.setSceneRect(QRectF(0, 0, SCENE_WIDTH, SCENE_HEIGHT))
+        self.setSceneRect(QRectF(0, 0, SCENE_SIZE[0], SCENE_SIZE[1]))
         self.transform = QTransform()
 
         self.nodes = {0: MultiLoadSerafin2DNode(0)}

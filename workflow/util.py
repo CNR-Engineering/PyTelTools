@@ -14,7 +14,8 @@ import matplotlib.tri as mtri
 import warnings
 warnings.filterwarnings('ignore', category=RuntimeWarning, module='matplotlib')
 
-from conf.settings import COLOR_SYLES, DEFAULT_COLOR_STYLE, LOGGING_LEVEL, NB_COLOR_LEVELS, SERAFIN_EXT
+from conf.settings import COLOR_SYLES, DEFAULT_COLOR_STYLE, FIG_OUT_DPI, FIG_SIZE, LOGGING_LEVEL,\
+    NB_COLOR_LEVELS, SERAFIN_EXT
 from gui.util import TemporalPlotViewer, VolumePlotViewer, MapCanvas,\
     FluxPlotViewer, PointPlotViewer, PointLabelEditor, SimpleTimeDateSelection, read_csv
 from slf.datatypes import SerafinData
@@ -1325,7 +1326,7 @@ class MultiSaveVolumeDialog(MultiSaveTemporalPlotDialog):
 
     def plot(self):
         fig, axes = plt.subplots(1)
-        fig.set_size_inches(8, 6)
+        fig.set_size_inches(FIG_SIZE[0], FIG_SIZE[1])
 
         for (data, time, str_datetime, str_datetime_bis), png_name in zip(self.data, self.out_names):
             axes.clear()
@@ -1343,7 +1344,7 @@ class MultiSaveVolumeDialog(MultiSaveTemporalPlotDialog):
                     label.set_rotation(45)
                     label.set_fontsize(8)
             fig.canvas.draw()
-            fig.savefig(png_name, dpi=100)
+            fig.savefig(png_name, dpi=FIG_OUT_DPI)
 
 
 class MultiSaveFluxDialog(MultiSaveTemporalPlotDialog):
@@ -1355,7 +1356,7 @@ class MultiSaveFluxDialog(MultiSaveTemporalPlotDialog):
 
     def plot(self):
         fig, axes = plt.subplots(1)
-        fig.set_size_inches(8, 6)
+        fig.set_size_inches(FIG_SIZE[0], FIG_SIZE[1])
 
         for (data, time, str_datetime, str_datetime_bis), png_name in zip(self.data, self.out_names):
             axes.clear()
@@ -1377,7 +1378,7 @@ class MultiSaveFluxDialog(MultiSaveTemporalPlotDialog):
                     label.set_rotation(45)
                     label.set_fontsize(8)
             fig.canvas.draw()
-            fig.savefig(png_name, dpi=100)
+            fig.savefig(png_name, dpi=FIG_OUT_DPI)
 
 
 class MultiSavePointDialog(MultiSaveTemporalPlotDialog):
@@ -1389,7 +1390,7 @@ class MultiSavePointDialog(MultiSaveTemporalPlotDialog):
 
     def plot(self):
         fig, axes = plt.subplots(1)
-        fig.set_size_inches(8, 6)
+        fig.set_size_inches(FIG_SIZE[0], FIG_SIZE[1])
 
         for (data, time, str_datetime, str_datetime_bis), png_name in zip(self.data, self.out_names):
             axes.clear()
@@ -1407,7 +1408,7 @@ class MultiSavePointDialog(MultiSaveTemporalPlotDialog):
                     label.set_rotation(45)
                     label.set_fontsize(8)
             fig.canvas.draw()
-            fig.savefig(png_name, dpi=100)
+            fig.savefig(png_name, dpi=FIG_OUT_DPI)
 
 
 class MultiInterpolationPlotDialog(QDialog):

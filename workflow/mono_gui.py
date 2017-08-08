@@ -2,7 +2,7 @@ import logging
 import sys
 from time import time
 
-from conf.settings import CSV_SEPARATOR, LANG, DIGITS, SCENE_WIDTH, SCENE_HEIGHT
+from conf.settings import CSV_SEPARATOR, LANG, DIGITS, SCENE_SIZE
 from workflow.Node import Port, Box, Link
 from workflow.nodes_io import *
 from workflow.nodes_op import *
@@ -82,7 +82,7 @@ class MonoScene(QGraphicsScene):
         self.csv_separator = CSV_SEPARATOR
         self.digits = DIGITS
 
-        self.setSceneRect(QRectF(0, 0, SCENE_WIDTH, SCENE_HEIGHT))
+        self.setSceneRect(QRectF(0, 0, SCENE_SIZE[0], SCENE_SIZE[1]))
         self.transform = QTransform()
         self.selectionChanged.connect(self.selection_changed)
 

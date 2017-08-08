@@ -6,7 +6,7 @@ import matplotlib.tri as mtri
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 from PyQt5.QtWidgets import *
 
-from conf.settings import NB_COLOR_LEVELS
+from conf.settings import NB_COLOR_LEVELS, FIG_OUT_DPI, FIG_SIZE
 from gui.util import MapCanvas, PolygonMapCanvas, LineMapCanvas, MapViewer, \
     PointAttributeTable, ProjectLinesPlotViewer, MultiVarLinePlotViewer, MultiFrameLinePlotViewer
 from slf.interpolation import MeshInterpolator
@@ -536,7 +536,7 @@ class MultiVarLinePlotNode(DoubleInputNode):
 
     def plot(self, values, distances, values_internal, distances_internal, current_vars, png_name):
         fig, axes = plt.subplots(1)
-        fig.set_size_inches(8, 6)
+        fig.set_size_inches(FIG_SIZE[0], FIG_SIZE[1])
         if self.plot_viewer.control.addInternal.isChecked():
             if self.plot_viewer.control.intersection.isChecked():
                 for i, var in enumerate(current_vars):
@@ -565,7 +565,7 @@ class MultiVarLinePlotNode(DoubleInputNode):
         axes.set_ylabel(self.plot_viewer.plotViewer.current_ylabel)
         axes.set_title(self.plot_viewer.plotViewer.current_title)
         fig.canvas.draw()
-        fig.savefig(png_name, dpi=100)
+        fig.savefig(png_name, dpi=FIG_OUT_DPI)
 
     def multi_save(self):
         current_vars = self.plot_viewer.getSelection()
@@ -699,7 +699,7 @@ class MultiFrameLinePlotNode(DoubleInputNode):
 
     def plot(self, values, distances, values_internal, distances_internal, time_indices, png_name):
         fig, axes = plt.subplots(1)
-        fig.set_size_inches(8, 6)
+        fig.set_size_inches(FIG_SIZE[0], FIG_SIZE[1])
         if self.plot_viewer.control.addInternal.isChecked():
             if self.plot_viewer.control.intersection.isChecked():
                 for i, index in enumerate(time_indices):
@@ -729,7 +729,7 @@ class MultiFrameLinePlotNode(DoubleInputNode):
         axes.set_ylabel(self.plot_viewer.plotViewer.current_ylabel)
         axes.set_title(self.plot_viewer.plotViewer.current_title)
         fig.canvas.draw()
-        fig.savefig(png_name, dpi=100)
+        fig.savefig(png_name, dpi=FIG_OUT_DPI)
 
     def multi_save(self):
         time_indices = self.plot_viewer.getTime()
@@ -859,7 +859,7 @@ class ProjectLinesPlotNode(DoubleInputNode):
 
     def plot(self, values, distances, values_internal, distances_internal, current_vars, png_name):
         fig, axes = plt.subplots(1)
-        fig.set_size_inches(8, 6)
+        fig.set_size_inches(FIG_SIZE[0], FIG_SIZE[1])
         if self.plot_viewer.control.addInternal.isChecked():
             if self.plot_viewer.control.intersection.isChecked():
                 for line_id, variables in current_vars.items():
@@ -901,7 +901,7 @@ class ProjectLinesPlotNode(DoubleInputNode):
         axes.set_ylabel(self.plot_viewer.plotViewer.current_ylabel)
         axes.set_title(self.plot_viewer.plotViewer.current_title)
         fig.canvas.draw()
-        fig.savefig(png_name, dpi=100)
+        fig.savefig(png_name, dpi=FIG_OUT_DPI)
 
     def multi_save(self):
         current_vars = self.plot_viewer.getSelection()
@@ -1042,7 +1042,7 @@ class VerticalTemporalProfileNode(DoubleInputNode):
 
     def plot(self, time, y, z, triangles, str_datetime, str_datetime_bis, png_name):
         fig, axes = plt.subplots(1)
-        fig.set_size_inches(8, 6)
+        fig.set_size_inches(FIG_SIZE[0], FIG_SIZE[1])
 
         triang = mtri.Triangulation(time[self.timeFormat], y, triangles)
         if self.plot_viewer.color_limits is not None:
@@ -1069,7 +1069,7 @@ class VerticalTemporalProfileNode(DoubleInputNode):
                 label.set_rotation(45)
                 label.set_fontsize(8)
         fig.canvas.draw()
-        fig.savefig(png_name, dpi=100)
+        fig.savefig(png_name, dpi=FIG_OUT_DPI)
 
     def multi_save(self):
         dlg = MultiLoadSerafinDialog([])
