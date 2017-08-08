@@ -1,16 +1,15 @@
+import numpy as np
 import os
+from PyQt5.QtCore import *
+from PyQt5.QtWidgets import *
 import struct
 
-import numpy as np
-from PyQt5.QtWidgets import *
-from PyQt5.QtCore import *
-
 from conf.settings import SERAFIN_EXT
-import slf.misc as operations
 from geom import BlueKenue, Shapefile
-from slf import Serafin
 from slf.datatypes import SerafinData, PointData, PolylineData
 from slf.interpolation import MeshInterpolator
+import slf.misc as operations
+from slf import Serafin
 from slf.variables import do_calculations_in_frame
 from workflow.Node import Node, SingleInputNode, SingleOutputNode, OneInOneOutNode
 from workflow.util import LoadSerafinDialog, logger, OutputOptionPanel, GeomOutputOptionPanel, VtkOutputOptionPanel, \

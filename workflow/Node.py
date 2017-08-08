@@ -45,6 +45,9 @@ class Port(QGraphicsRectItem):
 
 
 class InputPort(Port):
+    """!
+    Input stream of a Node
+    """
     def __init__(self, index, x, y):
         super().__init__(index, x, y, Port.INPUT)
         self.mother = None
@@ -63,6 +66,9 @@ class InputPort(Port):
 
 
 class OutputPort(Port):
+    """!
+    Output stream of a Node
+    """
     def __init__(self, index, x, y):
         super().__init__(index, x, y, Port.OUTPUT)
         self.children = set()
@@ -89,6 +95,9 @@ class Box(QGraphicsRectItem):
 
 
 class Node(QGraphicsItem):
+    """!
+    Node representing a tool with its state, ports, ... (in Mono tab)
+    """
     NOT_CONFIGURED, READY, SUCCESS, FAIL = 'Not configured', 'Ready', 'Success', 'Fail'
     COLOR = {NOT_CONFIGURED: QColor(220, 255, 255, 255), READY: QColor(250, 220, 165, 255),
              SUCCESS: QColor(180, 250, 165, 255), FAIL: QColor(255, 160, 160, 255)}
@@ -275,7 +284,15 @@ class Node(QGraphicsItem):
 
 
 class Link(QGraphicsLineItem):
+    """!
+    Link between Ports
+    """
     def __init__(self, from_port, to_port):
+        """!
+        @brief Link between two Ports (of different Nodes)
+        @param from_port <OutputPort>: origin port
+        @param to_port <InputPort>: destination port
+        """
         super().__init__()
         self.setFlag(QGraphicsItem.ItemIsSelectable)
 
@@ -424,6 +441,9 @@ class Link(QGraphicsLineItem):
 
 
 class SingleInputNode(Node):
+    """!
+    Node with single input (without output)
+    """
     def __init__(self, index):
         super().__init__(index)
         self.in_port = InputPort(0, -Port.WIDTH, Box.HEIGHT/2-Port.WIDTH/2)
@@ -449,6 +469,9 @@ class SingleInputNode(Node):
 
 
 class SingleOutputNode(Node):
+    """!
+    Node with single output (without input)
+    """
     def __init__(self, index):
         super().__init__(index)
         self.out_port = OutputPort(0, Box.WIDTH/2-Port.WIDTH/2, Box.HEIGHT)
@@ -477,6 +500,9 @@ class SingleOutputNode(Node):
 
 
 class OneInOneOutNode(Node):
+    """!
+    Node with single input and single output
+    """
     def __init__(self, index):
         super().__init__(index)
         self.in_port = InputPort(0, -Port.WIDTH, Box.HEIGHT/2-Port.WIDTH/2)
@@ -517,6 +543,9 @@ class OneInOneOutNode(Node):
 
 
 class TwoInOneOutNode(Node):
+    """!
+    Node with two inputs and single output
+    """
     def __init__(self, index):
         super().__init__(index)
         self.first_in_port = InputPort(0, -Port.WIDTH, Box.HEIGHT/4-Port.WIDTH/2)
@@ -569,6 +598,9 @@ class TwoInOneOutNode(Node):
 
 
 class DoubleInputNode(Node):
+    """!
+    Node with two inputs (without output)
+    """
     def __init__(self, index):
         super().__init__(index)
         self.first_in_port = InputPort(0, -Port.WIDTH, Box.HEIGHT/4-Port.WIDTH/2)

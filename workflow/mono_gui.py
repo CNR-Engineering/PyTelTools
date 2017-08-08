@@ -12,8 +12,9 @@ from workflow.util import logger
 
 
 NODES = {'Input/Output': {'Load Serafin 2D': LoadSerafin2DNode, 'Load Serafin 3D': LoadSerafin3DNode,
-                          'Load 2D Polygons': LoadPolygon2DNode, 'Load 2D Open Polylines': LoadOpenPolyline2DNode,
-                          'Load 2D Points': LoadPoint2DNode, 'Load Reference Serafin': LoadReferenceSerafinNode,
+                          'Load Reference Serafin': LoadReferenceSerafinNode,
+                          'Load 2D Points': LoadPoint2DNode, 'Load 2D Open Polylines': LoadOpenPolyline2DNode,
+                          'Load 2D Polygons': LoadPolygon2DNode,
                           'Write LandXML': WriteLandXMLNode, 'Write shp': WriteShpNode, 'Write vtk': WriteVtkNode,
                           'Write Serafin': WriteSerafinNode},
          'Basic operations': {'Select Variables': SelectVariablesNode,
@@ -82,29 +83,28 @@ class MonoScene(QGraphicsScene):
         self.csv_separator = CSV_SEPARATOR
         self.digits = DIGITS
 
+        self._init_with_default_node()
+
         self.setSceneRect(QRectF(0, 0, SCENE_SIZE[0], SCENE_SIZE[1]))
         self.transform = QTransform()
         self.selectionChanged.connect(self.selection_changed)
 
-        self.nodes = {0: LoadSerafin2DNode(0)}
-        self.nodes[0].moveBy(50, 50)
-        self.nb_nodes = 1
-
-        self.current_line = QGraphicsLineItem()
-        self.addItem(self.current_line)
-        self.current_line.setVisible(False)
-        pen = QPen(QColor(0, 0, 0))
-        pen.setWidth(2)
-        self.current_line.setPen(pen)
-        self.current_port = None
-        self.adj_list = {0: set()}
-
-        for node in self.nodes.values():
-            self.addItem(node)
-            logger.debug('Node %s' % node)
-
     def reinit(self):
         self.clear()
+        self._init_with_default_node()
+        self.update()
+
+    def _init_without_node(self):
+        self.nodes = {}
+        self.nb_nodes = 0
+        self.adj_list = {}
+
+    def _init_with_default_node(self):
+        self._init_without_node()
+        self.add_node(LoadSerafin2DNode(0), 50, 50)
+        self._add_current_line()
+
+    def _add_current_line(self):
         self.current_line = QGraphicsLineItem()
         self.addItem(self.current_line)
         self.current_line.setVisible(False)
@@ -112,13 +112,6 @@ class MonoScene(QGraphicsScene):
         pen.setWidth(2)
         self.current_line.setPen(pen)
         self.current_port = None
-
-        self.nodes = {0: LoadSerafin2DNode(0)}
-        self.nodes[0].moveBy(50, 50)
-        self.addItem(self.nodes[0])
-        self.nb_nodes = 1
-        self.adj_list = {0: set()}
-        self.update()
 
     def mousePressEvent(self, event):
         super().mousePressEvent(event)
@@ -173,6 +166,7 @@ class MonoScene(QGraphicsScene):
             view.deselect_node()
 
     def add_node(self, node, x, y):
+        logger.debug('Add node #%i %s' % (node.index(), node.label.replace('\n', ' ')))
         self.addItem(node)
         self.nodes[node.index()] = node
         self.adj_list[node.index()] = set()
@@ -195,18 +189,10 @@ class MonoScene(QGraphicsScene):
 
     def load(self, filename):
         logger.debug('Loading project in MONO: %s' % filename)
+        self.project_path = filename
         self.clear()
-        self.current_line = QGraphicsLineItem()
-        self.addItem(self.current_line)
-        self.current_line.setVisible(False)
-        pen = QPen(QColor(0, 0, 0))
-        pen.setWidth(2)
-        self.current_line.setPen(pen)
-        self.current_port = None
-
-        self.nb_nodes = 0
-        self.nodes = {}
-        self.adj_list = {}
+        self._add_current_line()
+        self._init_without_node()
         try:
             with open(filename, 'r') as f:
                 self.language, self.csv_separator = f.readline().rstrip().split('.')

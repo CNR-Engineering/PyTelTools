@@ -40,6 +40,9 @@ class MultiPort(QGraphicsRectItem):
 
 
 class MultiInputPort(MultiPort):
+    """!
+    MultiPort receiving input stream
+    """
     def __init__(self, index, x, y):
         super().__init__(index, x, y, MultiPort.INPUT)
         self.mother = None
@@ -49,6 +52,9 @@ class MultiInputPort(MultiPort):
 
 
 class MultiOutputPort(MultiPort):
+    """!
+    MultiPort sending output stream
+    """
     def __init__(self, index, x, y):
         super().__init__(index, x, y, MultiPort.OUTPUT)
         self.children = set()
@@ -66,6 +72,9 @@ class Box(QGraphicsRectItem):
         
 
 class MultiNode(QGraphicsItem):
+    """!
+    Node representing a tool with its state, ports, ... (in Multi tab)
+    """
     NOT_CONFIGURED, READY, SUCCESS, PARTIAL_FAIL, FAIL = 'Not configured', 'Ready', 'Success', 'Partial success', 'Fail'
     COLOR = {NOT_CONFIGURED: QColor(220, 255, 255, 255), READY: QColor(250, 220, 165, 255),
              SUCCESS: QColor(180, 250, 165, 255), PARTIAL_FAIL: QColor(255, 190, 160, 255),
@@ -135,7 +144,15 @@ class MultiNode(QGraphicsItem):
 
 
 class MultiLink(QGraphicsLineItem):
+    """!
+    Link between MultiPorts
+    """
     def __init__(self, from_port, to_port):
+        """!
+        @brief Link between two MultiPorts (of different MultiNodes)
+        @param from_port <MultiOutputPort>: origin port
+        @param to_port <MultiInputPort>: destination port
+        """
         super().__init__()
         self.head = None
         self.tail = None
@@ -275,6 +292,9 @@ class MultiLink(QGraphicsLineItem):
 
 
 class MultiSingleInputNode(MultiNode):
+    """!
+    MultiNode with single input (without output)
+    """
     def __init__(self, index):
         super().__init__(index)
         self.in_port = MultiInputPort(0, -MultiPort.WIDTH, Box.HEIGHT/2-MultiPort.WIDTH/2)
@@ -282,6 +302,9 @@ class MultiSingleInputNode(MultiNode):
 
 
 class MultiSingleOutputNode(MultiNode):
+    """!
+    MultiNode with single output (without input)
+    """
     def __init__(self, index):
         super().__init__(index)
         self.out_port = MultiOutputPort(0, Box.WIDTH/2-MultiPort.WIDTH/2, Box.HEIGHT)
@@ -289,6 +312,9 @@ class MultiSingleOutputNode(MultiNode):
 
 
 class MultiOneInOneOutNode(MultiNode):
+    """!
+    MultiNode with single input and single output
+    """
     def __init__(self, index):
         super().__init__(index)
         self.in_port = MultiInputPort(0, -MultiPort.WIDTH, Box.HEIGHT/2-MultiPort.WIDTH/2)
@@ -298,25 +324,10 @@ class MultiOneInOneOutNode(MultiNode):
         self.expected_input = (0,)
 
 
-class MultiDoubleInputNode(MultiNode):
-    def __init__(self, index):
-        super().__init__(index)
-        self.first_in_port = MultiInputPort(0, -MultiPort.WIDTH, Box.HEIGHT/4-MultiPort.WIDTH/2)
-        self.second_in_port = MultiInputPort(1, -MultiPort.WIDTH, 3*Box.HEIGHT/4-MultiPort.WIDTH/2)
-        self.add_port(self.first_in_port)
-        self.add_port(self.second_in_port)
-        self.expected_input = (0, 1)
-        self.double_input = True
-        self.auxiliary_data = None
-
-    def update_input(self, nb_input):
-        self.expected_input = (nb_input, 1)
-
-    def set_auxiliary_data(self, data):
-        self.auxiliary_data = data
-
-
 class MultiTwoInOneOutNode(MultiNode):
+    """!
+    MultiNode with two inputs and single output
+    """
     def __init__(self, index):
         super().__init__(index)
         self.first_in_port = MultiInputPort(0, -MultiPort.WIDTH, Box.HEIGHT/4-MultiPort.WIDTH/2)
@@ -342,4 +353,22 @@ class MultiTwoInOneOutNode(MultiNode):
         self.expected_input = (nb_input, nb_input)
 
 
+class MultiDoubleInputNode(MultiNode):
+    """!
+    MultiNode with two inputs (without output)
+    """
+    def __init__(self, index):
+        super().__init__(index)
+        self.first_in_port = MultiInputPort(0, -MultiPort.WIDTH, Box.HEIGHT/4-MultiPort.WIDTH/2)
+        self.second_in_port = MultiInputPort(1, -MultiPort.WIDTH, 3*Box.HEIGHT/4-MultiPort.WIDTH/2)
+        self.add_port(self.first_in_port)
+        self.add_port(self.second_in_port)
+        self.expected_input = (0, 1)
+        self.double_input = True
+        self.auxiliary_data = None
 
+    def update_input(self, nb_input):
+        self.expected_input = (nb_input, 1)
+
+    def set_auxiliary_data(self, data):
+        self.auxiliary_data = data
