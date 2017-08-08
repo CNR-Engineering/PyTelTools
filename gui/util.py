@@ -292,16 +292,29 @@ class SerafinInputTab(QWidget):
     def read(self, filename):
         self.inNameBox.setText(filename)
         data = SerafinData('', filename, self.current_language())
-        data.read()
+        try:
+            data.read()
+        except PermissionError:
+            QMessageBox.critical(None, 'Permission denied',
+                                 'Permission denied. (Is the file opened by another application?).',
+                                 QMessageBox.Ok, QMessageBox.Ok)
+            return False, None
         self.summaryTextBox.appendPlainText(data.header.summary())
         logging.info('Finished reading the input file')
-        return data
+        return True, data
 
     def read_2d(self, filename, update=True):
         if update:
             self.inNameBox.setText(filename)
         data = SerafinData('', filename, self.current_language())
-        is_2d = data.read()
+
+        try:
+            is_2d = data.read()
+        except PermissionError:
+            QMessageBox.critical(None, 'Permission denied',
+                                 'Permission denied. (Is the file opened by another application?).',
+                                 QMessageBox.Ok, QMessageBox.Ok)
+            return False, None
 
         if not is_2d:
             QMessageBox.critical(self, 'Error', 'The file type (TELEMAC 3D) is currently not supported.',
@@ -807,8 +820,8 @@ class TimeRangeSlider(QSlider):
         try:
             start_value = float(self.info.startValue.text())
             end_value = float(self.info.endValue.text())
-            start_index = self.info.parent.input.time.index(start_value) + 1
-            end_index = self.info.parent.input.time.index(end_value) + 1
+            start_index = self.info.parent.time.index(start_value) + 1
+            end_index = self.info.parent.time.index(end_value) + 1
         except ValueError:
             self.info.updateText(self._low, self.time_frames[self._low].total_seconds(), self.low(),
                                  self._high, self.time_frames[self._high].total_seconds(), self.high())
@@ -1191,9 +1204,9 @@ class FrictionLawMessage(QDialog):
         return -1
 
 
-class FallVelocityMessage(QDialog):
+class SettlingVelocityMessage(QDialog):
     """!
-    @brief Message dialog for adding fall velocities
+    @brief Message dialog for adding settling velocities
     """
     def __init__(self, old_velocities, old_table=None, parent=None):
         super().__init__(parent)
@@ -1221,7 +1234,7 @@ class FallVelocityMessage(QDialog):
         buttons.accepted.connect(self.check)
         buttons.rejected.connect(self.reject)
 
-        self.buttonAdd = QPushButton('Add a fall velocity', self)
+        self.buttonAdd = QPushButton('Add a settling velocity', self)
         self.buttonAdd.clicked.connect(self.btnAddEvent)
 
         vlayout = QVBoxLayout()
@@ -1233,7 +1246,7 @@ class FallVelocityMessage(QDialog):
         self.setLayout(vlayout)
 
         self.setFixedSize(350, 400)
-        self.setWindowTitle('Add fall velocities')
+        self.setWindowTitle('Add settling velocities')
 
     def check_name_length(self):
         for name in self.names:

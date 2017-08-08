@@ -1,13 +1,13 @@
 import datetime
 import logging
-from PyQt5.QtWidgets import *
-from PyQt5.QtGui import *
 from PyQt5.QtCore import *
+from PyQt5.QtGui import *
+from PyQt5.QtWidgets import *
 import sys
 
-from gui.util import TableWidgetDragRows, VariableTable, QPlainTextEditLogger, FallVelocityMessage, FrictionLawMessage, \
-    TimeRangeSlider, DoubleSliderBox, OutputProgressDialog, OutputThread, SerafinInputTab, \
-    TelToolWidget, save_dialog
+from gui.util import DoubleSliderBox, FrictionLawMessage, QPlainTextEditLogger, save_dialog, SerafinInputTab, \
+    SettlingVelocityMessage, TableWidgetDragRows, TelToolWidget, test_open, TimeRangeSlider, \
+    OutputProgressDialog, OutputThread, VariableTable
 from slf import Serafin
 from slf.variables import get_available_variables, do_calculations_in_frame, get_necessary_equations, \
                           get_US_equation, new_variables_from_US
@@ -181,7 +181,7 @@ class InputTab(SerafinInputTab):
         self.time = []
 
         self.available_vars = []
-        self.fall_velocities = []
+        self.settling_velocities = []
 
         self.YELLOW = QColor(245, 255, 207)
         self.GREEN = QColor(200, 255, 180)
@@ -205,9 +205,9 @@ class InputTab(SerafinInputTab):
         self.btnAddUS.setEnabled(False)
         self.btnAddUS.setFixedWidth(200)
 
-        # create a button for adding Rouse number from user-defined fall velocity
-        self.btnAddWs = QPushButton('Add Rouse from fall velocity', self)
-        self.btnAddWs.setToolTip('Compute <b>Rouse</b> for specific fall velocity')
+        # create a button for adding Rouse number from user-defined settling velocity
+        self.btnAddWs = QPushButton('Add Rouse from settling velocity', self)
+        self.btnAddWs.setToolTip('Compute <b>Rouse</b> for specific settling velocity')
         self.btnAddWs.setEnabled(False)
         self.btnAddWs.setFixedWidth(200)
 
@@ -315,7 +315,7 @@ class InputTab(SerafinInputTab):
         """
         self.available_vars = []
         self.data = None
-        self.fall_velocities = []
+        self.settling_velocities = []
         self.btnAddUS.setEnabled(False)
         self.btnAddWs.setEnabled(False)
         self.firstTable.setRowCount(0)
@@ -358,7 +358,7 @@ class InputTab(SerafinInputTab):
         self.btnAddWs.setEnabled(True)
 
     def btnAddWsEvent(self):
-        msg = FallVelocityMessage(self.fall_velocities)
+        msg = SettlingVelocityMessage(self.settling_velocities)
         value = msg.exec_()
         if value != QDialog.Accepted:
             return
@@ -371,7 +371,7 @@ class InputTab(SerafinInputTab):
                 self.secondTable.setItem(offset+i, j, item)
                 self.secondTable.item(offset+i, j).setBackground(self.BLUE)
         for i in range(len(table)):
-            self.fall_velocities.append(float(table[i][0][6:]))
+            self.settling_velocities.append(float(table[i][0][6:]))
 
     def btnOpenEvent(self):
         canceled, filename = super().open_event()
@@ -381,7 +381,9 @@ class InputTab(SerafinInputTab):
         # reinitialize input file data
         self._reinitInput()
 
-        self.data = self.read(filename)
+        success, self.data = self.read(filename)
+        if not success:
+            return
         self.time = self.data.time
 
         # displaying the available variables

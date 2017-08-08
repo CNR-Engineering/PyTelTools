@@ -4,7 +4,7 @@ from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 
-from gui.util import DoubleSliderBox, FallVelocityMessage, FrictionLawMessage, SimpleTimeDateSelection,\
+from gui.util import DoubleSliderBox, FrictionLawMessage, SettlingVelocityMessage, SimpleTimeDateSelection,\
     TimeRangeSlider, VariableTable
 import slf.misc as operations
 from geom.transformation import load_transformation_map
@@ -323,10 +323,10 @@ class AddRouseNode(OneInOneOutNode):
         self.in_data = None
         self.data = None
         self.table = []
-        self.fall_velocities = []
+        self.settling_velocities = []
 
     def _configure(self):
-        msg = FallVelocityMessage(self.fall_velocities, self.table)
+        msg = SettlingVelocityMessage(self.settling_velocities, self.table)
         value = msg.exec_()
         if value != QDialog.Accepted:
             return 0
@@ -340,17 +340,17 @@ class AddRouseNode(OneInOneOutNode):
                 QMessageBox.critical(None, 'Error', 'Duplicated value found.',
                                      QMessageBox.Ok)
                 self.table = []
-                self.fall_velocities = []
+                self.settling_velocities = []
                 return 1
         for name in new_names:
             if name in old_names:
                 QMessageBox.critical(None, 'Error', 'Duplicated name found.',
                                      QMessageBox.Ok)
                 self.table = []
-                self.fall_velocities = []
+                self.settling_velocities = []
                 return 1
         for i in range(len(self.table)):
-            self.fall_velocities.append(float(self.table[i][0][6:]))
+            self.settling_velocities.append(float(self.table[i][0][6:]))
         return 2
 
     def _reset(self):
@@ -358,7 +358,7 @@ class AddRouseNode(OneInOneOutNode):
         if not self.in_data.header.is_2d or 'US' not in self.in_data.selected_vars:
             self.state = Node.NOT_CONFIGURED
             self.in_data = None
-        elif self.fall_velocities:
+        elif self.settling_velocities:
             old_rouse = [self.table[i][0] for i in range(len(self.table))]
             old_names = [self.table[i][1] for i in range(len(self.table))]
             new_names = [self.in_data.selected_vars_names[var][0].decode('utf-8').strip()
@@ -366,7 +366,7 @@ class AddRouseNode(OneInOneOutNode):
             for rouse in old_rouse:
                 if rouse in self.in_data.selected_vars:  # duplicated value
                     self.state = Node.NOT_CONFIGURED
-                    self.fall_velocities = []
+                    self.settling_velocities = []
                     self.table = []
                     self.in_data = None
                     self.reconfigure_downward()
@@ -375,7 +375,7 @@ class AddRouseNode(OneInOneOutNode):
             for name in old_names:
                 if name in new_names:   # duplicated value
                     self.state = Node.NOT_CONFIGURED
-                    self.fall_velocities = []
+                    self.settling_velocities = []
                     self.table = []
                     self.in_data = None
                     self.reconfigure_downward()
@@ -399,7 +399,7 @@ class AddRouseNode(OneInOneOutNode):
 
     def reconfigure(self):
         super().reconfigure()
-        if self.fall_velocities and self.in_port.has_mother():
+        if self.settling_velocities and self.in_port.has_mother():
             parent_node = self.in_port.mother.parentItem()
             if parent_node.ready_to_run():
                 parent_node.run()
@@ -465,13 +465,13 @@ class AddRouseNode(OneInOneOutNode):
                 table.append(line[j])
         return '|'.join([self.category, self.name(), str(self.index()),
                          str(self.pos().x()), str(self.pos().y()),
-                         ','.join(map(str, self.fall_velocities)), ','.join(table)])
+                         ','.join(map(str, self.settling_velocities)), ','.join(table)])
 
     def load(self, options):
         values, table = options
         table = table.split(',')
         if values:
-            self.fall_velocities = list(map(float, values.split(',')))
+            self.settling_velocities = list(map(float, values.split(',')))
             for i in range(0, len(table), 3):
                 self.table.append([table[i], table[i+1], table[i+2]])
 
