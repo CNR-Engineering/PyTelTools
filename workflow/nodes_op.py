@@ -1002,7 +1002,7 @@ class BinaryOperatorNode(TwoInOneOutNode):
 
 class ConvertToSinglePrecisionNode(UnaryOperatorNode):
     def __init__(self, index):
-        super().__init__(index, None)
+        super().__init__(index)
         self.category = 'Basic operations'
         self.label = 'Convert to\nSingle\nPrecision'
         self.out_port.data_type = ('slf', 'slf 3d')
