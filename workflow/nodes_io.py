@@ -66,8 +66,14 @@ class LoadSerafin2DNode(SingleOutputNode):
         except PermissionError:
             self.fail('Access denied.')
             return
-        data = SerafinData(self.job_id, os.path.join(self.dir_path, self.slf_name), self.scene().language)
-        is_2d = data.read()
+
+        try:
+            data = SerafinData(self.job_id, os.path.join(self.dir_path, self.slf_name), self.scene().language)
+            is_2d = data.read()
+        except (Serafin.SerafinRequestError, Serafin.SerafinValidationError) as e:
+            self.fail(e.message)
+            return
+
         if not is_2d:
             self.data = None
             self.fail('the input file is not 2D.')
@@ -384,9 +390,14 @@ class WriteSerafinNode(OneInOneOutNode):
                         pass
                 except PermissionError:
                     self.fail('Access denied when reloading existing file.')
+                    return
 
-                self.data = SerafinData(input_data.job_id, self.filename, input_data.language)
-                self.data.read()
+                try:
+                    self.data = SerafinData(input_data.job_id, self.filename, input_data.language)
+                    self.data.read()
+                except (Serafin.SerafinRequestError, Serafin.SerafinValidationError) as e:
+                    self.fail(e.message)
+                    return
                 self.success('Reload existing file.')
                 return
 
@@ -399,22 +410,26 @@ class WriteSerafinNode(OneInOneOutNode):
 
         self.progress_bar.setVisible(True)
 
-        # do the actual calculation
-        if input_data.operator is None:
-            success = self._run_simple(input_data)
-        elif input_data.operator in (operations.MAX, operations.MIN, operations.MEAN):
-            success = self._run_max_min_mean(input_data)
-        elif input_data.operator in (operations.PROJECT, operations.DIFF, operations.REV_DIFF,
-                                     operations.MAX_BETWEEN, operations.MIN_BETWEEN):
-            success = self._run_project_mesh(input_data)
-        elif input_data.operator == operations.SYNCH_MAX:
-            success = self._run_synch_max(input_data)
-        else:
-            success = self._run_arrival_duration(input_data)
+        try:
+            # do the actual calculation
+            if input_data.operator is None:
+                success = self._run_simple(input_data)
+            elif input_data.operator in (operations.MAX, operations.MIN, operations.MEAN):
+                success = self._run_max_min_mean(input_data)
+            elif input_data.operator in (operations.PROJECT, operations.DIFF, operations.REV_DIFF,
+                                         operations.MAX_BETWEEN, operations.MIN_BETWEEN):
+                success = self._run_project_mesh(input_data)
+            elif input_data.operator == operations.SYNCH_MAX:
+                success = self._run_synch_max(input_data)
+            else:
+                success = self._run_arrival_duration(input_data)
 
-        if success:  # reload the output file
-            self.data = SerafinData(input_data.job_id, self.filename, input_data.language)
-            self.data.read()
+            if success:  # reload the output file
+                self.data = SerafinData(input_data.job_id, self.filename, input_data.language)
+                self.data.read()
+        except (Serafin.SerafinRequestError, Serafin.SerafinValidationError) as e:
+            self.fail(e.message)
+            return
 
 
 class LoadPolygon2DNode(SingleOutputNode):
@@ -736,8 +751,14 @@ class LoadReferenceSerafinNode(SingleOutputNode):
         except PermissionError:
             self.fail('Access denied.')
             return
-        data = SerafinData('', self.filename, self.scene().language)
-        is_2d = data.read()
+
+        try:
+            data = SerafinData('', self.filename, self.scene().language)
+            is_2d = data.read()
+        except (Serafin.SerafinRequestError, Serafin.SerafinValidationError) as e:
+            self.fail(e.message)
+            return
+
         if not is_2d:
             self.fail('the input file is not 2D.')
             return
@@ -797,8 +818,13 @@ class LoadSerafin3DNode(SingleOutputNode):
         except PermissionError:
             self.fail('Access denied.')
             return
-        data = SerafinData(self.job_id, os.path.join(self.dir_path, self.slf_name), self.scene().language)
-        is_2d = data.read()
+        try:
+            data = SerafinData(self.job_id, os.path.join(self.dir_path, self.slf_name), self.scene().language)
+            is_2d = data.read()
+        except (Serafin.SerafinRequestError, Serafin.SerafinValidationError) as e:
+            self.fail(e.message)
+            return
+
         if is_2d:
             self.data = None
             self.fail('the input file is not 3D.')

@@ -31,14 +31,20 @@ class SerafinValidationError(Exception):
     """!
     @brief Custom exception for Serafin file content check
     """
-    pass
+    def __init__(self, message):
+        super().__init__(message)
+        self.message = message
+        module_logger.error('SERAFIN VALIDATION ERROR: %s' % message)
 
 
 class SerafinRequestError(Exception):
     """!
     @brief Custom exception for requesting invalid values from Serafin object
     """
-    pass
+    def __init__(self, message):
+        super().__init__(message)
+        self.message = message
+        module_logger.error('SERAFIN REQUEST ERROR: %s' % message)
 
 
 class SerafinHeader:
@@ -49,6 +55,10 @@ class SerafinHeader:
     def __init__(self, file, file_size, language):
         self.file_size = file_size
         self.language = language
+
+        # Check if file is empty (usefull if re-runs after a crash)
+        if self.file_size == 0:
+            raise SerafinValidationError('File is empty (file size is equal to 0)')
 
         # Read title
         file.read(4)
@@ -72,7 +82,6 @@ class SerafinHeader:
         module_logger.debug('The file has %d variables' % self.nb_var)
         file.read(4)
         if self.nb_var_quadratic != 0:
-            module_logger.error('ERROR: The number of quadratic variables is not equal to 0')
             raise SerafinValidationError('The number of quadratic variables is not equal to zero')
 
         # Read variable names and units
@@ -106,20 +115,18 @@ class SerafinHeader:
         self.nb_nodes_per_elem = struct.unpack('>i', file.read(4))[0]
         test_value = struct.unpack('>i', file.read(4))[0]
         if test_value != 1:
-            module_logger.error('ERROR: the magic number is not equal to 1')
             raise SerafinValidationError('The magic number is not equal to one')
         file.read(4)
 
         # verify data consistence and determine 2D or 3D
         if self.is_2d:
             if self.nb_nodes_per_elem != 3:
-                raise SerafinValidationError('ERROR: Unknown mesh type')
+                raise SerafinValidationError('Unknown mesh type')
         else:
             if self.nb_nodes_per_elem != 6:
-                module_logger.error('ERROR: The number of nodes per element not equal to 6')
+                raise SerafinValidationError('The number of nodes per element is not equal to 6')
             if self.nb_planes < 2:
-                module_logger.error('ERROR: The number of planes is less than 2')
-                raise SerafinValidationError('Unknown mesh type')
+                raise SerafinValidationError('The number of planes is less than 2')
         module_logger.debug('The file is determined to be %s' % {True: '2D', False: '3D'}[self.is_2d])
 
         # determine the number of nodes in 2D
@@ -165,7 +172,6 @@ class SerafinHeader:
         module_logger.debug('The file has %d frames of size %d bytes' % (self.nb_frames, self.frame_size))
 
         if self.nb_frames * self.frame_size != (self.file_size - self.header_size):
-            module_logger.error('ERROR: The file size is not equal to (header size) + (nb frames) * (frame size)')
             raise SerafinValidationError('Something wrong with the file size (header and frames) check')
 
         # Deduce variable IDs from names
@@ -187,8 +193,7 @@ class SerafinHeader:
             nb_lines = self.ikle_2d.shape[0]
             # test the integer division
             if nb_lines * (self.nb_planes - 1) != self.nb_elements:
-                module_logger.error('ERROR: (3D) The number of elements is not divisible by (number of planes - 1)')
-                raise SerafinValidationError('Something wrong with ikle 3D dimension')
+                raise SerafinValidationError('The number of elements is not divisible by (number of planes - 1)')
             for i in range(nb_lines):
                 self.ikle_2d[i] = ikle[i, [0, 1, 2]]
         else:
@@ -295,12 +300,10 @@ class Read(Serafin):
         @return index <int> the index (0-based) of the requested variable
         """
         if self.header is None:
-            module_logger.error('ERROR: (forgot read_header ?) var_IDs is empty')
-            raise SerafinRequestError('(forgot read_header ?) Cannot extract variable from empty list.')
+            raise SerafinRequestError('Cannot extract variable from empty list (forgot read_header ?)')
         try:
             index = self.header.var_IDs.index(var_ID)
         except ValueError:
-            module_logger.error('ERROR: Variable ID %s not found' % var_ID)
             raise SerafinRequestError('Variable ID %s not found' % var_ID)
         return index
 
