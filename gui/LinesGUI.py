@@ -31,7 +31,8 @@ class WriteCSVProcess(OutputThread):
         nb_frames = len(input_stream.time)
         inv_steps = 1 / len(indices_nonempty) / nb_frames
 
-        for u, v, row in MeshInterpolator.interpolate_along_lines(input_stream, selected_vars, (len(input_stream.time)),
+        for u, v, row in MeshInterpolator.interpolate_along_lines(input_stream, selected_vars,
+                                                                  list(range(len(input_stream.time))),
                                                                   indices_nonempty, line_interpolators,
                                                                   self.format_string):
             output_stream.write(self.separator.join(row))
