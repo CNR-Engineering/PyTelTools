@@ -31,6 +31,12 @@ FIG_SIZE = (8, 6)
 # Figure output dot density
 FIG_OUT_DPI = 100
 
+# Map size (in inches)
+MAP_SIZE = (10, 10)
+
+# Map output dot density
+MAP_OUT_DPI = 100
+
 # Window size (in pixels) for workflow scheme interface
 SCENE_SIZE = (2400, 1000)
 
@@ -38,6 +44,15 @@ SCENE_SIZE = (2400, 1000)
 NB_COLOR_LEVELS = 512
 
 # Color style
-DEFAULT_COLOR_STYLE = 'viridis'
-COLOR_SYLES = ['viridis', 'plasma', 'inferno', 'magma', 'Greys', 'Purples', 'Blues', 'Greens', 'Oranges', 'Reds',
-               'YlOrBr', 'YlOrRd', 'OrRd', 'PuRd', 'RdPu', 'BuPu', 'GnBu', 'PuBu', 'YlGnBu', 'PuBuGn', 'BuGn', 'YlGn']
+## See https://matplotlib.org/examples/color/colormaps_reference.html to preview color rendering
+DEFAULT_COLOR_STYLE = 'jet'
+COLOR_SYLES = ['ocean', 'gist_earth', 'terrain', 'gist_stern', 'gnuplot', 'gnuplot2', 'CMRmap', 'cubehelix',
+               'brg', 'hsv', 'gist_rainbow', 'rainbow', 'jet', 'nipy_spectral', 'gits_ncar',  # Miscellaneous colormaps
+               'viridis', 'plasma', 'inferno', 'magma',  # Perceptually Uniform Sequential colormaps
+               'Spectral', 'coolwarn', 'seismic',  # Diverging colormaps
+               'Greys', 'Purples', 'Blues', 'Greens', 'Oranges', 'Reds',  # Sequential colormaps
+               'YlOrBr', 'YlOrRd', 'OrRd', 'PuRd', 'RdPu', 'BuPu', 'GnBu', 'PuBu',
+               'YlGnBu', 'PuBuGn', 'BuGn', 'YlGn']
+
+# Default axis label for coordinates
+X_AXIS_LABEL, Y_AXIS_LABEL = 'X (m)', 'Y (m)'

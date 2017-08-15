@@ -15,7 +15,7 @@ import warnings
 warnings.filterwarnings('ignore', category=RuntimeWarning, module='matplotlib')
 
 from conf.settings import COLOR_SYLES, DEFAULT_COLOR_STYLE, FIG_OUT_DPI, FIG_SIZE, LOGGING_LEVEL,\
-    NB_COLOR_LEVELS, SERAFIN_EXT
+    NB_COLOR_LEVELS, SERAFIN_EXT, X_AXIS_LABEL, Y_AXIS_LABEL
 from gui.util import FluxPlotViewer, MapCanvas, PointLabelEditor, PointPlotViewer, PlotViewer, \
     read_csv, SimpleTimeDateSelection, TemporalPlotViewer, VolumePlotViewer
 from slf.datatypes import SerafinData
@@ -2182,12 +2182,14 @@ class MultiSaveVerticalCrossSectionDialog(MultiInterpolationPlotDialog):
 
 class ScalarMapCanvas(MapCanvas):
     def __init__(self):
-        super().__init__(12, 12, 110)
+        super().__init__()
         self.cmap = None
 
-    def replot(self, mesh, values, color_style, limits):
+    def replot(self, mesh, values, color_style, limits, variable_label):
         self.fig.clear()   # remove the old color bar
         self.axes = self.fig.add_subplot(111)
+        self.axes.set_xlabel(X_AXIS_LABEL)
+        self.axes.set_ylabel(Y_AXIS_LABEL)
         self.axes.set_aspect('equal', adjustable='box')
 
         triang = mtri.Triangulation(mesh.x, mesh.y, mesh.ikle)
@@ -2202,6 +2204,7 @@ class ScalarMapCanvas(MapCanvas):
         # add colorbar
         divider = make_axes_locatable(self.axes)
         cax = divider.append_axes('right', size='5%', pad=0.2)
+        cax.set_title(variable_label)
         self.cmap = cm.ScalarMappable(cmap=color_style)
         self.cmap.set_array(levels)
         self.fig.colorbar(self.cmap, cax=cax)
@@ -2345,12 +2348,12 @@ class ScalarMapViewer(QWidget):
     def replot(self, compute):
         if compute:
             self.values = self.compute()
-        self.canvas.replot(self.mesh, self.values, self.current_style, self.color_limits)
+        self.canvas.replot(self.mesh, self.values, self.current_style, self.color_limits, self.current_var)
 
 
 class VectorMapCanvas(MapCanvas):
     def __init__(self):
-        super().__init__(12, 12, 110)
+        super().__init__()
         self.cmap = None
 
     def replot(self, mesh, values):

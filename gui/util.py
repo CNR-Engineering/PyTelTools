@@ -18,8 +18,8 @@ from matplotlib.colors import Normalize, colorConverter
 import matplotlib.lines as mlines
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
-from conf.settings import CSV_SEPARATOR, DIGITS, FIG_SIZE, FIG_OUT_DPI, LANG, LOGGING_LEVEL, NB_COLOR_LEVELS,\
-    SERAFIN_EXT
+from conf.settings import CSV_SEPARATOR, DIGITS, LANG, LOGGING_LEVEL, MAP_SIZE, MAP_OUT_DPI, NB_COLOR_LEVELS, \
+    SERAFIN_EXT, X_AXIS_LABEL, Y_AXIS_LABEL
 from geom import BlueKenue, Shapefile
 from slf.comparison import ReferenceMesh
 from slf.datatypes import SerafinData
@@ -1647,7 +1647,7 @@ class PlotCanvas(FigureCanvas):
 
 
 class MapCanvas(FigureCanvas):
-    def __init__(self, width=10, height=10, dpi=100):
+    def __init__(self, width=MAP_SIZE[0], height=MAP_SIZE[1], dpi=MAP_OUT_DPI):
         self.BLACK = '#a9a9a9'
 
         self.fig = Figure(figsize=(width, height), dpi=dpi)
@@ -1663,6 +1663,8 @@ class MapCanvas(FigureCanvas):
 
     def initFigure(self, mesh):
         self.axes.clear()
+        self.axes.set_xlabel(X_AXIS_LABEL)
+        self.axes.set_ylabel(Y_AXIS_LABEL)
         self.axes.triplot(mesh.x, mesh.y, mesh.ikle, '--', color=self.BLACK, alpha=0.5, lw=0.3)
         self.axes.set_aspect('equal', adjustable='box')
         self.draw()
@@ -1715,7 +1717,7 @@ class LineMapCanvas(MapCanvas):
 
 class ColorMapCanvas(MapCanvas):
     def __init__(self):
-        super().__init__(12, 12, 110)
+        super().__init__()
         self.TRANSPARENT = colorConverter.to_rgba('black', alpha=0.01)
 
     def reinitFigure(self, mesh, values, limits=None, polygon=None):
@@ -1807,8 +1809,8 @@ class PlotViewer(QWidget):
         self.nameToColor = {n: c for c, n in zip(self.defaultColors, name)}
 
         self.canvas = PlotCanvas(self)
-        self.current_xlabel = 'X'
-        self.current_ylabel = 'Y'
+        self.current_xlabel = X_AXIS_LABEL
+        self.current_ylabel = Y_AXIS_LABEL
         self.current_title = 'Default plot'
 
         # add a default plot
@@ -1913,8 +1915,8 @@ class PlotViewer(QWidget):
     def defaultPlot(self):
         x = [0]
         y = [0]
-        self.current_xlabel = 'X'
-        self.current_ylabel = 'Y'
+        self.current_xlabel = X_AXIS_LABEL
+        self.current_ylabel = Y_AXIS_LABEL
         self.current_title = 'Default plot'
         self.plot(x, y)
 
