@@ -38,6 +38,7 @@ NODES = {'Input/Output': {'Load Serafin 2D': LoadSerafin2DNode, 'Load Serafin 3D
                            'Volume Plot': VolumePlotNode, 'Flux Plot': FluxPlotNode, 'Point Plot': PointPlotNode,
                            'Point Attribute Table': PointAttributeTableNode, 'MultiVar Line Plot': MultiVarLinePlotNode,
                            'MultiFrame Line Plot': MultiFrameLinePlotNode, 'Project Lines Plot': ProjectLinesPlotNode,
+                           'Vertical Cross Section': VerticalCrossSectionNode,
                            'Vertical Temporal Profile 3D': VerticalTemporalProfileNode}}
 
 
@@ -621,7 +622,7 @@ if __name__ == '__main__':
     parser.parse_args()
     args = parser.parse_args()
 
-    if args.verbose: 
+    if args.verbose:
         logger.setLevel(logging.DEBUG)
 
     QApp = QCoreApplication.instance()

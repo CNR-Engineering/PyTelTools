@@ -16,8 +16,8 @@ warnings.filterwarnings('ignore', category=RuntimeWarning, module='matplotlib')
 
 from conf.settings import COLOR_SYLES, DEFAULT_COLOR_STYLE, FIG_OUT_DPI, FIG_SIZE, LOGGING_LEVEL,\
     NB_COLOR_LEVELS, SERAFIN_EXT
-from gui.util import TemporalPlotViewer, VolumePlotViewer, MapCanvas,\
-    FluxPlotViewer, PointPlotViewer, PointLabelEditor, SimpleTimeDateSelection, read_csv
+from gui.util import FluxPlotViewer, MapCanvas, PointLabelEditor, PointPlotViewer, PlotViewer, \
+    read_csv, SimpleTimeDateSelection, TemporalPlotViewer, VolumePlotViewer
 from slf.datatypes import SerafinData
 from slf.interpolation import MeshInterpolator
 from slf import Serafin
@@ -935,6 +935,231 @@ class ColorMapStyleDialog(QDialog):
         self.setLayout(vlayout)
         self.setWindowTitle('Change colormap style')
         self.resize(300, 150)
+
+
+class VerticalCrossSectionPlotViewer(PlotViewer):
+    def __init__(self):
+        super().__init__()
+        self.data = None
+        self.current_var = ''
+        self.current_section = ''
+        self.section_names = []
+        self.sections = []
+        self.line_interpolators = []
+        self.triang, self.values = None, None
+        self.nplan = -1
+
+        self.color_limits = None
+        self.cmap = None
+        self.current_style = DEFAULT_COLOR_STYLE
+        self.color_styles = COLOR_SYLES
+
+        self.create_actions()
+        self.toolBar.addAction(self.select_variable_act)
+        self.toolBar.addAction(self.selectSectionAct)
+        self.toolBar.addSeparator()
+        self.toolBar.addAction(self.change_color_style_act)
+        self.toolBar.addAction(self.change_color_range_act)
+        self.toolBar.addSeparator()
+
+        self.data_menu = QMenu('&Data', self)
+        self.data_menu.addAction(self.select_variable_act_short)
+        self.data_menu.addAction(self.selectSectionAct_short)
+        self.menuBar.addMenu(self.data_menu)
+
+        self.color_menu = QMenu('&Colors', self)
+        self.color_menu.addAction(self.change_color_style_act_short)
+        self.color_menu.addAction(self.change_color_range_act_short)
+        self.menuBar.addMenu(self.color_menu)
+
+    def create_actions(self):
+        self.select_variable_act = QAction('Select\nvariable', self, triggered=self.select_variable,
+                                           icon=self.style().standardIcon(QStyle.SP_FileDialogDetailedView))
+        self.change_color_style_act = QAction('Change\ncolor style', self, triggered=self.change_color_style,
+                                              icon=self.style().standardIcon(QStyle.SP_DialogHelpButton))
+        self.change_color_range_act = QAction('Change\ncolor range', self, triggered=self.change_color_range,
+                                              icon=self.style().standardIcon(QStyle.SP_DialogHelpButton))
+        self.selectSectionAct = QAction('Select\nsection', self,
+                                        icon=self.style().standardIcon(QStyle.SP_FileDialogDetailedView),
+                                        triggered=self.select_section)
+        self.select_variable_act_short = QAction('Select variable', self, triggered=self.select_variable,
+                                                 icon=self.style().standardIcon(QStyle.SP_FileDialogDetailedView))
+        self.change_color_style_act_short = QAction('Change color style', self, triggered=self.change_color_style,
+                                                    icon=self.style().standardIcon(QStyle.SP_DialogHelpButton))
+        self.change_color_range_act_short = QAction('Change color range', self, triggered=self.change_color_range,
+                                                    icon=self.style().standardIcon(QStyle.SP_DialogHelpButton))
+        self.selectSectionAct_short = QAction('Select section', self,
+                                              icon=self.style().standardIcon(QStyle.SP_FileDialogDetailedView),
+                                              triggered=self.select_section)
+
+    def select_section(self):
+        msg = QDialog()
+        combo = QComboBox()
+        combo.setFixedHeight(30)
+        for section in self.section_names:
+            combo.addItem(section)
+        combo.setCurrentIndex(self.section_names.index(self.current_section))
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel,
+                                   Qt.Horizontal, msg)
+        buttons.accepted.connect(msg.accept)
+        buttons.rejected.connect(msg.reject)
+        vlayout = QVBoxLayout()
+        vlayout.setSpacing(10)
+        vlayout.addWidget(QLabel('Select a section'))
+        vlayout.addWidget(combo)
+        vlayout.addStretch()
+        vlayout.addWidget(buttons)
+        msg.setLayout(vlayout)
+        msg.setWindowTitle('Select a section to plot')
+        msg.resize(300, 150)
+        msg.exec_()
+        self.current_section = combo.currentText()
+        self.color_limits = None
+        self.replot()
+
+    def _defaultTitle(self):
+        value = {'fr': 'Valeurs', 'en': 'Values'}[self.language]
+        of = {'fr': 'de', 'en': 'of'}[self.language]
+        at = {'fr': 'à la', 'en': 'at'}[self.language]
+        return '%s %s %s %s %s' % (value, of, self.current_var, at, self.current_section)
+
+    def _defaultXLabel(self):
+        return 'Distance (m)'
+
+    def _defaultYLabel(self):
+        return {'fr': 'Cote Z', 'en': 'Elevation Z'}[self.language]
+
+    def select_variable(self):
+        msg = QDialog()
+        combo = QComboBox()
+        combo.setFixedHeight(30)
+        variables = [var for var in self.data.header.var_IDs if var != 'Z']
+        names = [name.decode('utf-8').strip() for var, name in zip(self.data.header.var_IDs,
+                                                                   self.data.header.var_names) if var in variables]
+        for var, name in zip(variables, names):
+            combo.addItem(var + ' (%s)' % name)
+        combo.setCurrentIndex(variables.index(self.current_var))
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel,
+                                   Qt.Horizontal, msg)
+        buttons.accepted.connect(msg.accept)
+        buttons.rejected.connect(msg.reject)
+        vlayout = QVBoxLayout()
+        vlayout.setSpacing(10)
+        vlayout.addWidget(QLabel('Select a variable'))
+        vlayout.addWidget(combo)
+        vlayout.addStretch()
+        vlayout.addWidget(buttons)
+        msg.setLayout(vlayout)
+        msg.setWindowTitle('Select a variable to plot')
+        msg.resize(300, 150)
+        msg.exec_()
+        self.current_var = combo.currentText().split(' (')[0]
+        self.color_limits = None
+        self.replot()
+
+    def change_color(self, style):
+        self.current_style = style
+        self.replot(False)
+
+    def change_color_style(self):
+        msg = ColorMapStyleDialog(self)
+        if msg.exec_() == QDialog.Accepted:
+            self.change_color(msg.color_box.currentText())
+
+    def change_color_range(self):
+        value, ok = QInputDialog.getText(None, 'Change color bar range',
+                                         'Enter the new color range',
+                                         text=', '.join(map(lambda x: '{:+f}'.format(x),
+                                                            self.cmap.get_clim())))
+        if not ok:
+            return
+        try:
+            cmin, cmax = map(float, value.split(','))
+        except ValueError:
+            QMessageBox.critical(self, 'Error', 'Invalid input.', QMessageBox.Ok)
+            return
+
+        self.color_limits = (cmin, cmax)
+        self.replot(False)
+
+    def compute(self):
+        """!
+        Compute current cross section
+        """
+        line_interpolator, distances = self.line_interpolators[int(self.current_section.split()[1]) - 1]
+        npt = len(distances)
+        point_x = np.array([[distances[i]] * self.nplan for i in range(npt)])
+        point_y = np.empty((npt, self.nplan))
+        point_values = np.empty((npt, self.nplan))
+
+        with Serafin.Read(self.data.filename, self.data.language) as input_stream:
+            input_stream.header = self.data.header
+            input_stream.time = self.data.time
+            nb_nodes = input_stream.header.nb_nodes_2d
+
+            z = input_stream.read_var_in_frame(0, 'Z').reshape((self.nplan, nb_nodes)).T
+            values = input_stream.read_var_in_frame(0, self.current_var).reshape((self.nplan, nb_nodes)).T
+
+        for i_pt, ((x, y, (i, j, k), interpolator), distance) in enumerate(zip(line_interpolator, distances)):
+            point_y[i_pt] = interpolator.dot(z[[i, j, k]])
+            point_values[i_pt] = interpolator.dot(values[[i, j, k]])
+
+        triangles = [((ipt - 1) * self.nplan + iplan - 1, (ipt - 1) * self.nplan + iplan, ipt * self.nplan + iplan - 1)
+                     for ipt in range(1, npt) for iplan in range(1, self.nplan)] + \
+                    [((ipt - 1) * self.nplan + iplan, ipt * self.nplan + iplan - 1, ipt * self.nplan + iplan)
+                     for ipt in range(1, npt) for iplan in range(1, self.nplan)]
+        triang = mtri.Triangulation(point_x.flatten(), point_y.flatten(), triangles)
+
+        return triang, point_values.flatten()
+
+    def replot(self, compute=True):
+        if compute:
+            self.triang, self.values = self.compute()
+
+        self.canvas.figure.clear()   # remove the old color bar
+        self.canvas.axes = self.canvas.figure.add_subplot(111)
+
+        if self.color_limits is not None:
+            levels = np.linspace(self.color_limits[0], self.color_limits[1], NB_COLOR_LEVELS)
+            self.canvas.axes.tricontourf(self.triang, self.values, cmap=self.current_style, levels=levels,
+                                         extend='both', vmin=self.color_limits[0], vmax=self.color_limits[1])
+        else:
+            print(np.nanmin(self.values), np.nanmax(self.values))
+            levels = np.linspace(np.nanmin(self.values), np.nanmax(self.values), NB_COLOR_LEVELS)
+            self.canvas.axes.tricontourf(self.triang, self.values, cmap=self.current_style, levels=levels,
+                                         extend='both')
+
+        divider = make_axes_locatable(self.canvas.axes)
+        cax = divider.append_axes('right', size='5%', pad=0.2)
+        self.cmap = cm.ScalarMappable(cmap=self.current_style)
+        self.cmap.set_array(levels)
+        self.canvas.figure.colorbar(self.cmap, cax=cax)
+
+        self.canvas.axes.set_xlabel(self.current_xlabel)
+        self.canvas.axes.set_ylabel(self.current_ylabel)
+        self.current_title = self._defaultTitle()
+        self.canvas.axes.set_title(self.current_title)
+        self.canvas.draw()
+
+    def get_data(self, data, sections, line_interpolators, section_indices):
+        self.data = data
+        self.sections = sections
+        self.line_interpolators = line_interpolators
+        self.section_indices = section_indices
+
+        self.current_var = [var for var in self.data.header.var_IDs if var != 'Z'][0]
+        self.section_names = ['Section %d' % (i+1) for i in self.section_indices]
+        self.current_section = self.section_names[0]
+
+        # initialize the plot
+        self.language = self.data.language
+        self.current_xlabel = self._defaultXLabel()
+        self.current_ylabel = self._defaultYLabel()
+        self.current_title = self._defaultTitle()
+
+        self.nplan = self.data.header.nb_planes
+
+        self.replot()
 
 
 class VerticalProfilePlotViewer(TemporalPlotViewer):
@@ -1862,6 +2087,93 @@ class MultiSaveVerticalProfileDialog(MultiInterpolationPlotDialog):
             # export PNG
             time, y, z, triangles, str_datetime, str_datetime_bis = self.compute(input_data, point_interpolator)
             self.parent.plot(time, y, z, triangles, str_datetime, str_datetime_bis, self.png_names[row])
+            self.success(row, 3)
+            nb_successes += 1
+
+        self.finishing_up(nb_successes)
+
+
+class MultiSaveVerticalCrossSectionDialog(MultiInterpolationPlotDialog):
+    def __init__(self, parent, input_options, output_options, compute_options):
+        super().__init__(parent, 'Vertical Cross Section',
+                         input_options, output_options, compute_options)
+        self.line, self.current_var, self.language = self.compute_options
+
+    def load(self, row, input_file, job_id, language):
+        try:
+            with open(input_file) as f:
+                pass
+        except PermissionError:
+            self.fail(row, 1)
+            return None
+        input_data = SerafinData(job_id, input_file, language)
+        if not input_data.read():
+            return input_data
+        self.fail(row, 1)
+        return None
+
+    def check_load(self, row, input_data):
+        # check variables
+        if self.current_var not in input_data.header.var_IDs:
+            self.fail(row, 1)
+            return False
+        self.success(row, 1)
+        return True
+
+    def interpolate(self, row, input_mesh):
+        line_interpolators, distances, line_interpolators_internal, distances_internal = \
+            input_mesh.get_line_interpolators([self.line])
+        is_inside = True if distances_internal else False
+
+        if not is_inside:
+            self.fail(row, 2)
+            return False, None
+        self.success(row, 2)
+        return True, distances_internal[0], line_interpolators_internal[0]
+
+    def compute(self, input_data, line_interp):
+        line_interpolator, distances = line_interp
+        npt = len(distances)
+        nplan = input_data.header.nb_planes
+        point_x = np.array([[distances[i]] * nplan for i in range(npt)])
+        point_y = np.empty((npt, nplan))
+        point_values = np.empty((npt, nplan))
+
+        with Serafin.Read(input_data.filename, self.language) as input_stream:
+            input_stream.header = input_data.header
+            input_stream.time = input_data.time
+            nb_nodes = input_stream.header.nb_nodes_2d
+
+            z = input_stream.read_var_in_frame(0, 'Z').reshape((nplan, nb_nodes)).T
+            values = input_stream.read_var_in_frame(0, self.current_var).reshape((nplan, nb_nodes)).T
+
+        for i_pt, ((x, y, (i, j, k), interpolator), distance) in enumerate(zip(line_interpolator, distances)):
+            point_y[i_pt] = interpolator.dot(z[[i, j, k]])
+            point_values[i_pt] = interpolator.dot(values[[i, j, k]])
+
+        triangles = [((ipt - 1) * nplan + iplan - 1, (ipt - 1) * nplan + iplan, ipt * nplan + iplan - 1)
+                     for ipt in range(1, npt) for iplan in range(1, nplan)] + \
+                    [((ipt - 1) * nplan + iplan, ipt * nplan + iplan - 1, ipt * nplan + iplan)
+                     for ipt in range(1, npt) for iplan in range(1, nplan)]
+        triang = mtri.Triangulation(point_x.flatten(), point_y.flatten(), triangles)
+
+        return triang, point_values.flatten()
+
+    def run(self):
+        # load serafin
+        successful_rows, successful_input_data = self.first_step()
+
+        nb_successes = 0
+        for row, input_data in zip(successful_rows, successful_input_data):
+            # interpolation
+            mesh = self.build_mesh(input_data)
+            success, distances, line_interp = self.interpolate(row, mesh)
+            if not success:
+                continue
+
+            # export PNG
+            triang, point_values = self.compute(input_data, line_interp)
+            self.parent.plot(triang, point_values, self.png_names[row])
             self.success(row, 3)
             nb_successes += 1
 

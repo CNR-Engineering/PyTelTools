@@ -12,11 +12,12 @@ from gui.util import MapCanvas, PolygonMapCanvas, LineMapCanvas, MapViewer, \
 from slf.interpolation import MeshInterpolator
 from slf.mesh2D import Mesh2D
 from slf.misc import detect_vector_couples
-from workflow.Node import Node, SingleInputNode, DoubleInputNode
-from workflow.util import ScalarMapViewer, VectorMapViewer, MultiLoadSerafinDialog, MultiFigureSaveDialog, \
-    SimpleVolumePlotViewer, SimpleFluxPlotViewer, SimplePointPlotViewer, VerticalProfilePlotViewer, \
-    MultiSaveProjectLinesDialog, MultiSaveMultiVarLinePlotDialog, MultiSaveMultiFrameLinePlotDialog, \
-    MultiSaveVerticalProfileDialog
+from workflow.Node import DoubleInputNode, Node, SingleInputNode
+from workflow.util import MultiFigureSaveDialog, MultiLoadSerafinDialog, \
+    MultiSaveProjectLinesDialog, MultiSaveMultiFrameLinePlotDialog, MultiSaveMultiVarLinePlotDialog, \
+    MultiSaveVerticalCrossSectionDialog, MultiSaveVerticalProfileDialog, \
+    ScalarMapViewer, SimpleFluxPlotViewer, SimplePointPlotViewer, SimpleVolumePlotViewer, \
+    VectorMapViewer, VerticalCrossSectionPlotViewer, VerticalProfilePlotViewer
 
 
 class ShowMeshNode(SingleInputNode):
@@ -926,6 +927,164 @@ class ProjectLinesPlotNode(DoubleInputNode):
                            time_index, current_vars, self.first_in_port.mother.parentItem().data.language)
 
         dlg = MultiSaveProjectLinesDialog(self, input_options, output_options, compute_options)
+        dlg.run()
+        dlg.exec_()
+
+
+class VerticalCrossSectionNode(DoubleInputNode):
+    """!
+    Plot a 3D scalar in a vertical cross section
+    """
+    def __init__(self, index):
+        super().__init__(index)
+        self.category = 'Visualization'
+        self.label = 'Vertical\nCross\nSection'
+        self.first_in_port.data_type = ('slf 3d',)
+        self.second_in_port.data_type = ('polyline 2d',)
+        self.plot_viewer = VerticalCrossSectionPlotViewer()
+        self.state = Node.READY
+        self.has_plot = False
+
+        self.multi_save_act = QAction('Multi-Save', None, triggered=self.multi_save,
+                                      icon=self.plot_viewer.style().standardIcon(QStyle.SP_DialogSaveButton))
+        self.plot_viewer.toolBar.addSeparator()
+        self.plot_viewer.toolBar.addAction(self.multi_save_act)
+
+    def configure(self, check=None):
+        if not self.first_in_port.has_mother() or not self.second_in_port.has_mother():
+            QMessageBox.critical(None, 'Error', 'Connect and run the input before configure this node!',
+                                 QMessageBox.Ok)
+            return
+        parent_node = self.first_in_port.mother.parentItem()
+        if parent_node.state != Node.SUCCESS:
+            if parent_node.ready_to_run():
+                parent_node.run()
+            else:
+                QMessageBox.critical(None, 'Error', 'Configure and run the input before configure this node!',
+                                     QMessageBox.Ok)
+                return
+            if parent_node.state != Node.SUCCESS:
+                QMessageBox.critical(None, 'Error', 'Configure and run the input before configure this node!',
+                                     QMessageBox.Ok)
+                return
+        if parent_node.data.header.is_2d:
+            QMessageBox.critical(None, 'Error', 'The input file is not 3D!', QMessageBox.Ok)
+            return
+        if 'Z' not in parent_node.data.header.var_IDs:
+            QMessageBox.critical(None, 'Error', 'The variable Z is not found.', QMessageBox.Ok)
+            return
+        line_node = self.second_in_port.mother.parentItem()
+        if line_node.state != Node.SUCCESS:
+            if line_node.ready_to_run():
+                line_node.run()
+            else:
+                QMessageBox.critical(None, 'Error', 'Configure and run the input before configure this node!',
+                                     QMessageBox.Ok)
+                return
+            if line_node.state != Node.SUCCESS:
+                QMessageBox.critical(None, 'Error', 'Configure and run the input before configure this node!',
+                                     QMessageBox.Ok)
+                return
+        if not self.has_plot:
+            if not self._prepare():
+                QMessageBox.critical(None, 'Error', 'No line inside the mesh', QMessageBox.Ok)
+                self.fail('no line inside the mesh')
+                return
+        self.plot_viewer.showMaximized()
+        self.success()
+
+    def reconfigure(self):
+        super().reconfigure()
+        self.has_plot = False
+
+    def _prepare(self):
+        input_data = self.first_in_port.mother.parentItem().data
+        mesh = MeshInterpolator(input_data.header, False)
+        if input_data.triangles:
+            mesh.index = input_data.index
+            mesh.triangles = input_data.triangles
+        else:
+            self.progress_bar.setVisible(True)
+            self.construct_mesh(mesh)
+            input_data.index = mesh.index
+            input_data.triangles = mesh.triangles
+
+        sections = self.second_in_port.mother.parentItem().data.lines
+
+        line_interpolators, distances, line_interpolators_internal, distances_internal = \
+            mesh.get_line_interpolators(sections)
+
+        is_inside = [True if dist[0] else False for dist in distances_internal]
+        nb_inside = sum(map(int, is_inside))
+        section_indices = [i for i in range(len(sections)) if is_inside[i]]
+        if nb_inside == 0:
+            return False
+        self.success()
+        self.plot_viewer.get_data(input_data, sections, line_interpolators_internal, section_indices)
+        return True
+
+    def run(self):
+        success = super().run_upward()
+        if not success:
+            self.fail('input failed.')
+            return
+        parent_node = self.first_in_port.mother.parentItem()
+        if parent_node.data.header.is_2d:
+            QMessageBox.critical(None, 'Error', 'The input file is not 3D!', QMessageBox.Ok)
+            self.fail('The input file is not 3D.')
+            return
+        if 'Z' not in parent_node.data.header.var_IDs:
+            QMessageBox.critical(None, 'Error', 'The variable Z is not found.', QMessageBox.Ok)
+            self.fail('The variable Z is not found.')
+            return
+        if not self.has_plot:
+            if not self._prepare():
+                QMessageBox.critical(None, 'Error', 'No section inside the mesh', QMessageBox.Ok)
+                self.fail('no section inside the mesh')
+                return
+        self.plot_viewer.showMaximized()
+
+    def plot(self, triang, point_values, png_name):
+        fig, axes = plt.subplots(1)
+        fig.set_size_inches(FIG_SIZE[0], FIG_SIZE[1])
+
+        if self.plot_viewer.color_limits is not None:
+            levels = np.linspace(self.plot_viewer.color_limits[0], self.plot_viewer.color_limits[1], NB_COLOR_LEVELS)
+            axes.tricontourf(triang, point_values, cmap=self.plot_viewer.current_style, levels = levels,
+                           vmin=self.plot_viewer.color_limits[0], vmax=self.plot_viewer.color_limits[1])
+        else:
+            levels = np.linspace(np.nanmin(point_values), np.nanmax(point_values), NB_COLOR_LEVELS)
+            axes.tricontourf(triang, point_values, cmap=self.plot_viewer.current_style, levels=levels)
+
+        divider = make_axes_locatable(axes)
+        cax = divider.append_axes('right', size='5%', pad=0.2)
+        cmap = cm.ScalarMappable(cmap=self.plot_viewer.current_style)
+        cmap.set_array(levels)
+        fig.colorbar(cmap, cax=cax)
+
+        axes.set_xlabel(self.plot_viewer.current_xlabel)
+        axes.set_ylabel(self.plot_viewer.current_ylabel)
+        axes.set_title(self.plot_viewer.current_title)
+
+        fig.canvas.draw()
+        fig.savefig(png_name, dpi=FIG_OUT_DPI)
+
+    def multi_save(self):
+        dlg = MultiLoadSerafinDialog([])
+        if dlg.exec_() == QDialog.Accepted:
+            input_options = (dlg.dir_paths, dlg.slf_name, dlg.job_ids)
+        else:
+            return
+        dlg = MultiFigureSaveDialog('_vertical_cross_section_plot')
+        if dlg.exec_() == QDialog.Accepted:
+            output_options = dlg.panel.get_options()
+        else:
+            return
+
+        section_id = int(self.plot_viewer.current_section.split()[1]) - 1
+        line = self.plot_viewer.sections[section_id]
+        compute_options = (line, self.plot_viewer.current_var, self.first_in_port.mother.parentItem().data.language)
+        dlg = MultiSaveVerticalCrossSectionDialog(self, input_options, output_options, compute_options)
         dlg.run()
         dlg.exec_()
 
