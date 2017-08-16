@@ -2,7 +2,8 @@ import numpy as np
 from shapely.geometry import Point
 
 from slf.misc import to_infix, infix_to_postfix, is_valid_postfix, is_valid_expression
-from slf.expression.expression import SimpleExpression, ConditionalExpression, MaxMinExpression, MaskedExpression
+from slf.expression.expression import ConditionalExpression, MaskedExpression, MaxMinExpression, PolygonalMask, \
+    SimpleExpression
 from slf.expression.condition import SimpleCondition, AndOrCondition
 
 
