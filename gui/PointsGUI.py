@@ -354,7 +354,7 @@ class InputTab(SerafinInputTab):
         indices_inside = [i for i in range(len(self.points)) if self.point_interpolators[i] is not None]
 
         # initialize the progress bar
-        process = WriteCSVProcess(self.parent.csv_separator, self.mesh)
+        process = WriteCSVProcess(self.parent.csv_separator, self.parent.digits, self.mesh)
         progressBar = OutputProgressDialog()
 
         with Serafin.Read(self.data.filename, self.data.language) as input_stream:
