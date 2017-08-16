@@ -1,4 +1,5 @@
 import datetime
+from itertools import cycle
 import logging
 from PyQt5.QtCore import *
 from PyQt5.QtWidgets import *
@@ -483,9 +484,7 @@ class ImageTab(PointPlotViewer):
         self.columns = ['Point %d' % (i+1) for i in point_indices]
         self.current_columns = self.columns[0:1]
         self.column_labels = {x: x for x in self.columns}
-        self.column_colors = {x: None for x in self.columns}
-        for i in range(min(len(self.columns), len(self.defaultColors))):
-            self.column_colors[self.columns[i]] = self.defaultColors[i]
+        self.column_colors = {column: color for column, color in zip(self.columns, cycle(self.defaultColors))}
 
         # initialize the plot
         self.time = [self.data['time'], self.data['time'], self.data['time'],
