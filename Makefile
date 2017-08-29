@@ -17,13 +17,13 @@
 # - test: pytest (Python package, listed in requirements.txt)
 # - venv: virtualenv
 #
-DOC_PATH=../CNR-Engineering.github.io/TelTools
+DOC_PATH=../CNR-Engineering.github.io/PyTelTools
 
 doc: doxygen.config
 	doxygen $<
 
 update_doc: doc
-	rm -r ${DOC_PATH} && cp -r doc/html ${DOC_PATH}
+	rm -r ${DOC_PATH} && cp -r doc/html/* ${DOC_PATH}
 	cd ${DOC_PATH} && git add -A && git commit -m "Update doc" && git pull && git push && cd -
 
 venv:
