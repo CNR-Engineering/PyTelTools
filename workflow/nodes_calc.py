@@ -550,7 +550,7 @@ class ComputeVolumeNode(TwoInOneOutNode):
         if self.sup_volume:
             for name in polygon_names:
                 headers.append(name + ' POSITIVE')
-                headers.append(name + 'NEGATIVE')
+                headers.append(name + ' NEGATIVE')
         if not all(h in self.data.table[0] for h in headers):
             return False
         return True
@@ -855,7 +855,10 @@ class ComputeFluxNode(TwoInOneOutNode):
         sections = self.second_in_port.mother.parentItem().data.lines
         section_names = ['Section %d' % (i + 1) for i in range(len(sections))]
         headers = ['time'] + section_names
-        if not all(h in self.data.table[0] for h in headers):
+        if self.data.table:
+            if not all(h in self.data.table[0] for h in headers):
+                return False
+        else:
             return False
         return True
 
