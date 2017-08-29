@@ -21,7 +21,7 @@ class HelloWorld(QDialog):
         vlayout.addWidget(left_button)
         vlayout.addWidget(right_button)
         self.setLayout(vlayout)
-        self.setWindowTitle('TelTools')
+        self.setWindowTitle('PyTelTools')
 
     def choose_left(self):
         self.choice = 1

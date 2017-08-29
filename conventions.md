@@ -41,6 +41,6 @@ Use with following logging levels (with corresponding numeric value) :
 * DEBUG (10)
 
 ## Code documentation
-Developper documentation is generated with doyxgen and provided on https://cnr-engineering.github.io/TelTools.
+Developper documentation is generated with doyxgen and provided on https://cnr-engineering.github.io/PyTelTools.
 
 Doxygen will extract preformatted comments following [some conventions](https://www.stack.nl/~dimitri/doxygen/manual/docblocks.html#pythonblocks).

@@ -1,6 +1,6 @@
 # Contributing
 
-> First off, thank you for considering contributing to the opensource project TelTools.
+> First off, thank you for considering contributing to the opensource project PyTelTools.
 > It's people like you that make such great tools for Telemac post-processing tasks.
 
 Requiring needs include: development, documentation, tests, ...
@@ -8,14 +8,14 @@ Requiring needs include: development, documentation, tests, ...
 
 ## Report a bug
 
-Please [write an issue](https://github.com/CNR-Engineering/TelTools/issues/new) with: the error message (with traceback) and a minimal non-working example to reproduce it. 
+Please [write an issue](https://github.com/CNR-Engineering/PyTelTools/issues/new) with: the error message (with traceback) and a minimal non-working example to reproduce it.
 
 
 ## Documentate a tool
 
 Ask for write access (e.g. per email at: l _(dot)_ duron _(at)_ cnr _(dot)_ tm _(dot)_ fr).
 
-Screenshots should be upload on https://github.com/CNR-Engineering/TelTools_media.
+Screenshots should be upload on https://github.com/CNR-Engineering/PyTelTools_media.
 
 ### Some notions
 * DAG: directed acyclic graph

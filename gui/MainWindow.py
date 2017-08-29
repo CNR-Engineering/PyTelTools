@@ -59,7 +59,7 @@ class GlobalConfigDialog(QDialog):
         layout.addWidget(buttons)
         self.setLayout(layout)
 
-        self.setWindowTitle('TelTools global configuration')
+        self.setWindowTitle('PyTelTools global configuration')
         self.resize(300, 200)
 
     def _select(self):

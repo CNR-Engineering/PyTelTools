@@ -105,7 +105,7 @@ class ProjectWelcome(QWidget):
         vlayout.addWidget(left_button)
         vlayout.addWidget(right_button)
         self.setLayout(vlayout)
-        self.setWindowTitle('TelTools')
+        self.setWindowTitle('PyTelTools')
 
         self.new = False
         self.filename = ''

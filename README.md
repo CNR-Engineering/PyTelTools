@@ -1,11 +1,11 @@
-# TelTools
-Telemac toolbox
+# PyTelTools
+Python Telemac Tools
 
-* [User documentation](https://github.com/CNR-Engineering/TelTools/wiki)
-* [Developper documentation](https://cnr-engineering.github.io/TelTools) ([repository with static files](https://github.com/CNR-Engineering/CNR-Engineering.github.io))
+* [User documentation](https://github.com/CNR-Engineering/PyTelTools/wiki)
+* [Developper documentation](https://cnr-engineering.github.io/PyTelTools) ([repository with static files](https://github.com/CNR-Engineering/CNR-Engineering.github.io))
 
 ## Installation and requirements
-It relies on Python3 and requires packages which are listed in [requirements.txt](https://github.com/CNR-Engineering/TelTools/blob/master/requirements.txt).
+It relies on Python3 and requires packages which are listed in [requirements.txt](https://github.com/CNR-Engineering/PyTelTools/blob/master/requirements.txt).
 
 Packages installation can be done with pip:
 ```bash
