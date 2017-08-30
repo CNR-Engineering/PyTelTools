@@ -544,6 +544,8 @@ class ComputeVolumeNode(TwoInOneOutNode):
                 QApplication.processEvents()
 
     def is_valid_csv(self):
+        if not self.data.table:
+            return False
         polygons = self.second_in_port.mother.parentItem().data.lines
         polygon_names = ['Polygon %d' % (i+1) for i in range(len(polygons))]
         headers = ['time'] + polygon_names
@@ -852,13 +854,12 @@ class ComputeFluxNode(TwoInOneOutNode):
                 QApplication.processEvents()
     
     def is_valid_csv(self):
+        if not self.data.table:
+            return False
         sections = self.second_in_port.mother.parentItem().data.lines
         section_names = ['Section %d' % (i + 1) for i in range(len(sections))]
         headers = ['time'] + section_names
-        if self.data.table:
-            if not all(h in self.data.table[0] for h in headers):
-                return False
-        else:
+        if not all(h in self.data.table[0] for h in headers):
             return False
         return True
 
@@ -1002,6 +1003,8 @@ class InterpolateOnPointsNode(TwoInOneOutNode):
                 QApplication.processEvents()
 
     def is_valid_csv(self, points, selected_vars):
+        if not self.data.table:
+            return False
         headers = self.data.table[0]
         if not headers[0] == 'time':
             return False
