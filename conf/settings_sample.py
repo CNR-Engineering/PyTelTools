@@ -1,4 +1,5 @@
 import logging
+from multiprocessing import cpu_count
 
 
 # ~> GENERAL CONFIGURATION
@@ -6,6 +7,9 @@ import logging
 # Logging level
 # logging.DEBUG, logging.INFO, logging.ERROR
 LOGGING_LEVEL = logging.INFO
+
+# CPU Cores for parallel computation (workflow multi-folder view)
+NCSIZE = cpu_count()
 
 # ~> SERAFIN
 
@@ -22,6 +26,9 @@ DIGITS = 4
 
 # CSV column delimiter
 CSV_SEPARATOR = ';'
+
+# Write XYZ header
+WRITE_XYZ_HEADER = True
 
 # ~> VISUALIZATION
 

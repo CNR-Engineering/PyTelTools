@@ -9,6 +9,7 @@ import struct
 import geom.BlueKenue as bk
 from geom.geometry import Polyline
 import geom.Shapefile as shp
+from settings import WRITE_XYZ_HEADER
 
 
 class GeomFileConverter:
@@ -102,7 +103,8 @@ class XYZConverter(PointFileConverter):
 
     def to_xyz(self, new_shapes, to_file):
         with bk.Write(to_file) as f:
-            f.write_header(self.header)
+            if WRITE_XYZ_HEADER:
+                f.write_header(self.header)
             f.write_points(new_shapes)
 
     def to_csv(self, new_shapes, to_file):

@@ -6,7 +6,7 @@ import sys
 import os
 from time import time
 
-from conf.settings import CSV_SEPARATOR, LANG, DIGITS, SCENE_SIZE
+from conf.settings import CSV_SEPARATOR, DIGITS, LANG, NCSIZE, SCENE_SIZE
 import workflow.multi_func as worker
 from workflow.MultiNode import Box, MultiLink
 from workflow.multi_nodes import *
@@ -534,7 +534,7 @@ class CmdMessage(QPlainTextEdit):
 
 
 class MultiWidget(QWidget):
-    def __init__(self, parent=None, project_path=None):
+    def __init__(self, parent=None, project_path=None, ncsize=NCSIZE):
         super().__init__()
         self.parent = parent
         self.table = MultiTable()
@@ -581,7 +581,7 @@ class MultiWidget(QWidget):
         mainLayout.addWidget(splitter)
         self.setLayout(mainLayout)
 
-        self.worker = worker.Workers()
+        self.worker = worker.Workers(ncsize)
 
         if project_path is not None:
             self.scene.load(project_path)
@@ -624,7 +624,7 @@ class MultiWidget(QWidget):
             self.worker.stop()
             self.message_box.appendPlainText('Done!')
             self.setEnabled(True)
-            self.worker = worker.Workers()
+            self.worker = worker.Workers(ncsize)
             return
 
         # prepare slf input tasks
@@ -637,7 +637,7 @@ class MultiWidget(QWidget):
 
         self.message_box.appendPlainText('Done!')
         self.setEnabled(True)
-        self.worker = worker.Workers()
+        self.worker = worker.Workers(ncsize)
 
         logger.debug('Execution time %d s' % (time() - start_time))
 
@@ -761,7 +761,10 @@ if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('-i', '--workspace', help='workflow project file')
-    parser.add_argument('-v', '--verbose', action='store_true')
+    parser.add_argument('-v', '--verbose', help='output verbosity', action='store_true')
+    parser.add_argument('--ncsize', help='number of processors (overwrites default configuration)', type=int,
+                        default=NCSIZE)
+
     parser.parse_args()
     args = parser.parse_args()
 
@@ -770,4 +773,4 @@ if __name__ == '__main__':
 
     QApp = QCoreApplication.instance()
     QApp = QApplication(sys.argv)
-    cmd = MultiWidget(project_path=args.workspace)
+    cmd = MultiWidget(project_path=args.workspace, ncsize=args.ncsize)

@@ -7,6 +7,9 @@ from workflow.util import ConfigureDialog
 
 
 class Port(QGraphicsRectItem):
+    """!
+    Input/output of a node
+    """
     WIDTH = 20
     INPUT, OUTPUT = True, False
     COLOR = {OUTPUT: QColor(100, 120, 200, 255), INPUT: QColor(250, 230, 40, 255)}

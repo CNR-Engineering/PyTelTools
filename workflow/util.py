@@ -103,7 +103,14 @@ def validate_input_options(options):
 
 
 class ConfigureDialog(QDialog):
+    """!
+    Configuration window for a single node/tool
+    """
     def __init__(self, panel, label, check=None):
+        """!
+        @param panel <PyQt5.QtWidgets.QWidget>: configuration widget
+        @param label <str>: tool label for window title
+        """
         super().__init__()
         buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel,
                                    Qt.Horizontal, self)
@@ -126,7 +133,7 @@ class ConfigureDialog(QDialog):
         self.setLayout(layout)
 
         self.setWindowTitle('Configure %s' % label)
-        self.resize(500, 400)
+        self.resize(550, 400)
 
     def custom_accept(self):
         value = self.check()
@@ -484,12 +491,13 @@ class MultiLoadDialog(QDialog):
 
         self.table.setRowCount(self.nb_files)
 
-        # remove common prefix
-        if len(dir_names) > 1:
+        # remove common prefix in
+        dir_names_epure = dir_names
+        if len(dir_names_epure) > 1:
             common_prefix = os.path.commonprefix(dir_names)
-            dir_names = [name[len(common_prefix):] for name in dir_names]
+            dir_names_epure = [name[len(common_prefix):] for name in dir_names]
 
-        for i, name in enumerate(dir_names):
+        for i, name in enumerate(dir_names_epure):
             filtered_name = ''.join(c for c in name if c.isalnum() or c == '_')
             if not filtered_name:   # please do not name a directory with only special letters :D
                 filtered_name = 'default__'

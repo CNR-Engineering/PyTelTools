@@ -1,14 +1,14 @@
 import os
 from PyQt5.QtCore import *
 from PyQt5.QtWidgets import *
-import sys
 import struct
+import sys
 
 from geom import Shapefile
 from gui.util import OutputProgressDialog, OutputThread, TelToolWidget, test_open
 from slf.datatypes import SerafinData
-from slf import Serafin
 from slf.expression.pool import ComplexExpressionMultiPool
+from slf import Serafin
 from workflow.util import MultiLoadSerafinDialog, MultiSaveDialog, process_output_options
 
 

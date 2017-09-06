@@ -1,7 +1,7 @@
 import os
 import struct
 from datetime import datetime
-from multiprocessing import Process, Queue, cpu_count
+from multiprocessing import Process, Queue
 import numpy as np
 from shapely.geometry import Polygon
 
@@ -18,8 +18,8 @@ from workflow.util import process_output_options, process_geom_output_options, p
 
 
 class Workers:
-    def __init__(self):
-        self.nb_processes = cpu_count()
+    def __init__(self, ncsize):
+        self.nb_processes = ncsize
         self.started = False
         self.stopped = False
         self.task_queue = Queue()
