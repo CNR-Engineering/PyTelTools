@@ -1,5 +1,5 @@
 """!
-Read and write .i2s/.i3s/.xyz files
+Read and write BlueKenue files (.i2s/.i3s/.xyz)
 """
 
 import numpy as np
@@ -9,13 +9,18 @@ from .geometry import Polyline
 
 class BlueKenue:
     def __init__(self, filename, mode):
+        """!
+        @brief BlueKenue file object
+        @param filename <str>: path to BlueKenue file
+        @param mode <str>: `r` for read, `w` or `x` for write mode
+        """
         self.filename = filename
         self.mode = mode
         self.file = None
         self.header = None
 
     def __enter__(self):
-        self.file = open(self.filename, self.mode)
+        self.file = open(self.filename, self.mode, encoding='ISO-8859-1')
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
@@ -23,6 +28,9 @@ class BlueKenue:
 
 
 class Read(BlueKenue):
+    """"!
+    BlueKenue file reader
+    """
     def __init__(self, filename):
         super().__init__(filename, 'r')
 
@@ -81,6 +89,9 @@ class Read(BlueKenue):
 
 
 class Write(BlueKenue):
+    """"!
+    BlueKenue file writer
+    """
     def __init__(self, filename):
         super().__init__(filename, 'w')
 

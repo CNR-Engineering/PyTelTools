@@ -9,7 +9,7 @@ import struct
 import geom.BlueKenue as bk
 from geom.geometry import Polyline
 import geom.Shapefile as shp
-from settings import WRITE_XYZ_HEADER
+from conf.settings import WRITE_XYZ_HEADER
 
 
 class GeomFileConverter:
