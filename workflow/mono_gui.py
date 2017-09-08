@@ -518,7 +518,7 @@ class MonoPanel(QWidget):
         start_time = time()
         self.view.scene().run_all()
         self.view.scene().update()
-        logger.debug('Execution time %d s' % (time() - start_time))
+        logger.debug('Execution time %f s' % (time() - start_time))
 
     def configure_node(self):
         self.view.current_node.configure()
@@ -608,10 +608,8 @@ class MonoWidget(QWidget):
 
         if project_path is not None:
             self.scene.load(project_path)
-            logger.debug('Start running project')
             start_time = time()
             self.scene.run_all()
-            logger.debug('Execution time %d s' % (time() - start_time))
 
 
 if __name__ == '__main__':

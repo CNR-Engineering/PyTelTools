@@ -639,7 +639,7 @@ class MultiWidget(QWidget):
         self.setEnabled(True)
         self.worker = worker.Workers(ncsize)
 
-        logger.debug('Execution time %d s' % (time() - start_time))
+        logger.debug('Execution time %f s' % (time() - start_time))
 
     def _prepare_auxiliary_tasks(self):
         # auxiliary input tasks for N-1 type of double input nodes
