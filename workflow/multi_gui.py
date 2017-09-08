@@ -248,6 +248,7 @@ class MultiScene(QGraphicsScene):
 
             return True
         except (IndexError, ValueError, KeyError):
+            logger.error("An exception occured while loading project in MULTI.")
             self.reinit()
             self.table.reinit()
             return False

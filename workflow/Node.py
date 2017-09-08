@@ -1,14 +1,14 @@
 import math
-from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
+from PyQt5.QtWidgets import *
 from shapely.geometry import Polygon
 from workflow.util import ConfigureDialog
 
 
 class Port(QGraphicsRectItem):
     """!
-    Input/output of a node
+    Input/output of a Node
     """
     WIDTH = 20
     INPUT, OUTPUT = True, False
@@ -101,19 +101,23 @@ class Node(QGraphicsItem):
     """!
     Node representing a tool with its state, ports, ... (in Mono tab)
     """
+    # Node status labels <str>
     NOT_CONFIGURED, READY, SUCCESS, FAIL = 'Not configured', 'Ready', 'Success', 'Fail'
+    ## Node status colors <{str: PyQt5.QtGui.QColor}>
     COLOR = {NOT_CONFIGURED: QColor(220, 255, 255, 255), READY: QColor(250, 220, 165, 255),
              SUCCESS: QColor(180, 250, 165, 255), FAIL: QColor(255, 160, 160, 255)}
 
     def __init__(self, index):
         super().__init__()
         self._index = index
+        ## Box of the year
         self.box = Box(self)
-
+        ## Progress bar appearing in upper part box <PyQt5.QtWidgets.QProgressBar>
         self.progress_bar = QProgressBar()
         self.progress_bar.setTextVisible(False)
         self.progress_bar.setMinimum(0)
         self.progress_bar.setMaximum(100)
+        ## Progress bar proxy <PyQt5.QtWidgets.QGraphicsProxyWidget>
         self.proxy = QGraphicsProxyWidget(self)
         self.proxy.setWidget(self.progress_bar)
         self.proxy.setGeometry(QRectF(self.boundingRect().topLeft(), self.boundingRect().topRight()+QPointF(0, 30)))
@@ -125,16 +129,23 @@ class Node(QGraphicsItem):
         self.setFlag(QGraphicsItem.ItemIsSelectable)
         self.setCursor(Qt.ArrowCursor)
 
+        ## Help action <PyQt5.QtWidgets.QAction>
         self.help_action = QAction(QWidget().style().standardIcon(QStyle.SP_MessageBoxQuestion), 'Help', None)
         self.dashed_pen = QPen(Qt.black, 1, Qt.DashLine)
 
+        ## Node label <str>
         self.label = ''
+        ## Node category <str>
         self.category = ''
 
+        ## Node state (among NOT_CONFIGURED, READY, SUCCESS, FAIL)
         self.state = Node.NOT_CONFIGURED
+        ## Node message <str>
         self.message = ''
 
+        ## Input and Output Ports list <[Port]>
         self.ports = []
+        ## Links set <set(Link)>
         self.links = set()
 
     def index(self):
@@ -237,6 +248,7 @@ class Node(QGraphicsItem):
         return True
 
     def run_downward(self):
+        """Try to run current Node and check if succeeded"""
         if self.ready_to_run() and self.state != Node.SUCCESS:
             self.run()
         if self.state != Node.SUCCESS:
@@ -454,6 +466,7 @@ class SingleInputNode(Node):
         self.help_action.triggered.connect(self.help)
 
     def ready_to_run(self):
+        """Check if current Node is configured and parent is ready to run"""
         if self.state == Node.NOT_CONFIGURED:
             return False
         if not self.in_port.has_mother():
@@ -461,11 +474,13 @@ class SingleInputNode(Node):
         return self.in_port.mother.parentItem().ready_to_run()
 
     def run_upward(self):
+        """Run single parent and check if succeeded"""
         if self.in_port.mother.parentItem().state != Node.SUCCESS:
             self.in_port.mother.parentItem().run()
         return self.in_port.mother.parentItem().state == Node.SUCCESS
 
     def help(self):
+        """Display help message about input Port datatype"""
         QMessageBox.information(None, 'Help',
                                 'Input type: %s' % ', '.join(self.in_port.data_type),
                                 QMessageBox.Ok)
@@ -482,9 +497,11 @@ class SingleOutputNode(Node):
         self.help_action.triggered.connect(self.help)
 
     def ready_to_run(self):
+        """Check if current Node is configured"""
         return self.state != Node.NOT_CONFIGURED
 
     def run_downward(self):
+        """Run current Node and ready to run descendants"""
         if not super().run_downward():
             return False
         if self.out_port.has_children():
@@ -497,6 +514,7 @@ class SingleOutputNode(Node):
         self.reconfigure_downward()
 
     def help(self):
+        """Display help message about output Port datatype"""
         QMessageBox.information(None, 'Help',
                                 'Output type: %s' % ', '.join(self.out_port.data_type),
                                 QMessageBox.Ok)
@@ -515,6 +533,7 @@ class OneInOneOutNode(Node):
         self.help_action.triggered.connect(self.help)
 
     def ready_to_run(self):
+        """Check if current Node is configured and input is ready to run"""
         if self.state == Node.NOT_CONFIGURED:
             return False
         if not self.in_port.has_mother():
@@ -522,6 +541,7 @@ class OneInOneOutNode(Node):
         return self.in_port.mother.parentItem().ready_to_run()
 
     def run_downward(self):
+        """Run current Node and ready to run descendants"""
         if not super().run_downward():
             return False
         if self.out_port.has_children():
@@ -530,6 +550,7 @@ class OneInOneOutNode(Node):
         return True
 
     def run_upward(self):
+        """Run single parent and check if succeeded"""
         success = self.in_port.mother.parentItem().run_upward()
         if not success:
             return False
@@ -538,6 +559,7 @@ class OneInOneOutNode(Node):
         return self.in_port.mother.parentItem().state == Node.SUCCESS
 
     def help(self):
+        """Display help message about input and output Ports datatype"""
         QMessageBox.information(None, 'Help',
                                 'Input type: %s\n'
                                 'Output type: %s' % (', '.join(self.in_port.data_type),
@@ -551,9 +573,14 @@ class TwoInOneOutNode(Node):
     """
     def __init__(self, index):
         super().__init__(index)
+
+        ## First input Port
         self.first_in_port = InputPort(0, -Port.WIDTH, Box.HEIGHT/4-Port.WIDTH/2)
+        ## Second input Port
         self.second_in_port = InputPort(1, -Port.WIDTH, 3*Box.HEIGHT/4-Port.WIDTH/2)
+        ## Output Port
         self.out_port = OutputPort(2, Box.WIDTH/2-Port.WIDTH/2, Box.HEIGHT)
+
         self.add_port(self.first_in_port)
         self.add_port(self.second_in_port)
         self.add_port(self.out_port)
@@ -561,6 +588,7 @@ class TwoInOneOutNode(Node):
         self.help_action.triggered.connect(self.help)
 
     def ready_to_run(self):
+        """Check if current Node is configured and inputs are ready to run"""
         if self.state == Node.NOT_CONFIGURED:
             return False
         if not self.first_in_port.has_mother():
@@ -571,6 +599,7 @@ class TwoInOneOutNode(Node):
                self.second_in_port.mother.parentItem().ready_to_run()
 
     def run_downward(self):
+        """Run current Node and ready to run descendants"""
         if not super().run_downward():
             return False
         if self.out_port.has_children():
@@ -579,6 +608,7 @@ class TwoInOneOutNode(Node):
         return True
 
     def run_upward(self):
+        """Run parents and check if succeeded"""
         success = self.first_in_port.mother.parentItem().run_upward() and \
                   self.second_in_port.mother.parentItem().run_upward()
         if not success:
@@ -587,10 +617,11 @@ class TwoInOneOutNode(Node):
             self.first_in_port.mother.parentItem().run()
         if self.second_in_port.mother.parentItem().state != Node.SUCCESS:
             self.second_in_port.mother.parentItem().run()
-        return self.first_in_port.mother.parentItem().state == Node.SUCCESS and\
+        return self.first_in_port.mother.parentItem().state == Node.SUCCESS and \
                self.second_in_port.mother.parentItem().state == Node.SUCCESS
 
     def help(self):
+        """Display help message about inputs and output Ports datatype"""
         QMessageBox.information(None, 'Help',
                                 'First input type: %s\n'
                                 'Second input type: %s\n'
@@ -614,6 +645,7 @@ class DoubleInputNode(Node):
         self.help_action.triggered.connect(self.help)
 
     def ready_to_run(self):
+        """Check if current Node is configured and inputs are ready to run"""
         if self.state == Node.NOT_CONFIGURED:
             return False
         if not self.first_in_port.has_mother():
@@ -624,6 +656,7 @@ class DoubleInputNode(Node):
                self.second_in_port.mother.parentItem().ready_to_run()
 
     def run_upward(self):
+        """Run parents and check if succeeded"""
         success = self.first_in_port.mother.parentItem().run_upward() and \
                   self.second_in_port.mother.parentItem().run_upward()
         if not success:
@@ -632,10 +665,11 @@ class DoubleInputNode(Node):
             self.first_in_port.mother.parentItem().run()
         if self.second_in_port.mother.parentItem().state != Node.SUCCESS:
             self.second_in_port.mother.parentItem().run()
-        return self.first_in_port.mother.parentItem().state == Node.SUCCESS and\
+        return self.first_in_port.mother.parentItem().state == Node.SUCCESS and \
                self.second_in_port.mother.parentItem().state == Node.SUCCESS
 
     def help(self):
+        """Display help message about inputs Ports datatype"""
         QMessageBox.information(None, 'Help',
                                 'First input type: %s\n'
                                 'Second input type: %s' % (', '.join(self.first_in_port.data_type),

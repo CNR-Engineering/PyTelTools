@@ -2,7 +2,7 @@
 Python Telemac Tools
 
 * [User documentation](https://github.com/CNR-Engineering/PyTelTools/wiki)
-* [Developper documentation](https://cnr-engineering.github.io/PyTelTools) ([repository with static files](https://github.com/CNR-Engineering/CNR-Engineering.github.io))
+* [Developer documentation](https://cnr-engineering.github.io/PyTelTools) ([repository with static files](https://github.com/CNR-Engineering/CNR-Engineering.github.io))
 
 ## Installation and requirements
 It relies on Python3 and requires packages which are listed in [requirements.txt](https://github.com/CNR-Engineering/PyTelTools/blob/master/requirements.txt).
@@ -45,3 +45,14 @@ Output **verbosity** can be increased (debug mode) with `-v` argument.
 
 ## Configure
 Modify `conf/settings.py` to change default parameters.
+
+For example to change default Serafin language (for variable detection)
+and to change increase verbosity write this in `conf/settings.py`:
+```python
+from conf.settings_sample import *
+
+LANG = 'en'
+
+import logging
+LOGGING_LEVEL = logging.DEBUG
+```

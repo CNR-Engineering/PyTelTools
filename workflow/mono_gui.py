@@ -224,6 +224,7 @@ class MonoScene(QGraphicsScene):
             self.update()
             return True
         except (IndexError, ValueError, KeyError):
+            logger.error("An exception occured while loading project in MONO.")
             self.reinit()
             return False
 
