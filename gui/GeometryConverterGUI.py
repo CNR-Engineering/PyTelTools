@@ -134,7 +134,7 @@ class FileConverterInputTab(QWidget):
         elif shape_type == 25:
             self.from_type = 'shp PolygonM'
         elif shape_type == 8:
-            self.from_type = 'shp Multipoint'
+            self.from_type = 'shp MultiPoint'
         elif shape_type == 18:
             self.from_type = 'shp MultiPointZ'
         elif shape_type == 28:
@@ -261,6 +261,8 @@ class FileConverterOutputTab(QWidget):
                              'shp PolygonM': {'shp Polygon': self.EMPTY, 'shp PolygonM': self.M_FROM_SHP,
                                               'shp PolygonZ': self.Z_AND_M,
                                               'i2s': self.SHP_BK, 'i3s': self.Z_AND_BK, 'csv': self.EMPTY},
+                             'shp Multipoint': {'shp MultiPoint': self.EMPTY, 'shp Point': self.EMPTY,
+                                                'csv': self.EMPTY},
                              'shp MultiPoint': {'shp MultiPoint': self.EMPTY, 'shp Point': self.EMPTY,
                                                 'csv': self.EMPTY},
                              'shp MultiPointZ': {'shp MultiPointZ': self.EMPTY, 'shp PointZ': self.EMPTY,
