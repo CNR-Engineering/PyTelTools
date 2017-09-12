@@ -69,7 +69,7 @@ def cubic_root(x):
 
 
 def compute_NIKURADSE(w, h, m):
-    with np.errstate(divide='ignore', invalide='ignore'):
+    with np.errstate(divide='ignore', invalid='ignore'):
         return np.sqrt(np.power(m, 2) * KARMAN**2 / np.power(np.log(30 * h / np.exp(1) / w), 2))
 
 
@@ -79,10 +79,20 @@ def compute_DMAX(tau):
                              0.9055 * np.power(tau, 1.3178)))
 
 
+def compute_COMPONENT_X(scalar, x, y):
+    magnitude = np.sqrt(np.power(x, 2) + np.power(y, 2))
+    return np.where(magnitude>0, scalar*x/magnitude, 0)
+
+
+def compute_COMPONENT_Y(a, x, y):
+    return compute_COMPONENT_X(a, y, x)
+
+
 PLUS, MINUS, TIMES, NORM2, NORM2_3D = 1, 2, 3, 4, 104
 COMPUTE_TAU, COMPUTE_DMAX = 5, 6
 COMPUTE_CHEZY, COMPUTE_STRICKLER, COMPUTE_MANNING, COMPUTE_NIKURADSE = 7, 8, 9, 10
 COMPUTE_C, COMPUTE_F = 11, 12
+COMPUTE_COMPONENT_X, COMPUTE_COMPONENT_Y = 20, 21
 
 OPERATIONS = {
     PLUS: lambda a, b: a + b,
@@ -96,6 +106,8 @@ OPERATIONS = {
     COMPUTE_STRICKLER: lambda w, h, m: np.sqrt(np.power(m, 2) * GRAVITY / np.square(w) / cubic_root(h)),
     COMPUTE_MANNING: lambda w, h, m: np.sqrt(np.power(m, 2) * GRAVITY * np.power(w, 2) / cubic_root(h)),
     COMPUTE_NIKURADSE: compute_NIKURADSE,
+    COMPUTE_COMPONENT_X: compute_COMPONENT_X,
+    COMPUTE_COMPONENT_Y: compute_COMPONENT_Y,
     COMPUTE_C: lambda h: square_root(GRAVITY * h),
     COMPUTE_F: lambda m, c: m / c
 }

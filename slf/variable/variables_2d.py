@@ -60,7 +60,14 @@ BASIC_2D_EQUATIONS = {'H': Equation((S, B), H, MINUS), 'S': Equation((H, B), S, 
                       'QSSUSP': Equation((QSSUSP, QSSUSPY), QSSUSP, NORM2),
                       'TAU': Equation((US,), TAU, COMPUTE_TAU),
                       'DMAX': Equation((TAU,), DMAX, COMPUTE_DMAX),
-                      'FROTP': Equation((TAU, MU), FROTP, TIMES)}
+                      'FROTP': Equation((TAU, MU), FROTP, TIMES),
+                      # Deduce one vector component assuming that the it has same direction of (U, V) vector
+                      'QSX': Equation((QS, U, V), QSX, COMPUTE_COMPONENT_X),
+                      'QSY': Equation((QS, U, V), QSY, COMPUTE_COMPONENT_Y),
+                      'QSBLX': Equation((QSBL, U, V), QSBLX, COMPUTE_COMPONENT_X),
+                      'QSBLY': Equation((QSBL, U, V), QSBLY, COMPUTE_COMPONENT_Y),
+                      'QSSUSPX': Equation((QSSUSP, U, V), QSSUSPX, COMPUTE_COMPONENT_X),
+                      'QSSUSPY': Equation((QSSUSP, U, V), QSSUSPY, COMPUTE_COMPONENT_Y)}
 
 # define special equations
 CHEZY_EQUATION = Equation((W, H, M), US, COMPUTE_CHEZY)
@@ -241,6 +248,11 @@ def get_necessary_2d_equations(known_var_IDs, needed_var_IDs, us_equation):
     # add QSSUSP
     if 'QSSUSP' in selected_unknown_var_IDs:
         necessary_equations.append(BASIC_2D_EQUATIONS['QSSUSP'])
+
+    # add vector component computations
+    for var_ID in ('QSX', 'QSY', 'QSBLX', 'QSBLY', 'QSSUSPX', 'QSSUSPY'):
+        if var_ID in selected_unknown_var_IDs:
+            necessary_equations.append(BASIC_2D_EQUATIONS[var_ID])
 
     return necessary_equations
 
