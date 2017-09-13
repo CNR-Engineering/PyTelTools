@@ -1,6 +1,7 @@
 from copy import deepcopy
 import datetime
 import logging
+import numpy as np
 
 from slf import Serafin
 
@@ -89,8 +90,8 @@ class SerafinData:
         transformed_points = [(x, y, 0) for x, y in zip(self.header.x, self.header.y)]
         for t in trans:
             transformed_points = [t(p) for p in transformed_points]
-        self.header.x = [p[0] for p in transformed_points]
-        self.header.y = [p[1] for p in transformed_points]
+        self.header.x = np.array([p[0] for p in transformed_points])
+        self.header.y = np.array([p[1] for p in transformed_points])
         self.index = None
         self.triangles = {}
 

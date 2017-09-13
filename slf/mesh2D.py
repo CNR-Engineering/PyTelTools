@@ -13,6 +13,10 @@ class Mesh2D:
     The basis for interpolation, volume calculations etc.
     """
     def __init__(self, input_header, construct_index=False):
+        """!
+        @param input_header <slf.Serafin.SerafinHeader>: input Serafin header
+        @param construct_index <bool>: perform the index construction
+        """
         self.x, self.y = input_header.x[:input_header.nb_nodes_2d], input_header.y[:input_header.nb_nodes_2d]
         self.ikle = input_header.ikle_2d - 1  # back to 0-based indexing
         self.triangles = {}
