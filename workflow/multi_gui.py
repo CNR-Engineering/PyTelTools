@@ -410,7 +410,7 @@ class MultiView(QGraphicsView):
         self.setAcceptDrops(True)
         self.current_node = None
         self.centerOn(QPoint(400, 300))
-        
+
 
 class MultiTable(QTableWidget):
     def __init__(self):
@@ -582,7 +582,8 @@ class MultiWidget(QWidget):
         mainLayout.addWidget(splitter)
         self.setLayout(mainLayout)
 
-        self.worker = worker.Workers(ncsize)
+        self.ncsize = ncsize
+        self.worker = worker.Workers(self.ncsize)
 
         if project_path is not None:
             self.scene.load(project_path)
@@ -625,7 +626,7 @@ class MultiWidget(QWidget):
             self.worker.stop()
             self.message_box.appendPlainText('Done!')
             self.setEnabled(True)
-            self.worker = worker.Workers(ncsize)
+            self.worker = worker.Workers(self.ncsize)
             return
 
         # prepare slf input tasks
@@ -638,7 +639,7 @@ class MultiWidget(QWidget):
 
         self.message_box.appendPlainText('Done!')
         self.setEnabled(True)
-        self.worker = worker.Workers(ncsize)
+        self.worker = worker.Workers(self.ncsize)
 
         logger.debug('Execution time %f s' % (time() - start_time))
 
@@ -769,7 +770,7 @@ if __name__ == '__main__':
     parser.parse_args()
     args = parser.parse_args()
 
-    if args.verbose: 
+    if args.verbose:
         logger.setLevel(logging.DEBUG)
 
     QApp = QCoreApplication.instance()
