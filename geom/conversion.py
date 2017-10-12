@@ -38,14 +38,14 @@ class PointFileConverter(GeomFileConverter):
         super().__init__(from_file)
 
     def transform(self):
-        if not self.transformations:
-            return self.shapes
-        transformed_points = self.shapes[:]
-        for t in self.transformations:
-            transformed_points = [t(p) for p in transformed_points]
-        return transformed_points
+        return self.apply_transform(self.shapes[:])
 
     def apply_transform(self, shapes):
+        """!
+        @brief Apply successive transformations to points
+        @param shape <[tuple(x, y, (z)]>: original points
+        @return transformed_points <[tuple(x, y, (z)]>: transformed points
+        """
         if not self.transformations:
             return shapes
         transformed_points = shapes[:]
@@ -236,8 +236,7 @@ class ShpPointConverter(PointFileConverter):
 
     def read(self):
         self.fields = shp.get_all_fields(self.from_file)
-        for index, name in shp.get_numeric_attribute_names(self.from_file):
-            self.numeric_fields.append((index, name))
+        self.numeric_fields = shp.get_numeric_attribute_names(self.from_file)
         if self.shape_type == 1:
             self.read_point()
         elif self.shape_type == 11:
@@ -308,8 +307,7 @@ class ShpPointConverter(PointFileConverter):
                 attribute_index = int(mfield.split(' - ')[0])
                 new_m = []
                 for attribute in self.attributes:
-                    m = attribute[attribute_index]
-                    new_m.append(m)
+                    new_m.append(attribute[attribute_index])
                 self.to_pointz(transformed_shapes, to_file, new_m)
 
         elif out_type == 'shp PointM':
@@ -322,8 +320,7 @@ class ShpPointConverter(PointFileConverter):
                 attribute_index = int(mfield.split(' - ')[0])
                 new_m = []
                 for attribute in self.attributes:
-                    m = attribute[attribute_index]
-                    new_m.append(m)
+                    new_m.append(attribute[attribute_index])
                 self.to_pointm(new_shapes, to_file, new_m)
         elif out_type == 'xyz':
             zfield = options[0]
@@ -665,21 +662,28 @@ class ShpMultiPointConverter(GeomFileConverter):
         self.shape_type = shape_type
         self.fields = []
         self.attributes = []
+        self.numeric_fields = []
         self.m = []
 
     def transform(self):
+        return self.apply_transform(self.shapes[:])
+
+    def apply_transform(self, shapes):
+        """!
+        @brief Apply successive transformations to shapes
+        @param shape <[numpy 2D-array]>: original shapes
+        @return transformed_points <[numpy 2D-array]>: transformed shapes
+        """
         if not self.transformations:
-            return self.shapes
-        transformed_points = [part[:] for part in self.shapes]
+            return shapes
+        transformed_points = shapes[:]
         for t in self.transformations:
-            new_parts = []
-            for part in transformed_points:
-                new_parts.append([t(p) for p in part])
-            transformed_points = new_parts
+            transformed_points = [np.reshape([t(p) for p in points], points.shape) for points in transformed_points]
         return transformed_points
 
     def read(self):
         self.fields = shp.get_all_fields(self.from_file)
+        self.numeric_fields = shp.get_numeric_attribute_names(self.from_file)
         if self.shape_type == 8:
             self.read_point()
         elif self.shape_type == 18:
@@ -711,8 +715,8 @@ class ShpMultiPointConverter(GeomFileConverter):
                     if hasattr(record.shape, 'm'):
                         m = record.shape.m
                     else:
-                        m = [None] * points.shape[0]
-                    self.m.append(m)
+                        m = [0] * points.shape[0]  #FIXME: default value : 0
+                    self.m.append(np.array(m))
                     points = np.hstack((points, np.array(z).reshape((points.shape[0], 1))))
                     self.shapes.append(points)
                     self.attributes.append(record.record)
@@ -726,37 +730,129 @@ class ShpMultiPointConverter(GeomFileConverter):
                 points = np.array(record.shape.points)
                 points = np.hstack((points, np.zeros((points.shape[0], 1))))
                 m = record.shape.m
-                self.m.append(m)
+                self.m.append(np.array(m))
                 self.shapes.append(points)
                 self.attributes.append(record.record)
 
     def write(self, out_type, to_file, options):
-        new_shapes = self.transform()
+        """!
+        brief Write output file
+        @param out_type <str>: output file type
+        @param to_file <str>: output file path
+        @param options <[str]>: values of options
+        """
         if out_type == 'csv':
-            self.to_csv(new_shapes, to_file)
+            transformed_shapes = self.transform()
+            self.to_csv(transformed_shapes, to_file)
+
         elif out_type == 'shp Point':
-            self.to_point(new_shapes, to_file)
+            transformed_shapes = self.transform()
+            self.to_point(transformed_shapes, to_file)
+
         elif out_type == 'shp PointZ':
-            self.to_pointz(new_shapes, to_file)
+            zfield, mfield = options
+            new_m = self._construct_m(mfield)
+            new_shapes = self._construct_z(zfield)
+            transformed_shapes = self.apply_transform(new_shapes)
+            self.to_pointz(transformed_shapes, to_file, new_m)
+
         elif out_type == 'shp PointM':
-            self.to_pointm(new_shapes, to_file)
+            mfield = options[0]
+            transformed_shapes = self.transform()
+            new_m = self._construct_m(mfield)
+            self.to_pointm(transformed_shapes, to_file, new_m)
+
         else:
-            self.to_multi(new_shapes, to_file)
+            if out_type == 'shp MultiPointZ':
+                zfield, mfield = options
+                shape_type = shapefile.MULTIPOINTZ
+                new_m = self._construct_m(mfield)
+                new_shapes = self._construct_z(zfield)
+                transformed_shapes = self.apply_transform(new_shapes)
+                self.to_multiz(transformed_shapes, new_m, to_file, shape_type)
+            elif out_type == 'shp MultiPointM':
+                mfield = options[0]
+                shape_type = shapefile.MULTIPOINTM
+                new_m = self._construct_m(mfield)
+                transformed_shapes = self.transform()
+                self.to_multim(transformed_shapes, new_m, to_file, shape_type)
+            else:
+                shape_type = shapefile.MULTIPOINT
+                transformed_shapes = self.transform()
+                self.to_multi(transformed_shapes, to_file, shape_type)
 
-    def to_multi(self, new_shapes, to_file):
-        w = shp.MyWriter(shapeType=self.shape_type)  # brute-force fix for MultiPointZ- and MultiPointM-writing bug
+    def _construct_z(self, zfield):
+        """!
+        @brief Builds modified shapes with new Z coordinates
+        @param zfield <str>: field or identifier ('0' or 'Z') to build Z
+        @return new_shape <[numpy 2D-array]>: list of coordinates arrays
+        """
+        if zfield != 'Z':
+            # construct z
+            attribute_index = int(zfield.split(' - ')[0])
+            new_shapes = []
+            for i, (points, attributes) in enumerate(zip(self.shapes, self.attributes)):
+                new_z = attributes[attribute_index]
+                new_list = [(x, y, new_z) for x, y, _ in points]
+                new_shapes.append(np.array(new_list))
+        elif zfield == '0':
+            new_shapes = []
+            for i, (points, attributes) in enumerate(zip(self.shapes, self.attributes)):
+                new_list = [(x, y, 0) for x, y, _ in points]
+                new_shapes.append(np.array(new_list))
+        else:
+            new_shapes = self.shapes
+        return new_shapes
 
+    def _construct_m(self, mfield):
+        """!
+        @brief Builds new M values
+        @param mfield <str>: field or identifier ('0' or 'M') to build M
+        @return new_shape <[numpy 1D-array]>: list of arrays of M values
+        """
+        if mfield == 'M':
+            return self.m
+        elif mfield == '0':
+            new_m = []
+            for points in self.shapes:
+                new_m.append(np.array([0] *len(points)))
+            return new_m
+        else:
+            attribute_index = int(mfield.split(' - ')[0])
+            new_m = []
+            for points, attributes in zip(self.shapes, self.attributes):
+                m = attributes[attribute_index]
+                new_m.append(np.array([m] * len(points)))
+            return new_m
+
+    def _to_multi_init(self, shape_type):
+        """!
+        @brief Prepare Writer for MultiPoints* Shapefile
+        @param shape_type <int>: shape type identifier
+        """
+        w = shp.MyWriter(shapeType=shape_type)  # brute-force fix for MultiPointZ- and MultiPointM-writing bug
         for field_name, field_type, field_length, decimal_length in self.fields:
             w.field(field_name, field_type, str(field_length), decimal_length)
+        return w
 
-        for points, points_m, attributes in zip(new_shapes, self.m, self.attributes):
-            coords = np.array(points)
-            new_m = [0 if m is None else m for m in points_m]
-            m_flat = np.array(new_m).reshape((coords.shape[0], 1))
-            coords = np.hstack((coords, m_flat))
-            w.poly(parts=[list(map(tuple, coords))], shapeType=self.shape_type)
+    def to_multi(self, new_shapes, to_file, shape_type):
+        w = self._to_multi_init(shape_type)
+        for points, attributes in zip(new_shapes, self.attributes):
+            w.poly(parts=[list(map(tuple, points))], shapeType=shape_type)
             w.record(*attributes)
+        w.save(to_file)
 
+    def to_multim(self, new_shapes, new_m, to_file, shape_type):
+        # Calls to_multiz with specific shape_type for MultiPointsM
+        self.to_multiz(new_shapes, new_m, to_file, shape_type)
+
+    def to_multiz(self, new_shapes, new_m, to_file, shape_type):
+        w = self._to_multi_init(shape_type)
+        for points, points_m, attributes in zip(new_shapes, new_m, self.attributes):
+            m = points_m.reshape(points.shape[0], 1)
+            coords = np.hstack((points, m))
+            w.poly(parts=[list(map(tuple, coords))], shapeType=shape_type)
+            w.record(*attributes)
         w.save(to_file)
 
     def to_point(self, new_shapes, to_file):
@@ -780,7 +876,7 @@ class ShpMultiPointConverter(GeomFileConverter):
         for field_name, field_type, field_length, decimal_length in self.fields:
             w.field(field_name, field_type, str(field_length), decimal_length)
 
-        for i, (points, points_m, attributes) in enumerate(zip(new_shapes, self.m, self.attributes)):
+        for i, (points, points_m, attributes) in enumerate(zip(new_shapes, m_array, self.attributes)):
             new_attributes = [i+1] + attributes
             for (x, y, z), m in zip(points, points_m):
                 if m is None:
@@ -789,14 +885,14 @@ class ShpMultiPointConverter(GeomFileConverter):
                 w.record(*new_attributes)
         w.save(to_file)
 
-    def to_pointm(self, new_shapes, to_file):
+    def to_pointm(self, new_shapes, to_file, m_array):
         w = shapefile.Writer(shapefile.POINTM)
         w.field('ID_MultiPointM', 'N', decimal=0)
 
         for field_name, field_type, field_length, decimal_length in self.fields:
             w.field(field_name, field_type, str(field_length), decimal_length)
 
-        for i, (points, points_m, attributes) in enumerate(zip(new_shapes, self.m, self.attributes)):
+        for i, (points, points_m, attributes) in enumerate(zip(new_shapes, m_array, self.attributes)):
             new_attributes = [i+1] + attributes
             for (x, y, _), m in zip(points, points_m):
                 w.point(x, y, m=m, shapeType=shapefile.POINTM)

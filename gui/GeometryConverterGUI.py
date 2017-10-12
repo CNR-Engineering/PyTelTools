@@ -147,6 +147,7 @@ class FileConverterInputTab(QWidget):
             QMessageBox.critical(None, 'Error', 'The shape type MultiPatch is currently not supported!', QMessageBox.Ok)
             self.parent.reset()
             return False
+        logging.debug('Input Shapefile format: %s (type = %d)' % (self.from_type, shape_type))
         if shape_type in (1, 11, 21):
             self.converter = convert.ShpPointConverter(filename, shape_type)
         elif shape_type in (3, 5, 13, 15, 23, 25):
@@ -261,14 +262,23 @@ class FileConverterOutputTab(QWidget):
                              'shp PolygonM': {'shp Polygon': self.EMPTY, 'shp PolygonM': self.M_FROM_SHP,
                                               'shp PolygonZ': self.Z_AND_M,
                                               'i2s': self.SHP_BK, 'i3s': self.Z_AND_BK, 'csv': self.EMPTY},
-                             'shp Multipoint': {'shp MultiPoint': self.EMPTY, 'shp Point': self.EMPTY,
-                                                'csv': self.EMPTY},
-                             'shp MultiPoint': {'shp MultiPoint': self.EMPTY, 'shp Point': self.EMPTY,
-                                                'csv': self.EMPTY},
-                             'shp MultiPointZ': {'shp MultiPointZ': self.EMPTY, 'shp PointZ': self.EMPTY,
-                                                 'csv': self.EMPTY},
-                             'shp MultiPointM': {'shp MultiPointM': self.EMPTY, 'shp PointM': self.EMPTY,
-                                                 'csv': self.EMPTY}}
+                             'shp Multipoint': {'shp MultiPoint': self.EMPTY, 'shp MultiPointZ': self.Z_AND_M,
+                                                'shp MultiPointM': self.M_FROM_SHP, 'shp Point': self.EMPTY,
+                                                'shp PointZ': self.Z_AND_M, 'shp PointM': self.M_FROM_SHP,
+                                                'xyz': self.Z_FROM_SHP, 'csv': self.EMPTY},
+                             'shp MultiPoint': {'shp MultiPoint': self.EMPTY, 'shp MultiPointZ': self.Z_AND_M,
+                                                'shp MultiPointM': self.M_FROM_SHP, 'shp Point': self.EMPTY,
+                                                'shp PointZ': self.Z_AND_M, 'shp PointM': self.M_FROM_SHP,
+                                                'xyz': self.Z_FROM_SHP, 'csv': self.EMPTY},
+                             'shp MultiPointZ': {'shp MultiPoint': self.EMPTY, 'shp MultiPointZ': self.Z_AND_M,
+                                                'shp MultiPointM': self.M_FROM_SHP, 'shp Point': self.EMPTY,
+                                                'shp PointZ': self.Z_AND_M, 'shp PointM': self.M_FROM_SHP,
+                                                'xyz': self.Z_FROM_SHP, 'csv': self.EMPTY},
+                             'shp MultiPointM': {'shp MultiPoint': self.EMPTY, 'shp MultiPointZ': self.Z_AND_M,
+                                                'shp MultiPointM': self.M_FROM_SHP, 'shp Point': self.EMPTY,
+                                                'shp PointZ': self.Z_AND_M, 'shp PointM': self.M_FROM_SHP,
+                                                'xyz': self.Z_FROM_SHP, 'csv': self.EMPTY}
+                             }
         self._initWidgets()
         self._setLayout()
         self._bindEvents()
@@ -307,6 +317,7 @@ class FileConverterOutputTab(QWidget):
         hlayout.addWidget(self.bkshpname)
         self.bkshp.setLayout(hlayout)
 
+        # Fill Z for xyz
         self.zfield = QWidget()
         hlayout = QHBoxLayout()
         hlayout.addWidget(QLabel('Fill Z with'))
@@ -480,7 +491,7 @@ class FileConverterOutputTab(QWidget):
                                              QMessageBox.Ok)
                         return False, []
                     if value <= 0:
-                        QMessageBox.critical(None, 'Error', 'Re-sampling Maximum Length must be a positive!',
+                        QMessageBox.critical(None, 'Error', 'Re-sampling Maximum Length must be positive!',
                                              QMessageBox.Ok)
                         return False, []
                     options.append('v|' + str(value))
@@ -531,7 +542,7 @@ class FileConverterOutputTab(QWidget):
                     self.zfieldchoiceter.addItem(item)
                     self.mfieldchoicebis.addItem(item)
             else:
-                possible_types = ['shp Point', 'csv']
+                possible_types = [from_type, 'csv']
 
         elif from_type == 'shp PointM':
             numeric_fields = self.input.converter.numeric_fields
@@ -611,6 +622,26 @@ class FileConverterOutputTab(QWidget):
             else:
                 possible_types = [from_type, from_type[:-1], 'i2s', 'csv']
 
+        elif from_type == 'shp MultiPoint' or from_type == 'shp MultiPointZ':
+            if from_type == 'shp MultiPointZ':
+                self.zfieldchoice.addItem('Z')
+                self.zfieldchoiceter.addItem('Z')
+                self.mfieldchoice.addItem('M')
+                self.mfieldchoicebis.addItem('M')
+            numeric_fields = self.input.converter.numeric_fields
+            if numeric_fields:
+                for index, name in numeric_fields:
+                    item = '%d - %s' % (index, name)
+                    self.zfieldchoice.addItem(item)
+                    self.zfieldchoiceter.addItem(item)
+                    self.mfieldchoice.addItem(item)
+                    self.mfieldchoicebis.addItem(item)
+            else:
+                possible_types = [from_type, 'xyz', 'csv']
+                if from_type == 'shp MultiPointZ':
+                    possible_types.append('shp MultiPoint')
+
+        logging.debug('Possible output types: %s' % possible_types)
         for to_type in possible_types:
             self.outTypeBox.addItem(to_type)
 

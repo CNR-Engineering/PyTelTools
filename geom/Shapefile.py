@@ -65,7 +65,7 @@ def get_attribute_names(input_filename):
 def get_numeric_attribute_names(input_filename):
     sf = shapefile.Reader(input_filename)
     for i, (field_name, field_type, _, _) in enumerate(sf.fields[1:]):
-        if field_type == 'N':
+        if field_type == 'N' or field_type == 'F':
             if type(field_name) == bytes:
                 field_name = field_name.decode('latin-1')
             yield i, field_name
