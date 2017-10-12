@@ -56,6 +56,10 @@ class SerafinHeader:
         self.file_size = file_size
         self.language = language
 
+        # Header and frame sizes are set afterwards by specific methods
+        self.header_size = -1
+        self.frame_size = -1
+
         # Check if file is empty (usefull if re-runs after a crash)
         if self.file_size == 0:
             raise SerafinValidationError('File is empty (file size is equal to 0)')
@@ -160,12 +164,9 @@ class SerafinHeader:
         self.y = np.array(struct.unpack(nb_coord_values, file.read(coord_size)), dtype=self.np_float_type)
         file.read(4)
 
-        # Header size
-        self.header_size = (80 + 8) + (8 + 8) + (self.nb_var * (8 + 32)) \
-                                    + (40 + 8) + (self.params[-1] * ((6 * 4) + 8)) + (16 + 8) \
-                                    + (nb_ikle_values * 4 + 8) + (self.nb_nodes * 4 + 8) + 2 * (coord_size + 8)
-        # Frame size (all variable values for one time step)
-        self.frame_size = 8 + self.float_size + (self.nb_var * (8 + self.nb_nodes * self.float_size))
+        # Compute and set header and frame sizes
+        self._set_header_size()
+        self._set_frame_size()
 
         # Deduce the number of frames and test the integer division
         self.nb_frames = (self.file_size - self.header_size) // self.frame_size
@@ -179,8 +180,9 @@ class SerafinHeader:
         for var_name, var_unit in zip(self.var_names, self.var_units):
             name = var_name.decode(encoding='utf-8').strip()
             if name not in var_table:
-                module_logger.warning('WARNING: The variable name "%s" is not known. '
-                                      'The complete name will be used as ID' % name)
+                slf_type = '2D' if self.is_2d else '3D'
+                module_logger.warning('WARNING: The %s variable name "%s" is not known (lang=%s). '
+                                      'The complete name will be used as ID' % (slf_type, name, self.language))
                 var_id = name
             else:
                 var_id = var_table[name]
@@ -201,8 +203,25 @@ class SerafinHeader:
 
         module_logger.debug('Finished reading the header')
 
+    def _set_header_size(self):
+        """Set header size"""
+        nb_ikle_values = self.nb_elements * self.nb_nodes_per_elem
+        coord_size = self.nb_nodes * self.float_size
+        self.header_size = (80 + 8) + (8 + 8) + (self.nb_var * (8 + 32)) \
+                                    + (40 + 8) + (self.params[-1] * ((6 * 4) + 8)) + (16 + 8) \
+                                    + (nb_ikle_values * 4 + 8) + (self.nb_nodes * 4 + 8) + 2 * (coord_size + 8)
+
+    def _set_frame_size(self):
+        """Set frame size (all variable values for one time step)"""
+        self.frame_size = 8 + self.float_size + (self.nb_var * (8 + self.nb_nodes * self.float_size))
+
+    def _expected_file_size(self):
+        """Returns expected file size"""
+        return self.header_size + self.nb_frames * self.frame_size
+
     def summary(self):
-        template = 'The file is of type {} {}. It has {} variable{}{},\non {} nodes and {} elements for {} time frame{}.'
+        template = 'The file is of type {} {}. It has {} variable{}{},\n' \
+                   'on {} nodes and {} elements for {} time frame{}.'
         return template.format(self.file_type.decode('utf-8'),
                                {True: '2D', False: '3D'}[self.is_2d], self.nb_var,
                                '' if self.is_2d else ', %d layers' % self.nb_planes,
@@ -210,7 +229,38 @@ class SerafinHeader:
                                ['', 's'][self.nb_frames > 1])
 
     def copy(self):
+        """Returns a deep copy of the current instance"""
         return copy.deepcopy(self)
+
+    def copy_as_2d(self):
+        """Returns a 2D equivalent copy of the current instance"""
+        if self.is_2d:
+            raise SerafinRequestError('Cannot convert header to a 2D equivalent because the input is not 3D')
+
+        ori_params = self.params
+        nb_planes = self.nb_planes
+        new_header = self.copy()
+
+        new_header.nb_planes = 0
+        new_params = list(ori_params)
+        new_params[6] = new_header.nb_planes
+        new_header.params = tuple(new_params)
+        new_header.is_2d = True
+        new_header.nb_elements //= (nb_planes - 1)
+        new_header.nb_nodes //= nb_planes
+        new_header.nb_nodes_per_elem = 3
+        new_header.nb_nodes_2d = new_header.nb_nodes
+        npd = new_header.nb_nodes_per_elem
+        new_header.ikle = np.take(self.ikle, [2*npd*i+j for i in range(new_header.nb_elements) for j in range(3)])
+        new_header.ipobo = self.ipobo[:self.nb_nodes_2d]
+        new_header.x = self.x[:self.nb_nodes_2d]
+        new_header.y = self.y[:self.nb_nodes_2d]
+
+        new_header._set_header_size()
+        new_header._set_frame_size()
+        new_header.file_size = new_header._expected_file_size()
+
+        return new_header
 
     def is_double_precision(self):
         return self.float_type == 'd'
@@ -220,15 +270,9 @@ class SerafinHeader:
         self.float_type = 'f'
         self.float_size = 4
         self.np_float_type = np.float32
-
-        nb_ikle_values = self.nb_elements * self.nb_nodes_per_elem
-        coord_size = self.nb_nodes * self.float_size
-
-        self.header_size = (80 + 8) + (8 + 8) + (self.nb_var * (8 + 32)) \
-                                    + (40 + 8) + (self.params[-1] * ((6 * 4) + 8)) + (16 + 8) \
-                                    + (nb_ikle_values * 4 + 8) + (self.nb_nodes * 4 + 8) + 2 * (coord_size + 8)
-        self.frame_size = 8 + self.float_size + (self.nb_var * (8 + self.nb_nodes * self.float_size))
-        self.file_size = self.header_size + self.nb_frames * self.frame_size
+        self._set_frame_size()
+        self._set_header_size()
+        self.file_size = self._expected_file_size()
 
     def apply_transform(self, transformations):
         if not transformations:
@@ -322,6 +366,32 @@ class Read(Serafin):
         self.file.read(4)
         return np.array(struct.unpack(nb_values, self.file.read(self.header.float_size * self.header.nb_nodes)),
                         dtype=self.header.np_float_type)
+
+    def read_var_in_frame_as_3d(self, time_index, var_ID):
+        """!
+        @brief Read a single variable in a 3D frame
+        @param time_index <float>: 0-based index of simulation time from the target frame
+        @param var_ID <str>: variable ID
+        @return <numpy 2D-array>: values of the variables with shape (planes number, number of 2D nodes)
+        """
+        if self.header.is_2d:
+            raise SerafinRequestError('Reading values as 3D is only possible in 3D!')
+        new_shape = (self.header.nb_planes, self.header.nb_nodes_2d)
+        return self.read_var_in_frame(time_index, var_ID).reshape(new_shape)
+
+    def read_var_in_frame_at_layer(self, time_index, var_ID, iplan):
+        """!
+        @brief Read a single variable in a frame at specific layer
+        @param time_index <float>: 0-based index of simulation time from the target frame
+        @param var_ID <str>: variable ID
+        @param iplan <int>: 1-based index of layer
+        @return <numpy 1D-array>: values of the variables, of length equal to the number of nodes
+        """
+        if self.header.is_2d:
+            raise SerafinRequestError('Extracting values at a specific layer is only possible in 3D!')
+        if iplan < 1 or iplan > self.header.nb_planes:
+            raise SerafinRequestError('Layer %i is not inside [1, %i]' % (iplan, self.header.nb_planes))
+        return self.read_var_in_frame_as_3d(time_index, var_ID)[iplan + 1]
 
 
 class Write(Serafin):

@@ -86,6 +86,20 @@ class SerafinData:
             output_header.to_single_precision()
         return output_header
 
+    def build_2d_output_header(self):
+        output_header = self.header.copy_as_2d()
+        output_header.nb_var = len(self.selected_vars)
+        output_header.var_IDs, output_header.var_names, \
+        output_header.var_units = [], [], []
+        for var_ID in self.selected_vars:
+            var_name, var_unit = self.selected_vars_names[var_ID]
+            output_header.var_IDs.append(var_ID)
+            output_header.var_names.append(var_name)
+            output_header.var_units.append(var_unit)
+        if self.to_single:
+            output_header.to_single_precision()
+        return output_header
+
     def transform(self, trans):
         transformed_points = [(x, y, 0) for x, y in zip(self.header.x, self.header.y)]
         for t in trans:

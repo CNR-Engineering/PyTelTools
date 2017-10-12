@@ -126,6 +126,10 @@ class WriteSerafinNode(OneInOneOutNode):
                 suffix, in_source_folder, dir_path, double_name, overwrite
 
     def _run_simple(self, input_data):
+        """!
+        @brief Write Serafin without any operator
+        @param input_data <slf.datatypes.SerafinData>: input SerafinData stream
+        """
         output_header = input_data.default_output_header()
         with Serafin.Read(input_data.filename, input_data.language) as input_stream:
             input_stream.header = input_data.header
@@ -144,6 +148,10 @@ class WriteSerafinNode(OneInOneOutNode):
         return True
 
     def _run_max_min_mean(self, input_data):
+        """!
+        @brief Write Serafin with `Temporal Min/Max/Mean` operator
+        @param input_data <slf.datatypes.SerafinData>: input SerafinData stream
+        """
         selected = [(var, input_data.selected_vars_names[var][0],
                           input_data.selected_vars_names[var][1]) for var in input_data.selected_vars]
         scalars, vectors, additional_equations = operations.scalars_vectors(input_data.header.var_IDs,
@@ -198,6 +206,10 @@ class WriteSerafinNode(OneInOneOutNode):
         return True
 
     def _run_synch_max(self, input_data):
+        """!
+        @brief Write Serafin with `SynchMax` operator
+        @param input_data <slf.datatypes.SerafinData>: input SerafinData stream
+        """
         selected_vars = [var for var in input_data.selected_vars if var in input_data.header.var_IDs]
         output_header = input_data.header.copy()
         output_header.nb_var = len(selected_vars)
@@ -232,6 +244,10 @@ class WriteSerafinNode(OneInOneOutNode):
         return True
 
     def _run_arrival_duration(self, input_data):
+        """!
+        @brief Write Serafin with `Compute Arrival Duration` operator
+        @param input_data <slf.datatypes.SerafinData>: input SerafinData stream
+        """
         conditions, table, time_unit = input_data.metadata['conditions'], \
                                        input_data.metadata['table'], input_data.metadata['time unit']
 
@@ -285,6 +301,10 @@ class WriteSerafinNode(OneInOneOutNode):
         return True
 
     def _run_project_mesh(self, first_input):
+        """!
+        @brief Write Serafin with `Projet Mesh` operator
+        @param input_data <slf.datatypes.SerafinData>: input SerafinData stream
+        """
         operation_type = first_input.operator
         second_input = first_input.metadata['operand']
 
@@ -373,6 +393,31 @@ class WriteSerafinNode(OneInOneOutNode):
                                                                               first_input.header.nb_nodes))
         return True
 
+    def _run_layer_selection(self, input_data):
+        """!
+        @brief Write Serafin with `Select Single Layer` operator
+        @param input_data <slf.datatypes.SerafinData>: input SerafinData stream
+        """
+        output_header = input_data.build_2d_output_header()
+        with Serafin.Read(input_data.filename, input_data.language) as input_stream:
+            input_stream.header = input_data.header
+            input_stream.time = input_data.time
+            with Serafin.Write(self.filename, input_data.language) as output_stream:
+                output_stream.write_header(output_header)
+                for i, time_index in enumerate(input_data.selected_time_indices):
+                    # FIXME Optimization: Do calculations only on target layer and avoid reshaping afterwards
+                    values = do_calculations_in_frame(input_data.equations, input_stream, time_index,
+                                                      input_data.selected_vars, output_header.np_float_type,
+                                                      is_2d=output_header.is_2d, us_equation=input_data.us_equation)
+                    new_shape = (values.shape[0], input_stream.header.nb_planes,
+                                 values.shape[1] // input_stream.header.nb_planes)
+                    values_at_layer = values.reshape(new_shape)[:,input_data.metadata['layer_selection'] - 1,:]
+                    output_stream.write_entire_frame(output_header, input_data.time[time_index], values_at_layer)
+                    self.progress_bar.setValue(100 * (i+1) / len(input_data.selected_time_indices))
+                    QApplication.processEvents()
+        self.success('Output saved to {}.'.format(self.filename))
+        return True
+
     def run(self):
         success = super().run_upward()
         if not success:
@@ -421,8 +466,12 @@ class WriteSerafinNode(OneInOneOutNode):
                 success = self._run_project_mesh(input_data)
             elif input_data.operator == operations.SYNCH_MAX:
                 success = self._run_synch_max(input_data)
-            else:
+            elif input_data.operator == operations.ARRIVAL_DURATION:
                 success = self._run_arrival_duration(input_data)
+            elif input_data.operator == operations.LAYER_SELECTION:
+                success = self._run_layer_selection(input_data)
+            else:
+                raise NotImplementedError('Operator "%s" is not implemented in MONO' % input_data.operator)
 
             if success:  # reload the output file
                 self.data = SerafinData(input_data.job_id, self.filename, input_data.language)

@@ -302,6 +302,21 @@ def select_last_frame(node_id, fid, data, options):
     return True, node_id, fid, new_data, success_message('Select Last Frame', data.job_id)
 
 
+def select_single_layer(node_id, fid, data, options):
+    if data.header.is_2d:
+        return False, node_id, fid, None, fail_message('the input file is not 3d', 'Select Single Layer', data.job_id)
+
+    layer_selection = options[0]
+    if layer_selection < 1 or layer_selection > data.header.nb_planes:
+        range_text = '[1, %s]' % (data.header.nb_planes)
+        return False, node_id, fid, None, fail_message('layer %i is not inside %s' % (layer_selection, range_text),
+                                                       'Select Single Layer', data.job_id)
+    new_data = data.copy()
+    new_data.operator = operations.LAYER_SELECTION
+    new_data.metadata = {'layer_selection': layer_selection}
+    return True, node_id, fid, new_data, success_message('Select Single Layer', data.job_id)
+
+
 def compute_max(node_id, fid, data, options):
     if not data.header.is_2d:
         return False, node_id, fid, None, fail_message('the input file is not 2d', 'Max', data.job_id)
@@ -421,8 +436,12 @@ def write_slf(node_id, fid, data, options):
         success, message = write_arrival_duration(data, filename)
     elif data.operator == operations.SYNCH_MAX:
         success, message = write_synch_max(data, filename)
-    else:
+    elif data.operator == operations.LAYER_SELECTION:
+        success, message = write_slf_layer_selection(data, filename)
+    elif data.operator == operations.PROJECT:
         success, message = write_project_mesh(data, filename)
+    else:
+        raise NotImplementedError('Operator "%s" is not implemented in MULTI' % data.operator)
 
     new_data = None
     if success:
@@ -445,7 +464,8 @@ def write_simple_slf(input_data, filename):
 
         with Serafin.Write(filename, input_data.language) as output_stream:
             output_stream.write_header(output_header)
-            for i, time_index in enumerate(input_data.selected_time_indices):
+            for time_index in input_data.selected_time_indices:
+                # FIXME Optimization: Do calculations only on target layer and avoid reshaping afterwards
                 values = do_calculations_in_frame(input_data.equations, input_stream, time_index,
                                                   input_data.selected_vars, output_header.np_float_type,
                                                   is_2d=output_header.is_2d, us_equation=input_data.us_equation)
@@ -670,6 +690,37 @@ def write_project_mesh(first_input, filename):
                                                                                       first_input.header.nb_nodes),
                               second_input.job_id)
     return True, message
+
+
+def write_slf_layer_selection(input_data, filename):
+    selected_vars = [var for var in input_data.selected_vars if var in input_data.header.var_IDs]
+    output_header = input_data.header.copy_as_2d()
+    output_header.nb_var = len(selected_vars)
+    output_header.var_IDs, output_header.var_names, output_header.var_units = [], [], []
+    for var_ID in selected_vars:
+        var_name, var_unit = input_data.selected_vars_names[var_ID]
+        output_header.var_IDs.append(var_ID)
+        output_header.var_names.append(var_name)
+        output_header.var_units.append(var_unit)
+    if input_data.to_single:
+        output_header.to_single_precision()
+
+    with Serafin.Read(input_data.filename, input_data.language) as input_stream:
+        input_stream.header = input_data.header
+        input_stream.time = input_data.time
+
+        with Serafin.Write(filename, input_data.language) as output_stream:
+            output_stream.write_header(output_header)
+            for time_index in input_data.selected_time_indices:
+                values = do_calculations_in_frame(input_data.equations, input_stream, time_index,
+                                                  input_data.selected_vars, output_header.np_float_type,
+                                                  is_2d=output_header.is_2d, us_equation=input_data.us_equation)
+                new_shape = (values.shape[0], input_stream.header.nb_planes,
+                             values.shape[1] // input_stream.header.nb_planes)
+                values_at_layer = values.reshape(new_shape)[:, input_data.metadata['layer_selection'] - 1, :]
+                output_stream.write_entire_frame(output_header, input_data.time[time_index], values_at_layer)
+
+    return True, success_message('Write Serafin', input_data.job_id)
 
 
 def construct_mesh(mesh):
@@ -1272,6 +1323,7 @@ def write_vtk(node_id, fid, data, options):
 FUNCTIONS = {'Select Variables': select_variables, 'Add Rouse': add_rouse, 'Select Time': select_time,
              'Select Single Frame': select_single_frame,
              'Select First Frame': select_first_frame, 'Select Last Frame': select_last_frame,
+             'Select Single Layer': select_single_layer,
              'Max': compute_max, 'Min': compute_min, 'Mean': compute_mean,
              'Convert to Single Precision': convert_to_single, 'Compute Arrival Duration': arrival_duration,
              'Load 2D Polygons': read_polygons, 'Load 2D Open Polylines': read_polylines, 'Load 2D Points': read_points,

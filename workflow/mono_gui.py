@@ -4,9 +4,9 @@ from time import time
 
 from conf.settings import CSV_SEPARATOR, LANG, DIGITS, SCENE_SIZE
 from workflow.Node import Port, Box, Link
+from workflow.nodes_calc import *
 from workflow.nodes_io import *
 from workflow.nodes_op import *
-from workflow.nodes_calc import *
 from workflow.nodes_vis import *
 from workflow.util import logger
 
@@ -20,6 +20,7 @@ NODES = {'Input/Output': {'Load Serafin 2D': LoadSerafin2DNode, 'Load Serafin 3D
          'Basic operations': {'Select Variables': SelectVariablesNode,
                               'Select Time': SelectTimeNode, 'Select Single Frame': SelectSingleFrameNode,
                               'Select First Frame': SelectFirstFrameNode, 'Select Last Frame': SelectLastFrameNode,
+                              'Select Single Layer': SelectSingleLayerNode,
                               'Add Rouse Numbers': AddRouseNode,
                               'Convert to Single Precision': ConvertToSinglePrecisionNode,
                               'Add Transformation': AddTransformationNode},

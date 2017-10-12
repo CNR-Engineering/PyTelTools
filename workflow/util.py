@@ -146,6 +146,9 @@ class ConfigureDialog(QDialog):
 
 
 class OutputOptionPanel(QWidget):
+    """!
+    Options panel for output files
+    """
     def __init__(self, old_options):
         super().__init__()
         vlayout = QVBoxLayout()
@@ -1132,7 +1135,6 @@ class VerticalCrossSectionPlotViewer(PlotViewer):
             self.canvas.axes.tricontourf(self.triang, self.values, cmap=self.current_style, levels=levels,
                                          extend='both', vmin=self.color_limits[0], vmax=self.color_limits[1])
         else:
-            print(np.nanmin(self.values), np.nanmax(self.values))
             levels = np.linspace(np.nanmin(self.values), np.nanmax(self.values), NB_COLOR_LEVELS)
             self.canvas.axes.tricontourf(self.triang, self.values, cmap=self.current_style, levels=levels,
                                          extend='both')

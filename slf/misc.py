@@ -15,8 +15,8 @@ module_logger = logging.getLogger(__name__)
 
 # constants
 OPERATORS = ['+', '-', '*', '/', '^', 'sqrt', 'sin', 'cos', 'atan']
-MAX, MIN, MEAN, ARRIVAL_DURATION, \
-          PROJECT, DIFF, REV_DIFF, MAX_BETWEEN, MIN_BETWEEN, SYNCH_MAX = 0, 1, 2, 3, 4, 5, 6, 7, 8, 9
+MAX, MIN, MEAN, ARRIVAL_DURATION, PROJECT, DIFF, REV_DIFF, \
+    MAX_BETWEEN, MIN_BETWEEN, SYNCH_MAX, LAYER_SELECTION = 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10
 
 OPERATIONS = {'+': np.add, '-': np.subtract, '*': np.multiply, '/': np.divide, '^': np.power,
                'sqrt': np.sqrt, 'sin': np.sin, 'cos': np.cos, 'atan': np.arctan}

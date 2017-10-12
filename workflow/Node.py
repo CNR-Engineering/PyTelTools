@@ -223,6 +223,7 @@ class Node(QGraphicsItem):
         pass
 
     def configure(self, check=None):
+        """Execute configure dialog and check if accepted"""
         configure_dialog = ConfigureDialog(self.get_option_panel(), self.name(), check)
         configure_dialog.message_field.appendPlainText(self.message)
         if configure_dialog.exec_() == QDialog.Accepted:

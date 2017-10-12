@@ -366,6 +366,20 @@ class MultiSelectSingleFrameNode(MultiOneInOneOutNode):
         self.options = (datetime.strptime(str_date, '%Y/%m/%d %H:%M:%S'),)
 
 
+class MultiSelectSingleLayerNode(MultiOneInOneOutNode):
+    def __init__(self, index):
+        super().__init__(index)
+        self.category = 'Basic operations'
+        self.label = 'Select\nSingle\nLayer'
+
+    def load(self, options):
+        layer_selection = int(options[0])
+        if layer_selection<=0:
+            self.state = MultiNode.NOT_CONFIGURED
+            return
+        self.options = (layer_selection,)
+
+
 class MultiSelectVariablesNode(MultiOneInOneOutNode):
     def __init__(self, index):
         super().__init__(index)

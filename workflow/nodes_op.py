@@ -809,6 +809,131 @@ class SelectSingleFrameNode(OneInOneOutNode):
         self.success()
 
 
+class SelectSingleLayerNode(OneInOneOutNode):
+    def __init__(self, index):
+        super().__init__(index)
+        self.category = 'Basic operations'
+        self.label = 'Select\nSingle\nLayer'
+        self.out_port.data_type = ('slf out',)
+        self.in_port.data_type = ('slf 3d',)
+        self.in_data = None
+        self.data = None
+
+        ## Layer index (1-indexed) selection
+        self.layer_selection = -1
+        self.layer_type_box = None
+        self.new_option = -1
+        self.output_panel = None
+
+    def get_option_panel(self):
+        self.layer_type_box = QComboBox()
+        self.layer_type_box.setFixedHeight(30)
+        self.layer_type_box.setMaximumWidth(200)
+        for iplan in range(self.in_data.header.nb_planes):
+            self.layer_type_box.addItem('Layer %d' % (iplan + 1))
+        if self.layer_selection > 0:
+            self.layer_type_box.setCurrentIndex(self.layer_selection - 1)
+
+        option_panel = QWidget()
+        layout = QVBoxLayout()
+        layout.addSpacerItem(QSpacerItem(10, 10))
+        hlayout = QHBoxLayout()
+        hlayout.addWidget(QLabel('Select the layer'))
+        hlayout.addWidget(self.layer_type_box)
+        layout.addLayout(hlayout)
+        option_panel.setLayout(layout)
+        option_panel.destroyed.connect(self._select)
+        return option_panel
+
+    def _select(self):
+        self.new_option = self.layer_type_box.currentIndex() + 1
+
+    def _reset(self):
+        self.in_data = self.in_port.mother.parentItem().data
+        self.state = Node.NOT_CONFIGURED
+        if self.layer_selection > 0:
+            if self.layer_selection <= self.in_data.header.nb_planes + 1:
+                self.state = Node.READY
+        self.reconfigure_downward()
+        self.update()
+
+    def add_link(self, link):
+        super().add_link(link)
+        if not self.in_port.has_mother():
+            return
+
+        parent_node = self.in_port.mother.parentItem()
+        if parent_node.state != Node.SUCCESS:
+            if parent_node.ready_to_run():
+                parent_node.run()
+            if parent_node.state != Node.SUCCESS:
+                return
+        self._reset()
+
+    def reconfigure(self):
+        super().reconfigure()
+        if self.in_port.has_mother():
+            parent_node = self.in_port.mother.parentItem()
+            if parent_node.ready_to_run():
+                parent_node.run()
+                if parent_node.state == Node.SUCCESS:
+                    self._reset()
+                    return
+        self.in_data = None
+        self.state = Node.NOT_CONFIGURED
+        self.reconfigure_downward()
+        self.update()
+
+    def configure(self, check=None):
+        if not self.in_port.has_mother():
+            QMessageBox.critical(None, 'Error', 'Connect and run the input before configure this node!',
+                                 QMessageBox.Ok)
+            return
+
+        parent_node = self.in_port.mother.parentItem()
+        if parent_node.state != Node.SUCCESS:
+            if parent_node.ready_to_run():
+                parent_node.run()
+            else:
+                QMessageBox.critical(None, 'Error', 'Configure and run the input before configure this node!',
+                                     QMessageBox.Ok)
+                return
+            if parent_node.state != Node.SUCCESS:
+                QMessageBox.critical(None, 'Error', 'Configure and run the input before configure this node!',
+                                     QMessageBox.Ok)
+                return
+        self.in_data = parent_node.data
+        if 'layer_selection' not in self.in_data.metadata:
+            QMessageBox.critical(None, 'Error', 'Cannot re-select layer, already 2D.', QMessageBox.Ok)
+            return
+        if self.state != Node.SUCCESS:
+            self._reset()
+        if super().configure():
+            self.layer_selection = self.new_option
+            self.reconfigure_downward()
+
+    def save(self):
+        if self.layer_selection is not None:
+            vertical_operator = self.layer_selection
+        return '|'.join([self.category, self.name(), str(self.index()),
+                         str(self.pos().x()), str(self.pos().y()), str(vertical_operator)])
+
+    def load(self, options):
+        if options[0]:
+            self.layer_selection = int(options[0])
+
+    def run(self):
+        success = super().run_upward()
+        if not success:
+            self.fail('input failed.')
+            return
+        input_data = self.in_port.mother.parentItem().data
+        self.data = input_data.copy()
+        self.data.operator = operations.LAYER_SELECTION
+        self.data.metadata['layer_selection'] = self.layer_selection
+        self.success()
+
+
 class SynchMaxNode(OneInOneOutNode):
     def __init__(self, index):
         super().__init__(index)
