@@ -2,8 +2,8 @@ import logging
 import sys
 from time import time
 
-from conf.settings import CSV_SEPARATOR, LANG, DIGITS, SCENE_SIZE
-from workflow.Node import Port, Box, Link
+from conf.settings import CSV_SEPARATOR, DIGITS, LANG, SCENE_SIZE
+from workflow.Node import Box, Link, Port
 from workflow.nodes_calc import *
 from workflow.nodes_io import *
 from workflow.nodes_op import *

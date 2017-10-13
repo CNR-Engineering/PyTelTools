@@ -40,9 +40,9 @@ TODO
     * `nodes_*`: add a new class which derives from Node (e.g. `TwoInOneOutNode`) in the corresponding file (depending on its category)
     * `mono_gui`: add a new entry in dict `NODES`
 2. Add it to Multi tab
-    * `multi_nodes`: add a new class which derives from Nodederived (e.g. `MultiDoubleInputNode`) and define `load` method
-    * `multi_gui`: add
-    * `multi_func`: add a function
+    * `multi_nodes`: define a new class which derives from Node (e.g. `MultiDoubleInputNode`) and define `load` method to capture options
+    * `multi_gui`: add a new entry in dict `NODES`
+    * `multi_func`: define a function and add it in dict `FUNCTIONS`
 
 #### Datatypes for ports
 

@@ -6,6 +6,7 @@ Conventions
 * linux line breaking
 * indent: 4 spaces
 * comment language: English
+* shebang: `#!/usr/bin/python3`
 
 ## Module imports
 Avoid any import with * except for PyQt5:
@@ -15,10 +16,25 @@ from PyQt5.QtGui import *
 from PyQt5.QtWidgets import *
 ```
 
-### Order
-Sort import lines and lists by alphabetic order.
+### Group and order imports
+Two groups for line imports are separated by an empty line:
+1. internal Python imports
+2. imports from PyTelTools
+
+Imports are sorted by alphabetic order.
+
+Example:
+```python
+import sys
+from time import time
+
+from conf.settings import CSV_SEPARATOR, DIGITS, LANG, SCENE_SIZE
+from workflow.Node import Box, Link, Port
+from workflow.util import logger
+```
 
 ### Common abbreviations
+Some common import renamings:
 ```python
 import numpy as np
 import slf.misc as operations
