@@ -393,28 +393,32 @@ class SubmitTab(QWidget):
         progressBar = OutputProgressDialog()
 
         # do some calculations
-        with Serafin.Read(self.input.first_data.filename, self.input.first_data.language) as first_in:
-            first_in.header = self.input.first_data.header
-            first_in.time = self.input.first_data.time
+        try:
+            with Serafin.Read(self.input.first_data.filename, self.input.first_data.language) as first_in:
+                first_in.header = self.input.first_data.header
+                first_in.time = self.input.first_data.time
 
-            with Serafin.Read(self.input.second_data.filename, self.input.second_data.language) as second_in:
-                second_in.header = self.input.second_data.header
-                second_in.time = self.input.second_data.time
+                with Serafin.Read(self.input.second_data.filename, self.input.second_data.language) as second_in:
+                    second_in.header = self.input.second_data.header
+                    second_in.time = self.input.second_data.time
 
-                progressBar.setValue(5)
-                QApplication.processEvents()
+                    progressBar.setValue(5)
+                    QApplication.processEvents()
 
-                with Serafin.Write(filename, self.input.first_data.language) as out_stream:
+                    with Serafin.Write(filename, self.input.first_data.language) as out_stream:
 
-                    out_stream.write_header(output_header)
-                    process = ProjectMeshThread(first_in, second_in, out_stream, output_header, self.input.is_inside,
-                                                self.input.point_interpolators, time_indices,
-                                                operation_type)
-                    progressBar.connectToThread(process)
-                    process.run()
+                        out_stream.write_header(output_header)
+                        process = ProjectMeshThread(first_in, second_in, out_stream, output_header,
+                                                    self.input.is_inside, self.input.point_interpolators, time_indices,
+                                                    operation_type)
+                        progressBar.connectToThread(process)
+                        process.run()
 
-                    if not process.canceled:
-                        progressBar.outputFinished()
+                        if not process.canceled:
+                            progressBar.outputFinished()
+        except (Serafin.SerafinRequestError, Serafin.SerafinValidationError) as e:
+            QMessageBox.critical(None, 'Serafin Error', e.message, QMessageBox.Ok, QMessageBox.Ok)
+            return
 
         progressBar.exec_()
         self.parent.outDialog()

@@ -394,22 +394,27 @@ class CSVTab(QWidget):
         process = WriteCSVProcess(self.parent.csv_separator, self.parent.digits, self.input.mesh)
         progressBar = OutputProgressDialog()
 
-        with Serafin.Read(self.input.data.filename, self.input.data.language) as input_stream:
-            input_stream.header = self.input.data.header
-            input_stream.time = self.input.data.time
+        try:
+            with Serafin.Read(self.input.data.filename, self.input.data.language) as input_stream:
+                input_stream.header = self.input.data.header
+                input_stream.time = self.input.data.time
 
-            progressBar.setValue(1)
-            QApplication.processEvents()
+                progressBar.setValue(1)
+                QApplication.processEvents()
 
-            with open(filename, 'w') as output_stream:
-                progressBar.connectToThread(process)
+                with open(filename, 'w') as output_stream:
+                    progressBar.connectToThread(process)
 
-                if self.intersect.isChecked():
-                    process.write_csv(input_stream, selected_var_IDs, output_stream,
-                                      self.input.line_interpolators, indices_nonempty, reference, time_index)
-                else:
-                    process.write_csv(input_stream, selected_var_IDs, output_stream,
-                                      self.input.line_interpolators_internal, indices_nonempty, reference, time_index)
+                    if self.intersect.isChecked():
+                        process.write_csv(input_stream, selected_var_IDs, output_stream,
+                                          self.input.line_interpolators, indices_nonempty, reference, time_index)
+                    else:
+                        process.write_csv(input_stream, selected_var_IDs, output_stream,
+                                          self.input.line_interpolators_internal, indices_nonempty,
+                                          reference, time_index)
+        except (Serafin.SerafinRequestError, Serafin.SerafinValidationError) as e:
+            QMessageBox.critical(None, 'Serafin Error', e.message, QMessageBox.Ok, QMessageBox.Ok)
+            return
         if not process.canceled:
             progressBar.outputFinished()
         progressBar.exec_()

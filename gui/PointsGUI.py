@@ -358,19 +358,24 @@ class InputTab(SerafinInputTab):
         process = WriteCSVProcess(self.parent.csv_separator, self.parent.digits, self.mesh)
         progressBar = OutputProgressDialog()
 
-        with Serafin.Read(self.data.filename, self.data.language) as input_stream:
-            input_stream.header = self.data.header
-            input_stream.time = self.data.time
+        try:
+            with Serafin.Read(self.data.filename, self.data.language) as input_stream:
+                input_stream.header = self.data.header
+                input_stream.time = self.data.time
 
-            progressBar.setValue(1)
-            QApplication.processEvents()
+                progressBar.setValue(1)
+                QApplication.processEvents()
 
-            with open(filename, 'w') as output_stream:
-                progressBar.connectToThread(process)
-                process.write_csv(input_stream, selected_time, selected_var_IDs, output_stream,
-                                  indices_inside,
-                                  [self.points[i] for i in indices_inside],
-                                  [self.point_interpolators[i] for i in indices_inside])
+                with open(filename, 'w') as output_stream:
+                    progressBar.connectToThread(process)
+                    process.write_csv(input_stream, selected_time, selected_var_IDs, output_stream,
+                                      indices_inside,
+                                      [self.points[i] for i in indices_inside],
+                                      [self.point_interpolators[i] for i in indices_inside])
+        except (Serafin.SerafinRequestError, Serafin.SerafinValidationError) as e:
+            QMessageBox.critical(None, 'Serafin Error', e.message, QMessageBox.Ok, QMessageBox.Ok)
+            return
+
         if not process.canceled:
             progressBar.outputFinished()
         progressBar.exec_()

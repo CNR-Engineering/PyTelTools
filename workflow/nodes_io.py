@@ -47,7 +47,7 @@ class LoadSerafin2DNode(SingleOutputNode):
         if not self.dir_path:
             return
         try:
-            with open(os.path.join(self.dir_path, self.slf_name)) as f:
+            with open(os.path.join(self.dir_path, self.slf_name)):
                 pass
         except FileNotFoundError:
             self.state = Node.NOT_CONFIGURED
@@ -61,7 +61,7 @@ class LoadSerafin2DNode(SingleOutputNode):
         if self.state == Node.SUCCESS:
             return
         try:
-            with open(os.path.join(self.dir_path, self.slf_name)) as f:
+            with open(os.path.join(self.dir_path, self.slf_name)):
                 pass
         except PermissionError:
             self.fail('Access denied.')
@@ -431,7 +431,7 @@ class WriteSerafinNode(OneInOneOutNode):
         if not self.overwrite:
             if os.path.exists(self.filename):
                 try:
-                    with open(self.filename, 'r') as f:
+                    with open(self.filename, 'r'):
                         pass
                 except PermissionError:
                     self.fail('Access denied when reloading existing file.')
@@ -447,7 +447,7 @@ class WriteSerafinNode(OneInOneOutNode):
                 return
 
         try:
-            with open(self.filename, 'w') as f:
+            with open(self.filename, 'w'):
                 pass
         except PermissionError:
             self.fail('Access denied.')
@@ -539,7 +539,7 @@ class LoadPolygon2DNode(SingleOutputNode):
         if self.state == Node.SUCCESS:
             return
         try:
-            with open(self.filename) as f:
+            with open(self.filename):
                 pass
         except PermissionError:
             self.fail('Access denied.')
@@ -627,7 +627,7 @@ class LoadOpenPolyline2DNode(SingleOutputNode):
         if self.state == Node.SUCCESS:
             return
         try:
-            with open(self.filename) as f:
+            with open(self.filename):
                 pass
         except PermissionError:
             self.fail('Access denied.')
@@ -715,7 +715,7 @@ class LoadPoint2DNode(SingleOutputNode):
         if self.state == Node.SUCCESS:
             return
         try:
-            with open(self.filename) as f:
+            with open(self.filename):
                 pass
         except PermissionError:
             self.fail('Access denied.')
@@ -795,7 +795,7 @@ class LoadReferenceSerafinNode(SingleOutputNode):
         if self.state == Node.SUCCESS:
             return
         try:
-            with open(self.filename) as f:
+            with open(self.filename):
                 pass
         except PermissionError:
             self.fail('Access denied.')
@@ -848,7 +848,7 @@ class LoadSerafin3DNode(SingleOutputNode):
         if not self.dir_path:
             return
         try:
-            with open(os.path.join(self.dir_path, self.slf_name)) as f:
+            with open(os.path.join(self.dir_path, self.slf_name)):
                 pass
         except FileNotFoundError:
             self.state = Node.NOT_CONFIGURED
@@ -862,7 +862,7 @@ class LoadSerafin3DNode(SingleOutputNode):
         if self.state == Node.SUCCESS:
             return
         try:
-            with open(os.path.join(self.dir_path, self.slf_name)) as f:
+            with open(os.path.join(self.dir_path, self.slf_name)):
                 pass
         except PermissionError:
             self.fail('Access denied.')
@@ -953,7 +953,7 @@ class WriteLandXMLNode(SingleInputNode):
                 self.success('File already exists.')
                 return
         try:
-            with open(filename, 'w') as f:
+            with open(filename, 'w'):
                 pass
         except PermissionError:
             try:
@@ -1033,7 +1033,7 @@ class WriteShpNode(SingleInputNode):
                 self.success('File already exists.')
                 return
         try:
-            with open(filename, 'w') as f:
+            with open(filename, 'w'):
                 pass
         except PermissionError:
             try:
@@ -1117,7 +1117,7 @@ class WriteVtkNode(SingleInputNode):
                     skip.append(False)
             else:
                 try:
-                    with open(filename, 'w') as f:
+                    with open(filename, 'w'):
                         pass
                 except PermissionError:
                     try:

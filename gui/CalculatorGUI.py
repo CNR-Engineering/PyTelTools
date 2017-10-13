@@ -26,23 +26,27 @@ class WriteVariableThread(OutputThread):
 
     def run_single(self, input_name, input_header, output_name, output_header, pool):
         i = 0
-        with Serafin.Read(input_name, input_header.language) as input_stream:
-            input_stream.header = input_header
-            input_stream.get_time()
-            inv_nb_frames = len(input_stream.time)
+        try:
+            with Serafin.Read(input_name, input_header.language) as input_stream:
+                input_stream.header = input_header
+                input_stream.get_time()
+                inv_nb_frames = len(input_stream.time)
 
-            with Serafin.Write(output_name, input_header.language) as output_stream:
-                output_stream.write_header(output_header)
+                with Serafin.Write(output_name, input_header.language) as output_stream:
+                    output_stream.write_header(output_header)
 
-                for time_value, value_array in pool.evaluate_expressions(self.augmented_path,
-                                                                         input_stream, self.selected_expressions):
-                    if self.canceled:
-                        return
-                    i += 1
-                    output_stream.write_entire_frame(output_header, time_value, value_array)
+                    for time_value, value_array in pool.evaluate_expressions(self.augmented_path,
+                                                                             input_stream, self.selected_expressions):
+                        if self.canceled:
+                            return
+                        i += 1
+                        output_stream.write_entire_frame(output_header, time_value, value_array)
 
-                    self.tick.emit(100 * i * self.inv_nb_files * inv_nb_frames)
-                    QApplication.processEvents()
+                        self.tick.emit(100 * i * self.inv_nb_files * inv_nb_frames)
+                        QApplication.processEvents()
+        except (Serafin.SerafinRequestError, Serafin.SerafinValidationError) as e:
+            QMessageBox.critical(self, 'Serafin Error', e.message, QMessageBox.Ok)
+            return
 
     def run(self):
         for (input_name, input_header, output_header, pool), \
@@ -760,14 +764,19 @@ class InputTab(QWidget):
         for (job_id, dir_path) in zip(self.job_ids, self.dir_paths):
             filename = os.path.join(dir_path, self.slf_name)
             try:
-                with open(filename, 'rb') as f:
+                with open(filename, 'rb'):
                     pass
             except PermissionError:
                 QMessageBox.critical(self, 'Error', 'Fail to open the file with ID %s: permission denied.' % job_id,
                                      QMessageBox.Ok)
                 return []
             data = SerafinData(job_id, filename, self.language)
-            if not data.read():
+            try:
+                is_2d = data.read()
+            except (Serafin.SerafinRequestError, Serafin.SerafinValidationError) as e:
+                QMessageBox.critical(self, 'Serafin Error', e.message, QMessageBox.Ok)
+                return []
+            if not is_2d:
                 QMessageBox.critical(self, 'Error', 'The file with ID %s is not TELEMAC 2D.' % job_id,
                                      QMessageBox.Ok)
                 return []
@@ -1005,7 +1014,7 @@ class SubmitTab(QWidget):
         if overwrite:
             for out_name in out_names:
                 try:
-                    with open(out_name, 'w') as f:
+                    with open(out_name, 'w'):
                         pass
                 except PermissionError:
                     QMessageBox.critical(None, 'Permission denied',

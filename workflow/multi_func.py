@@ -103,7 +103,7 @@ def read_slf_reference(node_id, filename, language):
 
 def read_polygons(node_id, filename):
     try:
-        with open(filename) as f:
+        with open(filename):
             pass
     except PermissionError:
         message = fail_message('access denied', 'Load 2D Polygons', 'all')
@@ -136,7 +136,7 @@ def read_polygons(node_id, filename):
 
 def read_polylines(node_id, filename):
     try:
-        with open(filename) as f:
+        with open(filename):
             pass
     except PermissionError:
         message = fail_message('access denied', 'Load 2D Open Polylines', 'all')
@@ -169,7 +169,7 @@ def read_polylines(node_id, filename):
 
 def read_points(node_id, filename):
     try:
-        with open(filename) as f:
+        with open(filename):
             pass
     except PermissionError:
         message = fail_message('access denied', 'Load 2D Points', 'all')
@@ -409,7 +409,7 @@ def write_slf(node_id, fid, data, options):
     if not overwrite:
         if os.path.exists(filename):
             try:
-                with open(filename, 'r') as f:
+                with open(filename, 'r'):
                     pass
             except PermissionError:
                 return False, node_id, fid, None, fail_message('access denied when reloading existing file',
@@ -419,7 +419,7 @@ def write_slf(node_id, fid, data, options):
             return True, node_id, fid, new_data, success_message('Write Serafin', data.job_id, 'reload existing file')
 
     try:
-        with open(filename, 'w') as f:
+        with open(filename, 'w'):
             pass
     except PermissionError:
         try:
@@ -758,7 +758,7 @@ def compute_volume(node_id, fid, data, aux_data, options, csv_separator, format_
             return True, node_id, fid, None, success_message('Compute Volume', data.job_id, 'file already exists')
 
     try:
-        with open(filename, 'w') as f:
+        with open(filename, 'w'):
             pass
     except PermissionError:
         try:
@@ -833,7 +833,7 @@ def compute_flux(node_id, fid, data, aux_data, options, csv_separator, format_st
         if os.path.exists(filename):
             return True, node_id, fid, None, success_message('Compute Flux', data.job_id, 'file already exists')
     try:
-        with open(filename, 'w') as f:
+        with open(filename, 'w'):
             pass
     except PermissionError:
         try:
@@ -891,7 +891,7 @@ def interpolate_points(node_id, fid, data, aux_data, options, csv_separator, for
             return True, node_id, fid, None, success_message('Interpolate on Points', data.job_id,
                                                              'file already exists')
     try:
-        with open(filename, 'w') as f:
+        with open(filename, 'w'):
             pass
     except PermissionError:
         try:
@@ -974,7 +974,7 @@ def interpolate_lines(node_id, fid, data, aux_data, options, csv_separator, form
             return True, node_id, fid, None, success_message('Interpolate along Lines', data.job_id,
                                                              'file already exists')
     try:
-        with open(filename, 'w') as f:
+        with open(filename, 'w'):
             pass
     except PermissionError:
         try:
@@ -1049,7 +1049,7 @@ def project_lines(node_id, fid, data, aux_data, options, csv_separator, format_s
         if os.path.exists(filename):
             return True, node_id, fid, None, success_message('Project Lines', data.job_id, 'file already exists')
     try:
-        with open(filename, 'w') as f:
+        with open(filename, 'w'):
             pass
     except PermissionError:
         try:
@@ -1226,7 +1226,7 @@ def write_landxml(node_id, fid, data, options):
         if os.path.exists(filename):
             return True, node_id, fid, None, success_message('Write LandXML', data.job_id, 'file already exists')
     try:
-        with open(filename, 'w') as f:
+        with open(filename, 'w'):
             pass
     except PermissionError:
         try:
@@ -1261,7 +1261,7 @@ def write_shp(node_id, fid, data, options):
         if os.path.exists(filename):
             return True, node_id, fid, None, success_message('Write shp', data.job_id, 'file already exists')
     try:
-        with open(filename, 'w') as f:
+        with open(filename, 'w'):
             pass
     except PermissionError:
         try:
@@ -1297,7 +1297,7 @@ def write_vtk(node_id, fid, data, options):
                 skip.append(False)
         else:
             try:
-                with open(filename, 'w') as f:
+                with open(filename, 'w'):
                     pass
             except PermissionError:
                 try:

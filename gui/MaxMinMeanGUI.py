@@ -394,23 +394,27 @@ class MaxMinMeanTab(QWidget):
         progressBar = OutputProgressDialog()
 
         # do some calculations
-        with Serafin.Read(self.data.filename, self.data.language) as input_stream:
-            input_stream.header = self.data.header
-            input_stream.time = self.data.time
+        try:
+            with Serafin.Read(self.data.filename, self.data.language) as input_stream:
+                input_stream.header = self.data.header
+                input_stream.time = self.data.time
 
-            progressBar.setValue(5)
-            QApplication.processEvents()
+                progressBar.setValue(5)
+                QApplication.processEvents()
 
-            with Serafin.Write(filename, self.data.language) as output_stream:
-                process = MaxMinMeanThread(max_min_type, input_stream, scalars, vectors, time_indices,
-                                           additional_equations)
-                progressBar.connectToThread(process)
-                values = process.run()
+                with Serafin.Write(filename, self.data.language) as output_stream:
+                    process = MaxMinMeanThread(max_min_type, input_stream, scalars, vectors, time_indices,
+                                               additional_equations)
+                    progressBar.connectToThread(process)
+                    values = process.run()
 
-                if not process.canceled:
-                    output_stream.write_header(output_header)
-                    output_stream.write_entire_frame(output_header, self.data.time[0], values)
-                    progressBar.outputFinished()
+                    if not process.canceled:
+                        output_stream.write_header(output_header)
+                        output_stream.write_entire_frame(output_header, self.data.time[0], values)
+                        progressBar.outputFinished()
+        except (Serafin.SerafinRequestError, Serafin.SerafinValidationError) as e:
+            QMessageBox.critical(None, 'Serafin Error', e.message, QMessageBox.Ok, QMessageBox.Ok)
+            return
 
         progressBar.exec_()
         self.parent.outDialog()
@@ -664,23 +668,27 @@ class ArrivalDurationTab(QWidget):
         progressBar = OutputProgressDialog()
 
         # do some calculations
-        with Serafin.Read(self.data.filename, self.data.language) as input_stream:
-            input_stream.header = self.data.header
-            input_stream.time = self.data.time
+        try:
+            with Serafin.Read(self.data.filename, self.data.language) as input_stream:
+                input_stream.header = self.data.header
+                input_stream.time = self.data.time
 
-            progressBar.setValue(5)
-            QApplication.processEvents()
+                progressBar.setValue(5)
+                QApplication.processEvents()
 
-            with Serafin.Write(filename, self.data.language) as output_stream:
-                process = ArrivalDurationThread(input_stream, self.conditions, time_indices)
-                progressBar.connectToThread(process)
-                values = process.run()
+                with Serafin.Write(filename, self.data.language) as output_stream:
+                    process = ArrivalDurationThread(input_stream, self.conditions, time_indices)
+                    progressBar.connectToThread(process)
+                    values = process.run()
 
-                if not process.canceled:
-                    values = self._convertTimeUnit(time_indices, values)
-                    output_stream.write_header(output_header)
-                    output_stream.write_entire_frame(output_header, self.data.time[0], values)
-                    progressBar.outputFinished()
+                    if not process.canceled:
+                        values = self._convertTimeUnit(time_indices, values)
+                        output_stream.write_header(output_header)
+                        output_stream.write_entire_frame(output_header, self.data.time[0], values)
+                        progressBar.outputFinished()
+        except (Serafin.SerafinRequestError, Serafin.SerafinValidationError) as e:
+            QMessageBox.critical(None, 'Serafin Error', e.message, QMessageBox.Ok, QMessageBox.Ok)
+            return
 
         progressBar.exec_()
         self.parent.outDialog()
@@ -872,22 +880,26 @@ class SynchMaxTab(QWidget):
         progressBar = OutputProgressDialog()
 
         # do some calculations
-        with Serafin.Read(self.data.filename, self.data.language) as input_stream:
-            input_stream.header = self.data.header
-            input_stream.time = self.data.time
+        try:
+            with Serafin.Read(self.data.filename, self.data.language) as input_stream:
+                input_stream.header = self.data.header
+                input_stream.time = self.data.time
 
-            progressBar.setValue(5)
-            QApplication.processEvents()
+                progressBar.setValue(5)
+                QApplication.processEvents()
 
-            with Serafin.Write(filename, self.data.language) as output_stream:
-                process = SynchMaxThread(input_stream, selected_vars[1:], time_indices, var)
-                progressBar.connectToThread(process)
-                values = process.run()
+                with Serafin.Write(filename, self.data.language) as output_stream:
+                    process = SynchMaxThread(input_stream, selected_vars[1:], time_indices, var)
+                    progressBar.connectToThread(process)
+                    values = process.run()
 
-                if not process.canceled:
-                    output_stream.write_header(output_header)
-                    output_stream.write_entire_frame(output_header, self.data.time[0], values)
-                    progressBar.outputFinished()
+                    if not process.canceled:
+                        output_stream.write_header(output_header)
+                        output_stream.write_entire_frame(output_header, self.data.time[0], values)
+                        progressBar.outputFinished()
+        except (Serafin.SerafinRequestError, Serafin.SerafinValidationError) as e:
+            QMessageBox.critical(None, 'Serafin Error', e.message, QMessageBox.Ok, QMessageBox.Ok)
+            return
 
         progressBar.exec_()
         self.parent.outDialog()

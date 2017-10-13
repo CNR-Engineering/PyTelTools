@@ -569,7 +569,7 @@ class ComputeVolumeNode(TwoInOneOutNode):
         if not self.overwrite:
             if os.path.exists(filename):
                 try:
-                    with open(filename, 'r') as f:
+                    with open(filename, 'r'):
                         pass
                 except PermissionError:
                     self.fail('Access denied when reloading existing file.')
@@ -583,7 +583,7 @@ class ComputeVolumeNode(TwoInOneOutNode):
                 self.success('Reload existing file.')
                 return
         try:
-            with open(filename, 'w') as f:
+            with open(filename, 'w'):
                 pass
         except PermissionError:
             self.fail('Access denied.')
@@ -875,7 +875,7 @@ class ComputeFluxNode(TwoInOneOutNode):
         if not self.overwrite:
             if os.path.exists(filename):
                 try:
-                    with open(filename, 'r') as f:
+                    with open(filename, 'r'):
                         pass
                 except PermissionError:
                     self.fail('Access denied when reloading existing file.')
@@ -889,14 +889,20 @@ class ComputeFluxNode(TwoInOneOutNode):
                                       'var IDs': list(self.flux_options.split(':')[1].split('(')[1][:-1].split(', '))}
                 self.success('Reload existing file.')
                 return
+
         try:
-            with open(filename, 'w') as f:
+            self._run_flux()
+        except (Serafin.SerafinRequestError, Serafin.SerafinValidationError) as e:
+            self.fail(e.message)
+            return
+
+        try:
+            with open(filename, 'w'):
                 pass
         except PermissionError:
             self.fail('Access denied.')
             return
-        
-        self._run_flux()
+
         self.data.write(filename, self.scene().csv_separator)
         self.success('Output saved to %s' % filename)
 
@@ -1045,7 +1051,7 @@ class InterpolateOnPointsNode(TwoInOneOutNode):
         if not self.overwrite:
             if os.path.exists(filename):
                 try:
-                    with open(filename, 'r') as f:
+                    with open(filename, 'r'):
                         pass
                 except PermissionError:
                     self.fail('Access denied when reloading existing file.')
@@ -1066,7 +1072,7 @@ class InterpolateOnPointsNode(TwoInOneOutNode):
             self.fail('no point inside the mesh.')
             return
         try:
-            with open(filename, 'w') as f:
+            with open(filename, 'w'):
                 pass
         except PermissionError:
             self.fail('Access denied.')
@@ -1181,7 +1187,7 @@ class InterpolateAlongLinesNode(DoubleInputNode):
                 self.success('File already exists.')
                 return
         try:
-            with open(filename, 'w') as f:
+            with open(filename, 'w'):
                 pass
         except PermissionError:
             self.fail('Access denied.')
@@ -1339,7 +1345,7 @@ class ProjectLinesNode(DoubleInputNode):
                 self.success('File already exists.')
                 return
         try:
-            with open(filename, 'w') as f:
+            with open(filename, 'w'):
                 pass
         except PermissionError:
             self.fail('Access denied.')

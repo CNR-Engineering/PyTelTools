@@ -667,31 +667,35 @@ class SubmitTab(QWidget):
         progressBar = OutputProgressDialog()
 
         # do some calculations
-        with Serafin.Read(self.data.filename, self.data.language) as input_stream:
-            # instead of re-reading the header and the time, just do a copy
-            input_stream.header = self.data.header
-            input_stream.time = self.data.time
-            progressBar.setValue(5)
-            QApplication.processEvents()
+        try:
+            with Serafin.Read(self.data.filename, self.data.language) as input_stream:
+                # instead of re-reading the header and the time, just do a copy
+                input_stream.header = self.data.header
+                input_stream.time = self.data.time
+                progressBar.setValue(5)
+                QApplication.processEvents()
 
-            with Serafin.Write(filename, self.data.language) as output_stream:
-                logging.info(output_message)
+                with Serafin.Write(filename, self.data.language) as output_stream:
+                    logging.info(output_message)
 
-                output_stream.write_header(output_header)
+                    output_stream.write_header(output_header)
 
-                # do some additional computations
-                necessary_equations = get_necessary_equations(self.data.header.var_IDs, output_header.var_IDs,
-                                                              is_2d=output_header.is_2d,
-                                                              us_equation=self.data.us_equation)
-                process = ExtractVariablesThread(necessary_equations, self.data.us_equation, input_stream,
-                                                 output_stream, output_header, output_time_indices)
-                progressBar.connectToThread(process)
-                process.run()
+                    # do some additional computations
+                    necessary_equations = get_necessary_equations(self.data.header.var_IDs, output_header.var_IDs,
+                                                                  is_2d=output_header.is_2d,
+                                                                  us_equation=self.data.us_equation)
+                    process = ExtractVariablesThread(necessary_equations, self.data.us_equation, input_stream,
+                                                     output_stream, output_header, output_time_indices)
+                    progressBar.connectToThread(process)
+                    process.run()
 
-                if not process.canceled:
-                    progressBar.outputFinished()
-                progressBar.exec_()
-                self.parent.outDialog()
+                    if not process.canceled:
+                        progressBar.outputFinished()
+                    progressBar.exec_()
+                    self.parent.outDialog()
+        except (Serafin.SerafinRequestError, Serafin.SerafinValidationError) as e:
+            QMessageBox.critical(None, 'Serafin Error', e.message, QMessageBox.Ok, QMessageBox.Ok)
+            return
 
 
 class ExtractVariablesGUI(TelToolWidget):

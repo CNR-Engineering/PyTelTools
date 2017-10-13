@@ -361,24 +361,28 @@ class InputTab(SerafinInputTab):
 
         names = ['Polygon %d' % (i+1) for i in range(len(self.polygons))]
 
-        with Serafin.Read(self.data.filename, self.data.language) as input_stream:
-            input_stream.header = self.data.header
-            input_stream.time = self.data.time
-            if self.supVolumeBox.isChecked():
-                calculator = VolumeCalculatorThread(VolumeCalculator.POSITIVE, self.var_ID, self.second_var_ID,
-                                                    input_stream, names, self.polygons, sampling_frequency,
-                                                    self.mesh, self.parent.csv_separator, self.parent.digits)
-            else:
-                calculator = VolumeCalculatorThread(VolumeCalculator.NET, self.var_ID, self.second_var_ID,
-                                                    input_stream, names, self.polygons, sampling_frequency,
-                                                    self.mesh, self.parent.csv_separator, self.parent.digits)
+        try:
+            with Serafin.Read(self.data.filename, self.data.language) as input_stream:
+                input_stream.header = self.data.header
+                input_stream.time = self.data.time
+                if self.supVolumeBox.isChecked():
+                    calculator = VolumeCalculatorThread(VolumeCalculator.POSITIVE, self.var_ID, self.second_var_ID,
+                                                        input_stream, names, self.polygons, sampling_frequency,
+                                                        self.mesh, self.parent.csv_separator, self.parent.digits)
+                else:
+                    calculator = VolumeCalculatorThread(VolumeCalculator.NET, self.var_ID, self.second_var_ID,
+                                                        input_stream, names, self.polygons, sampling_frequency,
+                                                        self.mesh, self.parent.csv_separator, self.parent.digits)
 
-            progressBar.setValue(5)
-            QApplication.processEvents()
+                progressBar.setValue(5)
+                QApplication.processEvents()
 
-            with open(filename, 'w') as f2:
-                progressBar.connectToThread(calculator)
-                calculator.write_csv(f2)
+                with open(filename, 'w') as f2:
+                    progressBar.connectToThread(calculator)
+                    calculator.write_csv(f2)
+        except (Serafin.SerafinRequestError, Serafin.SerafinValidationError) as e:
+            QMessageBox.critical(None, 'Serafin Error', e.message, QMessageBox.Ok, QMessageBox.Ok)
+            return
 
         if not calculator.canceled:
             progressBar.outputFinished()

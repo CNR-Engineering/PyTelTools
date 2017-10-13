@@ -383,15 +383,19 @@ class ComputeErrorsTab(QWidget):
         test_time = int(self.timeSelection.testIndex.text()) - 1
         selected_variable = self.input.varBox.currentText().split('(')[0][:-1]
 
-        with Serafin.Read(self.input.ref_data.filename, self.input.ref_data.language) as input_stream:
-            input_stream.header = self.input.ref_data.header
-            input_stream.time = self.input.ref_data.time
-            ref_values = input_stream.read_var_in_frame(ref_time, selected_variable)
+        try:
+            with Serafin.Read(self.input.ref_data.filename, self.input.ref_data.language) as input_stream:
+                input_stream.header = self.input.ref_data.header
+                input_stream.time = self.input.ref_data.time
+                ref_values = input_stream.read_var_in_frame(ref_time, selected_variable)
 
-        with Serafin.Read(self.input.test_data.filename, self.input.test_data.language) as input_stream:
-            input_stream.header = self.input.test_data.header
-            input_stream.time = self.input.test_data.time
-            test_values = input_stream.read_var_in_frame(test_time, selected_variable)
+            with Serafin.Read(self.input.test_data.filename, self.input.test_data.language) as input_stream:
+                input_stream.header = self.input.test_data.header
+                input_stream.time = self.input.test_data.time
+                test_values = input_stream.read_var_in_frame(test_time, selected_variable)
+        except (Serafin.SerafinRequestError, Serafin.SerafinValidationError) as e:
+            QMessageBox.critical(None, 'Serafin Error', e.message, QMessageBox.Ok, QMessageBox.Ok)
+            return
 
         values = test_values - ref_values
         msd = self.input.ref_mesh.mean_signed_deviation(values)
@@ -463,19 +467,22 @@ class ErrorEvolutionTab(QWidget):
         ref_time = int(self.timeSelection.refIndex.text()) - 1
         selected_variable = self.input.varBox.currentText().split('(')[0][:-1]
 
-        with Serafin.Read(self.input.ref_data.filename, self.input.ref_data.language) as input_stream:
-            input_stream.header = self.input.ref_data.header
-            input_stream.time = self.input.ref_data.time
-            ref_values = input_stream.read_var_in_frame(ref_time, selected_variable)
-
         mad = []
-        with Serafin.Read(self.input.test_data.filename, self.input.test_data.language) as input_stream:
-            input_stream.header = self.input.test_data.header
-            input_stream.time = self.input.test_data.time
-            for i in range(len(self.input.test_data.time)):
-                values = input_stream.read_var_in_frame(i, selected_variable) - ref_values
-                mad.append(self.input.ref_mesh.mean_absolute_deviation(values))
+        try:
+            with Serafin.Read(self.input.ref_data.filename, self.input.ref_data.language) as input_stream:
+                input_stream.header = self.input.ref_data.header
+                input_stream.time = self.input.ref_data.time
+                ref_values = input_stream.read_var_in_frame(ref_time, selected_variable)
 
+            with Serafin.Read(self.input.test_data.filename, self.input.test_data.language) as input_stream:
+                input_stream.header = self.input.test_data.header
+                input_stream.time = self.input.test_data.time
+                for i in range(len(self.input.test_data.time)):
+                    values = input_stream.read_var_in_frame(i, selected_variable) - ref_values
+                    mad.append(self.input.ref_mesh.mean_absolute_deviation(values))
+        except (Serafin.SerafinRequestError, Serafin.SerafinValidationError) as e:
+            QMessageBox.critical(None, 'Serafin Error', e.message, QMessageBox.Ok, QMessageBox.Ok)
+            return
         self.plotViewer.plot(self.input.test_data.time, mad)
 
 
@@ -665,15 +672,19 @@ class ErrorDistributionTab(QWidget):
         test_time = int(self.timeSelection.testIndex.text()) - 1
         selected_variable = self.input.varBox.currentText().split('(')[0][:-1]
 
-        with Serafin.Read(self.input.ref_data.filename, self.input.ref_data.language) as input_stream:
-            input_stream.header = self.input.ref_data.header
-            input_stream.time = self.input.ref_data.time
-            ref_values = input_stream.read_var_in_frame(ref_time, selected_variable)
+        try:
+            with Serafin.Read(self.input.ref_data.filename, self.input.ref_data.language) as input_stream:
+                input_stream.header = self.input.ref_data.header
+                input_stream.time = self.input.ref_data.time
+                ref_values = input_stream.read_var_in_frame(ref_time, selected_variable)
 
-        with Serafin.Read(self.input.test_data.filename, self.input.test_data.language) as input_stream:
-            input_stream.header = self.input.test_data.header
-            input_stream.time = self.input.test_data.time
-            test_values = input_stream.read_var_in_frame(test_time, selected_variable)
+            with Serafin.Read(self.input.test_data.filename, self.input.test_data.language) as input_stream:
+                input_stream.header = self.input.test_data.header
+                input_stream.time = self.input.test_data.time
+                test_values = input_stream.read_var_in_frame(test_time, selected_variable)
+        except (Serafin.SerafinRequestError, Serafin.SerafinValidationError) as e:
+            QMessageBox.critical(None, 'Serafin Error', e.message, QMessageBox.Ok, QMessageBox.Ok)
+            return
 
         values = test_values - ref_values
         self.ewsd = self.input.ref_mesh.element_wise_signed_deviation(values)
@@ -776,27 +787,32 @@ class BSSTab(QWidget):
             init_time = int(self.initSelection.refIndex.text()) - 1
             selected_variable = self.input.varBox.currentText().split('(')[0][:-1]
 
-            with Serafin.Read(self.input.ref_data.filename, self.input.ref_data.language) as input_stream:
-                input_stream.header = self.input.ref_data.header
-                input_stream.time = self.input.ref_data.time
-                ref_values = input_stream.read_var_in_frame(ref_time, selected_variable)
+            try:
+                with Serafin.Read(self.input.ref_data.filename, self.input.ref_data.language) as input_stream:
+                    input_stream.header = self.input.ref_data.header
+                    input_stream.time = self.input.ref_data.time
+                    ref_values = input_stream.read_var_in_frame(ref_time, selected_variable)
 
-            with Serafin.Read(self.input.test_data.filename, self.input.test_data.language) as input_stream:
-                input_stream.header = self.input.test_data.header
-                input_stream.time = self.input.test_data.time
-                init_values = input_stream.read_var_in_frame(init_time, selected_variable)
-                ref_volume = self.input.ref_mesh.quadratic_volume(ref_values - init_values)
+                with Serafin.Read(self.input.test_data.filename, self.input.test_data.language) as input_stream:
+                    input_stream.header = self.input.test_data.header
+                    input_stream.time = self.input.test_data.time
+                    init_values = input_stream.read_var_in_frame(init_time, selected_variable)
+                    ref_volume = self.input.ref_mesh.quadratic_volume(ref_values - init_values)
 
-                for index in range(len(self.input.test_data.time)):
-                    test_values = input_stream.read_var_in_frame(index, selected_variable)
+                    for index in range(len(self.input.test_data.time)):
+                        test_values = input_stream.read_var_in_frame(index, selected_variable)
 
-                    test_volume = self.input.ref_mesh.quadratic_volume(test_values - ref_values)
-                    if test_volume == 0 and ref_volume == 0:
-                        bss = 1
-                    else:
-                        with np.errstate(divide='ignore'):
-                            bss = 1 - test_volume / ref_volume
-                    all_bss.append(bss)
+                        test_volume = self.input.ref_mesh.quadratic_volume(test_values - ref_values)
+                        if test_volume == 0 and ref_volume == 0:
+                            bss = 1
+                        else:
+                            with np.errstate(divide='ignore'):
+                                bss = 1 - test_volume / ref_volume
+                        all_bss.append(bss)
+            except (Serafin.SerafinRequestError, Serafin.SerafinValidationError) as e:
+                QMessageBox.critical(None, 'Serafin Error', e.message, QMessageBox.Ok, QMessageBox.Ok)
+                return
+
             self.plotViewer.plot(self.input.test_data.time, all_bss)
         self.plotViewer.show()
 
@@ -806,16 +822,20 @@ class BSSTab(QWidget):
         init_time = int(self.initSelection.refIndex.text()) - 1
         selected_variable = self.input.varBox.currentText().split('(')[0][:-1]
 
-        with Serafin.Read(self.input.ref_data.filename, self.input.ref_data.language) as input_stream:
-            input_stream.header = self.input.ref_data.header
-            input_stream.time = self.input.ref_data.time
-            ref_values = input_stream.read_var_in_frame(ref_time, selected_variable)
+        try:
+            with Serafin.Read(self.input.ref_data.filename, self.input.ref_data.language) as input_stream:
+                input_stream.header = self.input.ref_data.header
+                input_stream.time = self.input.ref_data.time
+                ref_values = input_stream.read_var_in_frame(ref_time, selected_variable)
 
-        with Serafin.Read(self.input.test_data.filename, self.input.test_data.language) as input_stream:
-            input_stream.header = self.input.test_data.header
-            input_stream.time = self.input.test_data.time
-            test_values = input_stream.read_var_in_frame(test_time, selected_variable)
-            init_values = input_stream.read_var_in_frame(init_time, selected_variable)
+            with Serafin.Read(self.input.test_data.filename, self.input.test_data.language) as input_stream:
+                input_stream.header = self.input.test_data.header
+                input_stream.time = self.input.test_data.time
+                test_values = input_stream.read_var_in_frame(test_time, selected_variable)
+                init_values = input_stream.read_var_in_frame(init_time, selected_variable)
+        except (Serafin.SerafinRequestError, Serafin.SerafinValidationError) as e:
+            QMessageBox.critical(None, 'Serafin Error', e.message, QMessageBox.Ok, QMessageBox.Ok)
+            return
 
         test_volume = self.input.ref_mesh.quadratic_volume(test_values - ref_values)
         ref_volume = self.input.ref_mesh.quadratic_volume(ref_values - init_values)

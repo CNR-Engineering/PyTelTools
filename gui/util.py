@@ -294,6 +294,9 @@ class SerafinInputTab(QWidget):
         data = SerafinData('', filename, self.current_language())
         try:
             data.read()
+        except (Serafin.SerafinRequestError, Serafin.SerafinValidationError) as e:
+            QMessageBox.critical(None, 'Serafin Error', e.message, QMessageBox.Ok, QMessageBox.Ok)
+            return False, None
         except PermissionError:
             QMessageBox.critical(None, 'Permission denied',
                                  'Permission denied. (Is the file opened by another application?).',
@@ -310,6 +313,9 @@ class SerafinInputTab(QWidget):
 
         try:
             is_2d = data.read()
+        except (Serafin.SerafinRequestError, Serafin.SerafinValidationError) as e:
+            QMessageBox.critical(None, 'Serafin Error', e.message, QMessageBox.Ok, QMessageBox.Ok)
+            return False, None
         except PermissionError:
             QMessageBox.critical(None, 'Permission denied',
                                  'Permission denied. (Is the file opened by another application?).',
@@ -2606,17 +2612,21 @@ class MultiVarLinePlotViewer(QWidget):
 
     def _compute(self, time_index, line_interpolator):
         values = []
-        with Serafin.Read(self.filename, self.header.language) as input_stream:
-            input_stream.header = self.header
-            input_stream.time = self.time
-            for var in self.current_vars:
-                line_var_values = []
-                var_values = input_stream.read_var_in_frame(time_index, var)
+        try:
+            with Serafin.Read(self.filename, self.header.language) as input_stream:
+                input_stream.header = self.header
+                input_stream.time = self.time
+                for var in self.current_vars:
+                    line_var_values = []
+                    var_values = input_stream.read_var_in_frame(time_index, var)
 
-                for x, y, (i, j, k), interpolator in line_interpolator:
-                    line_var_values.append(interpolator.dot(var_values[[i, j, k]]))
-                values.append(line_var_values)
-        return values
+                    for x, y, (i, j, k), interpolator in line_interpolator:
+                        line_var_values.append(interpolator.dot(var_values[[i, j, k]]))
+                    values.append(line_var_values)
+            return values
+        except (Serafin.SerafinRequestError, Serafin.SerafinValidationError) as e:
+            QMessageBox.critical(None, 'Serafin Error', e.message, QMessageBox.Ok, QMessageBox.Ok)
+            return []
 
     def btnComputeEvent(self):
         self.current_vars = self.getSelection()
@@ -2867,17 +2877,21 @@ class MultiFrameLinePlotViewer(QWidget):
 
     def _compute(self, time_indices, line_interpolator, current_var):
         values = []
-        with Serafin.Read(self.filename, self.header.language) as input_stream:
-            input_stream.header = self.header
-            input_stream.time = self.time
-            for index in time_indices:
-                line_var_values = []
-                var_values = input_stream.read_var_in_frame(index, current_var)
+        try:
+            with Serafin.Read(self.filename, self.header.language) as input_stream:
+                input_stream.header = self.header
+                input_stream.time = self.time
+                for index in time_indices:
+                    line_var_values = []
+                    var_values = input_stream.read_var_in_frame(index, current_var)
 
-                for x, y, (i, j, k), interpolator in line_interpolator:
-                    line_var_values.append(interpolator.dot(var_values[[i, j, k]]))
-                values.append(line_var_values)
-        return values
+                    for x, y, (i, j, k), interpolator in line_interpolator:
+                        line_var_values.append(interpolator.dot(var_values[[i, j, k]]))
+                    values.append(line_var_values)
+            return values
+        except (Serafin.SerafinRequestError, Serafin.SerafinValidationError) as e:
+            QMessageBox.critical(self, 'Serafin Error', e.message, QMessageBox.Ok)
+            return []
 
     def editColor(self):
         frame_labels = {i: 'Frame %d' % (i+1) for i in self.frame_colors}
@@ -3208,27 +3222,31 @@ class ProjectLinesPlotViewer(QWidget):
     def _compute(self, time_index, line_interpolators, reference, max_distance):
         distances = {}
         values = {}
-        with Serafin.Read(self.filename, self.language) as input_stream:
-            input_stream.header = self.header
-            input_stream.time = self.time
-            for line_id in self.current_vars:
-                distances[line_id] = []
-                values[line_id] = {}
-
-                for var in self.current_vars[line_id]:
-                    values[line_id][var] = []
-
-                for x, y, (i, j, k), interpolator in line_interpolators[line_id]:
-                    d = reference.project(x, y)
-                    if d <= 0 or d >= max_distance:
-                        continue
-                    distances[line_id].append(d)
+        try:
+            with Serafin.Read(self.filename, self.language) as input_stream:
+                input_stream.header = self.header
+                input_stream.time = self.time
+                for line_id in self.current_vars:
+                    distances[line_id] = []
+                    values[line_id] = {}
 
                     for var in self.current_vars[line_id]:
-                        all_values = input_stream.read_var_in_frame(time_index, var)
-                        values[line_id][var].append(interpolator.dot(all_values[[i, j, k]]))
-                distances[line_id] = np.array(distances[line_id])
-        return distances, values
+                        values[line_id][var] = []
+
+                    for x, y, (i, j, k), interpolator in line_interpolators[line_id]:
+                        d = reference.project(x, y)
+                        if d <= 0 or d >= max_distance:
+                            continue
+                        distances[line_id].append(d)
+
+                        for var in self.current_vars[line_id]:
+                            all_values = input_stream.read_var_in_frame(time_index, var)
+                            values[line_id][var].append(interpolator.dot(all_values[[i, j, k]]))
+                    distances[line_id] = np.array(distances[line_id])
+            return distances, values
+        except (Serafin.SerafinRequestError, Serafin.SerafinValidationError) as e:
+            QMessageBox.critical(self, 'Serafin Error', e.message, QMessageBox.Ok)
+            return {}, {}
 
     def btnComputeEvent(self):
         self.current_vars = self.getSelection()
