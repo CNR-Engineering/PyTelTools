@@ -464,12 +464,9 @@ class ComplexExpressionMultiPool:
     def output_headers(self, selected_names):
         for data in self.input_data:
             output_header = data.header.copy()
-            output_header.nb_var = len(selected_names)
-            output_header.var_IDs, output_header.var_names, output_header.var_units = [], [], []
+            output_header.empty_variables()
             for name in selected_names:
-                output_header.var_IDs.append('DUMMY')
-                output_header.var_names.append(bytes(name, 'utf-8').ljust(16))
-                output_header.var_units.append(bytes('', 'utf-8').ljust(16))
+                output_header.add_variables('DUMMY', bytes(name, 'utf-8').ljust(16), bytes('', 'utf-8').ljust(16))
             yield output_header
 
     def build_augmented_path(self, selected_expressions):

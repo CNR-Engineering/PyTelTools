@@ -627,12 +627,7 @@ class SubmitTab(QWidget):
 
     def getOutputHeader(self, selected_vars):
         output_header = self.data.header.copy()
-        output_header.nb_var = len(selected_vars)
-        output_header.var_IDs, output_header.var_names, output_header.var_units = [], [], []
-        for var_ID, var_name, var_unit in selected_vars:
-            output_header.var_IDs.append(var_ID)
-            output_header.var_names.append(var_name)
-            output_header.var_units.append(var_unit)
+        output_header.set_variables(selected_vars)
         if self.singlePrecisionBox.isChecked():
             output_header.to_single_precision()
         return output_header

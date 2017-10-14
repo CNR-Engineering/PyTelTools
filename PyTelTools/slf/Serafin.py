@@ -32,6 +32,9 @@ class SerafinValidationError(Exception):
     @brief Custom exception for Serafin file content check
     """
     def __init__(self, message):
+        """!
+        @param message <str>: error message description
+        """
         super().__init__(message)
         self.message = message
         module_logger.error('SERAFIN VALIDATION ERROR: %s' % message)
@@ -42,6 +45,9 @@ class SerafinRequestError(Exception):
     @brief Custom exception for requesting invalid values from Serafin object
     """
     def __init__(self, message):
+        """!
+        @param message <str>: error message description
+        """
         super().__init__(message)
         self.message = message
         module_logger.error('SERAFIN REQUEST ERROR: %s' % message)
@@ -275,6 +281,32 @@ class SerafinHeader:
         self._set_frame_size()
         self._set_header_size()
         self.file_size = self._expected_file_size()
+
+    def empty_variables(self):
+        """Empty all variables"""
+        self.nb_var = 0
+        self.var_IDs, self.var_names, self.var_units = [], [], []
+
+    def add_variable(self, var_ID, var_name, var_unit):
+        """!
+        @brief: Add a single variable
+        @param var_ID <str>: variables identifier (abbreviation)
+        @param var_name <bytes>: variable name
+        @param var_unit <bytes>: variable unit
+        """
+        self.nb_var += 1
+        self.var_IDs.append(var_ID)
+        self.var_names.append(var_name)
+        self.var_units.append(var_unit)
+
+    def set_variables(self, selected_vars):
+        """!
+        @brief: Set new variables
+        @param selected_vars <[str, bytes, bytes]>: list composed of variable ID, name and unit
+        """
+        self.empty_variables()
+        for var_ID, var_name, var_unit in selected_vars:
+            self.add_variable(var_ID, var_name, var_unit)
 
     def transform_mesh_copy(self, transformations):
         """!

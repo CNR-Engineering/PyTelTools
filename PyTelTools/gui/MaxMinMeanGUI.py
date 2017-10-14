@@ -326,12 +326,7 @@ class MaxMinMeanTab(QWidget):
 
     def getOutputHeader(self, scalars, vectors):
         output_header = self.data.header.copy()
-        output_header.nb_var = len(scalars) + len(vectors)
-        output_header.var_IDs, output_header.var_names, output_header.var_units = [], [], []
-        for var_ID, var_name, var_unit in scalars + vectors:
-            output_header.var_IDs.append(var_ID)
-            output_header.var_names.append(var_name)
-            output_header.var_units.append(var_unit)
+        output_header.set_variables(scalars + vectors)
         if self.singlePrecisionBox.isChecked():
             output_header.to_single_precision()
         return output_header
@@ -606,15 +601,13 @@ class ArrivalDurationTab(QWidget):
 
     def getOutputHeader(self):
         output_header = self.data.header.copy()
-        output_header.nb_var = 2 * len(self.conditions)
-        output_header.var_IDs, output_header.var_names, output_header.var_units = [], [], []
+        output_header.empty_variables()
         for row in range(self.conditionTable.rowCount()):
             a_name = self.conditionTable.item(row, 1).text()
             d_name = self.conditionTable.item(row, 2).text()
             for name in [a_name, d_name]:
-                output_header.var_IDs.append('')
-                output_header.var_names.append(bytes(name, 'utf-8').ljust(16))
-                output_header.var_units.append(bytes(self.unitBox.currentText().upper(), 'utf-8').ljust(16))
+                output_header.add_variable('', bytes(name, 'utf-8').ljust(16),
+                                           bytes(self.unitBox.currentText().upper(), 'utf-8').ljust(16))
         if self.singlePrecisionBox.isChecked():
             output_header.to_single_precision()
         return output_header
@@ -819,12 +812,7 @@ class SynchMaxTab(QWidget):
 
     def getOutputHeader(self, selected_vars):
         output_header = self.data.header.copy()
-        output_header.nb_var = len(selected_vars)
-        output_header.var_IDs, output_header.var_names, output_header.var_units = [], [], []
-        for var_ID, var_name, var_unit in selected_vars:
-            output_header.var_IDs.append(var_ID)
-            output_header.var_names.append(var_name)
-            output_header.var_units.append(var_unit)
+        output_header.set_variables(selected_vars)
         if self.singlePrecisionBox.isChecked():
             output_header.to_single_precision()
         return output_header

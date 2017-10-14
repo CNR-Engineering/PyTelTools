@@ -158,12 +158,7 @@ class WriteSerafinNode(OneInOneOutNode):
                                                                             selected,
                                                                             input_data.us_equation)
         output_header = input_data.header.copy()
-        output_header.nb_var = len(scalars) + len(vectors)
-        output_header.var_IDs, output_header.var_names, output_header.var_units = [], [], []
-        for var_ID, var_name, var_unit in scalars + vectors:
-            output_header.var_IDs.append(var_ID)
-            output_header.var_names.append(var_name)
-            output_header.var_units.append(var_unit)
+        output_header.set_variables(scalars + vectors)
         if input_data.to_single:
             output_header.to_single_precision()
 
@@ -212,13 +207,10 @@ class WriteSerafinNode(OneInOneOutNode):
         """
         selected_vars = [var for var in input_data.selected_vars if var in input_data.header.var_IDs]
         output_header = input_data.header.copy()
-        output_header.nb_var = len(selected_vars)
-        output_header.var_IDs, output_header.var_names, output_header.var_units = [], [], []
+        output_header.empty_variables()
         for var_ID in selected_vars:
             var_name, var_unit = input_data.selected_vars_names[var_ID]
-            output_header.var_IDs.append(var_ID)
-            output_header.var_names.append(var_name)
-            output_header.var_units.append(var_unit)
+            output_header.add_variable(var_ID, var_name, var_units)
         if input_data.to_single:
             output_header.to_single_precision()
 
@@ -252,15 +244,13 @@ class WriteSerafinNode(OneInOneOutNode):
                                        input_data.metadata['table'], input_data.metadata['time unit']
 
         output_header = input_data.header.copy()
-        output_header.nb_var = 2 * len(conditions)
-        output_header.var_IDs, output_header.var_names, output_header.var_units = [], [], []
+        output_header.empty_variables()
         for row in range(len(table)):
             a_name = table[row][1]
             d_name = table[row][2]
             for name in [a_name, d_name]:
-                output_header.var_IDs.append('')
-                output_header.var_names.append(bytes(name, 'utf-8').ljust(16))
-                output_header.var_units.append(bytes(time_unit.upper(), 'utf-8').ljust(16))
+                output_header.add_variable('', bytes(name, 'utf-8').ljust(16),
+                                           bytes(time_unit.upper(), 'utf-8').ljust(16))
         if input_data.to_single:
             output_header.to_single_precision()
 
@@ -339,13 +329,10 @@ class WriteSerafinNode(OneInOneOutNode):
 
         # construct output header
         output_header = first_input.header.copy()
-        output_header.nb_var = len(common_vars)
-        output_header.var_IDs, output_header.var_names, output_header.var_units = [], [], []
+        output_header.empty_variables()
         for var in common_vars:
             name, unit = first_input.selected_vars_names[var]
-            output_header.var_IDs.append(var)
-            output_header.var_names.append(name)
-            output_header.var_units.append(unit)
+            output_header.add_variable(var, name, unit)
         if first_input.to_single:
             output_header.to_single_precision()
 
