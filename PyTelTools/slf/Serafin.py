@@ -54,6 +54,8 @@ class SerafinHeader:
 
     def __init__(self, file, file_size, language):
         self.file_size = file_size
+        if language not in ('fr', 'en'):
+            raise SerafinRequestError('Language (for Serafin variables) %s is not implemented' % language)
         self.language = language
 
         # Header and frame sizes are set afterwards by specific methods
@@ -176,7 +178,7 @@ class SerafinHeader:
             raise SerafinValidationError('Something wrong with the file size (header and frames) check')
 
         # Deduce variable IDs from names
-        var_table = VARIABLES_2D[self.language] if self.is_2d else VARIABLES_3D[language]
+        var_table = VARIABLES_2D[self.language] if self.is_2d else VARIABLES_3D[self.language]
         for var_name, var_unit in zip(self.var_names, self.var_units):
             name = var_name.decode(encoding='utf-8').strip()
             if name not in var_table:
@@ -274,7 +276,12 @@ class SerafinHeader:
         self._set_header_size()
         self.file_size = self._expected_file_size()
 
-    def apply_transform(self, transformations):
+    def transform_mesh_copy(self, transformations):
+        """!
+        @brief Apply transformations on 2D nodes of a mesh copy
+        @param transformations <[geom.transformation.Transformation]>: list of successive transformations
+        @return: modified copy of original header with transformed mesh nodes
+        """
         if not transformations:
             return self.copy()
         points = [np.array([x, y, 0]) for x, y in zip(self.x, self.y)]
@@ -284,6 +291,19 @@ class SerafinHeader:
         new_header.x = np.array([p[0] for p in points])
         new_header.y = np.array([p[1] for p in points])
         return new_header
+
+    def transform_mesh(self, transformations):
+        """!
+        @brief Apply transformations on mesh nodes (only in 2D)
+        @param transformations <[geom.transformation.Transformation]>: list of successive transformations
+        """
+        if not transformations:
+            return
+        points = [np.array([x, y, 0]) for x, y in zip(self.x, self.y)]
+        for t in transformations:
+            points = [t(p) for p in points]
+        self.x = np.array([p[0] for p in points])
+        self.y = np.array([p[1] for p in points])
 
 
 class Serafin:

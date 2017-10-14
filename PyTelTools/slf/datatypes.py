@@ -100,12 +100,12 @@ class SerafinData:
             output_header.to_single_precision()
         return output_header
 
-    def transform(self, trans):
-        transformed_points = [(x, y, 0) for x, y in zip(self.header.x, self.header.y)]
-        for t in trans:
-            transformed_points = [t(p) for p in transformed_points]
-        self.header.x = np.array([p[0] for p in transformed_points])
-        self.header.y = np.array([p[1] for p in transformed_points])
+    def transform_mesh(self, transformations):
+        """!
+        @brief Apply transformations on mesh nodes (only in 2D)
+        @param transformations <[geom.transformation.Transformation]>: list of successive transformations
+        """
+        self.header.transform_mesh(transformations)
         self.index = None
         self.triangles = {}
 

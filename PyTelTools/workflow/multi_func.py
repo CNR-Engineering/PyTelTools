@@ -1196,7 +1196,7 @@ def add_transform(node_id, fid, data, options):
                                                        data.job_id)
     trans = options[0]
     new_data = data.copy()
-    new_data.transform(trans)
+    new_data.transform_mesh(trans)
     new_data.metadata['transformation'] = trans
     return True, node_id, fid, new_data, success_message('Add Transformation', data.job_id)
 

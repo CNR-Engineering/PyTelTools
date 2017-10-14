@@ -1418,7 +1418,7 @@ class AddTransformationNode(OneInOneOutNode):
         if not filename:
             return
         try:
-            with open(filename) as f:
+            with open(filename):
                 pass
         except FileNotFoundError:
             self.state = Node.NOT_CONFIGURED
@@ -1450,7 +1450,7 @@ class AddTransformationNode(OneInOneOutNode):
 
         trans = self.transformation.get_transformation(self.from_index, self.to_index)
         self.data = input_data.copy()
-        self.data.transform(trans)
+        self.data.transform_mesh(trans)
         self.data.metadata['transformation'] = trans
         self.success()
 
