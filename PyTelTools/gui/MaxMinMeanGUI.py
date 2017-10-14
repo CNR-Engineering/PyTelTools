@@ -193,8 +193,8 @@ class InputTab(SerafinInputTab):
         success, data = self.read_2d(filename)
         if not success:
             return
-        if data.header.nb_frames == 1:
-            QMessageBox.critical(self, 'Error', 'The input file must have more than one frame!',
+        if data.header.nb_frames <= 1:
+            QMessageBox.critical(self, 'Error', 'The input file must have (strictly) more than one frame!',
                                  QMessageBox.Ok)
             return False, None
         self.parent.getInput(data)

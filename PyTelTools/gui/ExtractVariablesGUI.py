@@ -400,6 +400,11 @@ class InputTab(SerafinInputTab):
             # unlock add Ws button
             if 'US' in self.data.header.var_IDs:
                 self.btnAddWs.setEnabled(True)
+
+        if len(self.time) == 0:
+            QMessageBox.critical(None, 'Serafin Input Error', 'Input file does not have any temporal frame!',
+                                 QMessageBox.Ok, QMessageBox.Ok)
+            return
         self.parent.getInput(self.data)
 
 
@@ -536,7 +541,8 @@ class TimeTab(QWidget):
 
         if self.manualSelection.hasData:
             reply = QMessageBox.warning(self, 'Confirm turn off selection',
-                                        'Do you want to turn off the manuel selection mode?\n(Your manual selection will be cleared)',
+                                        'Do you want to turn off the manuel selection mode?\n'
+                                        '(Your manual selection will be cleared)',
                                         QMessageBox.Ok | QMessageBox.Cancel,
                                         QMessageBox.Ok)
             if reply == QMessageBox.Cancel:
