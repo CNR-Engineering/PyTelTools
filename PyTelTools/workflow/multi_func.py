@@ -71,7 +71,10 @@ def fail_message(reason, node_name, job_id, second_job_id=''):
 
 def read_slf_2d(node_id, fid, filename, language, job_id):
     data = SerafinData(job_id, filename, language)
-    is_2d = data.read()
+    try:
+        is_2d = data.read()
+    except (Serafin.SerafinRequestError, Serafin.SerafinValidationError) as e:
+        return False, node_id, fid, data, fail_message(e.message, 'Load Serafin 2D', job_id)
     if not is_2d:
         success, message = False, fail_message('file is not 2D', 'Load Serafin 2D', job_id)
     else:
@@ -81,7 +84,10 @@ def read_slf_2d(node_id, fid, filename, language, job_id):
 
 def read_slf_3d(node_id, fid, filename, language, job_id):
     data = SerafinData(job_id, filename, language)
-    is_2d = data.read()
+    try:
+        is_2d = data.read()
+    except (Serafin.SerafinRequestError, Serafin.SerafinValidationError) as e:
+        return False, node_id, fid, data, fail_message(e.message, 'Load Serafin 3D', job_id)
     if is_2d:
         success, message = False, fail_message('file is not 3D', 'Load Serafin 3D', job_id)
     else:
@@ -91,7 +97,10 @@ def read_slf_3d(node_id, fid, filename, language, job_id):
 
 def read_slf_reference(node_id, filename, language):
     data = SerafinData('Ref', filename, language)
-    is_2d = data.read()
+    try:
+        is_2d = data.read()
+    except (Serafin.SerafinRequestError, Serafin.SerafinValidationError) as e:
+        return False, node_id, data, fail_message(e.message, 'Load Reference Serafin', 'all')
     if not is_2d:
         success, message = False, fail_message('file is not 2D', 'Load Reference Serafin', 'all')
     elif len(data.time) != 1:
@@ -415,8 +424,12 @@ def write_slf(node_id, fid, data, options):
                 return False, node_id, fid, None, fail_message('access denied when reloading existing file',
                                                                'Write Serafin', data.job_id)
             new_data = SerafinData(data.job_id, filename, data.language)
-            new_data.read()
-            return True, node_id, fid, new_data, success_message('Write Serafin', data.job_id, 'reload existing file')
+            try:
+                new_data.read()
+                return True, node_id, fid, new_data,\
+                       success_message('Write Serafin', data.job_id, 'reload existing file')
+            except (Serafin.SerafinRequestError, Serafin.SerafinValidationError) as e:
+                return False, node_id, fid, new_data, fail_message(e.message, 'Write Serafin', data.job_id)
 
     try:
         with open(filename, 'w'):
@@ -428,33 +441,34 @@ def write_slf(node_id, fid, data, options):
             pass
         return False, node_id, fid, None, fail_message('access denied', 'Write Serafin', data.job_id)
 
-    if data.operator is None:
-        success, message = write_simple_slf(data, filename)
-    elif data.operator in (operations.MAX, operations.MIN, operations.MEAN):
-        success, message = write_max_min_mean(data, filename)
-    elif data.operator == operations.ARRIVAL_DURATION:
-        success, message = write_arrival_duration(data, filename)
-    elif data.operator == operations.SYNCH_MAX:
-        success, message = write_synch_max(data, filename)
-    elif data.operator == operations.LAYER_SELECTION:
-        success, message = write_slf_layer_selection(data, filename)
-    elif data.operator == operations.PROJECT:
-        success, message = write_project_mesh(data, filename)
-    else:
-        raise NotImplementedError('Operator "%s" is not implemented in MULTI' % data.operator)
+    try:
+        if data.operator is None:
+            success, message = write_simple_slf(data, filename)
+        elif data.operator in (operations.MAX, operations.MIN, operations.MEAN):
+            success, message = write_max_min_mean(data, filename)
+        elif data.operator == operations.ARRIVAL_DURATION:
+            success, message = write_arrival_duration(data, filename)
+        elif data.operator == operations.SYNCH_MAX:
+            success, message = write_synch_max(data, filename)
+        elif data.operator == operations.LAYER_SELECTION:
+            success, message = write_slf_layer_selection(data, filename)
+        elif data.operator == operations.PROJECT:
+            success, message = write_project_mesh(data, filename)
+        else:
+            raise NotImplementedError('Operator "%s" is not implemented in MULTI' % data.operator)
 
-    new_data = None
-    if success:
-        new_data = SerafinData(data.job_id, filename, data.language)
-        new_data.read()
-    else:
-        try:
-            os.remove(filename)
-        except PermissionError:
-            pass
-
-    return success, node_id, fid, new_data, message
-
+        new_data = None
+        if success:
+            new_data = SerafinData(data.job_id, filename, data.language)
+            new_data.read()
+        else:
+            try:
+                os.remove(filename)
+            except PermissionError:
+                pass
+        return success, node_id, fid, new_data, message
+    except (Serafin.SerafinRequestError, Serafin.SerafinValidationError) as e:
+        return False, node_id, fid, None, fail_message(e.message, 'Write Serafin', data.job_id)
 
 def write_simple_slf(input_data, filename):
     output_header = input_data.default_output_header()

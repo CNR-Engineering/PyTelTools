@@ -494,13 +494,7 @@ class MultiLoadDialog(QDialog):
 
         self.table.setRowCount(self.nb_files)
 
-        # remove common prefix in
-        dir_names_epure = dir_names
-        if len(dir_names_epure) > 1:
-            common_prefix = os.path.commonprefix(dir_names)
-            dir_names_epure = [name[len(common_prefix):] for name in dir_names]
-
-        for i, name in enumerate(dir_names_epure):
+        for i, name in enumerate(dir_names):
             filtered_name = ''.join(c for c in name if c.isalnum() or c == '_')
             if not filtered_name:   # please do not name a directory with only special letters :D
                 filtered_name = 'default__'

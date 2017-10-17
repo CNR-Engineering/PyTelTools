@@ -903,7 +903,7 @@ class SelectSingleLayerNode(OneInOneOutNode):
                                      QMessageBox.Ok)
                 return
         self.in_data = parent_node.data
-        if 'layer_selection' not in self.in_data.metadata:
+        if 'layer_selection' in self.in_data.metadata:
             QMessageBox.critical(None, 'Error', 'Cannot re-select layer, already 2D.', QMessageBox.Ok)
             return
         if self.state != Node.SUCCESS:
