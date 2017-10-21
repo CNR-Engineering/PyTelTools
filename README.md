@@ -1,30 +1,68 @@
 # PyTelTools
-Python Telemac Tools
+<img style="float: right" src="https://github.com/CNR-Engineering/PyTelTools_media/blob/master/icons/PyTelTools_with_text.png" width="256px" />
 
+## Documentations
 * [User documentation](https://github.com/CNR-Engineering/PyTelTools/wiki)
 * [Developer documentation](https://cnr-engineering.github.io/PyTelTools) ([repository with static files](https://github.com/CNR-Engineering/CNR-Engineering.github.io))
 
 ## Installation and requirements
 PyTelTools relies on Python3 and requires packages which are listed in [requirements.txt](https://github.com/CNR-Engineering/PyTelTools/blob/master/requirements.txt).
 
-### Installation via pip
-Packages installation can be done with **pip**:
+I can be installed as an external program (A) or as a Python module (B).
+
+### A) Download source files
+
+#### A.1) Get source code
+Clone source code in a folder `PyTelTools`.
 ```bash
-# user install
-$ pip install -e git://github.com/CNR-Engineering/PyTelTools.git#egg=PyTelTools --user
-# default install (needs to be root)
-# pip install -e git://github.com/CNR-Engineering/PyTelTools.git#egg=PyTelTools
+$ git clone https://github.com/CNR-Engineering/PyTelTools.git
 ```
 
-### Installation in a virtual environnement
-The use of isolated Python environments is possible through **virtualenv**:
+If you do not have a `git` client, simply unzip the [source code repository](https://github.com/CNR-Engineering/PyTelTools/archive/master.zip). For the next steps, the source code is expected to be in a folder named `PyTelTools`.
+
+#### A.2) Install dependencies
+Move to PyTelTools folder (containing this README.md file):
+```bash
+$ cd PyTelTools
+```
+
+If you want to use a [virtual environnement](https://virtualenv.pypa.io/en/stable/) do the following
 ```bash
 $ virtualenv venv --python=python3
 $ source venv/bin/activate
-(venv) $ pip install -e git://github.com/CNR-Engineering/PyTelTools.git#egg=PyTelTools
+```
+This step to create and use virtualenv is optional and can also be done trough `make venv`.
+
+Packages installation can be done directly with **pip**:
+```bash
+$ pip install -r requirements.txt
 ```
 
-## Usage
+### B) Installation within Python
+If you want to use a [virtual environnement](https://virtualenv.pypa.io/en/stable/) do the following
+```bash
+$ virtualenv venv --python=python3
+$ source venv/bin/activate
+```
+This step to create and use virtualenv is optional and can also be done trough `make venv`.
+
+Packages installation can be done directly with **pip**:
+```bash
+# user install (eventually in a virtualenv)
+pip install -e git://github.com/CNR-Engineering/PyTelTools.git#egg=PyTelTools --user
+# default install (needs to be root)
+pip install -e git://github.com/CNR-Engineering/PyTelTools.git#egg=PyTelTools
+```
+
+#### Check installation
+Try to import PyTelTools module :
+```python
+import PyTelTools
+```
+
+Then you can use all the methods and classes (such as `PyTelTools.slf.Serafin`).
+
+## Usage as an external program
 
 ### Open interface
 ```bash
