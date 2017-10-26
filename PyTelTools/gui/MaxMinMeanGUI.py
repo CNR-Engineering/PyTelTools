@@ -606,8 +606,7 @@ class ArrivalDurationTab(QWidget):
             a_name = self.conditionTable.item(row, 1).text()
             d_name = self.conditionTable.item(row, 2).text()
             for name in [a_name, d_name]:
-                output_header.add_variable('', bytes(name, 'utf-8').ljust(16),
-                                           bytes(self.unitBox.currentText().upper(), 'utf-8').ljust(16))
+                output_header.add_variable_str('', name, self.unitBox.currentText().upper())
         if self.singlePrecisionBox.isChecked():
             output_header.to_single_precision()
         return output_header
@@ -821,7 +820,7 @@ class SynchMaxTab(QWidget):
         self.data = data
         self._initVarTables()
         for var, var_name in zip(self.data.header.var_IDs, self.data.header.var_names):
-            item = '%s (%s)' % (var, var_name.decode('utf-8').strip())
+            item = '%s (%s)' % (var, var_name.decode(Serafin.SLF_EIT).strip())
             self.varBox.addItem(item)
 
         self.btnSubmit.setEnabled(True)

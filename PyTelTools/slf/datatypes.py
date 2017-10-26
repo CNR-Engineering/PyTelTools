@@ -74,28 +74,20 @@ class SerafinData:
 
     def default_output_header(self):
         output_header = self.header.copy()
-        output_header.nb_var = len(self.selected_vars)
-        output_header.var_IDs, output_header.var_names, \
-                               output_header.var_units = [], [], []
+        output_header.empty_variables()
         for var_ID in self.selected_vars:
             var_name, var_unit = self.selected_vars_names[var_ID]
-            output_header.var_IDs.append(var_ID)
-            output_header.var_names.append(var_name)
-            output_header.var_units.append(var_unit)
+            output_header.add_variable(varID, var_name, var_unit)
         if self.to_single:
             output_header.to_single_precision()
         return output_header
 
     def build_2d_output_header(self):
         output_header = self.header.copy_as_2d()
-        output_header.nb_var = len(self.selected_vars)
-        output_header.var_IDs, output_header.var_names, \
-        output_header.var_units = [], [], []
+        output_header.empty_variables()
         for var_ID in self.selected_vars:
             var_name, var_unit = self.selected_vars_names[var_ID]
-            output_header.var_IDs.append(var_ID)
-            output_header.var_names.append(var_name)
-            output_header.var_units.append(var_unit)
+            output_header.add_variable(var_ID, var_name, var_unit)
         if self.to_single:
             output_header.to_single_precision()
         return output_header

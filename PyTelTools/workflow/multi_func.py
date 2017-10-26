@@ -240,7 +240,7 @@ def add_rouse(node_id, fid, data, options):
     rouse_table = options[0]
     new_rouse = [rouse_table[i][0] for i in range(len(rouse_table))]
     new_names = [rouse_table[i][1] for i in range(len(rouse_table))]
-    old_names = [data.selected_vars_names[var][0].decode('utf-8').strip()
+    old_names = [data.selected_vars_names[var][0].decode(Serafin.SLF_EIT).strip()
                  for var in data.selected_vars]
     for rouse in new_rouse:
         if rouse in data.selected_vars:
@@ -252,8 +252,8 @@ def add_rouse(node_id, fid, data, options):
     new_data = data.copy()
     new_data.selected_vars.extend([rouse_table[i][0] for i in range(len(rouse_table))])
     for i in range(len(rouse_table)):
-        new_data.selected_vars_names[rouse_table[i][0]] = (bytes(rouse_table[i][1], 'utf-8').ljust(16),
-                                                           bytes(rouse_table[i][2], 'utf-8').ljust(16))
+        new_data.selected_vars_names[rouse_table[i][0]] = (bytes(rouse_table[i][1], Serafin.SLF_EIT).ljust(16),
+                                                           bytes(rouse_table[i][2], Serafin.SLF_EIT).ljust(16))
     new_data.equations = get_necessary_equations(data.header.var_IDs, new_data.selected_vars,
                                                  is_2d=True, us_equation=data.us_equation)
     return True, node_id, fid, new_data, success_message('Add Rouse', data.job_id)
@@ -568,7 +568,7 @@ def write_arrival_duration(input_data, filename):
         a_name = table[row][1]
         d_name = table[row][2]
         for name in [a_name, d_name]:
-            output_header.add_variable('', bytes(name, 'utf-8').ljust(16), bytes(time_unit.upper(), 'utf-8').ljust(16))
+            output_header.add_variable_str('', name, time_unit.upper())
     if input_data.to_single:
         output_header.to_single_precision()
 

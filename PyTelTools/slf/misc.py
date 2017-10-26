@@ -231,7 +231,7 @@ def detect_vector_vtk(is_2d, variables, variable_names, language):
     for var in variables:
         if var not in var_vectors:
             scalars.append(var)
-            names[var] = variable_name_to_vtk(variable_names[var][0].decode('utf-8').strip())
+            names[var] = variable_name_to_vtk(variable_names[var][0].decode(Serafin.SLF_EIT).strip())
     return scalars, vectors, names
 
 
@@ -294,7 +294,7 @@ def slf_to_xml(slf_name, slf_header, xml_name, scalar, time_index):
     # write LandXML
     with open(xml_name, 'w') as xml:
         xml.write('<?xml version="1.0" ?>\n')
-        xml.write('<!-- Title: %s -->\n' % slf_header.title.decode('utf-8').strip())
+        xml.write('<!-- Title: %s -->\n' % slf_header.title.decode(Serafin.SLF_EIT).strip())
         xml.write('<!-- This file contains x and y reversed in purpose (because arcpy is buggy) -->\n')
         xml.write('<LandXML version="1.2" xmlns="http://www.landxml.org/schema/LandXML-1.2" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.landxml.org/schema/LandXML-1.2 http://www.landxml.org/schema/LandXML-1.2/LandXML-1.2.xsd">\n')
         xml.write('  <Surfaces>\n')

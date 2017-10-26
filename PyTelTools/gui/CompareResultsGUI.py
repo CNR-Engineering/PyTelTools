@@ -315,7 +315,7 @@ class InputTab(SerafinInputTab):
         self.parent.add_test()
 
         for var_ID, var_name in common_vars:
-            self.varBox.addItem(var_ID + ' (%s)' % var_name.decode('utf-8').strip())
+            self.varBox.addItem(var_ID + ' (%s)' % var_name.decode(Serafin.SLF_EIT).strip())
 
     def btnOpenPolygonEvent(self):
         success, filename, polygons = open_polygons()

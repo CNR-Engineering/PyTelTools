@@ -1039,8 +1039,8 @@ class VerticalCrossSectionPlotViewer(PlotViewer):
         combo = QComboBox()
         combo.setFixedHeight(30)
         variables = [var for var in self.data.header.var_IDs if var != 'Z']
-        names = [name.decode('utf-8').strip() for var, name in zip(self.data.header.var_IDs,
-                                                                   self.data.header.var_names) if var in variables]
+        names = [name.decode(Serafin.SLF_EIT).strip()
+                 for var, name in zip(self.data.header.var_IDs, self.data.header.var_names) if var in variables]
         for var, name in zip(variables, names):
             combo.addItem(var + ' (%s)' % name)
         combo.setCurrentIndex(variables.index(self.current_var))
@@ -1235,8 +1235,8 @@ class VerticalProfilePlotViewer(TemporalPlotViewer):
         combo = QComboBox()
         combo.setFixedHeight(30)
         variables = [var for var in self.data.header.var_IDs if var != 'Z']
-        names = [name.decode('utf-8').strip() for var, name in zip(self.data.header.var_IDs,
-                                                                   self.data.header.var_names) if var in variables]
+        names = [name.decode(Serafin.SLF_EIT).strip()
+                 for var, name in zip(self.data.header.var_IDs, self.data.header.var_names) if var in variables]
         for var, name in zip(variables, names):
             combo.addItem(var + ' (%s)' % name)
         combo.setCurrentIndex(variables.index(self.current_var))
@@ -2273,7 +2273,7 @@ class ScalarMapViewer(QWidget):
         combo = QComboBox()
         combo.setFixedHeight(30)
         for var, name in zip(self.data.header.var_IDs, self.data.header.var_names):
-            combo.addItem(var + ' (%s)' % name.decode('utf-8').strip())
+            combo.addItem(var + ' (%s)' % name.decode(Serafin.SLF_EIT).strip())
         combo.setCurrentIndex(self.data.header.var_IDs.index(self.current_var))
         buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel,
                                    Qt.Horizontal, msg)

@@ -32,7 +32,7 @@ from slf.volume import TruncatedTriangularPrisms, VolumeCalculator
 
 def test_open(filename):
     try:
-        with open(filename, 'rb') as f:
+        with open(filename, 'rb'):
             pass
     except PermissionError:
         QMessageBox.critical(None, 'Permission denied',
@@ -54,7 +54,7 @@ def handle_overwrite(filename):
         if msg == QMessageBox.Cancel:
             return None
         try:
-            with open(filename, 'w') as f:
+            with open(filename, 'w'):
                 pass
         except PermissionError:
             QMessageBox.critical(None, 'Permission denied',
@@ -1040,8 +1040,8 @@ class VariableTable(TableWidgetDragRows):
         for i, (var_id, name, unit) in enumerate(zip(header.var_IDs, header.var_names, header.var_units)):
             self.insertRow(self.rowCount())
             id_item = QTableWidgetItem(var_id.strip())
-            name_item = QTableWidgetItem(name.decode('utf-8').strip())
-            unit_item = QTableWidgetItem(unit.decode('utf-8').strip())
+            name_item = QTableWidgetItem(name.decode(Serafin.SLF_EIT).strip())
+            unit_item = QTableWidgetItem(unit.decode(Serafin.SLF_EIT).strip())
             self.setItem(i, 0, id_item)
             self.setItem(i, 1, name_item)
             self.setItem(i, 2, unit_item)
@@ -1056,8 +1056,8 @@ class VariableTable(TableWidgetDragRows):
         selected = []
         for i in range(self.rowCount()):
             selected.append((self.item(i, 0).text(),
-                            bytes(self.item(i, 1).text(), 'utf-8').ljust(16),
-                            bytes(self.item(i, 2).text(), 'utf-8').ljust(16)))
+                            bytes(self.item(i, 1).text(), Serafin.SLF_EIT).ljust(16),
+                            bytes(self.item(i, 2).text(), Serafin.SLF_EIT).ljust(16)))
         return selected
 
 
@@ -1338,7 +1338,7 @@ class ConditionDialog(QDialog):
         self.varBox.setFixedSize(150, 30)
 
         for var_ID, var_name in zip(var_IDs, var_names):
-            var_name = var_name.decode('utf-8').strip()
+            var_name = var_name.decode(Serafin.SLF_EIT).strip()
             self.varBox.addItem('%s (%s)' % (var_ID, var_name))
 
         self.comparatorBox = QComboBox()
@@ -2717,8 +2717,8 @@ class MultiVarLinePlotViewer(QWidget):
         self.var_table = {}
         for var_ID, var_name, var_unit in zip(self.header.var_IDs, self.header.var_names,
                                               self.header.var_units):
-            var_unit = var_unit.decode('utf-8').strip()
-            var_name = var_name.decode('utf-8').strip()
+            var_unit = var_unit.decode(Serafin.SLF_EIT).strip()
+            var_name = var_name.decode(Serafin.SLF_EIT).strip()
             if var_unit in self.var_table:
                 self.var_table[var_unit].append('%s (%s)' % (var_ID, var_name))
             else:
@@ -2915,8 +2915,8 @@ class MultiFrameLinePlotViewer(QWidget):
         self.plotViewer.current_title = 'Values of %s along line %s' % (current_var,
                                                                         self.control.lineBox.currentText().split()[1])
         var_index = self.header.var_IDs.index(current_var)
-        self.plotViewer.current_ylabel = '%s (%s)' % (self.header.var_names[var_index].decode('utf-8').strip(),
-                                                      self.header.var_units[var_index].decode('utf-8').strip())
+        self.plotViewer.current_ylabel = '%s (%s)' % (self.header.var_names[var_index].decode(Serafin.SLF_EIT).strip(),
+                                                      self.header.var_units[var_index].decode(Serafin.SLF_EIT).strip())
 
         line_id = int(self.control.lineBox.currentText().split()[1]) - 1
         if self.control.intersection.isChecked():
@@ -3004,7 +3004,7 @@ class MultiFrameLinePlotViewer(QWidget):
             if self.line_interpolators[i][0]:
                 self.control.lineBox.addItem('Line %s' % id_line)
         for var_ID, var_name in zip(self.header.var_IDs, self.header.var_names):
-            var_name = var_name.decode('utf-8').strip()
+            var_name = var_name.decode(Serafin.SLF_EIT).strip()
             self.control.varBox.addItem('%s (%s)' % (var_ID, var_name))
 
 
@@ -3352,7 +3352,7 @@ class ProjectLinesPlotViewer(QWidget):
         self.var_table = {}
         for var_ID, var_name, var_unit in zip(self.header.var_IDs, self.header.var_names,
                                               self.header.var_units):
-            var_unit = var_unit.decode('utf-8').strip()
+            var_unit = var_unit.decode(Serafin.SLF_EIT).strip()
             if var_unit in self.var_table:
                 self.var_table[var_unit].append(var_ID)
             else:

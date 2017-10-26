@@ -180,7 +180,7 @@ class InputTab(SerafinInputTab):
             if 'H' in header.var_IDs:
                 self.fluxBox.addItem('Liquid flux (m3/s): (U, V, H)')
                 for name in header.var_names:
-                    str_name = name.decode('utf-8').strip()
+                    str_name = name.decode(Serafin.SLF_EIT).strip()
                     if 'TRACEUR' in str_name or 'TRACER' in str_name:
                         self.fluxBox.addItem('Solid flux (kg/s): (U, V, H, %s)' % str_name)
         if 'I' in header.var_IDs and 'J' in header.var_IDs:
@@ -204,7 +204,7 @@ class InputTab(SerafinInputTab):
             self.fluxBox.addItem('Solid flux SUSPENSION (m3/s): (QSSUSP)')
 
         for name in header.var_names:
-            str_name = name.decode('utf-8').strip()
+            str_name = name.decode(Serafin.SLF_EIT).strip()
             if 'QS CLASS' in str_name:
                 self.fluxBox.addItem('Solid flux TOTAL (m3/s): (%s)' % str_name)
             if 'QS BEDLOAD CL' in str_name:

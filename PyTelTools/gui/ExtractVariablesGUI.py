@@ -281,8 +281,8 @@ class InputTab(SerafinInputTab):
             if not self.data.header.is_2d and var_ID == 'Z':
                 self.secondTable.insertRow(self.secondTable.rowCount())
                 id_item = QTableWidgetItem(var_ID.strip())
-                name_item = QTableWidgetItem(var_name.decode('utf-8').strip())
-                unit_item = QTableWidgetItem(var_unit.decode('utf-8').strip())
+                name_item = QTableWidgetItem(var_name.decode(Serafin.SLF_EIT).strip())
+                unit_item = QTableWidgetItem(var_unit.decode(Serafin.SLF_EIT).strip())
                 for j, item in enumerate([id_item, name_item, unit_item]):
                     item.setFlags(Qt.NoItemFlags)
                     self.secondTable.setItem(0, j, item)
@@ -290,8 +290,8 @@ class InputTab(SerafinInputTab):
             row = self.firstTable.rowCount()
             self.firstTable.insertRow(row)
             id_item = QTableWidgetItem(var_ID.strip())
-            name_item = QTableWidgetItem(var_name.decode('utf-8').strip())
-            unit_item = QTableWidgetItem(var_unit.decode('utf-8').strip())
+            name_item = QTableWidgetItem(var_name.decode(Serafin.SLF_EIT).strip())
+            unit_item = QTableWidgetItem(var_unit.decode(Serafin.SLF_EIT).strip())
             for j, item in enumerate([id_item, name_item, unit_item]):
                 self.firstTable.setItem(row, j, item)
 

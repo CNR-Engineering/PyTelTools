@@ -249,8 +249,7 @@ class WriteSerafinNode(OneInOneOutNode):
             a_name = table[row][1]
             d_name = table[row][2]
             for name in [a_name, d_name]:
-                output_header.add_variable('', bytes(name, 'utf-8').ljust(16),
-                                           bytes(time_unit.upper(), 'utf-8').ljust(16))
+                output_header.add_variable_str('', name, time_unit.upper())
         if input_data.to_single:
             output_header.to_single_precision()
 

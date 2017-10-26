@@ -8,6 +8,7 @@ from gui.util import DoubleSliderBox, FrictionLawMessage, SettlingVelocityMessag
     TimeRangeSlider, VariableTable
 import slf.misc as operations
 from geom.transformation import load_transformation_map
+from slf.Serafin import SLF_EIT
 from slf.variables import get_available_variables, get_necessary_equations, \
                           get_US_equation, new_variables_from_US
 from workflow.Node import Node, OneInOneOutNode, TwoInOneOutNode
@@ -44,8 +45,8 @@ class SelectVariablesNode(OneInOneOutNode):
                 row = self.second_table.rowCount()
                 self.second_table.insertRow(row)
                 id_item = QTableWidgetItem(var_id.strip())
-                name_item = QTableWidgetItem(var_name.decode('utf-8').strip())
-                unit_item = QTableWidgetItem(var_unit.decode('utf-8').strip())
+                name_item = QTableWidgetItem(var_name.decode(SLF_EIT).strip())
+                unit_item = QTableWidgetItem(var_unit.decode(SLF_EIT).strip())
                 for j, item in enumerate([id_item, name_item, unit_item]):
                     if not self.in_data.header.is_2d and var_id == 'Z':
                         item.setFlags(Qt.NoItemFlags)
@@ -54,8 +55,8 @@ class SelectVariablesNode(OneInOneOutNode):
                 row = self.first_table.rowCount()
                 self.first_table.insertRow(row)
                 id_item = QTableWidgetItem(var_id.strip())
-                name_item = QTableWidgetItem(var_name.decode('utf-8').strip())
-                unit_item = QTableWidgetItem(var_unit.decode('utf-8').strip())
+                name_item = QTableWidgetItem(var_name.decode(SLF_EIT).strip())
+                unit_item = QTableWidgetItem(var_unit.decode(SLF_EIT).strip())
                 for j, item in enumerate([id_item, name_item, unit_item]):
                     self.first_table.setItem(row, j, item)
 
@@ -154,8 +155,8 @@ class SelectVariablesNode(OneInOneOutNode):
         for i in range(self.second_table.rowCount()):
             var_id, var_name, var_unit = [self.second_table.item(i, j).text() for j in range(3)]
             selected_vars.append(var_id)
-            selected_vars_names[var_id] = (bytes(var_name, 'utf-8').ljust(16),
-                                           bytes(var_unit, 'utf-8').ljust(16))
+            selected_vars_names[var_id] = (bytes(var_name, SLF_EIT).ljust(16),
+                                           bytes(var_unit, SLF_EIT).ljust(16))
         self.new_options = (selected_vars, selected_vars_names)
 
     def _add_us(self):
@@ -280,8 +281,8 @@ class SelectVariablesNode(OneInOneOutNode):
         names, units = [], []
         for var in self.selected_vars:
             name, unit = self.selected_vars_names[var]
-            names.append(name.decode('utf-8').strip())
-            units.append(unit.decode('utf-8').strip())
+            names.append(name.decode(SLF_EIT).strip())
+            units.append(unit.decode(SLF_EIT).strip())
         return '|'.join([self.category, self.name(), str(self.index()),
                          str(self.pos().x()), str(self.pos().y()), str(self.friction_law),
                          vars, ','.join(names), ','.join(units)])
@@ -294,7 +295,7 @@ class SelectVariablesNode(OneInOneOutNode):
         if vars:
             for var, name, unit in zip(vars.split(','), names.split(','), units.split(',')):
                 self.selected_vars.append(var)
-                self.selected_vars_names[var] = (bytes(name, 'utf-8').ljust(16), bytes(unit, 'utf-8').ljust(16))
+                self.selected_vars_names[var] = (bytes(name, SLF_EIT).ljust(16), bytes(unit, SLF_EIT).ljust(16))
 
     def run(self):
         success = super().run_upward()
@@ -333,7 +334,7 @@ class AddRouseNode(OneInOneOutNode):
         self.table = msg.get_table()
         new_rouse = [self.table[i][0] for i in range(len(self.table))]
         new_names = [self.table[i][1] for i in range(len(self.table))]
-        old_names = [self.in_data.selected_vars_names[var][0].decode('utf-8').strip()
+        old_names = [self.in_data.selected_vars_names[var][0].decode(SLF_EIT).strip()
                      for var in self.in_data.selected_vars]
         for rouse in new_rouse:
             if rouse in self.in_data.selected_vars:
@@ -361,7 +362,7 @@ class AddRouseNode(OneInOneOutNode):
         elif self.settling_velocities:
             old_rouse = [self.table[i][0] for i in range(len(self.table))]
             old_names = [self.table[i][1] for i in range(len(self.table))]
-            new_names = [self.in_data.selected_vars_names[var][0].decode('utf-8').strip()
+            new_names = [self.in_data.selected_vars_names[var][0].decode(SLF_EIT).strip()
                          for var in self.in_data.selected_vars]
             for rouse in old_rouse:
                 if rouse in self.in_data.selected_vars:  # duplicated value
@@ -484,8 +485,8 @@ class AddRouseNode(OneInOneOutNode):
         self.data = input_data.copy()
         self.data.selected_vars.extend([self.table[i][0] for i in range(len(self.table))])
         for i in range(len(self.table)):
-            self.data.selected_vars_names[self.table[i][0]] = (bytes(self.table[i][1], 'utf-8').ljust(16),
-                                                               bytes(self.table[i][2], 'utf-8').ljust(16))
+            self.data.selected_vars_names[self.table[i][0]] = (bytes(self.table[i][1], SLF_EIT).ljust(16),
+                                                               bytes(self.table[i][2], SLF_EIT).ljust(16))
         self.data.equations = get_necessary_equations(self.in_data.header.var_IDs, self.data.selected_vars,
                                                       is_2d=True, us_equation=self.data.us_equation)
         self.success()

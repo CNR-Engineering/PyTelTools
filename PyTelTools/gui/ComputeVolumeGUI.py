@@ -314,8 +314,8 @@ class InputTab(SerafinInputTab):
         self.secondVarBox.addItem('Initial values of the first variable')
 
         for var_ID, var_name in zip(self.data.header.var_IDs, self.data.header.var_names):
-            self.firstVarBox.addItem(var_ID + ' (%s)' % var_name.decode('utf-8').strip())
-            self.secondVarBox.addItem(var_ID + ' (%s)' % var_name.decode('utf-8').strip())
+            self.firstVarBox.addItem(var_ID + ' (%s)' % var_name.decode(Serafin.SLF_EIT).strip())
+            self.secondVarBox.addItem(var_ID + ' (%s)' % var_name.decode(Serafin.SLF_EIT).strip())
 
         self._resetDefaultOptions()
 

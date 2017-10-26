@@ -5,6 +5,7 @@ from slf.misc import to_infix, infix_to_postfix, is_valid_postfix, is_valid_expr
 from slf.expression.expression import ConditionalExpression, MaskedExpression, MaxMinExpression, PolygonalMask, \
     SimpleExpression
 from slf.expression.condition import SimpleCondition, AndOrCondition
+from slf.Serafin import SLF_EIT
 
 
 class ComplexExpressionPool:
@@ -363,7 +364,7 @@ class ComplexExpressionMultiPool:
         for data in input_data[1:]:
             common_vars.intersection_update(data.header.var_IDs)
         variables = [var for var in input_data[0].header.var_IDs if var in common_vars]
-        names = [name.decode('utf-8').strip() for (var, name)
+        names = [name.decode(SLF_EIT).strip() for (var, name)
                  in zip(input_data[0].header.var_IDs, input_data[0].header.var_names) if var in common_vars]
 
         for data in input_data:
@@ -466,7 +467,7 @@ class ComplexExpressionMultiPool:
             output_header = data.header.copy()
             output_header.empty_variables()
             for name in selected_names:
-                output_header.add_variables('DUMMY', bytes(name, 'utf-8').ljust(16), bytes('', 'utf-8').ljust(16))
+                output_header.add_variables_str('DUMMY', name, '')
             yield output_header
 
     def build_augmented_path(self, selected_expressions):

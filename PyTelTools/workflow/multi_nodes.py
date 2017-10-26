@@ -3,6 +3,7 @@ from PyQt5.QtWidgets import *
 from workflow.MultiNode import MultiNode, MultiOneInOneOutNode, MultiSingleInputNode, \
                                MultiSingleOutputNode, MultiDoubleInputNode, MultiTwoInOneOutNode
 from workflow.util import MultiLoadSerafinDialog, validate_output_options, validate_input_options
+from slf.Serafin import SLF_EIT
 from slf.variables import get_US_equation
 import slf.misc as operations
 from geom.transformation import load_transformation_map
@@ -402,7 +403,7 @@ class MultiSelectVariablesNode(MultiOneInOneOutNode):
         selected_vars_names = {}
         for var, name, unit in zip(vars.split(','), names.split(','), units.split(',')):
             selected_vars.append(var)
-            selected_vars_names[var] = (bytes(name, 'utf-8').ljust(16), bytes(unit, 'utf-8').ljust(16))
+            selected_vars_names[var] = (bytes(name, SLF_EIT).ljust(16), bytes(unit, SLF_EIT).ljust(16))
         self.options = (us_equation, selected_vars, selected_vars_names)
 
 

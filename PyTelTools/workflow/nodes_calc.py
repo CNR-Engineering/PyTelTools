@@ -341,8 +341,8 @@ class ComputeVolumeNode(TwoInOneOutNode):
         for var_ID, var_name in zip(self.in_data.header.var_IDs, self.in_data.header.var_names):
             if var_ID not in available_vars:
                 continue
-            self.first_var_box.addItem(var_ID + ' (%s)' % var_name.decode('utf-8').strip())
-            self.second_var_box.addItem(var_ID + ' (%s)' % var_name.decode('utf-8').strip())
+            self.first_var_box.addItem(var_ID + ' (%s)' % var_name.decode(Serafin.SLF_EIT).strip())
+            self.second_var_box.addItem(var_ID + ' (%s)' % var_name.decode(Serafin.SLF_EIT).strip())
         if self.first_var is not None:
             self.first_var_box.setCurrentIndex(available_vars.index(self.first_var))
         if self.second_var is not None:
@@ -641,7 +641,7 @@ class ComputeFluxNode(TwoInOneOutNode):
             if 'H' in available_vars:
                 self.flux_type_box.addItem('Liquid flux (m3/s): (U, V, H)')
                 for name in available_var_names:
-                    str_name = name.decode('utf-8').strip()
+                    str_name = name.decode(Serafin.SLF_EIT).strip()
                     if 'TRACEUR' in str_name or 'TRACER' in str_name:
                         self.flux_type_box.addItem('Solid flux (kg/s): (U, V, H, %s)' % str_name)
         if 'I' in available_vars and 'J' in available_vars:
@@ -665,7 +665,7 @@ class ComputeFluxNode(TwoInOneOutNode):
             self.flux_type_box.addItem('Solid flux SUSPENSION (m3/s): (QSSUSP)')
 
         for name in available_var_names:
-            str_name = name.decode('utf-8').strip()
+            str_name = name.decode(Serafin.SLF_EIT).strip()
             if 'QS CLASS' in str_name:
                 self.flux_type_box.addItem('Solid flux TOTAL (m3/s): (%s)' % str_name)
             if 'QS BEDLOAD CL' in str_name:

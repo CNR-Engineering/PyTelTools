@@ -15,21 +15,21 @@ from slf import Serafin
 
 class TestHeader:
     def __init__(self):
-        self.title = bytes('DUMMY SERAFIN', 'utf-8').ljust(72)
-        self.file_type = bytes('SERAFIND', 'utf-8').ljust(8)
+        self.title = bytes('DUMMY SERAFIN', Serafin.SLF_EIT).ljust(72)
+        self.file_type = bytes('SERAFIND', Serafin.SLF_EIT).ljust(8)
         self.float_type = 'd'
         self.float_size = 8
 
         self.nb_var = 4
         self.nb_var_quadratic = 0
-        self.var_names = [bytes('VITESSE U', 'utf-8').ljust(16),
-                          bytes('VITESSE V', 'utf-8').ljust(16),
-                          bytes("HAUTEUR D'EAU", 'utf-8').ljust(16),
-                          bytes('VITESSE SCALAIRE', 'utf-8').ljust(16)]
-        self.var_units = [bytes('DUMMY UNIT', 'utf-8').ljust(16),
-                          bytes('DUMMY UNIT', 'utf-8').ljust(16),
-                          bytes('DUMMY UNIT', 'utf-8').ljust(16),
-                          bytes('DUMMY UNIT', 'utf-8').ljust(16)]
+        self.var_names = [bytes('VITESSE U', Serafin.SLF_EIT).ljust(16),
+                          bytes('VITESSE V', Serafin.SLF_EIT).ljust(16),
+                          bytes("HAUTEUR D'EAU", Serafin.SLF_EIT).ljust(16),
+                          bytes('VITESSE SCALAIRE', Serafin.SLF_EIT).ljust(16)]
+        self.var_units = [bytes('DUMMY UNIT', Serafin.SLF_EIT).ljust(16),
+                          bytes('DUMMY UNIT', Serafin.SLF_EIT).ljust(16),
+                          bytes('DUMMY UNIT', Serafin.SLF_EIT).ljust(16),
+                          bytes('DUMMY UNIT', Serafin.SLF_EIT).ljust(16)]
         self.params = [0] * 10
 
         self.nb_elements = 3
