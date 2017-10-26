@@ -23,6 +23,9 @@ from slf.interpolation import MeshInterpolator
 from slf import Serafin
 
 
+EPS_VALUE = 0.001  # value to add to or substrate from min or max values for color maps
+
+
 logger = logging.getLogger(__name__)
 handler = logging.StreamHandler()
 handler.setFormatter(logging.Formatter('%(asctime)s %(levelname)s %(message)s'))
@@ -1083,6 +1086,9 @@ class VerticalCrossSectionPlotViewer(PlotViewer):
         except ValueError:
             QMessageBox.critical(self, 'Error', 'Invalid input.', QMessageBox.Ok)
             return
+        if cmax <= cmin:
+            QMessageBox.critical(self, 'Error', 'Values are not increasing.', QMessageBox.Ok)
+            return
 
         self.color_limits = (cmin, cmax)
         self.replot(False)
@@ -1129,7 +1135,11 @@ class VerticalCrossSectionPlotViewer(PlotViewer):
             self.canvas.axes.tricontourf(self.triang, self.values, cmap=self.current_style, levels=levels,
                                          extend='both', vmin=self.color_limits[0], vmax=self.color_limits[1])
         else:
-            levels = np.linspace(np.nanmin(self.values), np.nanmax(self.values), NB_COLOR_LEVELS)
+            min_value, max_value = np.nanmin(self.values), np.nanmax(self.values)
+            if min_value == max_value:
+                min_value -= EPS_VALUE
+                max_value += EPS_VALUE
+            levels = np.linspace(min_value, max_value, NB_COLOR_LEVELS)
             self.canvas.axes.tricontourf(self.triang, self.values, cmap=self.current_style, levels=levels,
                                          extend='both')
 
@@ -1280,6 +1290,9 @@ class VerticalProfilePlotViewer(TemporalPlotViewer):
         except ValueError:
             QMessageBox.critical(self, 'Error', 'Invalid input.', QMessageBox.Ok)
             return
+        if cmax <= cmin:
+            QMessageBox.critical(self, 'Error', 'Values are not increasing.', QMessageBox.Ok)
+            return
 
         self.color_limits = (cmin, cmax)
         self.replot(False)
@@ -1319,7 +1332,11 @@ class VerticalProfilePlotViewer(TemporalPlotViewer):
             self.canvas.axes.tricontourf(triang, self.z, cmap=self.current_style, levels=levels, extend='both',
                                          vmin=self.color_limits[0], vmax=self.color_limits[1])
         else:
-            levels = np.linspace(np.nanmin(self.z), np.nanmax(self.z), NB_COLOR_LEVELS)
+            min_value, max_value = np.nanmin(self.z), np.nanmax(self.z)
+            if min_value == max_value:
+                min_value -= EPS_VALUE
+                max_value += EPS_VALUE
+            levels = np.linspace(min_value, max_value, NB_COLOR_LEVELS)
             self.canvas.axes.tricontourf(triang, self.z, cmap=self.current_style, levels=levels, extend='both')
 
         divider = make_axes_locatable(self.canvas.axes)
@@ -2202,7 +2219,11 @@ class ScalarMapCanvas(MapCanvas):
             self.axes.tricontourf(triang, values, cmap=color_style, levels=levels, extend='both',
                                   vmin=limits[0], vmax=limits[1])
         else:
-            levels = np.linspace(np.nanmin(values), np.nanmax(values), NB_COLOR_LEVELS)
+            min_value, max_value = np.nanmin(values), np.nanmax(values)
+            if min_value == max_value:
+                min_value -= EPS_VALUE
+                max_value += EPS_VALUE
+            levels = np.linspace(min_value, max_value, NB_COLOR_LEVELS)
             self.axes.tricontourf(triang, values, cmap=color_style, levels=levels, extend='both')
 
         # add colorbar
@@ -2313,6 +2334,9 @@ class ScalarMapViewer(QWidget):
             cmin, cmax = map(float, value.split(','))
         except ValueError:
             QMessageBox.critical(self, 'Error', 'Invalid input.', QMessageBox.Ok)
+            return
+        if cmax <= cmin:
+            QMessageBox.critical(self, 'Error', 'Values are not increasing.', QMessageBox.Ok)
             return
 
         self.color_limits = (cmin, cmax)
