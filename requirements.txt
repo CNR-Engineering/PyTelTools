@@ -1,10 +1,10 @@
-Rtree
-shapely
-tqdm
-numpy
-scipy
-matplotlib
 descartes
+matplotlib
+numpy
 PyQt5
 pyshp
 pytest
+Rtree
+scipy
+shapely
+tqdm

@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/env python
 """
 Performs multiple operations on a Serafin file:
 - compute and/or remove variables
@@ -9,10 +9,10 @@ Performs multiple operations on a Serafin file:
 import sys
 from tqdm import tqdm
 
-from utils.util import logger, MyArgParse
-from PyTelTools.geom.transformation import Translation
-from PyTelTools.slf import Serafin
-from PyTelTools.slf.variables import do_calculations_in_frame, get_necessary_equations
+from pyteltools.geom.transformation import Translation
+from pyteltools.slf import Serafin
+from pyteltools.slf.variables import do_calculations_in_frame, get_necessary_equations
+from pyteltools.utils.cli import logger, MyArgParse
 
 
 def slf_base(args):

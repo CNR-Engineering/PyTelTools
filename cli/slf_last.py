@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/env python
 """
 Extract last temporal frame of a 2D/3D Serafin file
 """
@@ -6,9 +6,9 @@ Extract last temporal frame of a 2D/3D Serafin file
 import numpy as np
 import sys
 
-from utils.util import logger, MyArgParse
-from PyTelTools.geom.transformation import Translation
-from PyTelTools.slf import Serafin
+from pyteltools.geom.transformation import Translation
+from pyteltools.slf import Serafin
+from pyteltools.utils.cli import logger, MyArgParse
 
 
 def slf_last(args):

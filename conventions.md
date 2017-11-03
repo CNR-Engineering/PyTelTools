@@ -6,7 +6,7 @@ Conventions
 * linux line breaking
 * indent: 4 spaces
 * comment language: English
-* shebang: `#!/usr/bin/python3`
+* shebang: `#!/usr/bin/env python`
 
 ## Module imports
 Avoid any import with * except for PyQt5:
@@ -17,9 +17,10 @@ from PyQt5.QtWidgets import *
 ```
 
 ### Group and order imports
-Two groups for line imports are separated by an empty line:
+Three groups for line imports are separated by an empty line:
 1. internal Python imports
 2. imports from PyTelTools
+3. relative imports (within a PyTelTools module)
 
 Imports are sorted by alphabetic order.
 
@@ -28,16 +29,17 @@ Example:
 import sys
 from time import time
 
-from conf.settings import CSV_SEPARATOR, DIGITS, LANG, SCENE_SIZE
-from workflow.Node import Box, Link, Port
-from workflow.util import logger
+from pyteltools.conf.settings import CSV_SEPARATOR, DIGITS, LANG, SCENE_SIZE
+
+from .Node import Box, Link, Port
+from .util import logger
 ```
 
 ### Common abbreviations
 Some common import renamings:
 ```python
 import numpy as np
-import slf.misc as operations
+import pyteltools.slf.misc as operations
 ```
 
 ## Naming conventions

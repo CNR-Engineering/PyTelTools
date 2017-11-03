@@ -1,7 +1,12 @@
 #!/usr/bin/env python
 
 from glob import glob
-from setuptools import setup
+from setuptools import find_packages, setup
+
+from pyteltools import VERSION
+
+
+EXCLUDE_FROM_PACKAGES = ['cli', 'tests']
 
 
 with open('requirements.txt') as f:
@@ -14,12 +19,13 @@ for file in glob('cli/*.py'):
 
 setup(
     name='PyTelTools',
-    version='0.21',
+    version=VERSION,
     author='Luc Duron',
     author_email='l.duron@cnr.tm.fr',
-    py_modules=['PyTelTools'],
+    packages=find_packages(exclude=EXCLUDE_FROM_PACKAGES),
+    include_package_data=True,  # see data files in `MANIFEST.in`
+    scripts=cli_files,
     install_requires=requirements,
     description='Python library for Telemac post-processing tasks',
     url='https://github.com/CNR-Engineering/PyTelTools',
-    scripts=cli_files,
 )
