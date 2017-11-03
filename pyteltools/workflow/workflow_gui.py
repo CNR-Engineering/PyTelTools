@@ -33,6 +33,7 @@ class ProjectWindow(QWidget):
         if not self.multi.scene.load(filename):
             return False
         self.filename = filename
+        self.setWindowTitle('PyTelTools :: Workflow :: %s' % filename)
         return True
 
     def save(self):
@@ -88,7 +89,7 @@ class ProjectWindow(QWidget):
         self.welcome.show()
 
 
-class ProjectWelcome(QWidget):
+class WorkflowWelcomeWindow(QWidget):
     def __init__(self):
         super().__init__()
         self.window = ProjectWindow(self)
@@ -105,7 +106,7 @@ class ProjectWelcome(QWidget):
         vlayout.addWidget(left_button)
         vlayout.addWidget(right_button)
         self.setLayout(vlayout)
-        self.setWindowTitle('PyTelTools')
+        self.setWindowTitle('PyTelTools :: Workflow interface')
 
         self.new = False
         self.filename = ''
@@ -170,7 +171,7 @@ if __name__ == '__main__':
         logger.setLevel(logging.DEBUG)
 
     app = QApplication(sys.argv)
-    widget = ProjectWelcome()
+    widget = WorkflowWelcomeWindow()
 
     loaded = False
     if args.workspace is not None:

@@ -24,7 +24,7 @@ class CustomFormatter(argparse.ArgumentDefaultsHelpFormatter, argparse.RawDescri
     pass
 
 
-class MyArgParse(argparse.ArgumentParser):
+class PyTelToolsArgParse(argparse.ArgumentParser):
     """
     Derived ArgumentParser with improved help message rendering
     """
@@ -60,7 +60,7 @@ class MyArgParse(argparse.ArgumentParser):
         """Add title group decoration"""
         return super().add_argument_group(self._title_group(name), *args, **kwargs)
 
-    def add_group_general(self, add_args):
+    def add_group_general(self, add_args=[]):
         """Add group for optional general arguments (commonly used in PyTelTools)"""
         self.group_general = self.add_argument_group('General optional arguments')
         if 'force' in add_args:

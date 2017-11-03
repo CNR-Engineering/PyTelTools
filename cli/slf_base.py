@@ -12,7 +12,7 @@ from tqdm import tqdm
 from pyteltools.geom.transformation import Translation
 from pyteltools.slf import Serafin
 from pyteltools.slf.variables import do_calculations_in_frame, get_necessary_equations
-from pyteltools.utils.cli import logger, MyArgParse
+from pyteltools.utils.cli import logger, PyTelToolsArgParse
 
 
 def slf_base(args):
@@ -67,7 +67,7 @@ def slf_base(args):
                 resout.write_entire_frame(output_header, time, values)
 
 
-parser = MyArgParse(description=__doc__, add_args=['in_slf', 'out_slf', 'shift'])
+parser = PyTelToolsArgParse(description=__doc__, add_args=['in_slf', 'out_slf', 'shift'])
 
 group_var = parser.add_argument_group('Serafin variables (optional)',
     'See variables abbrevations on https://github.com/CNR-Engineering/PyTelTools/wiki/Notations-of-variables')

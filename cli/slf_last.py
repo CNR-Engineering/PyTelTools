@@ -8,7 +8,7 @@ import sys
 
 from pyteltools.geom.transformation import Translation
 from pyteltools.slf import Serafin
-from pyteltools.utils.cli import logger, MyArgParse
+from pyteltools.utils.cli import logger, PyTelToolsArgParse
 
 
 def slf_last(args):
@@ -46,7 +46,7 @@ def slf_last(args):
             resout.write_entire_frame(output_header, time, values)
 
 
-parser = MyArgParse(description=__doc__, add_args=['in_slf', 'out_slf', 'shift'])
+parser = PyTelToolsArgParse(description=__doc__, add_args=['in_slf', 'out_slf', 'shift'])
 parser.add_argument('--time', help='time in seconds to write last frame (set to frame time by default)', type=float)
 parser.add_group_general(['force', 'verbose'])
 

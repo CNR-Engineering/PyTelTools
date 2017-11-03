@@ -1,8 +1,8 @@
 from PyQt5.QtWidgets import *
 import sys
 
-from pyteltools.gui.MainWindow import MyMainWindow as GUIWindow
-from pyteltools.workflow.interface import ProjectWelcome
+from pyteltools.gui.classic_gui import ClassicMainWindow as GUIWindow
+from pyteltools.workflow.workflow_gui import WorkflowWelcomeWindow
 
 
 class HelloWorld(QDialog):
@@ -32,7 +32,7 @@ class HelloWorld(QDialog):
         self.accept()
 
 
-if __name__ == '__main__':
+def run_gui_app():
     app = QApplication(sys.argv)
     dlg = HelloWorld()
     value = dlg.exec_()
@@ -41,9 +41,12 @@ if __name__ == '__main__':
             widget = GUIWindow()
             widget.showMaximized()
         else:
-            widget = ProjectWelcome()
+            widget = WorkflowWelcomeWindow()
             widget.show()
     else:
         sys.exit(0)
     app.exec_()
 
+
+if __name__ == '__main__':
+    run_gui_app()

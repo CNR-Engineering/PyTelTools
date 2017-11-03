@@ -20,7 +20,7 @@
 DOC_PATH=../CNR-Engineering.github.io/PyTelTools
 
 doc: doxygen.config
-	#doxygen $<
+	doxygen $<
 	python pyteltools/utils/write_cli_usage.py cli doc/cli_usage.md
 
 update_doc: doc

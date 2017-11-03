@@ -2,7 +2,7 @@ import sys
 from PyQt5.QtCore import *
 from PyQt5.QtWidgets import *
 
-from pyteltools.conf.settings import LANG, CSV_SEPARATOR, DIGITS, LOGGING_LEVEL
+from pyteltools.conf.settings import CSV_SEPARATOR, DIGITS, LANG, LOGGING_LEVEL
 
 from .CalculatorGUI import CalculatorGUI
 from .CompareResultsGUI import CompareResultsGUI
@@ -116,7 +116,7 @@ class MainPanel(QWidget):
             widget.switch_language(language)
 
 
-class MyMainWindow(QWidget):
+class ClassicMainWindow(QWidget):
     def __init__(self):
         super().__init__()
         self.language = LANG
@@ -167,7 +167,7 @@ class MyMainWindow(QWidget):
         mainLayout.setContentsMargins(0, 0, 0, 0)
         self.setLayout(mainLayout)
 
-        self.setWindowTitle('Main window')
+        self.setWindowTitle('PyTelTools :: Classic interface')
         self.setWindowFlags(self.windowFlags() | Qt.CustomizeWindowHint)
         self.frameGeom = self.frameGeometry()
         self.move(self.frameGeom.center())
@@ -208,7 +208,7 @@ if __name__ == '__main__':
     sys.excepthook = exception_hook
 
     app = QApplication(sys.argv)
-    window = MyMainWindow()
+    window = ClassicMainWindow()
     window.show()
     app.exec_()
 
