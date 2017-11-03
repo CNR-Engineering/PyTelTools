@@ -21,6 +21,7 @@ DOC_PATH=../CNR-Engineering.github.io/PyTelTools
 
 doc: doxygen.config
 	doxygen $<
+	export PYTHONPATH=$(shell pwd) && cd cli && python write_cli_usage.py
 
 update_doc: doc
 	rm -r ${DOC_PATH} && cp -r doc/html/* ${DOC_PATH}
@@ -37,4 +38,4 @@ test:
 clean:
 	rm -rf doc venv .cache
 
-.PHONY: clean test update_doc venv
+.PHONY: clean doc test update_doc venv

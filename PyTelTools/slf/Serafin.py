@@ -9,20 +9,17 @@ The sizes (file, header, frame) are in bytes (8 bits).
 """
 
 import copy
-import logging
 import numpy as np
 import os
 import struct
 
+from slf.util import logger
 from slf.variable.variables_2d import VARIABLES_2D
 from slf.variable.variables_3d import VARIABLES_3D
 
 
 # Encoding Information Type (EIT) for Serafin title, variable names and units
 SLF_EIT = 'iso-8859-1'
-
-
-module_logger = logging.getLogger(__name__)
 
 
 VARIABLES_ID_2D, VARIABLES_ID_3D = {'fr': {}, 'en': {}}, {'fr': {}, 'en': {}}
@@ -51,7 +48,7 @@ class SerafinValidationError(Exception):
         """
         super().__init__(message)
         self.message = message
-        module_logger.error('SERAFIN VALIDATION ERROR: %s' % message)
+        logger.error('SERAFIN VALIDATION ERROR: %s' % message)
 
 
 class SerafinRequestError(Exception):
@@ -64,7 +61,7 @@ class SerafinRequestError(Exception):
         """
         super().__init__(message)
         self.message = message
-        module_logger.error('SERAFIN REQUEST ERROR: %s' % message)
+        logger.error('SERAFIN REQUEST ERROR: %s' % message)
 
 
 class SerafinHeader:
@@ -96,7 +93,7 @@ class SerafinHeader:
             self.endian = '<'
         else:
             raise SerafinValidationError('File endianness could not be determined')
-        module_logger.debug('File is determined to be %s endian' % ('big' if self.endian == '>' else 'litte'))
+        logger.debug('File is determined to be %s endian' % ('big' if self.endian == '>' else 'litte'))
 
         # Read title
         self.title = file.read(72)
@@ -105,7 +102,7 @@ class SerafinHeader:
 
         try:
             data_format = self.file_type.decode(SLF_EIT)
-            module_logger.debug('The file type is: "%s"' % data_format)
+            logger.debug('The file type is: "%s"' % data_format)
         except UnicodeDecodeError:
             raise SerafinValidationError('File type is unreadable: %s' % self.file_type)
 
@@ -113,7 +110,7 @@ class SerafinHeader:
             self._set_as_double_precision()
         else:
             if data_format not in ('SERAFIN ', 'SERAPHIN', '        '):
-                module_logger.warning('Format "%s" is unknown and is forced to "SERAFIN"' % data_format)
+                logger.warning('Format "%s" is unknown and is forced to "SERAFIN"' % data_format)
                 self.file_type = bytes('SERAFIN', SLF_EIT).ljust(8)
             self._set_as_single_precision()
 
@@ -121,7 +118,7 @@ class SerafinHeader:
         file.read(4)
         self.nb_var = self.unpack_int(file.read(4), 1)[0]
         self.nb_var_quadratic = self.unpack_int(file.read(4), 1)[0]
-        module_logger.debug('The file has %d variables' % self.nb_var)
+        logger.debug('The file has %d variables' % self.nb_var)
         file.read(4)
         if self.nb_var_quadratic != 0:
             raise SerafinValidationError('The number of quadratic variables is not equal to zero')
@@ -171,7 +168,7 @@ class SerafinHeader:
                 raise SerafinValidationError('The number of nodes per element is not equal to 6')
             if self.nb_planes < 2:
                 raise SerafinValidationError('The number of planes is less than 2')
-        module_logger.debug('The file is determined to be %s' % {True: '2D', False: '3D'}[self.is_2d])
+        logger.debug('The file is determined to be %s' % {True: '2D', False: '3D'}[self.is_2d])
 
         # determine the number of nodes in 2D
         if self.is_2d:
@@ -207,7 +204,7 @@ class SerafinHeader:
 
         # Deduce the number of frames and test the integer division
         self.nb_frames = (self.file_size - self.header_size) // self.frame_size
-        module_logger.debug('The file has %d frames of size %d bytes' % (self.nb_frames, self.frame_size))
+        logger.debug('The file has %d frames of size %d bytes' % (self.nb_frames, self.frame_size))
 
         diff_size = self.file_size - self.header_size - self.frame_size * self.nb_frames
         # A difference of only one byte is tolerated.
@@ -222,7 +219,7 @@ class SerafinHeader:
             name = var_name.decode(encoding=SLF_EIT).strip()
             if name not in var_table:
                 slf_type = '2D' if self.is_2d else '3D'
-                module_logger.warning('WARNING: The %s variable name "%s" is not known (lang=%s). '
+                logger.warning('WARNING: The %s variable name "%s" is not known (lang=%s). '
                                       'The complete name will be used as ID' % (slf_type, name, self.language))
                 var_id = name
             else:
@@ -242,7 +239,7 @@ class SerafinHeader:
         else:
             self.ikle_2d = self.ikle.reshape(self.nb_elements, self.nb_nodes_per_elem)
 
-        module_logger.debug('Finished reading the header')
+        logger.debug('Finished reading the header')
 
     def _set_as_single_precision(self):
         """Set Serafin as single precision"""
@@ -295,6 +292,14 @@ class SerafinHeader:
         """
         fmt = self.endian + str(nb) + self.float_type
         return struct.pack(fmt, *args)
+
+    def toggle_endianness(self):
+        """Toggle original endianness (between big or little endian)"""
+        if self.endian == '>':
+            self.endian = '<'
+        else:
+            self.endian = '>'
+        logger.debug('Toggle endianness to %s' % ('big' if self.endian == '>' else 'litte'))
 
     def _set_header_size(self):
         """Set header size"""
@@ -484,7 +489,7 @@ class Read(Serafin):
         self.header = None
         self.time = []
         self.file_size = os.path.getsize(self.filename)
-        module_logger.info('Reading the input file: "%s" of size %d bytes' % (filename, self.file_size))
+        logger.info('Reading the input file: "%s" of size %d bytes' % (filename, self.file_size))
 
     def read_header(self):
         """!
@@ -498,13 +503,21 @@ class Read(Serafin):
         """
         if self.header is None:
             raise SerafinRequestError('Cannot read time without any header (forgot read_header ?)')
-        module_logger.debug('Reading the time series from the file')
+        logger.debug('Reading the time series from the file')
         self.file.seek(self.header.header_size, 0)
         for i in range(self.header.nb_frames):
             self.file.read(4)
             self.time.append(self.header.unpack_float(self.file.read(self.header.float_size), 1)[0])
             self.file.read(4)
             self.file.seek(self.header.frame_size - 8 - self.header.float_size, 1)
+
+    def subset_time(self, start, end, ech):
+        new_time = []
+        for time_index, time in enumerate(self.time):
+            if start <= time <= end:
+                if time_index % ech == 0:
+                    new_time.append((time_index, time))
+        return new_time
 
     def _get_var_index(self, var_ID):
         """!
@@ -527,7 +540,7 @@ class Read(Serafin):
         @param var_ID <str>: variable ID
         @return <numpy 1D-array>: values of the variables, of length equal to the number of nodes
         """
-        module_logger.debug('Reading variable %s at frame %i' % (var_ID, time_index))
+        logger.debug('Reading variable %s at frame %i' % (var_ID, time_index))
         pos_var = self._get_var_index(var_ID)
         self.file.seek(self.header.header_size + time_index * self.header.frame_size
                        + 8 + self.header.float_size + pos_var * (8 + self.header.float_size * self.header.nb_nodes), 0)
@@ -568,13 +581,13 @@ class Write(Serafin):
     """
     def __init__(self, filename, language):
         super().__init__(filename, 'wb', language)
-        module_logger.info('Writing the output file: "%s"' % filename)
+        logger.info('Writing the output file: "%s"' % filename)
 
     def __enter__(self):
         try:
             return Serafin.__enter__(self)
         except FileExistsError:
-            module_logger.error('ERROR: Cannot overwrite existing file')
+            logger.error('ERROR: Cannot overwrite existing file')
             raise FileExistsError('File {} already exists (remove the file or change the option '
                                   'and then re-run the program)'.format(self.filename))
 

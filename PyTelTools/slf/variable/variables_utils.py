@@ -4,6 +4,7 @@ Handle 2D and 3D additional variables
 
 import numpy as np
 
+
 # define constants
 KARMAN = 0.4
 RHO_WATER = 1000.
@@ -84,8 +85,8 @@ def compute_COMPONENT_X(scalar, x, y):
     return np.where(magnitude>0, scalar*x/magnitude, 0)
 
 
-def compute_COMPONENT_Y(a, x, y):
-    return compute_COMPONENT_X(a, y, x)
+def compute_COMPONENT_Y(scalar, x, y):
+    return compute_COMPONENT_X(scalar, y, x)
 
 
 PLUS, MINUS, TIMES, NORM2, NORM2_3D = 1, 2, 3, 4, 104

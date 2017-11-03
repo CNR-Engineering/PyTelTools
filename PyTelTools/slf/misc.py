@@ -8,10 +8,9 @@ import re
 import shapefile
 
 from slf import Serafin
+from slf.util import logger
 from slf.variables import do_calculation, get_available_variables, get_necessary_equations
 
-
-module_logger = logging.getLogger(__name__)
 
 # constants
 OPERATORS = ['+', '-', '*', '/', '^', 'sqrt', 'sin', 'cos', 'atan']
@@ -67,7 +66,7 @@ def scalars_vectors(known_vars, selected_vars, us_equation=None):
                                                                         is_2d=True, us_equation=us_equation))
                     continue
                 # if the magnitude is not computable, use scalar operation instead
-                module_logger.warning('The variable %s will be considered to be scalar instead of vector.' % var)
+                logger.warning('The variable %s will be considered to be scalar instead of vector.' % var)
                 scalars.append((var, name, unit))
         else:
             scalars.append((var, name, unit))

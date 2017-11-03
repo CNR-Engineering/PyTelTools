@@ -1,11 +1,8 @@
 from copy import deepcopy
 import datetime
-import logging
-import numpy as np
 
 from slf import Serafin
-
-module_logger = logging.getLogger(__name__)
+from slf.util import logger
 
 
 class SerafinData:
@@ -43,7 +40,7 @@ class SerafinData:
                 year, month, day, hour, minute, second = self.header.date
                 self.start_time = datetime.datetime(year, month, day, hour, minute, second)
             except ValueError:
-                module_logger.warning('Date seems invalid, replaced by default date.')
+                logger.warning('Date seems invalid, replaced by default date.')
         if self.start_time is None:
             self.start_time = datetime.datetime(1900, 1, 1, 0, 0, 0)
         self.time_second = list(map(lambda x: datetime.timedelta(seconds=x), self.time))

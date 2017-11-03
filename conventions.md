@@ -56,6 +56,11 @@ Use with following logging levels (with corresponding numeric value) :
 * INFO (20)
 * DEBUG (10)
 
+## CLI exiting code
+* 0 = successful termination
+* 1 = error with command-line arguments
+* 2 = error while parsing file
+
 ## Code documentation
 Developper documentation is generated with doyxgen and provided on https://cnr-engineering.github.io/PyTelTools.
 
