@@ -43,7 +43,7 @@ def build_levels_from_minmax(min_input, max_input):
     min_value = min(min_input, max_input * (1 - EPS_VALUE))
     max_value = max(max_input, min_input * (1 + EPS_VALUE))
     # Handle special case where min and max are equal to 0
-    if min_value == 0: min_value = EPS_VALUE
+    if min_value == 0: min_value = -EPS_VALUE
     if max_value == 0: max_value = EPS_VALUE
     return np.linspace(min_value, max_value, NB_COLOR_LEVELS)
 
