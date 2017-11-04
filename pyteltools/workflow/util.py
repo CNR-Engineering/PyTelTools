@@ -23,7 +23,7 @@ from pyteltools.slf.interpolation import MeshInterpolator
 from pyteltools.slf import Serafin
 
 
-EPS_VALUE = 0.001  # value to add to or substrate from min or max values for color maps
+EPS_VALUE = 0.001  # Relative tolerance (of 0.1%) above which min and max are modified to avoid a crash of colormap [#2]
 
 
 logger = logging.getLogger(__name__)
@@ -31,6 +31,21 @@ handler = logging.StreamHandler()
 handler.setFormatter(logging.Formatter('%(asctime)s %(levelname)s %(message)s'))
 logger.addHandler(handler)
 logger.setLevel(LOGGING_LEVEL)
+
+
+def build_levels_from_minmax(min_input, max_input):
+    """!
+    @brief: Build uniform levels and modify min and max values if they are not equal
+    @param min_input <float>: minimum value
+    @param max_input <float>: maximum value
+    @return <numpy.1D-array>
+    """
+    min_value = min(min_input, max_input * (1 - EPS_VALUE))
+    max_value = max(max_input, min_input * (1 + EPS_VALUE))
+    # Handle special case where min and max are equal to 0
+    if min_value == 0: min_value = EPS_VALUE
+    if max_value == 0: max_value = EPS_VALUE
+    return np.linspace(min_value, max_value, NB_COLOR_LEVELS)
 
 
 def process_output_options(input_file, job_id, extension, suffix, in_source_folder, dir_path, double_name):
@@ -1135,11 +1150,7 @@ class VerticalCrossSectionPlotViewer(PlotViewer):
             self.canvas.axes.tricontourf(self.triang, self.values, cmap=self.current_style, levels=levels,
                                          extend='both', vmin=self.color_limits[0], vmax=self.color_limits[1])
         else:
-            min_value, max_value = np.nanmin(self.values), np.nanmax(self.values)
-            if min_value == max_value:
-                min_value -= EPS_VALUE
-                max_value += EPS_VALUE
-            levels = np.linspace(min_value, max_value, NB_COLOR_LEVELS)
+            levels = build_levels_from_minmax(np.nanmin(self.values), np.nanmax(self.values))
             self.canvas.axes.tricontourf(self.triang, self.values, cmap=self.current_style, levels=levels,
                                          extend='both')
 
@@ -1332,11 +1343,7 @@ class VerticalProfilePlotViewer(TemporalPlotViewer):
             self.canvas.axes.tricontourf(triang, self.z, cmap=self.current_style, levels=levels, extend='both',
                                          vmin=self.color_limits[0], vmax=self.color_limits[1])
         else:
-            min_value, max_value = np.nanmin(self.z), np.nanmax(self.z)
-            if min_value == max_value:
-                min_value -= EPS_VALUE
-                max_value += EPS_VALUE
-            levels = np.linspace(min_value, max_value, NB_COLOR_LEVELS)
+            levels = build_levels_from_minmax(np.nanmin(self.z), np.nanmax(self.z))
             self.canvas.axes.tricontourf(triang, self.z, cmap=self.current_style, levels=levels, extend='both')
 
         divider = make_axes_locatable(self.canvas.axes)
@@ -2219,11 +2226,7 @@ class ScalarMapCanvas(MapCanvas):
             self.axes.tricontourf(triang, values, cmap=color_style, levels=levels, extend='both',
                                   vmin=limits[0], vmax=limits[1])
         else:
-            min_value, max_value = np.nanmin(values), np.nanmax(values)
-            if min_value == max_value:
-                min_value -= EPS_VALUE
-                max_value += EPS_VALUE
-            levels = np.linspace(min_value, max_value, NB_COLOR_LEVELS)
+            levels = build_levels_from_minmax(np.nanmin(values), np.nanmax(values))
             self.axes.tricontourf(triang, values, cmap=color_style, levels=levels, extend='both')
 
         # add colorbar
