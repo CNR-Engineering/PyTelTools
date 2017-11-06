@@ -2,7 +2,7 @@ import logging
 import sys
 from time import time
 
-from pyteltools.conf.settings import CSV_SEPARATOR, DIGITS, LANG, SCENE_SIZE
+from pyteltools.conf import settings
 
 from .Node import Box, Link, Port
 from .nodes_calc import *
@@ -82,13 +82,13 @@ class MonoScene(QGraphicsScene):
     def __init__(self):
         super().__init__()
 
-        self.language = LANG
-        self.csv_separator = CSV_SEPARATOR
-        self.digits = DIGITS
+        self.language = settings.LANG
+        self.csv_separator = settings.CSV_SEPARATOR
+        self.digits = settings.DIGITS
 
         self._init_with_default_node()
 
-        self.setSceneRect(QRectF(0, 0, SCENE_SIZE[0], SCENE_SIZE[1]))
+        self.setSceneRect(QRectF(0, 0, settings.SCENE_SIZE[0], settings.SCENE_SIZE[1]))
         self.transform = QTransform()
         self.selectionChanged.connect(self.selection_changed)
 

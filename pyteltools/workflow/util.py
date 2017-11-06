@@ -14,8 +14,7 @@ import matplotlib.tri as mtri
 import warnings
 warnings.filterwarnings('ignore', category=RuntimeWarning, module='matplotlib')
 
-from pyteltools.conf.settings import COLOR_SYLES, DEFAULT_COLOR_STYLE, FIG_OUT_DPI, FIG_SIZE, LOGGING_LEVEL,\
-    NB_COLOR_LEVELS, SERAFIN_EXT, X_AXIS_LABEL, Y_AXIS_LABEL
+from pyteltools.conf import settings 
 from pyteltools.gui.util import FluxPlotViewer, MapCanvas, PointLabelEditor, PointPlotViewer, PlotViewer, \
     read_csv, SimpleTimeDateSelection, TemporalPlotViewer, VolumePlotViewer
 from pyteltools.slf.datatypes import SerafinData
@@ -30,7 +29,7 @@ logger = logging.getLogger(__name__)
 handler = logging.StreamHandler()
 handler.setFormatter(logging.Formatter('%(asctime)s %(levelname)s %(message)s'))
 logger.addHandler(handler)
-logger.setLevel(LOGGING_LEVEL)
+logger.setLevel(settings.LOGGING_LEVEL)
 
 
 def build_levels_from_minmax(min_input, max_input):
@@ -45,7 +44,7 @@ def build_levels_from_minmax(min_input, max_input):
     # Handle special case where min and max are equal to 0
     if min_value == 0: min_value = -EPS_VALUE
     if max_value == 0: max_value = EPS_VALUE
-    return np.linspace(min_value, max_value, NB_COLOR_LEVELS)
+    return np.linspace(min_value, max_value, settings.NB_COLOR_LEVELS)
 
 
 def process_output_options(input_file, job_id, extension, suffix, in_source_folder, dir_path, double_name):
@@ -525,7 +524,7 @@ class MultiLoadDialog(QDialog):
 
 class MultiLoadSerafinDialog(MultiLoadDialog):
     def __init__(self, old_options):
-        super().__init__('Serafin', SERAFIN_EXT, old_options)
+        super().__init__('Serafin', settings.SERAFIN_EXT, old_options)
 
 
 class MultiLoadCSVDialog(MultiLoadDialog):
@@ -570,7 +569,7 @@ class LoadSerafinDialog(QDialog):
 
             slfs = set()
             for f in os.listdir(self.dir_path):
-                if os.path.isfile(os.path.join(self.dir_path, f)) and os.path.splitext(f)[1] in SERAFIN_EXT:
+                if os.path.isfile(os.path.join(self.dir_path, f)) and os.path.splitext(f)[1] in settings.SERAFIN_EXT:
                     slfs.add(f)
 
             slfs = list(slfs)
@@ -650,7 +649,7 @@ class LoadSerafinDialog(QDialog):
 
         slfs = set()
         for f in os.listdir(self.dir_path):
-            if os.path.isfile(os.path.join(self.dir_path, f)) and os.path.splitext(f)[1] in SERAFIN_EXT:
+            if os.path.isfile(os.path.join(self.dir_path, f)) and os.path.splitext(f)[1] in settings.SERAFIN_EXT:
                 slfs.add(f)
         if not slfs:
             QMessageBox.critical(None, 'Error', "The folder %s doesn't have any Serafin file!" % dir_name,
@@ -974,8 +973,8 @@ class VerticalCrossSectionPlotViewer(PlotViewer):
 
         self.color_limits = None
         self.cmap = None
-        self.current_style = DEFAULT_COLOR_STYLE
-        self.color_styles = COLOR_SYLES
+        self.current_style = settings.DEFAULT_COLOR_STYLE
+        self.color_styles = settings.COLOR_SYLES
 
         self.create_actions()
         self.toolBar.addAction(self.select_variable_act)
@@ -1146,7 +1145,7 @@ class VerticalCrossSectionPlotViewer(PlotViewer):
         self.canvas.axes = self.canvas.figure.add_subplot(111)
 
         if self.color_limits is not None:
-            levels = np.linspace(self.color_limits[0], self.color_limits[1], NB_COLOR_LEVELS)
+            levels = np.linspace(self.color_limits[0], self.color_limits[1], settings.NB_COLOR_LEVELS)
             self.canvas.axes.tricontourf(self.triang, self.values, cmap=self.current_style, levels=levels,
                                          extend='both', vmin=self.color_limits[0], vmax=self.color_limits[1])
         else:
@@ -1201,8 +1200,8 @@ class VerticalProfilePlotViewer(TemporalPlotViewer):
 
         self.color_limits = None
         self.cmap = None
-        self.current_style = DEFAULT_COLOR_STYLE
-        self.color_styles = COLOR_SYLES
+        self.current_style = settings.DEFAULT_COLOR_STYLE
+        self.color_styles = settings.COLOR_SYLES
 
         self.create_actions()
         self.current_columns = ('Point 1',)
@@ -1339,7 +1338,7 @@ class VerticalProfilePlotViewer(TemporalPlotViewer):
 
         triang = mtri.Triangulation(self.time[self.timeFormat], self.y, self.triangles)
         if self.color_limits is not None:
-            levels = np.linspace(self.color_limits[0], self.color_limits[1], NB_COLOR_LEVELS)
+            levels = np.linspace(self.color_limits[0], self.color_limits[1], settings.NB_COLOR_LEVELS)
             self.canvas.axes.tricontourf(triang, self.z, cmap=self.current_style, levels=levels, extend='both',
                                          vmin=self.color_limits[0], vmax=self.color_limits[1])
         else:
@@ -1579,7 +1578,7 @@ class MultiSaveVolumeDialog(MultiSaveTemporalPlotDialog):
 
     def plot(self):
         fig, axes = plt.subplots(1)
-        fig.set_size_inches(FIG_SIZE[0], FIG_SIZE[1])
+        fig.set_size_inches(settings.FIG_SIZE[0], settings.FIG_SIZE[1])
 
         for (data, time, str_datetime, str_datetime_bis), png_name in zip(self.data, self.out_names):
             axes.clear()
@@ -1597,7 +1596,7 @@ class MultiSaveVolumeDialog(MultiSaveTemporalPlotDialog):
                     label.set_rotation(45)
                     label.set_fontsize(8)
             fig.canvas.draw()
-            fig.savefig(png_name, dpi=FIG_OUT_DPI)
+            fig.savefig(png_name, dpi=settings.FIG_OUT_DPI)
 
 
 class MultiSaveFluxDialog(MultiSaveTemporalPlotDialog):
@@ -1609,7 +1608,7 @@ class MultiSaveFluxDialog(MultiSaveTemporalPlotDialog):
 
     def plot(self):
         fig, axes = plt.subplots(1)
-        fig.set_size_inches(FIG_SIZE[0], FIG_SIZE[1])
+        fig.set_size_inches(settings.FIG_SIZE[0], settings.FIG_SIZE[1])
 
         for (data, time, str_datetime, str_datetime_bis), png_name in zip(self.data, self.out_names):
             axes.clear()
@@ -1631,7 +1630,7 @@ class MultiSaveFluxDialog(MultiSaveTemporalPlotDialog):
                     label.set_rotation(45)
                     label.set_fontsize(8)
             fig.canvas.draw()
-            fig.savefig(png_name, dpi=FIG_OUT_DPI)
+            fig.savefig(png_name, dpi=settings.FIG_OUT_DPI)
 
 
 class MultiSavePointDialog(MultiSaveTemporalPlotDialog):
@@ -1643,7 +1642,7 @@ class MultiSavePointDialog(MultiSaveTemporalPlotDialog):
 
     def plot(self):
         fig, axes = plt.subplots(1)
-        fig.set_size_inches(FIG_SIZE[0], FIG_SIZE[1])
+        fig.set_size_inches(settings.FIG_SIZE[0], settings.FIG_SIZE[1])
 
         for (data, time, str_datetime, str_datetime_bis), png_name in zip(self.data, self.out_names):
             axes.clear()
@@ -1661,7 +1660,7 @@ class MultiSavePointDialog(MultiSaveTemporalPlotDialog):
                     label.set_rotation(45)
                     label.set_fontsize(8)
             fig.canvas.draw()
-            fig.savefig(png_name, dpi=FIG_OUT_DPI)
+            fig.savefig(png_name, dpi=settings.FIG_OUT_DPI)
 
 
 class MultiInterpolationPlotDialog(QDialog):
@@ -2216,13 +2215,13 @@ class ScalarMapCanvas(MapCanvas):
     def replot(self, mesh, values, color_style, limits, variable_label):
         self.fig.clear()   # remove the old color bar
         self.axes = self.fig.add_subplot(111)
-        self.axes.set_xlabel(X_AXIS_LABEL)
-        self.axes.set_ylabel(Y_AXIS_LABEL)
+        self.axes.set_xlabel(settings.X_AXIS_LABEL)
+        self.axes.set_ylabel(settings.Y_AXIS_LABEL)
         self.axes.set_aspect('equal', adjustable='box')
 
         triang = mtri.Triangulation(mesh.x, mesh.y, mesh.ikle)
         if limits is not None:
-            levels = np.linspace(limits[0], limits[1], NB_COLOR_LEVELS)
+            levels = np.linspace(limits[0], limits[1], settings.NB_COLOR_LEVELS)
             self.axes.tricontourf(triang, values, cmap=color_style, levels=levels, extend='both',
                                   vmin=limits[0], vmax=limits[1])
         else:
@@ -2250,8 +2249,8 @@ class ScalarMapViewer(QWidget):
 
         self.color_limits = None
         self.cmap = None
-        self.current_style = DEFAULT_COLOR_STYLE
-        self.color_styles = COLOR_SYLES
+        self.current_style = settings.DEFAULT_COLOR_STYLE
+        self.color_styles = settings.COLOR_SYLES
 
         self.canvas = ScalarMapCanvas()
         self.slider = SimpleTimeDateSelection()

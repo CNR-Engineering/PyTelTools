@@ -131,18 +131,37 @@ The argument `-h` provides a **help** message for the corresponding script and s
 Output **verbosity** can be increased (debug mode) with `-v` argument.
 
 ## Configure
-PyTelTools comes with a set of default parameters which determines its behavior and some assumptions and options.
+PyTelTools comes with a set of **default parameters** which determine its behavior and some assumptions and options.
 
-To configure PyTelTools, modify directly and only the file `pyteltools/conf/settings.py`.
-Every constants which are defined in `pyteltools/conf/settings_sample.py` can be overwritten through this mean.
+The recommended way to modify PyTelTools configuration is to write a **user configuration file** in **JSON** file format
+and refer to it in an environment variable named `PYTELTOOLS_SETTINGS`.
+The environment variable `PYTELTOOLS_SETTINGS` has to contain the **absolute path** to this file.
+For example, it could something like:
+`/home/user/pyteltools/cfg.json` or `C:\Users\MyAccount\Documents\config_pyteltools.json`.
 
-For example to change default Serafin language (for variable detection)
-and to change increase verbosity `pyteltools/conf/settings.py` would be:
-```python
-from .settings_sample import *
+The parameters defined in the user configuration file will be used instead of the default parameter.
 
-LANG = 'en'
-
-import logging
-LOGGING_LEVEL = logging.DEBUG
+For example to change default Serafin language (for variable detection) 
+and to change increase verbosity (to debug mode), the JSON file should be:
+```json
+{
+    "LANG": "en",
+    "LOGGING_LEVEL": 10
+}
 ```
+
+Here is a second example of a JSON configuration file with a more complex configuration:
+```json
+{
+    "DIGITS": 8,
+    "NCSIZE": 6,
+    "SCENE_SIZE": [2000, 1200],
+    "SERAFIN_EXT": [".slf", ".srf", ".res"],
+    "WRITE_XYZ_HEADER": false,
+    "X_AXIS_LABEL": "X coordinate (m)",
+    "Y_AXIS_LABEL": "Y coordinate (m)"
+}
+```
+
+PyTelTools configuration relies on the Python package [simple-settings](https://pypi.python.org/pypi/simple-settings)
+and all the parameters are defined and described in [pyteltools/conf/default_settings.py](https://github.com/CNR-Engineering/PyTelTools/blob/master/pyteltools/conf/default_settings.py).

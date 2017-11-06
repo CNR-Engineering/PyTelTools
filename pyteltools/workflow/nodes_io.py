@@ -4,9 +4,9 @@ from PyQt5.QtCore import *
 from PyQt5.QtWidgets import *
 import struct
 
-from pyteltools.conf.settings import SERAFIN_EXT
+from pyteltools.conf import settings
 from pyteltools.geom import BlueKenue, Shapefile
-from pyteltools.slf.datatypes import SerafinData, PointData, PolylineData
+from pyteltools.slf.datatypes import PointData, PolylineData, SerafinData
 from pyteltools.slf.interpolation import MeshInterpolator
 import pyteltools.slf.misc as operations
 from pyteltools.slf import Serafin
@@ -753,7 +753,7 @@ class LoadReferenceSerafinNode(SingleOutputNode):
 
     def _open(self):
         filename, _ = QFileDialog.getOpenFileName(None, 'Open a Serafin file', '', 'Serafin Files (%s)' %
-                                                  ' '.join(['*%s' % extension for extension in SERAFIN_EXT]),
+                                                  ' '.join(['*%s' % extension for extension in settings.SERAFIN_EXT]),
                                                   QDir.currentPath(),
                                                   options=QFileDialog.Options() | QFileDialog.DontUseNativeDialog)
         if filename:

@@ -6,7 +6,7 @@ import os
 from time import time
 import sys
 
-from pyteltools.conf.settings import CSV_SEPARATOR, DIGITS, LANG, NCSIZE, SCENE_SIZE
+from pyteltools.conf import settings
 
 from .MultiNode import Box, MultiLink
 from . import multi_func as worker
@@ -90,11 +90,11 @@ class MultiScene(QGraphicsScene):
         super().__init__()
         self.table = table
 
-        self.language = LANG
-        self.csv_separator = CSV_SEPARATOR
-        self.digits = DIGITS
+        self.language = settings.LANG
+        self.csv_separator = settings.CSV_SEPARATOR
+        self.digits = settings.DIGITS
 
-        self.setSceneRect(QRectF(0, 0, SCENE_SIZE[0], SCENE_SIZE[1]))
+        self.setSceneRect(QRectF(0, 0, settings.SCENE_SIZE[0], settings.SCENE_SIZE[1]))
         self.transform = QTransform()
 
         self.nodes = {0: MultiLoadSerafin2DNode(0)}
@@ -538,7 +538,7 @@ class CmdMessage(QPlainTextEdit):
 
 
 class MultiWidget(QWidget):
-    def __init__(self, parent=None, project_path=None, ncsize=NCSIZE):
+    def __init__(self, parent=None, project_path=None, ncsize=settings.NCSIZE):
         super().__init__()
         self.parent = parent
         self.table = MultiTable()
@@ -768,7 +768,7 @@ if __name__ == '__main__':
     parser.add_argument('-i', '--workspace', help='workflow project file')
     parser.add_argument('-v', '--verbose', help='output verbosity', action='store_true')
     parser.add_argument('--ncsize', help='number of processors (overwrites default configuration)', type=int,
-                        default=NCSIZE)
+                        default=settings.NCSIZE)
 
     parser.parse_args()
     args = parser.parse_args()

@@ -7,4 +7,5 @@ pytest
 Rtree
 scipy
 shapely
+simple-settings
 tqdm

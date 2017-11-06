@@ -6,7 +6,7 @@ import numpy as np
 import shapefile
 import struct
 
-from pyteltools.conf.settings import WRITE_XYZ_HEADER
+from pyteltools.conf import settings
 
 from . import BlueKenue as bk, Shapefile as shp
 from .geometry import Polyline
@@ -103,7 +103,7 @@ class XYZConverter(PointFileConverter):
 
     def to_xyz(self, new_shapes, to_file):
         with bk.Write(to_file) as f:
-            if WRITE_XYZ_HEADER:
+            if settings.WRITE_XYZ_HEADER:
                 f.write_header(self.header)
             f.write_points(new_shapes)
 

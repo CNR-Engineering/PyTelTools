@@ -18,8 +18,7 @@ from matplotlib.colors import Normalize, colorConverter
 import matplotlib.lines as mlines
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
-from pyteltools.conf.settings import CSV_SEPARATOR, DIGITS, LANG, LOGGING_LEVEL, MAP_SIZE, MAP_OUT_DPI, \
-    NB_COLOR_LEVELS, SERAFIN_EXT, X_AXIS_LABEL, Y_AXIS_LABEL
+from pyteltools.conf import settings
 from pyteltools.geom import BlueKenue, Shapefile
 from pyteltools.slf.comparison import ReferenceMesh
 from pyteltools.slf.datatypes import SerafinData
@@ -176,8 +175,8 @@ def save_dialog(file_format, input_name='', input_names=None):
     options |= QFileDialog.DontUseNativeDialog
     options |= QFileDialog.DontConfirmOverwrite
     if file_format == 'Serafin':
-        extensions = SERAFIN_EXT
-        file_filter = 'Serafin Files (%s)' % ' '.join(['*%s' % extension for extension in SERAFIN_EXT])
+        extensions = settings.SERAFIN_EXT
+        file_filter = 'Serafin Files (%s)' % ' '.join(['*%s' % extension for extension in extensions])
     elif file_format == 'CSV':
         extensions = ['.csv']
         file_filter = 'CSV Files (*.csv)'
@@ -279,7 +278,7 @@ class SerafinInputTab(QWidget):
 
     def open_event(self):
         filename, _ = QFileDialog.getOpenFileName(self, 'Open a Serafin file', '', 'Serafin Files (%s)' %
-                                                  ' '.join(['*%s' % extension for extension in SERAFIN_EXT]),
+                                                  ' '.join(['*%s' % extension for extension in settings.SERAFIN_EXT]),
                                                   options=QFileDialog.Options() | QFileDialog.DontUseNativeDialog)
         if not filename:
             return True, ''
@@ -338,10 +337,10 @@ class PyTelToolWidget(QWidget):
         self.parent = parent
         self.input = None
         if parent is None:
-            self.language = LANG
-            self.csv_separator = CSV_SEPARATOR
-            self.digits = DIGITS
-            self.logging_level = LOGGING_LEVEL
+            self.language = settings.LANG
+            self.csv_separator = settings.CSV_SEPARATOR
+            self.digits = settings.DIGITS
+            self.logging_level = settings.LOGGING_LEVEL
         else:
             self.language = parent.language
             self.csv_separator = parent.csv_separator
@@ -1653,7 +1652,7 @@ class PlotCanvas(FigureCanvas):
 
 
 class MapCanvas(FigureCanvas):
-    def __init__(self, width=MAP_SIZE[0], height=MAP_SIZE[1], dpi=MAP_OUT_DPI):
+    def __init__(self, width=settings.MAP_SIZE[0], height=settings.MAP_SIZE[1], dpi=settings.MAP_OUT_DPI):
         self.BLACK = '#a9a9a9'
 
         self.fig = Figure(figsize=(width, height), dpi=dpi)
@@ -1669,8 +1668,8 @@ class MapCanvas(FigureCanvas):
 
     def initFigure(self, mesh):
         self.axes.clear()
-        self.axes.set_xlabel(X_AXIS_LABEL)
-        self.axes.set_ylabel(Y_AXIS_LABEL)
+        self.axes.set_xlabel(settings.X_AXIS_LABEL)
+        self.axes.set_ylabel(settings.Y_AXIS_LABEL)
         self.axes.triplot(mesh.x, mesh.y, mesh.ikle, '--', color=self.BLACK, alpha=0.5, lw=0.3)
         self.axes.set_aspect('equal', adjustable='box')
         self.draw()
@@ -1771,7 +1770,7 @@ class ColorMapCanvas(MapCanvas):
         divider = make_axes_locatable(self.axes)
         cax = divider.append_axes('right', size='5%', pad=0.2)
         cmap = cm.ScalarMappable(cmap='coolwarm', norm=Normalize(xmin, xmax))
-        cmap.set_array(np.linspace(xmin, xmax, NB_COLOR_LEVELS))
+        cmap.set_array(np.linspace(xmin, xmax, settings.NB_COLOR_LEVELS))
         self.fig.colorbar(cmap, cax=cax)
 
         self.draw()
@@ -1815,8 +1814,8 @@ class PlotViewer(QWidget):
         self.nameToColor = {n: c for c, n in zip(self.defaultColors, name)}
 
         self.canvas = PlotCanvas(self)
-        self.current_xlabel = X_AXIS_LABEL
-        self.current_ylabel = Y_AXIS_LABEL
+        self.current_xlabel = settings.X_AXIS_LABEL
+        self.current_ylabel = settings.Y_AXIS_LABEL
         self.current_title = 'Default plot'
 
         # add a default plot
@@ -1921,8 +1920,8 @@ class PlotViewer(QWidget):
     def defaultPlot(self):
         x = [0]
         y = [0]
-        self.current_xlabel = X_AXIS_LABEL
-        self.current_ylabel = Y_AXIS_LABEL
+        self.current_xlabel = settings.X_AXIS_LABEL
+        self.current_ylabel = settings.Y_AXIS_LABEL
         self.current_title = 'Default plot'
         self.plot(x, y)
 

@@ -2,7 +2,7 @@ import sys
 from PyQt5.QtCore import *
 from PyQt5.QtWidgets import *
 
-from pyteltools.conf.settings import CSV_SEPARATOR, DIGITS, LANG, LOGGING_LEVEL
+from pyteltools.conf import settings
 
 from .CalculatorGUI import CalculatorGUI
 from .CompareResultsGUI import CompareResultsGUI
@@ -119,10 +119,10 @@ class MainPanel(QWidget):
 class ClassicMainWindow(QWidget):
     def __init__(self):
         super().__init__()
-        self.language = LANG
-        self.csv_separator = CSV_SEPARATOR
-        self.digits = DIGITS
-        self.logging_level = LOGGING_LEVEL
+        self.language = settings.LANG
+        self.csv_separator = settings.CSV_SEPARATOR
+        self.digits = settings.DIGITS
+        self.logging_level = settings.LOGGING_LEVEL
         self.panel = MainPanel(self)
 
         config_button = QPushButton('Global\nConfiguration')

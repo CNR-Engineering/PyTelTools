@@ -3,11 +3,12 @@ Prepare module logger
 
 Handles some exceptions (if `in_slf` or `out_slf` arguments are present)
 """
+
 import argparse
 import logging
 import sys
 
-from pyteltools.conf.settings import LANG, LOGGING_LEVEL
+from pyteltools.conf import settings
 from pyteltools.slf.Serafin import logger as slf_logger
 
 
@@ -17,7 +18,7 @@ logger = logging.getLogger(__name__)
 handler = logging.StreamHandler()
 handler.setFormatter(logging.Formatter('%(message)s'))
 logger.addHandler(handler)
-logger.setLevel(LOGGING_LEVEL)
+logger.setLevel(settings.LOGGING_LEVEL)
 
 
 class CustomFormatter(argparse.ArgumentDefaultsHelpFormatter, argparse.RawDescriptionHelpFormatter):
@@ -46,7 +47,7 @@ class PyTelToolsArgParse(argparse.ArgumentParser):
                               action='store_true')
         if any(arg in add_args for arg in ('in_slf', 'out_slf')):
             self.add_argument('--lang', help='Serafin language for variables detection (`fr` or `en`)',
-                              default=LANG)
+                              default=settings.LANG)
         if 'shift' in add_args:
             self.add_argument('--shift', type=float, nargs=2, help='translation (x_distance, y_distance)',
                               metavar=('X', 'Y'))
@@ -93,6 +94,6 @@ class PyTelToolsArgParse(argparse.ArgumentParser):
 
         if any(arg in new_args for arg in ('in_slf', 'out_slf')):
             if 'slf_lang' not in new_args:
-                new_args.in_lang = LANG
+                new_args.in_lang = settings.LANG
 
         return new_args
