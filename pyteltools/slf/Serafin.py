@@ -541,6 +541,8 @@ class Read(Serafin):
         @param var_ID <str>: variable ID
         @return <numpy 1D-array>: values of the variables, of length equal to the number of nodes
         """
+        if time_index < 0:
+            raise SerafinRequestError('Impossible to read a negative time index!')
         logger.debug('Reading variable %s at frame %i' % (var_ID, time_index))
         pos_var = self._get_var_index(var_ID)
         self.file.seek(self.header.header_size + time_index * self.header.frame_size

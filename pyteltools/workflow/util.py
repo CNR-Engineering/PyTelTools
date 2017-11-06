@@ -965,6 +965,7 @@ class VerticalCrossSectionPlotViewer(PlotViewer):
         self.data = None
         self.current_var = ''
         self.current_section = ''
+        self.time_index = -1
         self.section_names = []
         self.sections = []
         self.line_interpolators = []
@@ -976,6 +977,10 @@ class VerticalCrossSectionPlotViewer(PlotViewer):
         self.current_style = settings.DEFAULT_COLOR_STYLE
         self.color_styles = settings.COLOR_SYLES
 
+        self.slider = SimpleTimeDateSelection()
+        self.slider.index.editingFinished.connect(self.select_frame)
+        self.slider.value.textChanged.connect(lambda text: self.select_frame())
+
         self.create_actions()
         self.toolBar.addAction(self.select_variable_act)
         self.toolBar.addAction(self.selectSectionAct)
@@ -983,6 +988,7 @@ class VerticalCrossSectionPlotViewer(PlotViewer):
         self.toolBar.addAction(self.change_color_style_act)
         self.toolBar.addAction(self.change_color_range_act)
         self.toolBar.addSeparator()
+        self.toolBar.addWidget(self.slider)
 
         self.data_menu = QMenu('&Data', self)
         self.data_menu.addAction(self.select_variable_act_short)
@@ -1107,6 +1113,18 @@ class VerticalCrossSectionPlotViewer(PlotViewer):
         self.color_limits = (cmin, cmax)
         self.replot(False)
 
+    def select_frame(self):
+        text = self.slider.index.text()
+        try:
+            index = int(text) - 1
+        except ValueError:
+            self.slider.index.setText(str(self.time_index+1))
+            self.slider.slider.enterIndexEvent()
+            return
+        if 0 <= index < len(self.data.time):
+            self.time_index = index
+            self.replot(compute=True)
+
     def compute(self):
         """!
         Compute current cross section
@@ -1120,10 +1138,9 @@ class VerticalCrossSectionPlotViewer(PlotViewer):
         with Serafin.Read(self.data.filename, self.data.language) as input_stream:
             input_stream.header = self.data.header
             input_stream.time = self.data.time
-            nb_nodes = input_stream.header.nb_nodes_2d
 
-            z = input_stream.read_var_in_frame(0, 'Z').reshape((self.nplan, nb_nodes)).T
-            values = input_stream.read_var_in_frame(0, self.current_var).reshape((self.nplan, nb_nodes)).T
+            z = input_stream.read_var_in_frame_as_3d(self.time_index, 'Z').T
+            values = input_stream.read_var_in_frame_as_3d(self.time_index, self.current_var).T
 
         for i_pt, ((x, y, (i, j, k), interpolator), distance) in enumerate(zip(line_interpolator, distances)):
             point_y[i_pt] = interpolator.dot(z[[i, j, k]])
@@ -1155,6 +1172,7 @@ class VerticalCrossSectionPlotViewer(PlotViewer):
 
         divider = make_axes_locatable(self.canvas.axes)
         cax = divider.append_axes('right', size='5%', pad=0.2)
+        cax.set_title(self.current_var)
         self.cmap = cm.ScalarMappable(cmap=self.current_style)
         self.cmap.set_array(levels)
         self.canvas.figure.colorbar(self.cmap, cax=cax)
@@ -1183,6 +1201,7 @@ class VerticalCrossSectionPlotViewer(PlotViewer):
 
         self.nplan = self.data.header.nb_planes
 
+        self.slider.initTime(self.data.time, list(map(lambda x: x + self.data.start_time, self.data.time_second)))
         self.replot()
 
 
@@ -1318,8 +1337,8 @@ class VerticalProfilePlotViewer(TemporalPlotViewer):
             point_values = np.empty((self.n, self.k))
 
             for i in range(self.n):
-                z = input_stream.read_var_in_frame(i, 'Z').reshape((self.k, self.m))
-                values = input_stream.read_var_in_frame(i, self.current_var).reshape((self.k, self.m))
+                z = input_stream.read_var_in_frame_as_3d(i, 'Z')
+                values = input_stream.read_var_in_frame_as_3d(i, self.current_var)
 
                 for j in range(self.k):
                     point_y[i, j] = z[j, [a, b, c]].dot(interpolator)
@@ -1347,6 +1366,7 @@ class VerticalProfilePlotViewer(TemporalPlotViewer):
 
         divider = make_axes_locatable(self.canvas.axes)
         cax = divider.append_axes('right', size='5%', pad=0.2)
+        cax.set_title(self.current_var)
         self.cmap = cm.ScalarMappable(cmap=self.current_style)
         self.cmap.set_array(levels)
         self.canvas.figure.colorbar(self.cmap, cax=cax)
@@ -2080,8 +2100,8 @@ class MultiSaveVerticalProfileDialog(MultiInterpolationPlotDialog):
             point_values = np.empty((n, k))
 
             for i in range(n):
-                z = input_stream.read_var_in_frame(i, 'Z').reshape((k, m))
-                values = input_stream.read_var_in_frame(i, self.current_var).reshape((k, m))
+                z = input_stream.read_var_in_frame_as_3d(i, 'Z')
+                values = input_stream.read_var_in_frame_as_3d(i, self.current_var)
 
                 for j in range(k):
                     point_y[i, j] = z[j, [a, b, c]].dot(interpolator)
@@ -2169,10 +2189,10 @@ class MultiSaveVerticalCrossSectionDialog(MultiInterpolationPlotDialog):
         with Serafin.Read(input_data.filename, self.language) as input_stream:
             input_stream.header = input_data.header
             input_stream.time = input_data.time
-            nb_nodes = input_stream.header.nb_nodes_2d
 
-            z = input_stream.read_var_in_frame(0, 'Z').reshape((nplan, nb_nodes)).T
-            values = input_stream.read_var_in_frame(0, self.current_var).reshape((nplan, nb_nodes)).T
+            #FIXME: time index is hardcoded to 0!
+            z = input_stream.read_var_in_frame_as_3d(0, 'Z').T
+            values = input_stream.read_var_in_frame_as_3d(0, self.current_var).T
 
         for i_pt, ((x, y, (i, j, k), interpolator), distance) in enumerate(zip(line_interpolator, distances)):
             point_y[i_pt] = interpolator.dot(z[[i, j, k]])

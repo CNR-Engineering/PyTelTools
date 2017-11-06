@@ -1725,7 +1725,7 @@ class ColorMapCanvas(MapCanvas):
         super().__init__()
         self.TRANSPARENT = colorConverter.to_rgba('black', alpha=0.01)
 
-    def reinitFigure(self, mesh, values, limits=None, polygon=None):
+    def reinitFigure(self, mesh, values, variable_name, limits=None, polygon=None):
         self.fig.clear()   # remove the old color bar
         self.axes = self.fig.add_subplot(111)
 
@@ -1735,6 +1735,8 @@ class ColorMapCanvas(MapCanvas):
         else:
             xmin, xmax = limits
 
+        self.axes.set_xlabel(settings.X_AXIS_LABEL)
+        self.axes.set_ylabel(settings.Y_AXIS_LABEL)
         self.axes.set_aspect('equal', adjustable='box')
         self.axes.triplot(mesh.x, mesh.y, mesh.ikle, '--', color=self.BLACK, alpha=0.5, lw=0.3)
 
@@ -1758,9 +1760,8 @@ class ColorMapCanvas(MapCanvas):
         else:
             colors = np.array([values[i, j, k] for i, j, k in mesh.triangles])
 
-        self.axes.tripcolor(mesh.x, mesh.y, mesh.ikle, facecolors=colors,
-                            cmap='coolwarm', vmin=xmin, vmax=xmax,
-                            norm=Normalize(xmin, xmax))
+        self.axes.tripcolor(mesh.x, mesh.y, mesh.ikle, facecolors=colors, cmap=settings.DEFAULT_COLOR_STYLE,
+                            vmin=xmin, vmax=xmax, norm=Normalize(xmin, xmax))
 
         if polygon is not None:  # add the contour of the polygon
             patches = [PolygonPatch(polygon.polyline().buffer(0), fc=self.TRANSPARENT, ec='black', zorder=1)]
@@ -1769,7 +1770,8 @@ class ColorMapCanvas(MapCanvas):
         # add colorbar
         divider = make_axes_locatable(self.axes)
         cax = divider.append_axes('right', size='5%', pad=0.2)
-        cmap = cm.ScalarMappable(cmap='coolwarm', norm=Normalize(xmin, xmax))
+        cax.set_title(variable_name)
+        cmap = cm.ScalarMappable(cmap=settings.DEFAULT_COLOR_STYLE, norm=Normalize(xmin, xmax))
         cmap.set_array(np.linspace(xmin, xmax, settings.NB_COLOR_LEVELS))
         self.fig.colorbar(cmap, cax=cax)
 

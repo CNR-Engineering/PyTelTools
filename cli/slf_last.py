@@ -37,7 +37,7 @@ def slf_last(args):
         with Serafin.Write(args.out_slf, args.lang) as resout:
             resout.write_header(resin.header)
 
-            time_index = -1
+            time_index = len(resin.time) - 1
             time = resin.time[-1] if args.time is None else args.time
 
             for i, var_ID in enumerate(resin.header.var_IDs):

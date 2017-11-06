@@ -1060,6 +1060,7 @@ class VerticalCrossSectionNode(DoubleInputNode):
 
         divider = make_axes_locatable(axes)
         cax = divider.append_axes('right', size='5%', pad=0.2)
+        cax.set(self.plot_viewer.current_var)
         cmap = cm.ScalarMappable(cmap=self.plot_viewer.current_style)
         cmap.set_array(levels)
         fig.colorbar(cmap, cax=cax)

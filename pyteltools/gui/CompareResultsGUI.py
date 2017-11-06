@@ -700,8 +700,8 @@ class ErrorDistributionTab(QWidget):
                                          QMessageBox.Yes | QMessageBox.No)
             if reply == QMessageBox.No:
                 return
-
-            self.map.canvas.reinitFigure(self.input.ref_mesh, self.ewsd,
+            selected_variable = self.input.varBox.currentText().split('(')[0][:-1]
+            self.map.canvas.reinitFigure(self.input.ref_mesh, self.ewsd, selected_variable,
                                          self.xlim, self.input.ref_mesh.polygon)
             self.has_map = True
         self.btnColorMap.setEnabled(False)
