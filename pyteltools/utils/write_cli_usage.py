@@ -10,6 +10,8 @@ from glob import glob
 import sys
 
 
+sys.path.append(sys.argv[1])  # dirty method to improve modules easily
+
 class CommandLineScript:
     def __init__(self, path):
         self.path = path
@@ -18,7 +20,7 @@ class CommandLineScript:
 
     def help_msg(self):
         """Returns help message with description and usage"""
-        mod = importlib.import_module('cli.%s' % self.name)
+        mod = importlib.import_module('%s' % self.name)
         return getattr(mod, 'parser').format_help()
 
 
@@ -32,14 +34,18 @@ for file in sorted(glob(os.path.join(sys.argv[1], '*.py'))):
 # Write a markdown file (to be integrated within github wiki)
 with open(sys.argv[2], 'w') as fileout:
     # Write TOC
+    fileout.write('Available **command line** scripts are:\n')
     for script in cli_scripts:
-        fileout.write('* [%s](#%s)\n' % (script.name, script.name))
+        fileout.write('* [%s.py](#%spy)\n' % (script.name, script.name))
+    fileout.write('\n')
+    fileout.write('A **help message** is provided for each script with the argument `-h` (e.g. `slf_base.py -h`).\n')
+    fileout.write('Help messages are gathered below for each script (and this file was in fact automatically generated).\n')
     fileout.write('\n')
 
     # Write help message for each script
     for script in cli_scripts:
         print(script.name)
-        fileout.write('# %s\n' % script.name)
+        fileout.write('# %s.py\n' % script.name)
         fileout.write('```\n')
         fileout.write(script.help_msg())
         fileout.write('```\n')

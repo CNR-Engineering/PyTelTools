@@ -2190,9 +2190,9 @@ class MultiSaveVerticalCrossSectionDialog(MultiInterpolationPlotDialog):
             input_stream.header = input_data.header
             input_stream.time = input_data.time
 
-            #FIXME: time index is hardcoded to 0!
-            z = input_stream.read_var_in_frame_as_3d(0, 'Z').T
-            values = input_stream.read_var_in_frame_as_3d(0, self.current_var).T
+            time_index = self.parent.plot_viewer.time_index
+            z = input_stream.read_var_in_frame_as_3d(time_index, 'Z').T
+            values = input_stream.read_var_in_frame_as_3d(time_index, self.current_var).T
 
         for i_pt, ((x, y, (i, j, k), interpolator), distance) in enumerate(zip(line_interpolator, distances)):
             point_y[i_pt] = interpolator.dot(z[[i, j, k]])
