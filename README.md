@@ -13,9 +13,15 @@
 
 
 ## Installation and requirements
-PyTelTools relies on Python3 and requires packages which are listed in [requirements.txt](https://github.com/CNR-Engineering/PyTelTools/blob/master/requirements.txt).
+PyTelTools relies on **Python3** and requires packages which are listed in [requirements.txt](https://github.com/CNR-Engineering/PyTelTools/blob/master/requirements.txt).
 
-I can be installed as a Python module (A) or an external program (B).
+> :warning: If you have multiple versions of Python installed, beware of using the right **python** or **pip** executable (or consider using a  [virtual environnement](https://virtualenv.pypa.io/en/stable/) if you are on Linux), which has to be a Python 3 version.
+
+> :information_source: For **Windows** users who face problems with the installation of these packages (especially PyQt5, scipy or numpy), consider using a Python version with a full set of **pre-installed scientific packages**, such as [WinPython](http://winpython.github.io) or [Conda](https://conda.io). All the major packages will be already installed, therefore it should facilitate the installation.
+> 
+> It is even possible to download a WinPython portable installation for Python 3.6 (64 bits) with all the dependencies required by PyTelTools (and many more packages) already installed [here (~500 MB)](https://drive.google.com/file/d/1IihdjBCefjq8EoTOnY9WBjDwLK5-vLvc/view?usp=sharing).
+
+PyTelTools can be installed as a Python module (A) or an external program (B).
 The recommended installation is within Python (A) as it becomes fully integrated with Python and more easier to install, upgrade and use.
 
 ### A) Installation as Python module
@@ -34,6 +40,11 @@ pip install -e git://github.com/CNR-Engineering/PyTelTools.git#egg=pyteltools --
 pip install -e git://github.com/CNR-Engineering/PyTelTools.git#egg=pyteltools
 ```
 
+> :information_source: If you do not have a `git` client (which might be the case if you are using Windows), you can try to install it with:
+> ```python
+> pip install https://github.com/CNR-Engineering/PyTelTools/zipball/master
+> ```
+
 #### Upgrade
 To upgrade PyTelTools, simply use **pip**:
 ```bash
@@ -48,7 +59,8 @@ Clone source code repository in a folder `PyTelTools`.
 $ git clone https://github.com/CNR-Engineering/PyTelTools.git
 ```
 
-If you do not have a `git` client, simply unzip the [source code repository](https://github.com/CNR-Engineering/PyTelTools/archive/master.zip).
+> :information_source: If you do not have a `git` client, simply unzip the [source code repository](https://github.com/CNR-Engineering/PyTelTools/archive/master.zip).
+
 For the next steps, the source code is expected to be in a folder named `PyTelTools` (containing this `README.md` file).
 
 #### B.2) Install dependencies
