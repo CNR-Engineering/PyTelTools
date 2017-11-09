@@ -13,10 +13,10 @@ from .util import LineMapCanvas, LoadMeshDialog, MapViewer, MultiFrameLinePlotVi
 
 
 class WriteCSVProcess(OutputThread):
-    def __init__(self, separator, digits, mesh):
+    def __init__(self, separator, fmt_float, mesh):
         super().__init__()
         self.separator = separator
-        self.format_string = '{0:.%df}' % digits
+        self.fmt_float = fmt_float
         self.mesh = mesh
 
     def write_header(self, output_stream, selected_vars):
@@ -35,7 +35,7 @@ class WriteCSVProcess(OutputThread):
         for u, v, row in MeshInterpolator.interpolate_along_lines(input_stream, selected_vars,
                                                                   list(range(len(input_stream.time))),
                                                                   indices_nonempty, line_interpolators,
-                                                                  self.format_string):
+                                                                  self.fmt_float):
             output_stream.write(self.separator.join(row))
             output_stream.write('\n')
             self.tick.emit(100 * (v+1+u*nb_frames) * inv_steps)
@@ -336,7 +336,7 @@ class CSVTab(QWidget):
         indices_nonempty = [i for i in range(len(self.input.lines)) if self.input.line_interpolators[i][0]]
 
         # initialize the progress bar
-        process = WriteCSVProcess(self.parent.csv_separator, self.parent.digits, self.input.mesh)
+        process = WriteCSVProcess(self.parent.csv_separator, self.parent.fmt_float, self.input.mesh)
         progressBar = OutputProgressDialog()
 
         try:

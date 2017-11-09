@@ -21,8 +21,14 @@ LANG = 'fr'
 
 # ~> INPUTS/OUTPUTS
 
-# Number of digits to write for csv
-DIGITS = 4
+# Format to write float values (in CSV, LandXML, VTK)
+FMT_FLOAT = '{:.5e}'  # 1.53849e5 (6 significant numbers)
+
+# Format to write x, y (and z) coordinates (in CSV, LandXML, VTK)
+FMT_COORD = '{:.4f}'  # 153849.2841
+
+# Representation of a "Not A Number" value (to write in CSV files)
+NAN_STR = '#N/A'
 
 # CSV column delimiter
 CSV_SEPARATOR = ';'

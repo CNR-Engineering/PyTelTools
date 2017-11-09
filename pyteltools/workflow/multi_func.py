@@ -5,6 +5,7 @@ import os
 from shapely.geometry import Polygon
 import struct
 
+from pyteltools.conf import settings
 from pyteltools.geom import BlueKenue, Shapefile
 from pyteltools.slf.datatypes import SerafinData, PolylineData, PointData, CSVData
 from pyteltools.slf.flux import TriangularVectorField, FluxCalculator
@@ -722,7 +723,7 @@ def construct_mesh(mesh):
         mesh.index.insert(i, t.bounds, obj=(i, j, k))
 
 
-def compute_volume(node_id, fid, data, aux_data, options, csv_separator, format_string):
+def compute_volume(node_id, fid, data, aux_data, options, csv_separator, fmt_float):
     if not data.header.is_2d:
         return False, node_id, fid, None, fail_message('the input file is not 2d', 'Compute Volume',
                                                        data.job_id)
@@ -783,7 +784,7 @@ def compute_volume(node_id, fid, data, aux_data, options, csv_separator, format_
 
         csv_data = CSVData(data.filename, calculator.get_csv_header())
 
-        result = calculator.run(format_string)
+        result = calculator.run(fmt_float)
         for row in result:
             csv_data.add_row(row)
 
@@ -791,7 +792,7 @@ def compute_volume(node_id, fid, data, aux_data, options, csv_separator, format_
     return True, node_id, fid, None, success_message('Compute Volume', data.job_id)
 
 
-def compute_flux(node_id, fid, data, aux_data, options, csv_separator, format_string):
+def compute_flux(node_id, fid, data, aux_data, options, csv_separator, fmt_float):
     if not data.header.is_2d:
         return False, node_id, fid, None, fail_message('the input file is not 2d', 'Compute Flux',
                                                        data.job_id)
@@ -857,7 +858,7 @@ def compute_flux(node_id, fid, data, aux_data, options, csv_separator, format_st
         calculator.construct_intersections()
 
         csv_data = CSVData(data.filename, ['time'] + section_names)
-        result = calculator.run(format_string)
+        result = calculator.run(fmt_float)
         for row in result:
             csv_data.add_row(row)
 
@@ -865,7 +866,7 @@ def compute_flux(node_id, fid, data, aux_data, options, csv_separator, format_st
     return True, node_id, fid, None, success_message('Compute Flux', data.job_id)
 
 
-def interpolate_points(node_id, fid, data, aux_data, options, csv_separator, format_string):
+def interpolate_points(node_id, fid, data, aux_data, options, csv_separator, fmt_float):
     if not data.header.is_2d:
         return False, node_id, fid, None, fail_message('the input file is not 2d', 'Interpolate on Points',
                                                        data.job_id)
@@ -922,7 +923,8 @@ def interpolate_points(node_id, fid, data, aux_data, options, csv_separator, for
     header = ['time']
     for index, (x, y) in zip(indices, points):
         for var in selected_vars:
-            header.append('Point %d %s (%.4f, %.4f)' % (index+1, var, x, y))
+            header.append('Point %d %s (%s, %s)' % (index + 1, var, settings.FMT_COORD.format(x),
+                                                    settings.FMT_COORD.format(y)))
     csv_data = CSVData(data.filename, header)
 
     nb_selected_vars = len(selected_vars)
@@ -940,7 +942,7 @@ def interpolate_points(node_id, fid, data, aux_data, options, csv_separator, for
 
             for (i, j, k), interpolator in point_interpolators:
                 for index_var in range(nb_selected_vars):
-                    row.append(format_string.format(interpolator.dot(var_values[index_var][[i, j, k]])))
+                    row.append(fmt_float.format(interpolator.dot(var_values[index_var][[i, j, k]])))
             csv_data.add_row(row)
 
     csv_data.write(filename, csv_separator)
@@ -949,7 +951,7 @@ def interpolate_points(node_id, fid, data, aux_data, options, csv_separator, for
                                  '%s point%s inside the mesh' % (nb_inside, 's are' if nb_inside > 1 else ' is'))
 
 
-def interpolate_lines(node_id, fid, data, aux_data, options, csv_separator, format_string):
+def interpolate_lines(node_id, fid, data, aux_data, options, csv_separator, fmt_float):
     if not data.header.is_2d:
         return False, node_id, fid, None, fail_message('the input file is not 2d', 'Interpolate along Lines',
                                                        data.job_id)
@@ -1006,7 +1008,7 @@ def interpolate_lines(node_id, fid, data, aux_data, options, csv_separator, form
 
         for _, _, row in MeshInterpolator.interpolate_along_lines(input_stream, selected_vars,
                                                                   data.selected_time_indices, indices_nonempty,
-                                                                  line_interpolators, format_string):
+                                                                  line_interpolators, fmt_float):
             csv_data.add_row(row)
 
     csv_data.write(filename, csv_separator)
@@ -1016,7 +1018,7 @@ def interpolate_lines(node_id, fid, data, aux_data, options, csv_separator, form
                                                                 's intersect' if nb_nonempty > 1 else ' intersects'))
 
 
-def project_lines(node_id, fid, data, aux_data, options, csv_separator, format_string):
+def project_lines(node_id, fid, data, aux_data, options, csv_separator, fmt_float):
     if not data.header.is_2d:
         return False, node_id, fid, None, fail_message('the input file is not 2d', 'Project Lines',
                                                        data.job_id)
@@ -1090,7 +1092,7 @@ def project_lines(node_id, fid, data, aux_data, options, csv_separator, format_s
         input_stream.time = data.time
 
         for _, row in MeshInterpolator.project_lines(input_stream, selected_vars, time_index, indices_nonempty,
-                                                     max_distance, reference, line_interpolators, format_string):
+                                                     max_distance, reference, line_interpolators, fmt_float):
             csv_data.add_row(row)
 
     csv_data.write(filename, csv_separator)

@@ -339,12 +339,12 @@ class PyTelToolWidget(QWidget):
         if parent is None:
             self.language = settings.LANG
             self.csv_separator = settings.CSV_SEPARATOR
-            self.digits = settings.DIGITS
+            self.fmt_float = settings.FMT_FLOAT
             self.logging_level = settings.LOGGING_LEVEL
         else:
             self.language = parent.language
             self.csv_separator = parent.csv_separator
-            self.digits = parent.digits
+            self.fmt_float = parent.fmt_float
             self.logging_level = parent.logging_level
         self.setMinimumWidth(600)
         self.setWindowFlags(self.windowFlags() | Qt.CustomizeWindowHint)
@@ -1116,8 +1116,10 @@ class ConstructIndexThread(OutputThread):
             self.mesh = TriangularVectorField(input_header, False)
         elif mesh_type == 'comparison':
             self.mesh = ReferenceMesh(input_header, False)
-        else:
+        elif mesh_type == 'interpolation':
             self.mesh = MeshInterpolator(input_header, False)
+        else:
+            raise NotImplementedError('Mesh type "%s" is unknown' % mesh_type)
 
     def run(self):
         logging.info('Processing the mesh')
@@ -2270,7 +2272,8 @@ class PointPlotViewer(TemporalPlotViewer):
     def _to_column(self, point):
         point_index = int(point.split()[1]) - 1
         x, y = self.points.points[point_index]
-        return 'Point %d %s (%.4f|%.4f)' % (point_index+1, self.current_var, x, y)
+        return 'Point %d %s (%s|%s)' % (point_index+1, self.current_var, settings.FMT_COORD.format(x),
+                                        settings.FMT_COORD.format(y))
 
     def _defaultYLabel(self):
         word = {'fr': 'de', 'en': 'of'}[self.language]

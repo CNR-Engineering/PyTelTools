@@ -13,10 +13,10 @@ from .util import LineMapCanvas, LoadMeshDialog, MapViewer, open_polylines, Outp
 
 
 class WriteCSVProcess(OutputThread):
-    def __init__(self, separator, digits, mesh):
+    def __init__(self, separator, fmt_float, mesh):
         super().__init__()
         self.mesh = mesh
-        self.format_string = '{0:.%df}' % digits
+        self.fmt_float = fmt_float
         self.separator = separator
 
     def write_header(self, output_stream, selected_vars):
@@ -51,16 +51,16 @@ class WriteCSVProcess(OutputThread):
                     continue
                 output_stream.write(str(id_line+1))
                 output_stream.write(self.separator)
-                output_stream.write(self.format_string.format(x))
+                output_stream.write(self.fmt_float.format(x))
                 output_stream.write(self.separator)
-                output_stream.write(self.format_string.format(y))
+                output_stream.write(self.fmt_float.format(y))
                 output_stream.write(self.separator)
-                output_stream.write(self.format_string.format(distance))
+                output_stream.write(self.fmt_float.format(distance))
 
                 for i_var, var in enumerate(selected_vars):
                     values = var_values[i_var]
                     output_stream.write(self.separator)
-                    output_stream.write(self.format_string.format(interpolator.dot(values[[i, j, k]])))
+                    output_stream.write(self.fmt_float.format(interpolator.dot(values[[i, j, k]])))
                 output_stream.write('\n')
 
             self.tick.emit(int(100 * (u+1) / nb_lines))
@@ -392,7 +392,7 @@ class CSVTab(QWidget):
         time_index = int(self.timeSelection.index.text()) - 1
 
         # initialize the progress bar
-        process = WriteCSVProcess(self.parent.csv_separator, self.parent.digits, self.input.mesh)
+        process = WriteCSVProcess(self.parent.csv_separator, self.input.mesh)
         progressBar = OutputProgressDialog()
 
         try:

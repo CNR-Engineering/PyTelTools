@@ -14,14 +14,14 @@ from .util import FluxPlotViewer, LineMapCanvas, LoadMeshDialog, MapViewer, open
 
 class FluxCalculatorThread(OutputThread):
     def __init__(self, flux_type, var_IDs, input_stream, section_names, sections,
-                 time_sampling_frequency, mesh, separator, digits):
+                 time_sampling_frequency, mesh, separator, fmt_float):
         super().__init__()
 
         self.calculator = FluxCalculator(flux_type, var_IDs, input_stream,
                                          section_names, sections, time_sampling_frequency)
         self.mesh = mesh
         self.separator = separator
-        self.format_string = '{0:.%df}' % digits
+        self.fmt_float = fmt_float
 
     def run_calculator(self):
         self.tick.emit(6)
@@ -51,7 +51,7 @@ class FluxCalculatorThread(OutputThread):
             for j in range(len(self.calculator.sections)):
                 intersections = self.calculator.intersections[j]
                 flux = self.calculator.flux_in_frame(intersections, values)
-                i_result.append(self.format_string.format(flux))
+                i_result.append(self.fmt_float.format(flux))
 
             result.append(i_result)
             self.tick.emit(30 + int(70 * (i+1) / len(self.calculator.time_indices)))
@@ -318,7 +318,7 @@ class InputTab(SerafinInputTab):
                 input_stream.time = self.data.time
                 calculator = FluxCalculatorThread(flux_type, self.var_IDs,
                                                   input_stream, names, self.polylines, sampling_frequency,
-                                                  self.mesh, self.parent.csv_separator, self.parent.digits)
+                                                  self.mesh, self.parent.csv_separator, self.parent.fmt_float)
                 progressBar.setValue(5)
                 QApplication.processEvents()
 

@@ -4,6 +4,8 @@ Flux calculations across sections
 
 import numpy as np
 
+from pyteltools.conf import settings
+
 from .interpolation import Interpolator
 from .mesh2D import Mesh2D
 
@@ -235,7 +237,7 @@ class FluxCalculator:
         else:
             return TriangularVectorField.mass_flux(intersections, values[0], values[1], values[2], values[3])
 
-    def run(self, format_string='{0:.6f}'):
+    def run(self, fmt_float=settings.FMT_FLOAT):
         """!
         Separate the major part of the computation, allowing a GUI override
         """
@@ -249,7 +251,7 @@ class FluxCalculator:
             for j in range(len(self.sections)):
                 intersections = self.intersections[j]
                 flux = self.flux_in_frame(intersections, values)
-                i_result.append(format_string.format(flux))
+                i_result.append(fmt_float.format(flux))
             result.append(i_result)
         return result
 

@@ -71,6 +71,11 @@ class SerafinHeader:
     """
 
     def __init__(self, file, file_size, language):
+        """!
+        @param file <_io.BufferedReader>: input Serafin stream
+        @param file_size <int>: file size (in bytes)
+        @param language <str>: Serafin variable name language ('fr' or 'en')
+        """
         self.file_size = file_size
         if language not in ('fr', 'en'):
             raise SerafinRequestError('Language (for Serafin variables) %s is not implemented' % language)
@@ -486,6 +491,10 @@ class Read(Serafin):
     @brief Serafin file input stream
     """
     def __init__(self, filename, language):
+        """!
+        @param filename <str>: path to input Serafin file
+        @param language <str>: Serafin variable name language ('fr' or 'en')
+        """
         super().__init__(filename, 'rb', language)
         self.header = None
         self.time = []
@@ -513,6 +522,13 @@ class Read(Serafin):
             self.file.seek(self.header.frame_size - 8 - self.header.float_size, 1)
 
     def subset_time(self, start, end, ech):
+        """!
+        Get a subset of the time frames list
+        @param start <float>: starting time (in seconds)
+        @param end <float>: ending time (in seconds)
+        @param ech <int>: sampling frequency
+        @return <[float]>: sampled time serie
+        """
         new_time = []
         for time_index, time in enumerate(self.time):
             if start <= time <= end:
@@ -583,6 +599,10 @@ class Write(Serafin):
     @brief Serafin file output stream
     """
     def __init__(self, filename, language):
+        """!
+        @param filename <str>: path to output Serafin file
+        @param language <str>: Serafin variable name language ('fr' or 'en')
+        """
         super().__init__(filename, 'wb', language)
         logger.info('Writing the output file: "%s"' % filename)
 
@@ -658,7 +678,8 @@ class Write(Serafin):
     def write_entire_frame(self, header, time_to_write, values):
         """!
         @brief write all variables/nodes values
-        @param time_to_write <float>: time in second
+        @param header <SerafinHeader>: output header
+        @param time_to_write <float>: output time (in seconds)
         @param values <numpy 2D-array>: values to write, of dimension (nb_var, nb_nodes)
         """
         self.file.write(header.pack_int(header.float_size))

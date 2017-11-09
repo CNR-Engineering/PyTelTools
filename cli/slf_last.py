@@ -22,7 +22,7 @@ def slf_last(args):
         if args.shift:
             output_header.transform_mesh(Translation(args.shift[0], args.shift[1], 0))
 
-        # Toogle output file endianness if necessary
+        # Toggle output file endianness if necessary
         if args.toggle_endianness:
             output_header.toggle_endianness()
 
@@ -33,14 +33,14 @@ def slf_last(args):
             else:
                 logger.warn('Input file is already single precision! Argument `--to_single_precision` is ignored')
 
-        values = np.empty((output_header.nb_var, resin.header.nb_nodes), dtype=resin.header.np_float_type)
+        values = np.empty((output_header.nb_var, output_header.nb_nodes), dtype=output_header.np_float_type)
         with Serafin.Write(args.out_slf, args.lang) as resout:
-            resout.write_header(resin.header)
+            resout.write_header(output_header)
 
             time_index = len(resin.time) - 1
             time = resin.time[-1] if args.time is None else args.time
 
-            for i, var_ID in enumerate(resin.header.var_IDs):
+            for i, var_ID in enumerate(output_header.var_IDs):
                 values[i, :] = resin.read_var_in_frame(time_index, var_ID)
 
             resout.write_entire_frame(output_header, time, values)
@@ -58,4 +58,4 @@ if __name__ == '__main__':
         slf_last(args)
     except (Serafin.SerafinRequestError, Serafin.SerafinValidationError):
         # Message is already reported by slf logger
-        sys.exit(2)
+        sys.exit(1)

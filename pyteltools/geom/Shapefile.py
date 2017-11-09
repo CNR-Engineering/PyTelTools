@@ -5,6 +5,7 @@ Read and write .shp files
 import numpy as np
 import os
 import shapefile
+from shapefile import ShapefileException as ShpException
 from struct import pack, error
 
 from .geometry import Polyline
@@ -42,15 +43,24 @@ def get_polygons(input_filename):
 
 
 def get_all_fields(input_filename):
+    """!
+    Get all fields characteristics of a shapefile
+    @param input_filename <str>: path to shapefile
+    @return <list([str, str, int, int])>: list composed of a tuple (attribute name, attribute type, length and
+        precision) for each field
+    """
     sf = shapefile.Reader(input_filename)
     return sf.fields[1:]
 
 
 def get_attribute_names(input_filename):
-    sf = shapefile.Reader(input_filename)
-    names = []
-    indices = []
-    for i, (field_name, field_type, _, _) in enumerate(sf.fields[1:]):
+    """!
+    Get attributes (except the M value) of a shapefile
+    @param input_filename <str>: path to shapefile
+    @return <[str], [int]>: list of field names and indices
+    """
+    names, indices = [], []
+    for i, (field_name, field_type, _, _) in enumerate(get_all_fields(input_filename)):
         if field_type == 'M':
             continue
         else:
@@ -63,8 +73,12 @@ def get_attribute_names(input_filename):
 
 
 def get_numeric_attribute_names(input_filename):
-    sf = shapefile.Reader(input_filename)
-    for i, (field_name, field_type, _, _) in enumerate(sf.fields[1:]):
+    """!
+    Get all numeric attributes of a shapefile
+    @param input_filename <str>: path to shapefile
+    @return <[str], [int]>: list of field names and indices
+    """
+    for i, (field_name, field_type, _, _) in enumerate(get_all_fields(input_filename)):
         if field_type == 'N' or field_type == 'F':
             if type(field_name) == bytes:
                 field_name = field_name.decode('latin-1')
@@ -72,25 +86,35 @@ def get_numeric_attribute_names(input_filename):
 
 
 def get_points(input_filename, indices=None, with_z=False):
-    sf = shapefile.Reader(input_filename)
-    for record in sf.shapeRecords():
-        if record.shape.shapeType in [1, 11, 21]:
-            attributes = record.record
-            decoded_attributes = []
-            for attribute in attributes:
-                if type(attribute) == bytes:
-                    decoded_attributes.append(attribute.decode('latin-1'))
+    """!
+    Get specific points (coordinates and attributes) from a shapefile
+    @param input_filename <str>: path to shapefile
+    @param indices <[int]>: indices of points
+    @param with_z <bool>: extract z coordinate
+    @return <tuple([(x, y, (z)), list(float)])>: tuple of coordinates and list of corresponding field values
+    """
+    try:
+        sf = shapefile.Reader(input_filename)
+        for record in sf.shapeRecords():
+            if record.shape.shapeType in [1, 11, 21]:
+                attributes = record.record
+                decoded_attributes = []
+                for attribute in attributes:
+                    if type(attribute) == bytes:
+                        decoded_attributes.append(attribute.decode('latin-1'))
+                    else:
+                        decoded_attributes.append(attribute)
+                if indices is not None:
+                    decoded_attributes = [decoded_attributes[i] for i in indices]
+                if not with_z:
+                    yield tuple(record.shape.points[0]), decoded_attributes
                 else:
-                    decoded_attributes.append(attribute)
-            if indices is not None:
-                decoded_attributes = [decoded_attributes[i] for i in indices]
-            if not with_z:
-                yield tuple(record.shape.points[0]), decoded_attributes
-            else:
-                if record.shape.shapeType == 11:
-                    x, y = record.shape.points[0]
-                    z = record.shape.z[0]
-                    yield (x, y, z), decoded_attributes
+                    if record.shape.shapeType == 11:
+                        x, y = record.shape.points[0]
+                        z = record.shape.z[0]
+                        yield (x, y, z), decoded_attributes
+    except error:
+        raise ShpException('Error while reading Shapefile. Inconsistent bytes.')
 
 
 def write_bk_points(output_filename, z_name, points):
@@ -127,6 +151,7 @@ class MyWriter(shapefile.Writer):
     This is a reimplementation of Writer class of pyshp 1.2.11
     The MultiPointZ- and MultiPointM-writing bug is fixed by changing four lines
     see the lines commented with    # HERE GOES THE REIMPLEMENTATION
+    Moreover every RuntimeError were replaced by a ShpException
     """
     def __init__(self, shapeType=None):
         super().__init__(shapeType)
@@ -149,7 +174,7 @@ class MyWriter(shapefile.Writer):
                 try:
                     f.write(pack("<4d", *self.__bbox([s])))
                 except error:
-                    raise RuntimeError("Failed to write bounding box for record %s. Expected floats." % recNum)
+                    raise ShpException("Failed to write bounding box for record %s. Expected floats." % recNum)
             # Shape types with parts
             if s.shapeType in (3,5,13,15,23,25,31):
                 # Number of parts
@@ -171,20 +196,20 @@ class MyWriter(shapefile.Writer):
                 try:
                     [f.write(pack("<2d", *p[:2])) for p in s.points]
                 except error:
-                    raise RuntimeError("Failed to write points for record %s. Expected floats." % recNum)
+                    raise ShpException("Failed to write points for record %s. Expected floats." % recNum)
             # Write z extremes and values
             if s.shapeType in (13,15,18,31):
                 try:
                     f.write(pack("<2d", *self.__zbox([s])))
                 except error:
-                    raise RuntimeError("Failed to write elevation extremes for record %s. Expected floats." % recNum)
+                    raise ShpException("Failed to write elevation extremes for record %s. Expected floats." % recNum)
                 try:
                     if hasattr(s,"z"):
                         f.write(pack("<%sd" % len(s.z), *s.z))
                     else:
                         [f.write(pack("<d", p[2])) for p in s.points]
                 except error:
-                    raise RuntimeError("Failed to write elevation values for record %s. Expected floats." % recNum)
+                    raise ShpException("Failed to write elevation values for record %s. Expected floats." % recNum)
             # Write m extremes and values
             if s.shapeType in (13,15,18,23,25,28,31):
                 try:
@@ -193,17 +218,17 @@ class MyWriter(shapefile.Writer):
                     else:
                         f.write(pack("<2d", *self.__mbox([s])))
                 except error:
-                    raise RuntimeError("Failed to write measure extremes for record %s. Expected floats" % recNum)
+                    raise ShpException("Failed to write measure extremes for record %s. Expected floats" % recNum)
                 try:
                     [f.write(pack("<d", len(p) > 3 and p[3] or 0)) for p in s.points]
                 except error:
-                    raise RuntimeError("Failed to write measure values for record %s. Expected floats" % recNum)
+                    raise ShpException("Failed to write measure values for record %s. Expected floats" % recNum)
             # Write a single point
             if s.shapeType in (1,11,21):
                 try:
                     f.write(pack("<2d", s.points[0][0], s.points[0][1]))
                 except error:
-                    raise RuntimeError("Failed to write point for record %s. Expected floats." % recNum)
+                    raise ShpException("Failed to write point for record %s. Expected floats." % recNum)
             # Write a single Z value
             if s.shapeType == 11:
                 if hasattr(s, "z"):
@@ -212,14 +237,14 @@ class MyWriter(shapefile.Writer):
                             s.z = (0,)
                         f.write(pack("<d", s.z[0]))
                     except error:
-                        raise RuntimeError("Failed to write elevation value for record %s. Expected floats." % recNum)
+                        raise ShpException("Failed to write elevation value for record %s. Expected floats." % recNum)
                 else:
                     try:
                         if len(s.points[0])<3:
                             s.points[0].append(0)
                         f.write(pack("<d", s.points[0][2]))
                     except error:
-                        raise RuntimeError("Failed to write elevation value for record %s. Expected floats." % recNum)
+                        raise ShpException("Failed to write elevation value for record %s. Expected floats." % recNum)
             # Write a single M value
             if s.shapeType in (11,21):
                 if hasattr(s, "m"):
@@ -228,14 +253,14 @@ class MyWriter(shapefile.Writer):
                             s.m = (0,)
                         f.write(pack("<1d", s.m[0]))
                     except error:
-                        raise RuntimeError("Failed to write measure value for record %s. Expected floats." % recNum)
+                        raise ShpException("Failed to write measure value for record %s. Expected floats." % recNum)
                 else:
                     try:
                         if len(s.points[0])<4:
                             s.points[0].append(0)
                         f.write(pack("<1d", s.points[0][3]))
                     except error:
-                        raise RuntimeError("Failed to write measure value for record %s. Expected floats." % recNum)
+                        raise ShpException("Failed to write measure value for record %s. Expected floats." % recNum)
             # Finalize record length as 16-bit words
             finish = f.tell()
             length = (finish - start) // 2
@@ -324,7 +349,7 @@ class MyWriter(shapefile.Writer):
             try:
                 f.write(pack("<4d", *self.bbox()))
             except error:
-                raise RuntimeError("Failed to write shapefile bounding box. Floats required.")
+                raise ShpException("Failed to write shapefile bounding box. Floats required.")
         else:
             f.write(pack("<4d", 0,0,0,0))
         # Elevation
@@ -335,12 +360,12 @@ class MyWriter(shapefile.Writer):
             f.write(pack("<4d", z[0], z[1], m[0], m[1]))
         except error:
 
-            raise RuntimeError("Failed to write shapefile elevation and measure values. Floats required.")
+            raise ShpException("Failed to write shapefile elevation and measure values. Floats required.")
 
     def __getFileObj(self, f):
         """Safety handler to verify file-like objects"""
         if not f:
-            raise RuntimeError("No file-like object available.")
+            raise ShpException("No file-like object available.")
         elif hasattr(f, "write"):
             return f
         else:

@@ -2,6 +2,7 @@ import os
 from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 
+from pyteltools.conf import settings
 from pyteltools.gui.util import ConditionDialog
 from pyteltools.slf.datatypes import CSVData
 from pyteltools.slf.flux import TriangularVectorField, FluxCalculator
@@ -492,7 +493,7 @@ class ComputeVolumeNode(TwoInOneOutNode):
 
     def _run_volume(self):
         # process options
-        format_string = '{0:.%df}' % self.scene().digits
+        fmt_float = self.scene().fmt_float
         polygons = self.second_in_port.mother.parentItem().data.lines
         polygon_names = ['Polygon %d' % (i+1) for i in range(len(polygons))]
         if self.sup_volume:
@@ -536,9 +537,9 @@ class ComputeVolumeNode(TwoInOneOutNode):
                     volume = calculator.volume_in_frame_in_polygon(weight, values, calculator.polygons[j])
                     if calculator.volume_type == VolumeCalculator.POSITIVE:
                         for v in volume:
-                            i_result.append(format_string.format(v))
+                            i_result.append(fmt_float.format(v))
                     else:
-                        i_result.append(format_string.format(volume))
+                        i_result.append(fmt_float.format(volume))
                 self.data.add_row(i_result)
 
                 self.progress_bar.setValue(100 * (i+1) / len(calculator.time_indices))
@@ -794,7 +795,7 @@ class ComputeFluxNode(TwoInOneOutNode):
 
     def _run_flux(self):
         # process options
-        format_string = '{0:.%df}' % self.scene().digits
+        fmt_float = self.scene().fmt_float
         sections = self.second_in_port.mother.parentItem().data.lines
         section_names = ['Section %d' % (i+1) for i in range(len(sections))]
 
@@ -848,7 +849,7 @@ class ComputeFluxNode(TwoInOneOutNode):
                 for j in range(len(calculator.sections)):
                     intersections = calculator.intersections[j]
                     flux = calculator.flux_in_frame(intersections, values)
-                    i_result.append(format_string.format(flux))
+                    i_result.append(fmt_float.format(flux))
                 self.data.add_row(i_result)
 
                 self.progress_bar.setValue(100 * (i+1) / len(calculator.time_indices))
@@ -977,11 +978,12 @@ class InterpolateOnPointsNode(TwoInOneOutNode):
         return points, point_interpolators, indices_inside, nb_inside
 
     def _run_interpolate(self, points, point_interpolators, indices_inside, selected_vars):
-        format_string = '{0:.%df}' % self.scene().digits
+        fmt_float = self.scene().fmt_float
         header = ['time']
         for index, (x, y) in zip(indices_inside, points):
             for var in selected_vars:
-                header.append('Point %d %s (%.4f|%.4f)' % (index+1, var, x, y))
+                header.append('Point %d %s (%s|%s)' % (index+1, var, settings.FMT_COORD.format(x),
+                                                       settings.FMT_COORD.format(y)))
         self.data = CSVData(self.in_data.filename, header)
         self.data.metadata = {'start time': self.in_data.start_time, 'var IDs': selected_vars,
                               'language': self.in_data.language,
@@ -1003,7 +1005,7 @@ class InterpolateOnPointsNode(TwoInOneOutNode):
 
                 for (i, j, k), interpolator in point_interpolators:
                     for index_var in range(nb_selected_vars):
-                        row.append(format_string.format(interpolator.dot(var_values[index_var][[i, j, k]])))
+                        row.append(fmt_float.format(interpolator.dot(var_values[index_var][[i, j, k]])))
 
                 self.data.add_row(row)
                 self.progress_bar.setValue(100 * (index+1) / nb_frames)
@@ -1023,7 +1025,7 @@ class InterpolateOnPointsNode(TwoInOneOutNode):
             if index >= len(points):
                 return False
             x, y = points[index]
-            point_coord = '(%.4f|%.4f)' % (x, y)
+            point_coord = '(%s|%s)' % (settings.FMT_COORD.format(x), settings.FMT_COORD.format(y))
             if point_coord != coord:
                 return False
         for var in selected_vars:
@@ -1128,7 +1130,7 @@ class InterpolateAlongLinesNode(DoubleInputNode):
                 suffix, in_source_folder, dir_path, double_name, overwrite
 
     def _run_interpolate(self, selected_vars):
-        format_string = '{0:.%df}' % self.scene().digits
+        fmt_float = self.scene().fmt_float
         self.progress_bar.setVisible(True)
         mesh = MeshInterpolator(self.in_data.header, False)
 
@@ -1158,7 +1160,7 @@ class InterpolateAlongLinesNode(DoubleInputNode):
             for u, v, row in MeshInterpolator.interpolate_along_lines(input_stream, selected_vars,
                                                                       self.in_data.selected_time_indices,
                                                                       indices_nonempty,
-                                                                      line_interpolators, format_string):
+                                                                      line_interpolators, fmt_float):
                 self.data.add_row(row)
                 self.progress_bar.setValue(100 * (v+1+u*nb_frames) * inv_steps)
                 QApplication.processEvents()
@@ -1381,7 +1383,7 @@ class ProjectLinesNode(DoubleInputNode):
             self.fail('the reference line does not intersect the mesh continuously.')
             return
 
-        format_string = '{0:.%df}' % self.scene().digits
+        fmt_float = self.scene().fmt_float
         reference = lines[self.reference_index]
 
         header = ['line', 'x', 'y', 'distance'] + selected_vars
@@ -1394,7 +1396,7 @@ class ProjectLinesNode(DoubleInputNode):
             input_stream.time = input_data.time
 
             for u, row in MeshInterpolator.project_lines(input_stream, selected_vars, time_index, indices_nonempty,
-                                                         max_distance, reference, line_interpolators, format_string):
+                                                         max_distance, reference, line_interpolators, fmt_float):
                 self.data.add_row(row)
                 self.progress_bar.setValue(100 * (u+1) / nb_lines)
                 QApplication.processEvents()

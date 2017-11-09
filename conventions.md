@@ -29,7 +29,8 @@ Example:
 import sys
 from time import time
 
-from pyteltools.conf.settings import CSV_SEPARATOR, DIGITS, LANG, SCENE_SIZE
+from pyteltools.conf import settings
+from pyteltools.slf import Serafin
 
 from .Node import Box, Link, Port
 from .util import logger
@@ -53,17 +54,18 @@ import pyteltools.slf.misc as operations
 
 ## Logging
 Use with following logging levels (with corresponding numeric value) :
-* CRITICAL (40)
-* WARNING (30)
-* INFO (20)
-* DEBUG (10)
+* `CRITICAL` (40)
+* `WARNING` (30)
+* `INFO` (20)
+* `DEBUG` (10)
 
 ## CLI exiting code
 * 0 = successful termination
-* 1 = error with command-line arguments
-* 2 = error while parsing file
+* 1 = different kind of errors/inconsistencies: in input/output, error during computation, ... 
+* 2 = error or inconsistencies with command-line arguments
+* 3 = file error (parser, writer)
 
 ## Code documentation
-Developper documentation is generated with doyxgen and provided on https://cnr-engineering.github.io/PyTelTools.
+Developer documentation is generated with doyxgen and provided on https://cnr-engineering.github.io/PyTelTools.
 
 Doxygen will extract preformatted comments following [some conventions](https://www.stack.nl/~dimitri/doxygen/manual/docblocks.html#pythonblocks).

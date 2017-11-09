@@ -5,6 +5,7 @@ Volume calculations in polygons
 import numpy as np
 import shapely.geometry as geom
 
+from pyteltools.conf import settings
 from pyteltools.geom import geometry
 
 from .interpolation import Interpolator
@@ -285,7 +286,7 @@ class VolumeCalculator:
                 values -= second_values
         return values
 
-    def run(self, format_string='{0:.6f}'):
+    def run(self, fmt_float=settings.FMT_FLOAT):
         """!
         Separate the major part of the computation, allowing a GUI override
         """
@@ -299,9 +300,9 @@ class VolumeCalculator:
                 volume = self.volume_in_frame_in_polygon(weight, values, self.polygons[j])
                 if self.volume_type == VolumeCalculator.POSITIVE:
                     for v in volume:
-                        i_result.append(format_string.format(v))
+                        i_result.append(fmt_float.format(v))
                 else:
-                    i_result.append(format_string.format(volume))
+                    i_result.append(fmt_float.format(volume))
             result.append(i_result)
         return result
 

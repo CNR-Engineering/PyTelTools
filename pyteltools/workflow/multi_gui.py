@@ -92,7 +92,7 @@ class MultiScene(QGraphicsScene):
 
         self.language = settings.LANG
         self.csv_separator = settings.CSV_SEPARATOR
-        self.digits = settings.DIGITS
+        self.fmt_float = settings.FMT_FLOAT
 
         self.setSceneRect(QRectF(0, 0, settings.SCENE_SIZE[0], settings.SCENE_SIZE[1]))
         self.transform = QTransform()
@@ -621,7 +621,7 @@ class MultiWidget(QWidget):
         if self.parent: self.parent.save()
         self.setEnabled(False)
         csv_separator = self.scene.csv_separator
-        format_string = '{0:.%df}' % self.scene.digits
+        fmt_float = settings.FMT_FLOAT
 
         # first get auxiliary tasks done
         success = self._prepare_auxiliary_tasks()
@@ -636,7 +636,7 @@ class MultiWidget(QWidget):
         nb_tasks = self._prepare_input_tasks()
 
         while not self.worker.stopped:
-            nb_tasks = self._listen(nb_tasks, csv_separator, format_string)
+            nb_tasks = self._listen(nb_tasks, csv_separator, fmt_float)
             if nb_tasks == 0:
                 self.worker.stop()
 
@@ -716,7 +716,7 @@ class MultiWidget(QWidget):
                 node.pending_data[fid] = data
                 return False
 
-    def _listen(self, nb_tasks, csv_separator, format_string):
+    def _listen(self, nb_tasks, csv_separator, fmt_float):
         # get one task result
         success, node_id, fid, data, message = self.worker.get_result()
         nb_tasks -= 1
@@ -733,7 +733,7 @@ class MultiWidget(QWidget):
                 fun = worker.FUNCTIONS[next_node.name()]
                 if next_node.double_input:
                     self.worker.add_task((fun, (next_node_id, fid, data, next_node.auxiliary_data,
-                                                next_node.options, csv_separator, format_string)))
+                                                next_node.options, csv_separator, fmt_float)))
                     nb_tasks += 1
                 elif next_node.two_in_one_out:
                     if current_node.second_parent:

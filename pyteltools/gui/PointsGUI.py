@@ -5,6 +5,7 @@ from PyQt5.QtCore import *
 from PyQt5.QtWidgets import *
 import sys
 
+from pyteltools.conf import settings
 from pyteltools.slf import Serafin
 
 from .util import LoadMeshDialog, MapViewer, MapCanvas, open_points, OutputProgressDialog, OutputThread, \
@@ -13,10 +14,10 @@ from .util import LoadMeshDialog, MapViewer, MapCanvas, open_points, OutputProgr
 
 
 class WriteCSVProcess(OutputThread):
-    def __init__(self, separator, digits, mesh):
+    def __init__(self, separator, fmt_float, mesh):
         super().__init__()
         self.mesh = mesh
-        self.format_string = '{0:.%df}' % digits
+        self.fmt_float = fmt_float
         self.separator = separator
 
     def write_header(self, output_stream, selected_vars, indices, points):
@@ -24,7 +25,8 @@ class WriteCSVProcess(OutputThread):
         for index, (x, y) in zip(indices, points):
             for var in selected_vars:
                 output_stream.write(self.separator)
-                output_stream.write('Point %d %s (%.4f|%.4f)' % (index+1, var, x, y))
+                output_stream.write('Point %d %s (%s|%s)' % (index+1, var, settings.FMT_COORD.format(x),
+                                                             settings.FMT_COORD.format(y)))
         output_stream.write('\n')
 
     def write_csv(self, input_stream, output_time, selected_vars, output_stream, indices,
@@ -48,7 +50,7 @@ class WriteCSVProcess(OutputThread):
                     return
                 for index_var in range(nb_selected_vars):
                     output_stream.write(self.separator)
-                    output_stream.write(self.format_string.format(interpolator.dot(var_values[index_var][[i, j, k]])))
+                    output_stream.write(self.fmt_float.format(interpolator.dot(var_values[index_var][[i, j, k]])))
 
             output_stream.write('\n')
             self.tick.emit(int(100 * (index+1) / nb_frames))
@@ -356,7 +358,7 @@ class InputTab(SerafinInputTab):
         indices_inside = [i for i in range(len(self.points)) if self.point_interpolators[i] is not None]
 
         # initialize the progress bar
-        process = WriteCSVProcess(self.parent.csv_separator, self.parent.digits, self.mesh)
+        process = WriteCSVProcess(self.parent.csv_separator, self.parent.fmt_float, self.mesh)
         progressBar = OutputProgressDialog()
 
         try:
@@ -456,7 +458,8 @@ class ImageTab(PointPlotViewer):
     def _to_column(self, point):
         point_index = int(point.split()[1]) - 1
         x, y = self.input.points[point_index]
-        return 'Point %d %s (%.4f|%.4f)' % (point_index+1, self.current_var, x, y)
+        return 'Point %d %s (%s|%s)' % (point_index+1, self.current_var, settings.FMT_COORD.format(x),
+                                        settings.FMT_COORD.format(y))
 
     def editColumns(self):
         msg = PointLabelEditor(self.column_labels, self.column_name,

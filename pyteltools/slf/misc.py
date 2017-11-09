@@ -6,6 +6,8 @@ import numpy as np
 import re
 import shapefile
 
+from pyteltools.conf import settings
+
 from . import Serafin
 from .util import logger
 from .variables import do_calculation, get_available_variables, get_necessary_equations
@@ -300,7 +302,8 @@ def slf_to_xml(slf_name, slf_header, xml_name, scalar, time_index):
         xml.write('      <Definition surfType="TIN">\n')
         xml.write('        <Pnts>\n')
         for i, (x, y, z) in enumerate(zip(slf_header.x, slf_header.y, scalar_values)):
-            xml.write('          <P id="%d">%.4f %.4f %.4f</P>\n' % (i+1, y, x, z))
+            fmt_values = settings.FMT_COORD + ' ' + settings.FMT_COORD + ' ' + settings.FMT_FLOAT
+            xml.write(('          <P id="{}">' + fmt_values + '</P>\n').format(i+1, y, x, z))
         xml.write('        </Pnts>\n')
         xml.write('        <Faces>\n')
         for i, (a, b, c) in enumerate(slf_header.ikle_2d):
@@ -341,7 +344,7 @@ def slf_to_vtk_2d(slf_name, slf_header, vtk_name, scalars, vectors, variable_nam
             # write vertices
             output_stream.write('POINTS %d float\n' % slf_header.nb_nodes)
             for ix, iy in zip(slf_header.x, slf_header.y):
-                output_stream.write('%.6f %.6f 0.\n' % (ix, iy))
+                output_stream.write('%s %s 0.\n' % (settings.FMT_COORD.format(ix), settings.FMT_COORD.format(iy)))
             output_stream.write('\n')
 
             # write cells
@@ -366,7 +369,7 @@ def slf_to_vtk_2d(slf_name, slf_header, vtk_name, scalars, vectors, variable_nam
 
                 output_stream.write('SCALARS %s float\nLOOKUP_TABLE default\n' % name)
                 for v in values:
-                    output_stream.write('%.6f\n' % v)
+                    output_stream.write(settings.FMT_FLOAT.format(v) + '\n')
                 output_stream.write('\n')
 
             for triple in vectors:
@@ -376,7 +379,7 @@ def slf_to_vtk_2d(slf_name, slf_header, vtk_name, scalars, vectors, variable_nam
 
                 output_stream.write('VECTORS %s float\n' % name)
                 for u, v in zip(u_values, v_values):
-                    output_stream.write('%.6f %.6f 0.\n' % (u, v))
+                    output_stream.write('%s %s 0.\n' % (settings.FMT_FLOAT.format(u), settings.FMT_FLOAT.format(v)))
                 output_stream.write('\n')
 
 
@@ -395,7 +398,8 @@ def slf_to_vtk_3d(slf_name, slf_header, vtk_name, scalars, vectors, variable_nam
             # write vertices
             output_stream.write('POINTS %d float\n' % slf_header.nb_nodes)
             for ix, iy, iz in zip(slf_header.x, slf_header.y, z):
-                output_stream.write('%.6f %.6f %.6f\n' % (ix, iy, iz))
+                output_stream.write((settings.FMT_COORD + ' ' + settings.FMT_COORD + ' ' + settings.FMT_FLOAT +
+                                     '\n').format(ix, iy, iz))
             output_stream.write('\n')
 
             # write cells
@@ -420,7 +424,7 @@ def slf_to_vtk_3d(slf_name, slf_header, vtk_name, scalars, vectors, variable_nam
 
                 output_stream.write('SCALARS %s float\nLOOKUP_TABLE default\n' % name)
                 for v in values:
-                    output_stream.write('%.6f\n' % v)
+                    output_stream.write(settings.FMT_FLOAT.format(v) + '\n')
                 output_stream.write('\n')
 
             for triple in vectors:
@@ -431,7 +435,7 @@ def slf_to_vtk_3d(slf_name, slf_header, vtk_name, scalars, vectors, variable_nam
 
                 output_stream.write('VECTORS %s float\n' % name)
                 for u, v, w in zip(u_values, v_values, w_values):
-                    output_stream.write('%.6f %.6f %.6f\n' % (u, v, w))
+                    output_stream.write(' '.join([settings.FMT_FLOAT.format(x) for x in (u, v, w)]) + '\n')
                 output_stream.write('\n')
 
 

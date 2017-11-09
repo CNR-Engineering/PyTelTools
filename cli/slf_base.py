@@ -71,8 +71,8 @@ parser = PyTelToolsArgParse(description=__doc__, add_args=['in_slf', 'out_slf', 
 
 group_var = parser.add_argument_group('Serafin variables (optional)',
     'See variables abbrevations on https://github.com/CNR-Engineering/PyTelTools/wiki/Notations-of-variables')
-group_var.add_argument('--var2del', nargs='+', help='variable(s) to delete', default=[], metavar=('V1', 'V2'))
-group_var.add_argument('--var2add', nargs='+', help='variable(s) to add', default=[], metavar=('V1', 'V2'))
+group_var.add_argument('--var2del', nargs='+', help='variable(s) to delete', default=[], metavar=('VA', 'VB'))
+group_var.add_argument('--var2add', nargs='+', help='variable(s) to add', default=[], metavar=('VA', 'VB'))
 
 group_temp = parser.add_argument_group('Temporal operations (optional)')
 group_temp.add_argument('--ech', type=int, help='frequency sampling of input', default=1)
@@ -89,4 +89,4 @@ if __name__ == '__main__':
         slf_base(args)
     except (Serafin.SerafinRequestError, Serafin.SerafinValidationError):
         # Message is already reported by slf logger
-        sys.exit(2)
+        sys.exit(1)

@@ -121,7 +121,7 @@ class ClassicMainWindow(QWidget):
         super().__init__()
         self.language = settings.LANG
         self.csv_separator = settings.CSV_SEPARATOR
-        self.digits = settings.DIGITS
+        self.fmt_float = settings.FMT_FLOAT
         self.logging_level = settings.LOGGING_LEVEL
         self.panel = MainPanel(self)
 

@@ -167,7 +167,7 @@ class MeshInterpolator(Mesh2D):
 
     @staticmethod
     def interpolate_along_lines(input_stream, selected_vars, selected_time_indices, indices_nonempty,
-                                line_interpolators, format_string):
+                                line_interpolators, fmt_float):
         for u, id_line in enumerate(indices_nonempty):
             line_interpolator, distances = line_interpolators[id_line]
 
@@ -178,17 +178,17 @@ class MeshInterpolator(Mesh2D):
                     var_values.append(input_stream.read_var_in_frame(time_index, var))
 
                 for (x, y, (i, j, k), interpolator), distance in zip(line_interpolator, distances):
-                    row = [str(id_line+1), str(time_value), format_string.format(x), format_string.format(y),
-                           format_string.format(distance)]
+                    row = [str(id_line+1), str(time_value), fmt_float.format(x), fmt_float.format(y),
+                           fmt_float.format(distance)]
 
                     for i_var, var in enumerate(selected_vars):
                         values = var_values[i_var]
-                        row.append(format_string.format(interpolator.dot(values[[i, j, k]])))
+                        row.append(fmt_float.format(interpolator.dot(values[[i, j, k]])))
                     yield u, v, row
 
     @staticmethod
     def project_lines(input_stream, selected_vars, time_index, indices_nonempty, max_distance,
-                      reference, line_interpolators, format_string):
+                      reference, line_interpolators, fmt_float):
         var_values = []
         for var in selected_vars:
             var_values.append(input_stream.read_var_in_frame(time_index, var))
@@ -202,11 +202,11 @@ class MeshInterpolator(Mesh2D):
             for (x, y, (i, j, k), interpolator), distance in zip(line_interpolator, distances):
                 if distance <= 0 or distance >= max_distance:
                     continue
-                row = [str(id_line+1), format_string.format(x), format_string.format(y),
-                       format_string.format(distance)]
+                row = [str(id_line+1), fmt_float.format(x), fmt_float.format(y),
+                       fmt_float.format(distance)]
                 for i_var, var in enumerate(selected_vars):
                     values = var_values[i_var]
-                    row.append(format_string.format(interpolator.dot(values[[i, j, k]])))
+                    row.append(fmt_float.format(interpolator.dot(values[[i, j, k]])))
                 yield u, row
 
 

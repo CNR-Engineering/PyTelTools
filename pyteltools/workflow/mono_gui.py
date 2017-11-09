@@ -84,7 +84,7 @@ class MonoScene(QGraphicsScene):
 
         self.language = settings.LANG
         self.csv_separator = settings.CSV_SEPARATOR
-        self.digits = settings.DIGITS
+        self.fmt_float = settings.FMT_FLOAT
 
         self._init_with_default_node()
 
