@@ -7,7 +7,7 @@ import sys
 import pyteltools.slf.misc as operations
 from pyteltools.slf import Serafin
 
-from .util import LoadMeshDialog, OutputProgressDialog, OutputThread, PyTelToolWidget, \
+from .util import LoadMeshDialog, OutputProgressDialog, OutputThread, ProgressBarIterator, PyTelToolWidget, \
     QPlainTextEditLogger, save_dialog, SerafinInputTab, VariableTable
 
 
@@ -24,15 +24,14 @@ class ProjectMeshThread(OutputThread):
         self.nb_frames = len(time_indices)
 
     def run(self):
-        for i, (first_time_index, second_time_index) in enumerate(self.calculator.time_indices):
+        iter_pbar = ProgressBarIterator.prepare(self.tick.emit, (5, 100))
+        for first_time_index, second_time_index in iter_pbar(self.calculator.time_indices):
             if self.canceled:
                 return
             values = self.calculator.operation_in_frame(first_time_index, second_time_index)
             self.out_stream.write_entire_frame(self.out_header,
                                                self.calculator.first_in.time[first_time_index], values)
 
-            self.tick.emit(5 + 95 * (i+1) / self.nb_frames)
-            QApplication.processEvents()
 
 
 class InputTab(SerafinInputTab):

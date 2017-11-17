@@ -223,7 +223,7 @@ class FluxCalculator:
     def flux_in_frame(self, intersections, values):
         """!
         @brief Do the flux computation in a single frame, depending on the flux type
-        @param values <numpy.1D-array>: The values of the scalar/vector fields
+        @param values <[numpy.1D-array]>: list of the values of the scalar/vector fields
         @return <float>: The value of the flux
         """
         if self.flux_type == FluxCalculator.LINE_INTEGRAL:
@@ -237,12 +237,12 @@ class FluxCalculator:
         else:
             return TriangularVectorField.mass_flux(intersections, values[0], values[1], values[2], values[3])
 
-    def run(self, fmt_float=settings.FMT_FLOAT):
+    def run(self, iter_pbar, fmt_float=settings.FMT_FLOAT):
         """!
         Separate the major part of the computation, allowing a GUI override
         """
         result = []
-        for time_index in self.time_indices:
+        for time_index in iter_pbar(self.time_indices):
             i_result = [str(self.input_stream.time[time_index])]
             values = []
             for var_ID in self.var_IDs:

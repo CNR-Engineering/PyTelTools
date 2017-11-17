@@ -5,12 +5,12 @@ Write a markdown documentation file for command line scripts.
 """
 
 import importlib
-import os.path
 from glob import glob
+import os.path
 import sys
 
 
-sys.path.append(sys.argv[1])  # dirty method to improve modules easily
+sys.path.append(sys.argv[1])  # dirty method to import modules easily
 
 class CommandLineScript:
     def __init__(self, path):

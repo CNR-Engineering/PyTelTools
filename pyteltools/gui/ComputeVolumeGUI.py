@@ -9,7 +9,7 @@ from pyteltools.slf import Serafin
 from pyteltools.slf.volume import VolumeCalculator
 
 from .util import LoadMeshDialog, MapViewer, open_polygons, OutputProgressDialog, OutputThread, PolygonMapCanvas, \
-    PyTelToolWidget, read_csv, save_dialog, SerafinInputTab, VolumePlotViewer
+    ProgressBarIterator, PyTelToolWidget, read_csv, save_dialog, SerafinInputTab, VolumePlotViewer
 
 
 class VolumeCalculatorThread(OutputThread):
@@ -24,21 +24,21 @@ class VolumeCalculatorThread(OutputThread):
         self.fmt_float = fmt_float
 
     def run_calculator(self):
-        self.tick.emit(6)
+        self.tick.emit(2)
         QApplication.processEvents()
 
         logging.info('Starting to process the mesh')
         self.calculator.mesh = self.mesh
-        self.tick.emit(15)
+        self.tick.emit(10)
         QApplication.processEvents()
 
-        self.calculator.construct_weights()
-        self.tick.emit(30)
-        QApplication.processEvents()
+        iter_pbar = ProgressBarIterator.prepare(self.tick.emit, (10, 30))
+        self.calculator.construct_weights(iter_pbar)
         logging.info('Finished processing the mesh')
 
         result = []
-        for i, time_index in enumerate(self.calculator.time_indices):
+        iter_pbar = ProgressBarIterator.prepare(self.tick.emit, (30, 100))
+        for time_index in iter_pbar(self.calculator.time_indices):
             if self.canceled:
                 return []
             i_result = [str(self.calculator.input_stream.time[time_index])]
@@ -55,9 +55,6 @@ class VolumeCalculatorThread(OutputThread):
                 else:
                     i_result.append(self.fmt_float.format(volume))
             result.append(i_result)
-
-            self.tick.emit(30 + int(70 * (i+1) / len(self.calculator.time_indices)))
-            QApplication.processEvents()
 
         return result
 

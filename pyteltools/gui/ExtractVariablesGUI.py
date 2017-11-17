@@ -9,8 +9,8 @@ from pyteltools.slf import Serafin
 from pyteltools.slf.variables import get_available_variables, do_calculations_in_frame, get_necessary_equations, \
     get_US_equation, new_variables_from_US
 
-from .util import DoubleSliderBox, FrictionLawMessage, OutputProgressDialog, OutputThread, PyTelToolWidget, \
-    QPlainTextEditLogger, save_dialog, SerafinInputTab, SettlingVelocityMessage, TableWidgetDragRows, \
+from .util import DoubleSliderBox, FrictionLawMessage, OutputProgressDialog, OutputThread, ProgressBarIterator, \
+    PyTelToolWidget, QPlainTextEditLogger, save_dialog, SerafinInputTab, SettlingVelocityMessage, TableWidgetDragRows, \
     TimeRangeSlider, VariableTable
 
 
@@ -27,7 +27,8 @@ class ExtractVariablesThread(OutputThread):
         self.nb_frames = len(time_indices)
 
     def run(self):
-        for i, time_index in enumerate(self.time_indices):
+        iter_pbar = ProgressBarIterator.prepare(self.tick.emit, (5, 100))
+        for time_index in iter_pbar(self.time_indices):
             if self.canceled:
                 return
             values = do_calculations_in_frame(self.necessary_equations, self.input_stream, time_index,
@@ -35,7 +36,6 @@ class ExtractVariablesThread(OutputThread):
                                               is_2d=self.output_header.is_2d, us_equation=self.us_equation)
 
             self.output_stream.write_entire_frame(self.output_header, self.input_stream.time[time_index], values)
-            self.tick.emit(5 + int(95 * (i+1) / self.nb_frames))
 
 
 class TimeTable(TableWidgetDragRows):

@@ -91,7 +91,7 @@ def open_polygons():
     if not test_open(filename):
         return False, '', []
 
-    is_i2s = filename[-4:] == '.i2s'
+    is_i2s = filename.endswith('.i2s')
 
     polygons = []
     if is_i2s:
@@ -121,7 +121,7 @@ def open_polylines():
     if not test_open(filename):
         return False, '', []
 
-    is_i2s = filename[-4:] == '.i2s'
+    is_i2s = filename.endswith('.i2s')
 
     polylines = []
     if is_i2s:
@@ -1060,6 +1060,53 @@ class VariableTable(TableWidgetDragRows):
         return selected
 
 
+class ProgressBarIterator:
+    def __init__(self, iterable, emit=lambda x: x, perc_range=(0, 100), length=None):
+        """
+        Update progress bar during an iterative
+        @param iterable: iterator
+        @param perc_range <(int, int)>: minimum and maximum percentage bounds
+        @param emit: function to call at each significant progress
+        """
+        self.emit = emit
+        self.iterable = iterable
+        self.min, self.max = perc_range
+        self.length = length
+
+    def do_at_next(self, perc):
+        """
+        Call self.emit function with curent percentage
+        @param perc <float>: percentage progress (within range [0, 100])
+        """
+        self.emit(perc)
+        QApplication.processEvents()
+
+    def __iter__(self):
+        """Iterate and update progress bar at each new percentage"""
+        length = len(self.iterable) if self.length is None else self.length
+        if length != 0:
+            ratio = (self.max - self.min) / length
+            old_perc = -1
+            for i, value in enumerate(self.iterable):
+                yield value
+
+                new_perc = int(self.min + (i + 1) * ratio)
+                if new_perc > old_perc:
+                    self.do_at_next(new_perc)
+                old_perc = new_perc
+
+    @staticmethod
+    def prepare(*args, **kwargs):
+        """
+        Get a ready sub-class on which to iterate
+        @return <SubProgressBarIterator>:  ProgressBarIterator sub-class with pre-defined arguments
+        """
+        class SubProgressBarIterator(ProgressBarIterator):
+            def __init__(self, iterable):
+                super().__init__(iterable, *args, **kwargs)
+        return SubProgressBarIterator
+
+
 class OutputThread(QThread):
     tick = pyqtSignal(int, name='changed')
 
@@ -1123,25 +1170,14 @@ class ConstructIndexThread(OutputThread):
 
     def run(self):
         logging.info('Processing the mesh')
-        # emit a signal for every five percent of triangles processed
-        five_percent = 0.05 * self.mesh.nb_triangles
-        nb_processed = 0
-        current_percent = 0
 
-        for i, j, k in self.mesh.ikle:
+        iter_pbar = ProgressBarIterator.prepare(self.tick.emit)
+        for i, j, k in iter_pbar(self.mesh.ikle):
             if self.canceled:
                 return
-
             t = shapely.geometry.Polygon([self.mesh.points[i], self.mesh.points[j], self.mesh.points[k]])
             self.mesh.triangles[i, j, k] = t
             self.mesh.index.insert(i, t.bounds, obj=(i, j, k))
-
-            nb_processed += 1
-            if nb_processed > five_percent:
-                nb_processed = 0
-                current_percent += 5
-                self.tick.emit(current_percent)
-                QApplication.processEvents()
 
 
 class LoadMeshDialog(OutputProgressDialog):

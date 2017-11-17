@@ -8,7 +8,7 @@ from PyQt5.QtWidgets import *
 from pyteltools.slf import Serafin
 
 from .util import LineMapCanvas, LoadMeshDialog, MapViewer, open_polylines, OutputProgressDialog, OutputThread, \
-    ProjectLinesPlotViewer, PyTelToolWidget, QPlainTextEditLogger, save_dialog, SerafinInputTab, \
+    ProgressBarIterator, ProjectLinesPlotViewer, PyTelToolWidget, QPlainTextEditLogger, save_dialog, SerafinInputTab, \
     SimpleTimeDateSelection, VariableTable
 
 
@@ -30,14 +30,14 @@ class WriteCSVProcess(OutputThread):
                   indices_nonempty, reference, time_index):
         self.write_header(output_stream, selected_vars)
 
-        nb_lines = len(indices_nonempty)
         max_distance = reference.length()
 
         var_values = []
         for var in selected_vars:
             var_values.append(input_stream.read_var_in_frame(time_index, var))
 
-        for u, id_line in enumerate(indices_nonempty):
+        iter_pbar = ProgressBarIterator.prepare(self.tick.emit)
+        for id_line in iter_pbar(indices_nonempty):
             line_interpolator, _ = line_interpolators[id_line]
             distances = []
             for x, y, _, __ in line_interpolator:
@@ -62,9 +62,6 @@ class WriteCSVProcess(OutputThread):
                     output_stream.write(self.separator)
                     output_stream.write(self.fmt_float.format(interpolator.dot(values[[i, j, k]])))
                 output_stream.write('\n')
-
-            self.tick.emit(int(100 * (u+1) / nb_lines))
-            QApplication.processEvents()
 
 
 class InputTab(SerafinInputTab):
@@ -392,7 +389,7 @@ class CSVTab(QWidget):
         time_index = int(self.timeSelection.index.text()) - 1
 
         # initialize the progress bar
-        process = WriteCSVProcess(self.parent.csv_separator, self.input.mesh)
+        process = WriteCSVProcess(self.parent.csv_separator, self.parent.fmt_float, self.input.mesh)
         progressBar = OutputProgressDialog()
 
         try:

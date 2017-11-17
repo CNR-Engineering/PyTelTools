@@ -94,7 +94,7 @@ def slf_int2d(args):
 
 
 parser = PyTelToolsArgParse(description=__doc__, add_args=['in_slf'])
-parser.add_argument('in_points', help='set of points file (*.shp or *.xyz)')
+parser.add_argument('in_points', help='set of points file (*.shp)')
 parser.add_known_argument('out_csv')
 parser.add_argument('--long', help='write CSV with long format (variables are also in rows) instead of wide format',
                     action='store_true')

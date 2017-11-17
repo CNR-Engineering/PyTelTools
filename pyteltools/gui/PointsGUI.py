@@ -9,8 +9,8 @@ from pyteltools.conf import settings
 from pyteltools.slf import Serafin
 
 from .util import LoadMeshDialog, MapViewer, MapCanvas, open_points, OutputProgressDialog, OutputThread, \
-    PointAttributeTable, PointLabelEditor, PointPlotViewer, PyTelToolWidget, read_csv, SerafinInputTab, save_dialog, \
-    VariableTable
+    PointAttributeTable, PointLabelEditor, PointPlotViewer, ProgressBarIterator, PyTelToolWidget, read_csv, \
+    SerafinInputTab, save_dialog, VariableTable
 
 
 class WriteCSVProcess(OutputThread):
@@ -36,7 +36,8 @@ class WriteCSVProcess(OutputThread):
         nb_selected_vars = len(selected_vars)
         nb_frames = len(output_time)
 
-        for index, time in enumerate(output_time):
+        iter_pbar = ProgressBarIterator.prepare(self.tick.emit)
+        for index, time in enumerate(iter_pbar(output_time)):
             if self.canceled:
                 return
             output_stream.write(str(time))
@@ -53,8 +54,6 @@ class WriteCSVProcess(OutputThread):
                     output_stream.write(self.fmt_float.format(interpolator.dot(var_values[index_var][[i, j, k]])))
 
             output_stream.write('\n')
-            self.tick.emit(int(100 * (index+1) / nb_frames))
-            QApplication.processEvents()
 
 
 class InputTab(SerafinInputTab):

@@ -227,19 +227,19 @@ class VolumeCalculator:
     def construct_triangles(self):
         self.mesh = TruncatedTriangularPrisms(self.input_stream.header, True)
 
-    def construct_weights(self):
+    def construct_weights(self, iter_pbar=lambda x:x):
         """!
         Construct the point weights/intersections etc. depending on the volume type, for every polygons
         """
         if self.volume_type == VolumeCalculator.NET_STRICT:
-            for poly in self.polygons:
+            for poly in iter_pbar(self.polygons):
                 self.weights.append(self.mesh.polygon_intersection_strict(poly))
         elif self.volume_type == VolumeCalculator.NET:
-            for poly in self.polygons:
+            for poly in iter_pbar(self.polygons):
                 weight, triangle_polygon_intersection = self.mesh.polygon_intersection(poly)
                 self.weights.append((weight, triangle_polygon_intersection))
         elif self.volume_type == VolumeCalculator.POSITIVE:
-            for poly in self.polygons:
+            for poly in iter_pbar(self.polygons):
                 self.weights.append(self.mesh.polygon_intersection_all(poly))
 
     def volume_in_frame_in_polygon(self, weight, values, polygon):

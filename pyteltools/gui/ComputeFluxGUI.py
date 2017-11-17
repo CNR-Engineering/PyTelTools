@@ -9,7 +9,7 @@ from pyteltools.slf.flux import FluxCalculator
 from pyteltools.slf import Serafin
 
 from .util import FluxPlotViewer, LineMapCanvas, LoadMeshDialog, MapViewer, open_polylines, OutputProgressDialog, \
-    OutputThread, PyTelToolWidget, read_csv, save_dialog, SerafinInputTab
+    OutputThread, ProgressBarIterator, PyTelToolWidget, read_csv, save_dialog, SerafinInputTab
 
 
 class FluxCalculatorThread(OutputThread):
@@ -24,40 +24,20 @@ class FluxCalculatorThread(OutputThread):
         self.fmt_float = fmt_float
 
     def run_calculator(self):
-        self.tick.emit(6)
+        self.tick.emit(2)
         QApplication.processEvents()
 
         logging.info('Starting to process the mesh')
         self.calculator.mesh = self.mesh
-        self.tick.emit(15)
+        self.tick.emit(10)
         QApplication.processEvents()
 
         self.calculator.construct_intersections()
-        self.tick.emit(30)
+        self.tick.emit(20)
         QApplication.processEvents()
         logging.info('Finished processing the mesh')
 
-        result = []
-
-        for i, time_index in enumerate(self.calculator.time_indices):
-            if self.canceled:
-                return []
-
-            i_result = [str(self.calculator.input_stream.time[time_index])]
-            values = []
-            for var_ID in self.calculator.var_IDs:
-                values.append(self.calculator.input_stream.read_var_in_frame(time_index, var_ID))
-
-            for j in range(len(self.calculator.sections)):
-                intersections = self.calculator.intersections[j]
-                flux = self.calculator.flux_in_frame(intersections, values)
-                i_result.append(self.fmt_float.format(flux))
-
-            result.append(i_result)
-            self.tick.emit(30 + int(70 * (i+1) / len(self.calculator.time_indices)))
-            QApplication.processEvents()
-
-        return result
+        return self.calculator.run(ProgressBarIterator.prepare(self.tick.emit, (20, 100)))
 
     def write_csv(self, output_stream):
         result = self.run_calculator()

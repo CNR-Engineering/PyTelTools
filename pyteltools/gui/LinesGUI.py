@@ -8,7 +8,7 @@ from pyteltools.slf import Serafin
 from pyteltools.slf.interpolation import MeshInterpolator
 
 from .util import LineMapCanvas, LoadMeshDialog, MapViewer, MultiFrameLinePlotViewer, MultiVarLinePlotViewer, \
-    open_polylines, OutputProgressDialog, OutputThread, PyTelToolWidget, QPlainTextEditLogger, \
+    open_polylines, OutputProgressDialog, OutputThread, ProgressBarIterator, PyTelToolWidget, QPlainTextEditLogger, \
     save_dialog, SerafinInputTab, VariableTable
 
 
@@ -29,17 +29,18 @@ class WriteCSVProcess(OutputThread):
     def write_csv(self, input_stream, selected_vars, output_stream, line_interpolators, indices_nonempty):
         self.write_header(output_stream, selected_vars)
 
-        nb_frames = len(input_stream.time)
-        inv_steps = 1 / len(indices_nonempty) / nb_frames
+        length = 0
+        for id_line in indices_nonempty:
+            _, distances = line_interpolators[id_line]
+            length += len(distances)
+        length *= len(input_stream.time)
+        iter_pbar = ProgressBarIterator.prepare(self.tick.emit, length=length)
 
-        for u, v, row in MeshInterpolator.interpolate_along_lines(input_stream, selected_vars,
-                                                                  list(range(len(input_stream.time))),
-                                                                  indices_nonempty, line_interpolators,
-                                                                  self.fmt_float):
+        for u, v, row in iter_pbar(MeshInterpolator.interpolate_along_lines(input_stream, selected_vars,
+                                   list(range(len(input_stream.time))), indices_nonempty, line_interpolators,
+                                   self.fmt_float)):
             output_stream.write(self.separator.join(row))
             output_stream.write('\n')
-            self.tick.emit(100 * (v+1+u*nb_frames) * inv_steps)
-            QApplication.processEvents()
 
 
 class InputTab(SerafinInputTab):

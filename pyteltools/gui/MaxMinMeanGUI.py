@@ -9,7 +9,7 @@ import pyteltools.slf.misc as operations
 from pyteltools.slf import Serafin
 
 from .util import ConditionDialog, PyTelToolWidget, QPlainTextEditLogger, SerafinInputTab, \
-    TimeRangeSlider, OutputProgressDialog, OutputThread, save_dialog, VariableTable
+    TimeRangeSlider, OutputProgressDialog, OutputThread, ProgressBarIterator, save_dialog, VariableTable
 
 
 class MaxMinMeanThread(OutputThread):
@@ -30,16 +30,14 @@ class MaxMinMeanThread(OutputThread):
         self.nb_frames = len(time_indices)
 
     def run(self):
-        for i, time_index in enumerate(self.time_indices):
+        iter_pbar = ProgressBarIterator.prepare(self.tick.emit)
+        for time_index in iter_pbar(self.time_indices):
             if self.canceled:
                 return []
             if self.has_scalar:
                 self.scalar_calculator.max_min_mean_in_frame(time_index)
             if self.has_vector:
                 self.vector_calculator.max_min_mean_in_frame(time_index)
-
-            self.tick.emit(int(95 * (i+1) / self.nb_frames))
-            QApplication.processEvents()
 
         if self.has_scalar and not self.has_vector:
             values = self.scalar_calculator.finishing_up()
@@ -65,15 +63,13 @@ class ArrivalDurationThread(OutputThread):
                                                                          condition))
 
     def run(self):
-        for i, index in enumerate(self.time_indices[1:]):
+        iter_pbar = ProgressBarIterator.prepare(self.tick.emit)
+        for index in iter_pbar(self.time_indices[1:]):
             if self.canceled:
                 return []
 
             for calculator in self.calculators:
                 calculator.arrival_duration_in_frame(index)
-
-            self.tick.emit(int(95 * (i+1) / self.nb_frames))
-            QApplication.processEvents()
 
         values = np.empty((2*self.nb_conditions, self.input_stream.header.nb_nodes))
         for i, calculator in enumerate(self.calculators):
@@ -90,13 +86,11 @@ class SynchMaxThread(OutputThread):
         self.calculator = operations.SynchMaxCalculator(input_stream, selected_vars, time_indices, var)
 
     def run(self):
-        for i, time_index in enumerate(self.time_indices[1:]):
+        iter_pbar = ProgressBarIterator.prepare(self.tick.emit)
+        for time_index in iter_pbar(self.time_indices[1:]):
             if self.canceled:
                 return []
             self.calculator.synch_max_in_frame(time_index)
-
-            self.tick.emit(int(95 * (i+1) / self.nb_frames))
-            QApplication.processEvents()
 
         return self.calculator.finishing_up()
 
