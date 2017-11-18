@@ -12,10 +12,11 @@ class Mesh2D:
     The general representation of mesh in Serafin 2D.
     The basis for interpolation, volume calculations etc.
     """
-    def __init__(self, input_header, construct_index=False):
+    def __init__(self, input_header, construct_index=False, iter_pbar=lambda x: x):
         """!
         @param input_header <slf.Serafin.SerafinHeader>: input Serafin header
         @param construct_index <bool>: perform the index construction
+        @param iter_pbar: iterable progress bar
         """
         self.x, self.y = input_header.x[:input_header.nb_nodes_2d], input_header.y[:input_header.nb_nodes_2d]
         self.ikle = input_header.ikle_2d - 1  # back to 0-based indexing
@@ -26,14 +27,15 @@ class Mesh2D:
         if not construct_index:
             self.index = Index()
         else:
-            self._construct_index()
+            self._construct_index(iter_pbar)
 
-    def _construct_index(self):
+    def _construct_index(self, iter_pbar):
         """!
         Separate the index construction from the constructor, allowing a GUI override
+        @param iter_pbar: iterable progress bar
         """
         self.index = Index()
-        for i, j, k in self.ikle:
+        for i, j, k in iter_pbar(self.ikle, unit='elements'):
             t = Polygon([self.points[i], self.points[j], self.points[k]])
             self.triangles[i, j, k] = t
             self.index.insert(i, t.bounds, obj=(i, j, k))

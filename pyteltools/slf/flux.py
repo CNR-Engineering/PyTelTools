@@ -8,6 +8,93 @@ from pyteltools.conf import settings
 
 from .interpolation import Interpolator
 from .mesh2D import Mesh2D
+from .Serafin import SLF_EIT
+from .util import logger
+
+
+class PossibleFluxComputation:
+    """!
+    @brief Determine which flux computations are possible from a set of variables and which flux type it is
+    """
+    COMMON_FLUXES = {
+        'Liquid flux (m3/s)': [('U', 'V', 'H'), ('I', 'J'), ('M', 'H'), ('Q',)],
+        'Solid flux TOTAL (m3/s)': [('QSX', 'QSY'), ('QS',)],
+        'Solid flux BEDLOAD (m3/s)': [('QSBLX', 'QSBLY'), ('QSBL',)],
+        'Solid flux SUSPENSION (m3/s)': [('QSSUSPX', 'QSSUSPY'), ('QSSUSP',)],
+    }
+
+    def __init__(self, var_IDs, var_names):
+        """!
+        Determine all possible flux computations
+        @param <slf.Serafin.SerafinHeader>: input Serafin header
+        """
+        self.var_IDs = var_IDs
+        self.var_names = var_names
+
+    def __iter__(self):
+        """!Iterate over all the possible flux computations"""
+        # Add common liquid and solid fluxes
+        for title, list_var_IDs in PossibleFluxComputation.COMMON_FLUXES.items():
+            for var_IDs in list_var_IDs:
+                if set(var_IDs).issubset(self.var_IDs):
+                    yield '%s: (%s)' % (title, ', '.join(var_IDs))
+
+        # Add specific solid fluxes for each sediment classes
+        for name in self.var_names:
+            str_name = name.decode(SLF_EIT).strip()
+            if set(['U', 'V', 'H']).issubset(self.var_IDs):
+                if 'TRACEUR' in str_name or 'TRACER' in str_name:
+                    yield 'Solid flux (kg/s): (U, V, H, %s)' % str_name
+            if 'QS CLASS' in str_name:
+                yield 'Solid flux TOTAL (m3/s): (%s)' % str_name
+            if 'QS BEDLOAD CL' in str_name:
+                yield 'Solid flux BEDLOAD (m3/s): (%s)' % str_name
+            if 'QS SUSP. CL' in str_name:
+                yield 'Solid flux SUSPENSION (m3/s): (%s)' % str_name
+
+    @staticmethod
+    def get_variables(possible_flux):
+        """!
+        Get variables from a possible flux
+        @param possible_flux <str>: text describing a possible flux
+        @return <[str]>: list of var_IDs
+        """
+        return list(possible_flux.split(':')[1].split('(')[1][:-1].split(', '))
+
+    @staticmethod
+    def get_flux_type(var_IDs):
+        """!
+        Get flux type
+        @param <[str]>: list of varIDs (between 1 and 4)
+        @return <int>: flux type identifier
+        """
+        nb_vars = len(var_IDs)
+        if nb_vars == 1:
+            flux_type = FluxCalculator.LINE_INTEGRAL
+        elif nb_vars == 2:
+            if var_IDs[0] == 'M':
+                flux_type = FluxCalculator.DOUBLE_LINE_INTEGRAL
+            else:
+                flux_type = FluxCalculator.LINE_FLUX
+        elif nb_vars == 3:
+            flux_type = FluxCalculator.AREA_FLUX
+        elif nb_vars == 4:
+            flux_type = FluxCalculator.MASS_FLUX
+        else:
+            NotImplementedError('Flux with more than 4 variables is not possible')
+        logger.debug('Flux type %s' % flux_type)
+        return flux_type
+
+    @staticmethod
+    def common_fluxes():
+        """!
+        @brief Get list of var_IDs corresponding to common fluxes
+        """
+        list_common_fluxes = []
+        for _, list_var_IDs in PossibleFluxComputation.COMMON_FLUXES.items():
+            for var_IDs in list_var_IDs:
+                list_common_fluxes.append(list(var_IDs))
+        return list_common_fluxes
 
 
 class TriangularVectorField(Mesh2D):
@@ -19,8 +106,8 @@ class TriangularVectorField(Mesh2D):
     The flux across a section (or integral along a line) is the sum of the flux (or integral) on
     all intersected segments between the mesh and the section.
     """
-    def __init__(self, input_header, construct_index):
-        super().__init__(input_header, construct_index)
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
     def section_intersection(self, section):
         """!
@@ -210,8 +297,12 @@ class FluxCalculator:
         self.mesh = None
         self.intersections = []
 
-    def construct_triangles(self):
-        self.mesh = TriangularVectorField(self.input_stream.header, True)
+    def construct_triangles(self, iter_pbar=lambda x: x):
+        """!
+        Construct triangular elements (index construction)
+        @param iter_pbar: iterable progress bar
+        """
+        self.mesh = TriangularVectorField(self.input_stream.header, True, iter_pbar)
 
     def construct_intersections(self):
         """!
@@ -240,6 +331,7 @@ class FluxCalculator:
     def run(self, iter_pbar, fmt_float=settings.FMT_FLOAT):
         """!
         Separate the major part of the computation, allowing a GUI override
+        @param iter_pbar: iterable progress bar
         """
         result = []
         for time_index in iter_pbar(self.time_indices):

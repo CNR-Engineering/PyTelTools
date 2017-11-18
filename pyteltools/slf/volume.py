@@ -30,8 +30,8 @@ class TruncatedTriangularPrisms(Mesh2D):
     the surface area of the intersection (polygon or multipolygon) times
     the interpolated value of the centroid of the intersection.
     """
-    def __init__(self, input_header, construct_index):
-        super().__init__(input_header, construct_index)
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
     def polygon_intersection_strict(self, polygon):
         """!

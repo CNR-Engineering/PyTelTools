@@ -5,7 +5,7 @@ from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 import sys
 
-from pyteltools.slf.flux import FluxCalculator
+from pyteltools.slf.flux import FluxCalculator, PossibleFluxComputation
 from pyteltools.slf import Serafin
 
 from .util import FluxPlotViewer, LineMapCanvas, LoadMeshDialog, MapViewer, open_polylines, OutputProgressDialog, \
@@ -157,42 +157,8 @@ class InputTab(SerafinInputTab):
                 break
 
     def _addFluxOptions(self, header):
-        if 'U' in header.var_IDs and 'V' in header.var_IDs:
-            if 'H' in header.var_IDs:
-                self.fluxBox.addItem('Liquid flux (m3/s): (U, V, H)')
-                for name in header.var_names:
-                    str_name = name.decode(Serafin.SLF_EIT).strip()
-                    if 'TRACEUR' in str_name or 'TRACER' in str_name:
-                        self.fluxBox.addItem('Solid flux (kg/s): (U, V, H, %s)' % str_name)
-        if 'I' in header.var_IDs and 'J' in header.var_IDs:
-            self.fluxBox.addItem('Liquid flux (m3/s): (I, J)')
-        if 'H' in header.var_IDs and 'M' in header.var_IDs:
-            self.fluxBox.addItem('Liquid flux (m3/s): (M, H)')
-        if 'Q' in header.var_IDs:
-            self.fluxBox.addItem('Liquid flux (m3/s): (Q)')
-
-        if 'QSX' in header.var_IDs and 'QSY' in header.var_IDs:
-            self.fluxBox.addItem('Solid flux TOTAL (m3/s): (QSX, QSY)')
-        if 'QS' in header.var_IDs:
-            self.fluxBox.addItem('Solid flux TOTAL (m3/s): (QS)')
-        if 'QSBLX' in header.var_IDs and 'QSBLY' in header.var_IDs:
-            self.fluxBox.addItem('Solid flux BEDLOAD (m3/s): (QSBLX, QSBLY)')
-        if 'QSBL' in header.var_IDs:
-            self.fluxBox.addItem('Solid flux BEDLOAD (m3/s): (QSBL)')
-        if 'QSSUSPX' in header.var_IDs and 'QSSUSPY' in header.var_IDs:
-            self.fluxBox.addItem('Solid flux SUSPENSION (m3/s): (QSSUSPX, QSSUSPY)')
-        if 'QSSUSP' in header.var_IDs:
-            self.fluxBox.addItem('Solid flux SUSPENSION (m3/s): (QSSUSP)')
-
-        for name in header.var_names:
-            str_name = name.decode(Serafin.SLF_EIT).strip()
-            if 'QS CLASS' in str_name:
-                self.fluxBox.addItem('Solid flux TOTAL (m3/s): (%s)' % str_name)
-            if 'QS BEDLOAD CL' in str_name:
-                self.fluxBox.addItem('Solid flux BEDLOAD (m3/s): (%s)' % str_name)
-            if 'QS SUSP. CL' in str_name:
-                self.fluxBox.addItem('Solid flux SUSPENSION (m3/s): (%s)' % str_name)
-
+        for possible_flux in PossibleFluxComputation(header.var_IDs, header.var_names):
+            self.fluxBox.addItem(possible_flux)
         return self.fluxBox.count() > 0
 
     def _checkSamplingFrequency(self):
@@ -211,19 +177,8 @@ class InputTab(SerafinInputTab):
 
     def _getFluxSection(self):
         selection = self.fluxBox.currentText()
-        var_IDs = list(selection.split(':')[1].split('(')[1][:-1].split(', '))
-        nb_vars = len(var_IDs)
-        if nb_vars == 1:
-            flux_type = FluxCalculator.LINE_INTEGRAL
-        elif nb_vars == 2:
-            if var_IDs[0] == 'M':
-                flux_type = FluxCalculator.DOUBLE_LINE_INTEGRAL
-            else:
-                flux_type = FluxCalculator.LINE_FLUX
-        elif nb_vars == 3:
-            flux_type = FluxCalculator.AREA_FLUX
-        else:
-            flux_type = FluxCalculator.MASS_FLUX
+        var_IDs = PossibleFluxComputation.get_variables(selection)
+        flux_type = PossibleFluxComputation.get_flux_type(var_IDs)
         return flux_type, var_IDs, selection
 
     def btnOpenSerafinEvent(self):

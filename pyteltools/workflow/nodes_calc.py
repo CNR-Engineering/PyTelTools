@@ -5,7 +5,7 @@ from PyQt5.QtCore import *
 from pyteltools.conf import settings
 from pyteltools.gui.util import ConditionDialog
 from pyteltools.slf.datatypes import CSVData
-from pyteltools.slf.flux import TriangularVectorField, FluxCalculator
+from pyteltools.slf.flux import FluxCalculator, PossibleFluxComputation, TriangularVectorField
 from pyteltools.slf.interpolation import MeshInterpolator
 import pyteltools.slf.misc as operations
 from pyteltools.slf import Serafin
@@ -639,41 +639,8 @@ class ComputeFluxNode(TwoInOneOutNode):
     def _prepare_options(self, available_vars, available_var_names):
         self.flux_type_box = QComboBox()
         self.flux_type_box.setFixedSize(400, 30)
-        if 'U' in available_vars and 'V' in available_vars:
-            if 'H' in available_vars:
-                self.flux_type_box.addItem('Liquid flux (m3/s): (U, V, H)')
-                for name in available_var_names:
-                    str_name = name.decode(Serafin.SLF_EIT).strip()
-                    if 'TRACEUR' in str_name or 'TRACER' in str_name:
-                        self.flux_type_box.addItem('Solid flux (kg/s): (U, V, H, %s)' % str_name)
-        if 'I' in available_vars and 'J' in available_vars:
-            self.flux_type_box.addItem('Liquid flux (m3/s): (I, J)')
-        if 'H' in available_vars and 'M' in available_vars:
-            self.flux_type_box.addItem('Liquid flux (m3/s): (M, H)')
-        if 'Q' in available_vars:
-            self.flux_type_box.addItem('Liquid flux (m3/s): (Q)')
-
-        if 'QSX' in available_vars and 'QSY' in available_vars:
-            self.flux_type_box.addItem('Solid flux TOTAL (m3/s): (QSX, QSY)')
-        if 'QS' in available_vars:
-            self.flux_type_box.addItem('Solid flux TOTAL (m3/s): (QS)')
-        if 'QSBLX' in available_vars and 'QSBLY' in available_vars:
-            self.flux_type_box.addItem('Solid flux BEDLOAD (m3/s): (QSBLX, QSBLY)')
-        if 'QSBL' in available_vars:
-            self.flux_type_box.addItem('Solid flux BEDLOAD (m3/s): (QSBL)')
-        if 'QSSUSPX' in available_vars and 'QSSUSPY' in available_vars:
-            self.flux_type_box.addItem('Solid flux SUSPENSION (m3/s): (QSSUSPX, QSSUSPY)')
-        if 'QSSUSP' in available_vars:
-            self.flux_type_box.addItem('Solid flux SUSPENSION (m3/s): (QSSUSP)')
-
-        for name in available_var_names:
-            str_name = name.decode(Serafin.SLF_EIT).strip()
-            if 'QS CLASS' in str_name:
-                self.flux_type_box.addItem('Solid flux TOTAL (m3/s): (%s)' % str_name)
-            if 'QS BEDLOAD CL' in str_name:
-                self.flux_type_box.addItem('Solid flux BEDLOAD (m3/s): (%s)' % str_name)
-            if 'QS SUSP. CL' in str_name:
-                self.flux_type_box.addItem('Solid flux SUSPENSION (m3/s): (%s)' % str_name)
+        for possible_flux in PossibleFluxComputation(available_vars, available_var_names):
+            self.flux_type_box.addItem(possible_flux)
 
         return self.flux_type_box.count() > 0
 
@@ -799,19 +766,8 @@ class ComputeFluxNode(TwoInOneOutNode):
         sections = self.second_in_port.mother.parentItem().data.lines
         section_names = ['Section %d' % (i+1) for i in range(len(sections))]
 
-        var_IDs = list(self.flux_options.split(':')[1].split('(')[1][:-1].split(', '))
-        nb_vars = len(var_IDs)
-        if nb_vars == 1:
-            flux_type = FluxCalculator.LINE_INTEGRAL
-        elif nb_vars == 2:
-            if var_IDs[0] == 'M':
-                flux_type = FluxCalculator.DOUBLE_LINE_INTEGRAL
-            else:
-                flux_type = FluxCalculator.LINE_FLUX
-        elif nb_vars == 3:
-            flux_type = FluxCalculator.AREA_FLUX
-        else:
-            flux_type = FluxCalculator.MASS_FLUX
+        var_IDs = PossibleFluxComputation.get_variables(self.flux_options)
+        flux_type = PossibleFluxComputation.get_flux_type(var_IDs)
 
         # prepare the mesh
         self.progress_bar.setVisible(True)
@@ -888,7 +844,7 @@ class ComputeFluxNode(TwoInOneOutNode):
                     return 
                 self.data.metadata = {'flux title': self.flux_options,
                                       'language': self.in_data.language, 'start time': self.in_data.start_time,
-                                      'var IDs': list(self.flux_options.split(':')[1].split('(')[1][:-1].split(', '))}
+                                      'var IDs': PossibleFluxComputation.get_variables(self.flux_options)}
                 self.success('Reload existing file.')
                 return
 

@@ -8,7 +8,7 @@ import struct
 from pyteltools.conf import settings
 from pyteltools.geom import BlueKenue, Shapefile
 from pyteltools.slf.datatypes import SerafinData, PolylineData, PointData, CSVData
-from pyteltools.slf.flux import TriangularVectorField, FluxCalculator
+from pyteltools.slf.flux import FluxCalculator, PossibleFluxComputation, TriangularVectorField
 from pyteltools.slf.interpolation import MeshInterpolator
 import pyteltools.slf.misc as operations
 from pyteltools.slf import Serafin
@@ -799,24 +799,13 @@ def compute_flux(node_id, fid, data, aux_data, options, csv_separator, fmt_float
     flux_options, suffix, in_source_folder, dir_path, double_name, overwrite = options
 
     # process flux options
-    var_IDs = list(flux_options.split(':')[1].split('(')[1][:-1].split(', '))
+    var_IDs = PossibleFluxComputation.get_variables(flux_options)
     if not all(u in data.selected_vars and u in data.header.var_IDs for u in var_IDs):
         return False, node_id, fid, None, fail_message('variable not available', 'Compute Flux', data.job_id)
 
     sections = aux_data.lines
     section_names = ['Section %d' % (i+1) for i in range(len(sections))]
-    nb_vars = len(var_IDs)
-    if nb_vars == 1:
-        flux_type = FluxCalculator.LINE_INTEGRAL
-    elif nb_vars == 2:
-        if var_IDs[0] == 'M':
-            flux_type = FluxCalculator.DOUBLE_LINE_INTEGRAL
-        else:
-            flux_type = FluxCalculator.LINE_FLUX
-    elif nb_vars == 3:
-        flux_type = FluxCalculator.AREA_FLUX
-    else:
-        flux_type = FluxCalculator.MASS_FLUX
+    flux_type = PossibleFluxComputation.get_flux_type(var_IDs)
 
     # process output options
     filename = process_output_options(data.filename, data.job_id, '.csv',

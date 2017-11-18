@@ -15,8 +15,8 @@ class ReferenceMesh(TruncatedTriangularPrisms):
     The test mesh should have identical geometry to the reference mesh. Only the values are different.
     The comparison region can be the whole mesh or the interior of a polygon.
     """
-    def __init__(self, input_header, construct_index):
-        super().__init__(input_header, construct_index)
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.area = {}
         self.point_weight = []
         self.inverse_total_area = 1

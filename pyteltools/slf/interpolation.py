@@ -37,8 +37,8 @@ class Interpolator:
 
 
 class MeshInterpolator(Mesh2D):
-    def __init__(self, input_header, construct_index):
-        super().__init__(input_header, construct_index)
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
     def get_point_interpolators(self, points):
         nb_points = len(points)
