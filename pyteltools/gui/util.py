@@ -5,6 +5,7 @@ import os
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 from PyQt5.QtWidgets import *
+from shapefile import ShapefileException
 import shapely
 import struct
 
@@ -103,8 +104,8 @@ def open_polygons():
         try:
             for polygon in Shapefile.get_polygons(filename):
                 polygons.append(polygon)
-        except struct.error:
-            QMessageBox.critical(None, 'Error', 'Inconsistent bytes.', QMessageBox.Ok)
+        except ShapefileException as e:
+            QMessageBox.critical(None, 'Error', e, QMessageBox.Ok)
             return False, '', []
     if not polygons:
         QMessageBox.critical(None, 'Error', 'The file does not contain any polygon.',
@@ -133,8 +134,8 @@ def open_polylines():
         try:
             for polyline in Shapefile.get_open_polylines(filename):
                 polylines.append(polyline)
-        except struct.error:
-            QMessageBox.critical(None, 'Error', 'Inconsistent bytes.', QMessageBox.Ok)
+        except ShapefileException as e:
+            QMessageBox.critical(None, 'Error', e, QMessageBox.Ok)
             return False, '', []
     if not polylines:
         QMessageBox.critical(None, 'Error', 'The file does not contain any open polyline.',
@@ -158,8 +159,8 @@ def open_points():
         for point, attribute in Shapefile.get_points(filename, indices):
             points.append(point)
             attributes.append(attribute)
-    except struct.error:
-        QMessageBox.critical(None, 'Error', 'Inconsistent bytes.', QMessageBox.Ok)
+    except ShapefileException as e:
+        QMessageBox.critical(None, 'Error', e, QMessageBox.Ok)
         return False, '', [], [], []
 
     if not points:
@@ -1102,7 +1103,11 @@ class ProgressBarIterator:
         @return <SubProgressBarIterator>:  ProgressBarIterator sub-class with pre-defined arguments
         """
         class SubProgressBarIterator(ProgressBarIterator):
-            def __init__(self, iterable):
+            def __init__(self, iterable, unit=None):
+                """!
+                @param iterable: iterable or generator to loop over
+                @param unit: argument not used in GUI
+                """
                 super().__init__(iterable, *args, **kwargs)
         return SubProgressBarIterator
 

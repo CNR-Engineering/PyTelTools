@@ -2,8 +2,8 @@ from datetime import datetime
 from multiprocessing import Process, Queue
 import numpy as np
 import os
+from shapefile import ShapefileException
 from shapely.geometry import Polygon
-import struct
 
 from pyteltools.conf import settings
 from pyteltools.geom import BlueKenue, Shapefile
@@ -121,7 +121,7 @@ def read_polygons(node_id, filename):
         return False, node_id, None, message
 
     data = PolylineData()
-    is_i2s = filename[-4:] == '.i2s'
+    is_i2s = filename.endswith('.i2s')
     if is_i2s:
         with BlueKenue.Read(filename) as f:
             f.read_header()
@@ -132,8 +132,8 @@ def read_polygons(node_id, filename):
         try:
             for polygon in Shapefile.get_polygons(filename):
                 data.add_line(polygon)
-        except struct.error:
-            message = fail_message('inconsistent bytes', 'Load 2D Polygons', 'all')
+        except ShapefileException as e:
+            message = fail_message(e, 'Load 2D Polygons', 'all')
             return False, node_id, None, message
 
         data.set_fields(Shapefile.get_all_fields(filename))
@@ -154,7 +154,7 @@ def read_polylines(node_id, filename):
         return False, node_id, None, message
 
     data = PolylineData()
-    is_i2s = filename[-4:] == '.i2s'
+    is_i2s = filename.endswith('.i2s')
     if is_i2s:
         with BlueKenue.Read(filename) as f:
             f.read_header()
@@ -165,8 +165,8 @@ def read_polylines(node_id, filename):
         try:
             for poly in Shapefile.get_open_polylines(filename):
                 data.add_line(poly)
-        except struct.error:
-            message = fail_message('inconsistent bytes', 'Load 2D Open Polylines', 'all')
+        except ShapefileException as e:
+            message = fail_message(e, 'Load 2D Open Polylines', 'all')
             return False, node_id, None, message
 
         data.set_fields(Shapefile.get_all_fields(filename))
@@ -191,8 +191,8 @@ def read_points(node_id, filename):
         for point, attribute in Shapefile.get_points(filename):
             data.add_point(point)
             data.add_attribute(attribute)
-    except struct.error:
-        message = fail_message('inconsistent bytes', 'Load 2D Points', 'all')
+    except ShapefileException as e:
+        message = fail_message(e, 'Load 2D Points', 'all')
         return False, node_id, None, message
 
     data.set_fields(Shapefile.get_all_fields(filename))

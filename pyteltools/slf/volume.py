@@ -224,22 +224,22 @@ class VolumeCalculator:
         if self.second_var_ID == VolumeCalculator.INIT_VALUE:
             self.init_values = input_stream.read_var_in_frame(0, self.var_ID)
 
-    def construct_triangles(self):
-        self.mesh = TruncatedTriangularPrisms(self.input_stream.header, True)
+    def construct_triangles(self, iter_pbar=lambda *args: args):
+        self.mesh = TruncatedTriangularPrisms(self.input_stream.header, True, iter_pbar)
 
-    def construct_weights(self, iter_pbar=lambda x:x):
+    def construct_weights(self, iter_pbar=lambda iter, unit: iter):
         """!
         Construct the point weights/intersections etc. depending on the volume type, for every polygons
         """
         if self.volume_type == VolumeCalculator.NET_STRICT:
-            for poly in iter_pbar(self.polygons):
+            for poly in iter_pbar(self.polygons, unit='polygons'):
                 self.weights.append(self.mesh.polygon_intersection_strict(poly))
         elif self.volume_type == VolumeCalculator.NET:
-            for poly in iter_pbar(self.polygons):
+            for poly in iter_pbar(self.polygons, unit='polygons'):
                 weight, triangle_polygon_intersection = self.mesh.polygon_intersection(poly)
                 self.weights.append((weight, triangle_polygon_intersection))
         elif self.volume_type == VolumeCalculator.POSITIVE:
-            for poly in iter_pbar(self.polygons):
+            for poly in iter_pbar(self.polygons, unit='polygons'):
                 self.weights.append(self.mesh.polygon_intersection_all(poly))
 
     def volume_in_frame_in_polygon(self, weight, values, polygon):

@@ -51,7 +51,7 @@ class PyTelToolsArgParse(argparse.ArgumentParser):
         elif 'out_slf' == arg_id:
             self.add_argument('out_slf', help='Serafin output filename')
         elif 'out_csv' == arg_id:
-            self.add_argument('out_csv', help='output CSV file')
+            self.add_argument('out_csv', help='output csv file')
         elif 'shift' == arg_id:
             self.add_argument('--shift', type=float, nargs=2, help='translation (x_distance, y_distance)',
                               metavar=('X', 'Y'))
@@ -67,10 +67,10 @@ class PyTelToolsArgParse(argparse.ArgumentParser):
             self.add_argument('--toggle_endianness', help='toggle output file endianness (between big/little endian)',
                               action='store_true')
         if any(arg in self.args_known_ids for arg in ('in_slf', 'out_slf')):
-            self.add_argument('--lang', help="Serafin language for variables detection ('fr' or 'en')",
+            self.add_argument('--lang', help="Serafin language for variables detection: 'fr' or 'en'",
                               default=settings.LANG)
         if 'out_csv' in self.args_known_ids:
-            self.group_general.add_argument('--sep', help='CSV column delimiter', default=settings.CSV_SEPARATOR)
+            self.group_general.add_argument('--sep', help='csv column delimiter', default=settings.CSV_SEPARATOR)
 
     @staticmethod
     def _title_group(label):

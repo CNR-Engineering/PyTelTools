@@ -2,7 +2,7 @@ import numpy as np
 import os
 from PyQt5.QtCore import *
 from PyQt5.QtWidgets import *
-import struct
+from shapefile import ShapefileException
 
 from pyteltools.conf import settings
 from pyteltools.geom import BlueKenue, Shapefile
@@ -211,7 +211,7 @@ class WriteSerafinNode(OneInOneOutNode):
         output_header.empty_variables()
         for var_ID in selected_vars:
             var_name, var_unit = input_data.selected_vars_names[var_ID]
-            output_header.add_variable(var_ID, var_name, var_units)
+            output_header.add_variable(var_ID, var_name, var_unit)
         if input_data.to_single:
             output_header.to_single_precision()
 
@@ -543,8 +543,8 @@ class LoadPolygon2DNode(SingleOutputNode):
             try:
                 for polygon in Shapefile.get_polygons(self.filename):
                     self.data.add_line(polygon)
-            except struct.error:
-                self.fail('Inconsistent bytes.')
+            except ShapefileException as e:
+                self.fail(e)
                 return
             self.data.set_fields(Shapefile.get_all_fields(self.filename))
 
@@ -631,8 +631,8 @@ class LoadOpenPolyline2DNode(SingleOutputNode):
             try:
                 for poly in Shapefile.get_open_polylines(self.filename):
                     self.data.add_line(poly)
-            except struct.error:
-                self.fail('Inconsistent bytes.')
+            except ShapefileException as e:
+                self.fail(e)
                 return
             self.data.set_fields(Shapefile.get_all_fields(self.filename))
 
@@ -712,8 +712,8 @@ class LoadPoint2DNode(SingleOutputNode):
             for point, attribute in Shapefile.get_points(self.filename):
                 self.data.add_point(point)
                 self.data.add_attribute(attribute)
-        except struct.error:
-            self.fail('Inconsistent bytes.')
+        except ShapefileException as e:
+            self.fail(e)
             return
         self.data.set_fields(Shapefile.get_all_fields(self.filename))
         if self.data.is_empty():

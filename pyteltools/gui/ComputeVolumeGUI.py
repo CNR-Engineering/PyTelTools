@@ -364,13 +364,12 @@ class InputTab(SerafinInputTab):
                 input_stream.header = self.data.header
                 input_stream.time = self.data.time
                 if self.supVolumeBox.isChecked():
-                    calculator = VolumeCalculatorThread(VolumeCalculator.POSITIVE, self.var_ID, self.second_var_ID,
-                                                        input_stream, names, self.polygons, sampling_frequency,
-                                                        self.mesh, self.parent.csv_separator, self.parent.fmt_float)
+                    volume_type = VolumeCalculator.POSITIVE
                 else:
-                    calculator = VolumeCalculatorThread(VolumeCalculator.NET, self.var_ID, self.second_var_ID,
-                                                        input_stream, names, self.polygons, sampling_frequency,
-                                                        self.mesh, self.parent.csv_separator, self.parent.fmt_float)
+                    volume_type = VolumeCalculator.NET
+                calculator = VolumeCalculatorThread(volume_type, self.var_ID, self.second_var_ID, input_stream,
+                                                    names, self.polygons, sampling_frequency, self.mesh,
+                                                    self.parent.csv_separator, self.parent.fmt_float)
 
                 progressBar.setValue(5)
                 QApplication.processEvents()

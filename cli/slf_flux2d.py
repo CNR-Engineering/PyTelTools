@@ -14,8 +14,11 @@ from pyteltools.slf.flux import FluxCalculator, PossibleFluxComputation
 from pyteltools.utils.cli import logger, PyTelToolsArgParse
 
 
-
 def slf_flux2d(args):
+    if len(args.scalars) > 2:
+        logger.error('Only two scalars can be integrated!')
+        sys.exit(2)
+
     # Read set of lines from input file
     polylines = []
     if args.in_sections.endswith('.i2s'):
@@ -24,8 +27,12 @@ def slf_flux2d(args):
             for polyline in f.get_open_polylines():
                 polylines.append(polyline)
     elif args.in_sections.endswith('.shp'):
-        for polyline in Shapefile.get_open_polylines(args.in_sections):
-            polylines.append(polyline)
+        try:
+            for polyline in Shapefile.get_open_polylines(args.in_sections):
+                polylines.append(polyline)
+        except ShapefileException as e:
+            logger.error(e)
+            sys.exit(3)
     else:
         logger.error('File "%s" is not a i2s or shp file.' % args.in_sections)
         sys.exit(2)
@@ -82,7 +89,7 @@ def slf_flux2d(args):
         # Write CSV
         mode = 'w' if args.force else 'x'
         with open(args.out_csv, mode) as out_csv:
-            calculator.write_csv(result, out_csv, settings.CSV_SEPARATOR)
+            calculator.write_csv(result, out_csv, args.sep)
 
 
 parser = PyTelToolsArgParse(description=__doc__, add_args=['in_slf'])
@@ -104,9 +111,6 @@ if __name__ == '__main__':
     except (Serafin.SerafinRequestError, Serafin.SerafinValidationError):
         # Message is already reported by slf logger
         sys.exit(1)
-    except ShapefileException as e:
-        logger.error(e)
-        sys.exit(3)
     except FileNotFoundError as e:
         logger.error('Input file %s not found.' % e.filename)
         sys.exit(3)
