@@ -3,6 +3,7 @@ from PyQt5.QtCore import *
 from PyQt5.QtWidgets import *
 import sys
 
+from pyteltools.conf import settings
 from pyteltools.slf import Serafin
 
 from .util import ColorMapCanvas, LoadMeshDialog, MapViewer, PlotViewer, PolygonMapCanvas, PyTelToolWidget, \
@@ -649,7 +650,7 @@ class ErrorDistributionTab(QWidget):
         self.plotViewer.canvas.axes.clear()
         self.plotViewer.canvas.axes.grid(linestyle='dotted')
 
-        self.plotViewer.canvas.axes.hist(ewsd, weights=weights, histtype='bar', color='g',
+        self.plotViewer.canvas.axes.hist(ewsd, bins=settings.NB_BINS_EWSD, weights=weights, histtype='bar', color='g',
                                          edgecolor='k', alpha=0.5)
         self.plotViewer.canvas.axes.set_xlabel(self.plotViewer.current_xlabel)
         self.plotViewer.canvas.axes.set_ylabel(self.plotViewer.current_ylabel)

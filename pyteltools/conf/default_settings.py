@@ -1,3 +1,4 @@
+from collections import OrderedDict
 import logging
 from multiprocessing import cpu_count
 
@@ -57,6 +58,12 @@ SCENE_SIZE = (2400, 1000)
 NB_COLOR_LEVELS = 512
 
 # Color style
+## Discrete color map (loop over the list if more are required)
+DEFAULT_COLORS = OrderedDict([('Blue', '#1f77b4'), ('Orange', '#ff7f0e'), ('Green', '#2ca02c'), ('Red', '#d62728'),
+                              ('Purple', '#9467bd'), ('Brown', '#8c564b'), ('Pink', '#e377c2'), ('DarkGray', '#7f7f7f'),
+                              ('Yellow', '#bcbd22'), ('Cyan', '#17becf')])
+
+## Continous color map
 ## See https://matplotlib.org/examples/color/colormaps_reference.html to preview color rendering
 DEFAULT_COLOR_STYLE = 'coolwarm'
 COLOR_SYLES = ['ocean', 'gist_earth', 'terrain', 'gnuplot', 'gnuplot2', 'CMRmap',
@@ -69,3 +76,6 @@ COLOR_SYLES = ['ocean', 'gist_earth', 'terrain', 'gnuplot', 'gnuplot2', 'CMRmap'
 
 # Default axis label for coordinates
 X_AXIS_LABEL, Y_AXIS_LABEL = 'X (m)', 'Y (m)'
+
+# Number of bins for EWSD distribution (for GUI `Compare Resultats`)
+NB_BINS_EWSD = 100

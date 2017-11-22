@@ -167,11 +167,19 @@ Here is a second example of a JSON configuration file with a more complex config
 {
     "DIGITS": 8,
     "NCSIZE": 6,
+    "FIG_SIZE": [12, 8],
+    "FMT_COORD": "{:.5f}",
     "SCENE_SIZE": [2000, 1200],
     "SERAFIN_EXT": [".slf", ".srf", ".res"],
     "WRITE_XYZ_HEADER": false,
     "X_AXIS_LABEL": "X coordinate (m)",
-    "Y_AXIS_LABEL": "Y coordinate (m)"
+    "Y_AXIS_LABEL": "Y coordinate (m)",
+    "DEFAULT_COLORS":
+    {
+        "Yellow": "#bcbd22",
+        "Cyan": "#17becf",
+        "Red": "#d62728"
+    }
 }
 ```
 

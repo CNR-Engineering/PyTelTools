@@ -1682,7 +1682,7 @@ class ColumnColorEditor(QDialog):
 class PlotCanvas(FigureCanvas):
     def __init__(self, parent):
         self.parent = parent
-        self.figure = Figure(figsize=(8, 6), dpi=100)
+        self.figure = Figure(figsize=(settings.FIG_SIZE[0], settings.FIG_SIZE[1]), dpi=settings.FIG_OUT_DPI)
         self.axes = self.figure.add_subplot(111)
 
         FigureCanvas.__init__(self, self.figure)
@@ -1852,11 +1852,9 @@ class MapViewer(QWidget):
 class PlotViewer(QWidget):
     def __init__(self):
         super().__init__()
-        self.defaultColors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2',
-                              '#7f7f7f', '#bcbd22', '#17becf']
-        name = ['Blue', 'Orange', 'Green', 'Red', 'Purple', 'Brown', 'Pink', 'DarkGray', 'Yellow', 'Cyan']
-        self.colorToName = {c: n for c, n in zip(self.defaultColors, name)}
-        self.nameToColor = {n: c for c, n in zip(self.defaultColors, name)}
+        self.defaultColors = [c for n, c in settings.DEFAULT_COLORS.items()]
+        self.colorToName = {c: n for n, c in settings.DEFAULT_COLORS.items()}
+        self.nameToColor = {n: c for n, c in settings.DEFAULT_COLORS.items()}
 
         self.canvas = PlotCanvas(self)
         self.current_xlabel = settings.X_AXIS_LABEL
