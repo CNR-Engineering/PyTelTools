@@ -29,7 +29,7 @@ def do_calculations_in_frame(equations, input_serafin, time_index, selected_outp
     @brief Return the selected 2D variables values in a single time frame
     @param equations <[slf.variables_utils.Equation]>: list of all equations necessary to compute selected variables
     @param input_serafin <Serafin.Read>: input stream for reading necessary variables
-    @param time_index <int>: the position of time frame to read
+    @param time_index <int>: the index of the frame (0-based)
     @param selected_output_IDs <[str]>: the short names of the selected output variables
     @param output_float_type <numpy.dtype>: float32 or float64 according to the output file type
     @param is_2d <bool>: True if input data is 2D

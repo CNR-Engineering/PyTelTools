@@ -311,6 +311,12 @@ class ComplexExpressionPool:
             yield time_value, value_array
 
     def decode(self, input_stream, time_index, node_code):
+        """
+        @param input_stream <slf.Serafin.Read>: the input Serafin
+        @param time_index <int>: the index of the frame (0-based)
+        @param node_code <str>: expression abbreviation (?)
+        @return <(numpy 1D-array, ???)>: node_values, node_object
+        """
         if node_code == 'COORDX':
             return self.x, None
         elif node_code == 'COORDY':
@@ -328,6 +334,11 @@ class ComplexExpressionPool:
             return None, self.expressions[index]
 
     def _evaluate_expressions(self, input_stream, time_index, path):
+        """!
+        @param input_stream <slf.Serafin.Read>: the input Serafin
+        @param time_index <int>: the index of the frame (0-based)
+        @param path <[str]>: list of expressions (?)
+        """
         # evaluate each node on the augmented path
         values = {node: None for node in path}
         for node in path:
@@ -357,6 +368,9 @@ class ComplexExpressionMultiPool:
         self.representative = None
 
     def get_data(self, input_data):
+        """!
+        @param input_data <slf.datatypes.SerafinData>: input SerafinData stream
+        """
         self.input_data = input_data
         self.nb_pools = len(input_data)
 
@@ -467,7 +481,7 @@ class ComplexExpressionMultiPool:
             output_header = data.header.copy()
             output_header.empty_variables()
             for name in selected_names:
-                output_header.add_variables_str('DUMMY', name, '')
+                output_header.add_variable_str('DUMMY', name, '')
             yield output_header
 
     def build_augmented_path(self, selected_expressions):

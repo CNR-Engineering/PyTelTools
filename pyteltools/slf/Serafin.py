@@ -540,7 +540,7 @@ class Read(Serafin):
         """!
         @brief Handle data request by variable ID
         @param var_ID <str>: the ID of the requested variable
-        @return index <int> the index (0-based) of the requested variable
+        @return index <int> the index of the frame (0-based)
         """
         if self.header is None:
             raise SerafinRequestError('Cannot extract variable from empty list (forgot read_header ?)')
@@ -553,7 +553,7 @@ class Read(Serafin):
     def read_var_in_frame(self, time_index, var_ID):
         """!
         @brief Read a single variable in a frame
-        @param time_index <float>: 0-based index of simulation time from the target frame
+        @param time_index <int>: the index of the frame (0-based)
         @param var_ID <str>: variable ID
         @return <numpy 1D-array>: values of the variables, of length equal to the number of nodes
         """
@@ -570,7 +570,7 @@ class Read(Serafin):
     def read_var_in_frame_as_3d(self, time_index, var_ID):
         """!
         @brief Read a single variable in a 3D frame
-        @param time_index <float>: 0-based index of simulation time from the target frame
+        @param time_index <int>: the index of the frame (0-based)
         @param var_ID <str>: variable ID
         @return <numpy 2D-array>: values of the variables with shape (planes number, number of 2D nodes)
         """
@@ -582,7 +582,7 @@ class Read(Serafin):
     def read_var_in_frame_at_layer(self, time_index, var_ID, iplan):
         """!
         @brief Read a single variable in a frame at specific layer
-        @param time_index <float>: 0-based index of simulation time from the target frame
+        @param time_index <int>: the index of the frame (0-based)
         @param var_ID <str>: variable ID
         @param iplan <int>: 1-based index of layer
         @return <numpy 1D-array>: values of the variables, of length equal to the number of nodes
