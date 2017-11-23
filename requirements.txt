@@ -1,3 +1,4 @@
+coloredlogs
 descartes
 matplotlib
 numpy

@@ -9,6 +9,13 @@ from multiprocessing import cpu_count
 # logging.DEBUG, logging.INFO, logging.ERROR
 LOGGING_LEVEL = logging.INFO
 
+# Logging formats
+LOGGING_FMT_CLI = '%(message)s'
+LOGGING_FMT_GUI = '%(asctime)s - [%(levelname)s] - \n%(message)s'
+
+# Color logging messages (requires coloredlogs package)"
+COLOR_LOGS = True
+
 # CPU Cores for parallel computation (workflow multi-folder view)
 NCSIZE = cpu_count()
 

@@ -4,6 +4,7 @@ from PyQt5.QtCore import *
 from PyQt5.QtWidgets import *
 import sys
 
+from pyteltools.conf import settings
 import pyteltools.slf.misc as operations
 from pyteltools.slf import Serafin
 
@@ -232,7 +233,7 @@ class SubmitTab(QWidget):
 
         # create the widget displaying message logs
         self.logTextBox = QPlainTextEditLogger(self)
-        self.logTextBox.setFormatter(logging.Formatter('%(asctime)s - [%(levelname)s] - \n%(message)s'))
+        self.logTextBox.setFormatter(logging.Formatter(settings.LOGGING_FMT_GUI))
         logging.getLogger().addHandler(self.logTextBox)
         logging.getLogger().setLevel(self.parent.logging_level)
 

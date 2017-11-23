@@ -11,15 +11,12 @@ import sys
 
 from pyteltools.conf import settings
 from pyteltools.slf.Serafin import logger as slf_logger
+from .logging import new_logger
 
 
 LINE_WIDTH = 80
 
-logger = logging.getLogger(__name__)
-handler = logging.StreamHandler()
-handler.setFormatter(logging.Formatter('%(message)s'))
-logger.addHandler(handler)
-logger.setLevel(settings.LOGGING_LEVEL)
+logger = new_logger(__name__)
 
 
 class CustomFormatter(argparse.ArgumentDefaultsHelpFormatter, argparse.RawDescriptionHelpFormatter):

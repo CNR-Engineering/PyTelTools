@@ -4,6 +4,7 @@ from PyQt5.QtCore import *
 import shapefile
 import sys
 
+from pyteltools.conf import settings
 import pyteltools.geom.conversion as convert
 import pyteltools.geom.Shapefile as shp
 from pyteltools.geom.transformation import load_transformation_map
@@ -58,7 +59,7 @@ class FileConverterInputTab(QWidget):
 
         # create the widget displaying message logs
         self.logTextBox = QPlainTextEditLogger(self)
-        self.logTextBox.setFormatter(logging.Formatter('%(asctime)s - [%(levelname)s] - \n%(message)s'))
+        self.logTextBox.setFormatter(logging.Formatter(settings.LOGGING_FMT_GUI))
         logging.getLogger().addHandler(self.logTextBox)
         logging.getLogger().setLevel(self.parent.logging_level)
 
@@ -292,7 +293,7 @@ class FileConverterOutputTab(QWidget):
 
         # create the widget displaying message logs
         self.logTextBox = QPlainTextEditLogger(self)
-        self.logTextBox.setFormatter(logging.Formatter('%(asctime)s - [%(levelname)s] - \n%(message)s'))
+        self.logTextBox.setFormatter(logging.Formatter(settings.LOGGING_FMT_GUI))
         logging.getLogger().addHandler(self.logTextBox)
         logging.getLogger().setLevel(self.input.parent.logging_level)
 
