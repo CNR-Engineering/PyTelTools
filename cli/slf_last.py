@@ -34,7 +34,7 @@ def slf_last(args):
                 logger.warn('Input file is already single precision! Argument `--to_single_precision` is ignored')
 
         values = np.empty((output_header.nb_var, output_header.nb_nodes), dtype=output_header.np_float_type)
-        with Serafin.Write(args.out_slf, args.lang) as resout:
+        with Serafin.Write(args.out_slf, args.lang, overwrite=args.force) as resout:
             resout.write_header(output_header)
 
             time_index = len(resin.time) - 1

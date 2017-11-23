@@ -6,6 +6,7 @@ Performs multiple operations on a Serafin file:
 - select frames
 """
 
+import os.path
 import sys
 from tqdm import tqdm
 
@@ -57,7 +58,7 @@ def slf_base(args):
         necessary_equations = get_necessary_equations(resin.header.var_IDs, output_header.var_IDs,
                                                       is_2d=resin.header.is_2d)
 
-        with Serafin.Write(args.out_slf, args.lang) as resout:
+        with Serafin.Write(args.out_slf, args.lang, overwrite=args.force) as resout:
             resout.write_header(resin.header)
 
             for time_index, time in tqdm(resin.subset_time(args.start, args.end, args.ech), unit='frame'):

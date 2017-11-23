@@ -5,12 +5,12 @@ Handles some exceptions (if `in_slf` or `out_slf` arguments are present)
 """
 
 import argparse
+import coloredlogs
 import logging
 import os.path
 import sys
 
 from pyteltools.conf import settings
-from pyteltools.slf.Serafin import logger as slf_logger
 from .logging import new_logger
 
 
@@ -83,9 +83,10 @@ class PyTelToolsArgParse(argparse.ArgumentParser):
         self.group_general = self.add_argument_group('General optional arguments')
         if 'force' in add_args:
             self.group_general.add_argument('-f', '--force', help='force output overwrite', action='store_true')
+            self.args_known_ids.append('force')
         if 'verbose' in add_args:
             self.group_general.add_argument('-v', '--verbose', help='increase output verbosity', action='store_true')
-
+            self.args_known_ids.append('verbose')
 
     def parse_args(self, *args, **kwargs):
         if self.group_general is None:
@@ -96,11 +97,13 @@ class PyTelToolsArgParse(argparse.ArgumentParser):
 
         new_args = super().parse_args(*args, **kwargs)
 
-        # Set module logger verbosity
         if 'verbose' in new_args:
+            # Change verbosity globally
             if new_args.verbose:
-                logger.setLevel(logging.DEBUG)
-                slf_logger.setLevel(logging.DEBUG)
+                if settings.COLOR_LOGS:
+                    coloredlogs.set_level(logging.DEBUG)
+                else:
+                    logging.basicConfig(level=logging.DEBUG)
 
         # Input Serafin file
         if 'in_slf' in new_args:
@@ -108,17 +111,23 @@ class PyTelToolsArgParse(argparse.ArgumentParser):
                 with open(new_args.in_slf):
                     pass
             except FileNotFoundError:
-                logger.error('No such file or directory: %s' % new_args.in_slf)
+                logger.critical('No such file or directory: %s' % new_args.in_slf)
                 sys.exit(3)
+
+            if 'out_slf' in new_args:  # avoid input file overwriting
+                if os.path.isfile(new_args.out_slf):
+                    if os.path.samefile(new_args.in_slf, new_args.out_slf):
+                        logger.critical('Cannot overwrite to the input file.')
+                        sys.exit(3)
 
         # Output files
         if 'force' in self.args_known_ids:
-            if not args.force:
+            if not new_args.force:
                 for out_arg in ('out_csv', 'out_slf'):
                     if out_arg in new_args:
                         out_path = getattr(new_args, out_arg)
                         if os.path.isfile(out_path):
-                            logger.error('Output file alredy exists: %s' % out_path)
+                            logger.critical('Output file already exists: %s' % out_path)
                             sys.exit(3)
 
         if any(arg in new_args for arg in ('in_slf', 'out_slf')):

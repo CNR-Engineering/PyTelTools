@@ -16,7 +16,7 @@ from pyteltools.utils.cli import logger, PyTelToolsArgParse
 
 def slf_flux2d(args):
     if len(args.scalars) > 2:
-        logger.error('Only two scalars can be integrated!')
+        logger.critical('Only two scalars can be integrated!')
         sys.exit(2)
 
     # Read set of lines from input file
@@ -31,14 +31,14 @@ def slf_flux2d(args):
             for polyline in Shapefile.get_open_polylines(args.in_sections):
                 polylines.append(polyline)
         except ShapefileException as e:
-            logger.error(e)
+            logger.critical(e)
             sys.exit(3)
     else:
-        logger.error('File "%s" is not a i2s or shp file.' % args.in_sections)
+        logger.critical('File "%s" is not a i2s or shp file.' % args.in_sections)
         sys.exit(2)
 
     if not polylines:
-        logger.error('The file does not contain any open polyline.')
+        logger.critical('The file does not contain any open polyline.')
         sys.exit(1)
     logger.debug('The file contains {} open polyline{}.'.format(len(polylines), 's' if len(polylines) > 1 else ''))
 
@@ -49,7 +49,7 @@ def slf_flux2d(args):
         resin.get_time()
 
         if not resin.header.is_2d:
-            logger.error('The file has to be a 2D Serafin!')
+            logger.critical('The file has to be a 2D Serafin!')
             sys.exit(3)
 
         # Determine flux computations properties
@@ -57,10 +57,10 @@ def slf_flux2d(args):
         variables_missing = [var_ID for var_ID in var_IDs if var_ID not in resin.header.var_IDs]
         if variables_missing:
             if len(variables_missing) > 1:
-                logger.error('Variables {} are not present in the Serafin file'.format(variables_missing))
+                logger.critical('Variables {} are not present in the Serafin file'.format(variables_missing))
             else:
-                logger.error('Variable {} is not present in the Serafin file'.format(variables_missing[0]))
-            logger.error('Check also `--lang` argument for variable detection.')
+                logger.critical('Variable {} is not present in the Serafin file'.format(variables_missing[0]))
+            logger.critical('Check also `--lang` argument for variable detection.')
             sys.exit(1)
         if var_IDs not in PossibleFluxComputation.common_fluxes():
             logger.warn('Flux computations is not common. Check what you are doing (or the language).')
@@ -112,8 +112,8 @@ if __name__ == '__main__':
         # Message is already reported by slf logger
         sys.exit(1)
     except FileNotFoundError as e:
-        logger.error('Input file %s not found.' % e.filename)
+        logger.critical('Input file %s not found.' % e.filename)
         sys.exit(3)
     except FileExistsError as e:
-        logger.error('Output file %s already exists. Remove it or add `--force` argument' % e.filename)
+        logger.critical('Output file %s already exists. Remove it or add `--force` argument' % e.filename)
         sys.exit(3)

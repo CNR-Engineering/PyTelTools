@@ -25,7 +25,7 @@ def slf_int2d(args):
         attributes.append(attribute)
 
     if not points:
-        logger.error('The Shapefile does not contain any point.')
+        logger.critical('The Shapefile does not contain any point.')
         sys.exit(1)
 
     # Read Serafin file
@@ -34,7 +34,7 @@ def slf_int2d(args):
         logger.info(resin.header.summary())
 
         if not resin.header.is_2d:
-            logger.error('The file has to be a 2D Serafin!')
+            logger.critical('The file has to be a 2D Serafin!')
             sys.exit(3)
 
         resin.get_time()
@@ -46,7 +46,7 @@ def slf_int2d(args):
         nb_inside = sum(map(int, is_inside))
 
         if nb_inside == 0:
-            logger.error('No point inside the mesh.')
+            logger.critical('No point inside the mesh.')
             sys.exit(3)
         logger.debug('The file contains {} point{}. {} point{} inside the mesh'.format(
                      len(points), 's' if len(points) > 1 else '',
@@ -112,11 +112,11 @@ if __name__ == '__main__':
         # Message is already reported by slf logger
         sys.exit(1)
     except ShapefileException as e:
-        logger.error(e)
+        logger.critical(e)
         sys.exit(3)
     except FileNotFoundError as e:
-        logger.error('Input file %s not found.' % e.filename)
+        logger.critical('Input file %s not found.' % e.filename)
         sys.exit(3)
     except FileExistsError as e:
-        logger.error('Output file %s already exists. Remove it or add `--force` argument' % e.filename)
+        logger.critical('Output file %s already exists. Remove it or add `--force` argument' % e.filename)
         sys.exit(3)

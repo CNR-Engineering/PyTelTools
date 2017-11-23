@@ -598,21 +598,21 @@ class Write(Serafin):
     """!
     @brief Serafin file output stream
     """
-    def __init__(self, filename, language):
+    def __init__(self, filename, language, overwrite=False):
         """!
         @param filename <str>: path to output Serafin file
         @param language <str>: Serafin variable name language ('fr' or 'en')
+        @param overwrite <bool>: overwrite if file already exists
         """
-        super().__init__(filename, 'wb', language)
+        mode = 'wb' if overwrite else 'xb'
+        super().__init__(filename, mode, language)
         logger.info('Writing the output file: "%s"' % filename)
 
     def __enter__(self):
         try:
             return Serafin.__enter__(self)
         except FileExistsError:
-            logger.error('ERROR: Cannot overwrite existing file')
-            raise FileExistsError('File {} already exists (remove the file or change the option '
-                                  'and then re-run the program)'.format(self.filename))
+            raise SerafinRequestError('Cannot overwrite existing file')
 
     def write_header(self, header):
         """!
