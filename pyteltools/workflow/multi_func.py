@@ -478,7 +478,7 @@ def write_simple_slf(input_data, filename):
         input_stream.header = input_data.header
         input_stream.time = input_data.time
 
-        with Serafin.Write(filename, input_data.language) as output_stream:
+        with Serafin.Write(filename, input_data.language, True) as output_stream:
             output_stream.write_header(output_header)
             for time_index in input_data.selected_time_indices:
                 # FIXME Optimization: Do calculations only on target layer and avoid reshaping afterwards
@@ -527,7 +527,7 @@ def write_max_min_mean(input_data, filename):
         else:
             values = np.vstack((scalar_calculator.finishing_up(), vector_calculator.finishing_up()))
 
-        with Serafin.Write(filename, input_data.language) as resout:
+        with Serafin.Write(filename, input_data.language, True) as resout:
             resout.write_header(output_header)
             resout.write_entire_frame(output_header, input_data.time[0], values)
 
@@ -553,7 +553,7 @@ def write_synch_max(input_data, filename):
         calculator.run()
         values = calculator.finishing_up()
 
-        with Serafin.Write(filename, input_data.language) as output_stream:
+        with Serafin.Write(filename, input_data.language, True) as output_stream:
             output_stream.write_header(output_header)
             output_stream.write_entire_frame(output_header, input_data.time[0], values)
 
@@ -600,7 +600,7 @@ def write_arrival_duration(input_data, filename):
             values *= 100 / (input_data.time[input_data.selected_time_indices[-1]]
                              - input_data.time[input_data.selected_time_indices[0]])
 
-        with Serafin.Write(filename, input_data.language) as resout:
+        with Serafin.Write(filename, input_data.language, True) as resout:
             resout.write_header(output_header)
             resout.write_entire_frame(output_header, input_data.time[0], values)
 
@@ -680,7 +680,7 @@ def write_project_mesh(first_input, filename):
                                                           point_interpolators, common_frames, operation_type,
                                                           use_reference)
 
-            with Serafin.Write(filename, first_input.language) as out_stream:
+            with Serafin.Write(filename, first_input.language, True) as out_stream:
                 out_stream.write_header(output_header)
                 calculator.run(out_stream, output_header)
 
@@ -702,7 +702,7 @@ def write_slf_layer_selection(input_data, filename):
         input_stream.header = input_data.header
         input_stream.time = input_data.time
 
-        with Serafin.Write(filename, input_data.language) as output_stream:
+        with Serafin.Write(filename, input_data.language, True) as output_stream:
             output_stream.write_header(output_header)
             for time_index in input_data.selected_time_indices:
                 values = do_calculations_in_frame(input_data.equations, input_stream, time_index,
