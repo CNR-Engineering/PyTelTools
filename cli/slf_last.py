@@ -6,7 +6,7 @@ Extract last temporal frame of a 2D/3D Serafin file
 import numpy as np
 import sys
 
-from pyteltools.geom.transformation import Translation
+from pyteltools.geom.transformation import Transformation
 from pyteltools.slf import Serafin
 from pyteltools.utils.cli import logger, PyTelToolsArgParse
 
@@ -20,7 +20,7 @@ def slf_last(args):
         output_header = resin.header.copy()
         # Shift mesh coordinates if necessary
         if args.shift:
-            output_header.transform_mesh(Translation(args.shift[0], args.shift[1], 0))
+            output_header.transform_mesh([Transformation(0, 1, 1, args.shift[0], args.shift[1], 0)])
 
         # Toggle output file endianness if necessary
         if args.toggle_endianness:

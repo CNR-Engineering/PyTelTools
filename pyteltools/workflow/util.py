@@ -1,5 +1,4 @@
 import datetime
-import logging
 import numpy as np
 import os
 from PyQt5.QtCore import *
@@ -14,22 +13,19 @@ import matplotlib.tri as mtri
 import warnings
 warnings.filterwarnings('ignore', category=RuntimeWarning, module='matplotlib')
 
-from pyteltools.conf import settings 
+from pyteltools.conf import settings
 from pyteltools.gui.util import FluxPlotViewer, MapCanvas, PointLabelEditor, PointPlotViewer, PlotViewer, \
     read_csv, SimpleTimeDateSelection, TemporalPlotViewer, VolumePlotViewer
 from pyteltools.slf.datatypes import SerafinData
 from pyteltools.slf.interpolation import MeshInterpolator
 from pyteltools.slf import Serafin
+from pyteltools.utils.cli import new_logger
 
 
 EPS_VALUE = 0.001  # Relative tolerance (of 0.1%) above which min and max are modified to avoid a crash of colormap [#2]
 
 
-logger = logging.getLogger(__name__)
-handler = logging.StreamHandler()
-handler.setFormatter(logging.Formatter('%(asctime)s %(levelname)s %(message)s'))
-logger.addHandler(handler)
-logger.setLevel(settings.LOGGING_LEVEL)
+logger = new_logger(__name__)
 
 
 def build_levels_from_minmax(min_input, max_input):

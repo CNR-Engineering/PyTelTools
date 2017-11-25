@@ -328,8 +328,8 @@ class SerafinHeader:
                    'on {} nodes and {} elements for {} time frame{}.'
         return template.format(self.file_type.decode(SLF_EIT),
                                {True: '2D', False: '3D'}[self.is_2d], self.nb_var,
-                               '' if self.is_2d else ', %d layers' % self.nb_planes,
-                               ['', 's'][self.nb_var > 1], self.nb_nodes, self.nb_elements, self.nb_frames,
+                               ['', 's'][self.nb_var > 1], '' if self.is_2d else ', %d layers' % self.nb_planes,
+                               self.nb_nodes, self.nb_elements, self.nb_frames,
                                ['', 's'][self.nb_frames > 1])
 
     def copy(self):
@@ -618,6 +618,9 @@ class Write(Serafin):
         """!
         @brief Write Serafin header from attributes
         """
+        logger.debug('Writing header with {} nodes, {} elements{} and {} variable{}'.format(header.nb_nodes,
+            header.nb_elements, '' if header.is_2d else ', %i layers' % header.nb_planes,
+            header.nb_var, ['', 's'][header.nb_var > 1]))
         # Title and file type
         self.file.write(header.pack_int(80))
         self.file.write(header.title)

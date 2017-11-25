@@ -6,11 +6,10 @@ Performs multiple operations on a Serafin file:
 - select frames
 """
 
-import os.path
 import sys
 from tqdm import tqdm
 
-from pyteltools.geom.transformation import Translation
+from pyteltools.geom.transformation import Transformation
 from pyteltools.slf import Serafin
 from pyteltools.slf.variables import do_calculations_in_frame, get_necessary_equations
 from pyteltools.utils.cli import logger, PyTelToolsArgParse
@@ -25,11 +24,18 @@ def slf_base(args):
         output_header = resin.header.copy()
         # Shift mesh coordinates if necessary
         if args.shift:
-            output_header.transform_mesh(Translation(args.shift[0], args.shift[1], 0))
+            output_header.transform_mesh([Transformation(0, 1, 1, args.shift[0], args.shift[1], 0)])
 
-        # Toogle output file endianness if necessary
+        # Toggle output file endianness if necessary
         if args.toggle_endianness:
             output_header.toggle_endianness()
+
+        # Convert to single precision
+        if args.to_single_precision:
+            if resin.header.is_double_precision():
+                output_header.to_single_precision()
+            else:
+                logger.warn('Input file is already single precision! Argument `--to_single_precision` is ignored')
 
         # Remove variables if necessary
         output_header.empty_variables()
@@ -48,18 +54,11 @@ def slf_base(args):
                 else:
                     output_header.add_variable_from_ID(var_ID)
 
-        # Convert to single precision
-        if args.to_single_precision:
-            if resin.header.is_double_precision():
-                output_header.to_single_precision()
-            else:
-                logger.warn('Input file is already single precision! Argument `--to_single_precision` is ignored')
-
         necessary_equations = get_necessary_equations(resin.header.var_IDs, output_header.var_IDs,
                                                       is_2d=resin.header.is_2d)
 
         with Serafin.Write(args.out_slf, args.lang, overwrite=args.force) as resout:
-            resout.write_header(resin.header)
+            resout.write_header(output_header)
 
             for time_index, time in tqdm(resin.subset_time(args.start, args.end, args.ech), unit='frame'):
                 values = do_calculations_in_frame(necessary_equations, resin, time_index, output_header.var_IDs,
