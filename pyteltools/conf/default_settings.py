@@ -19,6 +19,9 @@ COLOR_LOGS = True
 # CPU Cores for parallel computation (workflow multi-folder view)
 NCSIZE = cpu_count()
 
+# Path to ArGIS Python executable (for `outil_carto.py`)
+PY_ARCGIS = 'C:\\Python27\\ArcGIS10.5\\python.exe'
+
 # ~> SERAFIN
 
 # Serafin extensions for file name filtering (default extension is the first)

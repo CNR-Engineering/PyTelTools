@@ -295,8 +295,11 @@ def slf_to_xml(slf_name, slf_header, xml_name, scalar, time_index):
     with open(xml_name, 'w') as xml:
         xml.write('<?xml version="1.0" ?>\n')
         xml.write('<!-- Title: %s -->\n' % slf_header.title.decode(Serafin.SLF_EIT).strip())
-        xml.write('<!-- This file contains x and y reversed in purpose (because arcpy is buggy) -->\n')
+        xml.write('<!-- 3D Coordinates (Northing Easting Elevation) with triangular elements connectivity table -->\n')
         xml.write('<LandXML version="1.2" xmlns="http://www.landxml.org/schema/LandXML-1.2" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.landxml.org/schema/LandXML-1.2 http://www.landxml.org/schema/LandXML-1.2/LandXML-1.2.xsd">\n')
+        xml.write('  <Units>\n')
+        xml.write('    <Metric linearUnit="meter" areaUnit="squareMeter" volumeUnit="cubicMeter"/>\n')
+        xml.write('  </Units>\n')
         xml.write('  <Surfaces>\n')
         xml.write('    <Surface name="%s at frame %i/%i">\n' % (scalar, time_index+1, slf_header.nb_frames))
         xml.write('      <Definition surfType="TIN">\n')

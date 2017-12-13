@@ -9,6 +9,8 @@ from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 from PyQt5.QtWidgets import *
 
+from pyteltools.conf import settings
+
 
 class LandXMLtoTinDialog(QDialog):
     def __init__(self, dir_names, dir_paths, xml_name, overwrite):
@@ -58,10 +60,11 @@ class LandXMLtoTinDialog(QDialog):
         green = QColor(180, 250, 165, 255)
         red = QColor(255, 160, 160, 255)
 
-        python_path = 'C:\\Python27\\ArcGIS10.1\\python.exe'
+        python_path = settings.PY_ARCGIS
         if not os.path.exists(python_path):
-            QMessageBox.critical(self, 'Erreur', "ArcGIS10.1 n'est pas disponible!",
-                                 QMessageBox.Ok)
+            QMessageBox.critical(self, 'Erreur', "ArcGIS n'est pas disponible!"
+                "Chemin introuvable : %s" % python_path,
+                QMessageBox.Ok)
             return
 
         script_name = os.path.abspath(os.path.join('slf', 'data', 'landxml_to_tin.py'))
@@ -558,7 +561,7 @@ class WelcomeToCarto(QWidget):
         vlayout.addWidget(left_button)
         vlayout.addWidget(right_button)
         self.setLayout(vlayout)
-        self.setWindowTitle("Bienvenue à l'outil Carto !")
+        self.setWindowTitle("Bienvenue dans l'outil Carto !")
 
         self.first_page = LandXMLtoTin()
         self.second_page = MxdToPng()
