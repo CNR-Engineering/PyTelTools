@@ -13,6 +13,7 @@ from pyteltools.slf.variables import get_available_variables, get_necessary_equa
     new_variables_from_US
 
 from .Node import Node, OneInOneOutNode, TwoInOneOutNode
+from .util import logger
 
 
 class SelectVariablesNode(OneInOneOutNode):
@@ -905,7 +906,7 @@ class SelectSingleLayerNode(OneInOneOutNode):
                                      QMessageBox.Ok)
                 return
         self.in_data = parent_node.data
-        if 'layer_selection' in self.in_data.metadata:
+        if 'vertical_operator' in self.in_data.metadata:
             QMessageBox.critical(None, 'Error', 'Cannot re-select layer, already 2D.', QMessageBox.Ok)
             return
         if self.state != Node.SUCCESS:
@@ -931,8 +932,139 @@ class SelectSingleLayerNode(OneInOneOutNode):
             return
         input_data = self.in_port.mother.parentItem().data
         self.data = input_data.copy()
-        self.data.operator = operations.LAYER_SELECTION
+        self.data.operator = operations.SELECT_LAYER
         self.data.metadata['layer_selection'] = self.layer_selection
+        self.success()
+
+
+class VerticalAggregationNode(OneInOneOutNode):
+    VERTICAL_OPERATIONS = ('Mean', 'Min', 'Max')
+    DEFAULT_OPERATOR = 0  # `Mean`
+
+    def __init__(self, index):
+        super().__init__(index)
+        self.category = 'Basic operations'
+        self.label = 'Vertical\nAggregation'
+        self.out_port.data_type = ('slf out',)
+        self.in_port.data_type = ('slf 3d',)
+        self.in_data = None
+        self.data = None
+
+        ## Vertical operation among 'Max', 'Min' or 'Mean'
+        self.vertical_operation = None
+        self.vertical_operation_box = None
+        self.new_option = -1
+        self.output_panel = None
+
+    def get_option_panel(self):
+        option_panel = QWidget()
+        vlayout = QVBoxLayout()
+        vlayout.addWidget(QLabel('Operation over the vertical'))
+        self.vertical_operation_box = QButtonGroup(option_panel)
+        self.vertical_operation_box.setExclusive(True)
+        for i, operation_name in enumerate(VerticalAggregationNode.VERTICAL_OPERATIONS):
+            button = QRadioButton(operation_name)
+            if operation_name == self.vertical_operation:
+                button.setChecked(True)
+            self.vertical_operation_box.addButton(button)
+            vlayout.addWidget(button)
+        option_panel.setLayout(vlayout)
+        option_panel.destroyed.connect(self._select)
+        return option_panel
+
+    def _get_default_option(self):
+        return VerticalAggregationNode.VERTICAL_OPERATIONS[VerticalAggregationNode.DEFAULT_OPERATOR]
+
+    def _select(self):
+        if self.vertical_operation_box.checkedButton() is not None:
+            operation = self.vertical_operation_box.checkedButton().text()
+            self.new_option = operation
+        else:
+            self.new_option = None
+
+    def _reset(self):
+        self.in_data = self.in_port.mother.parentItem().data
+        self.state = Node.READY
+        self.reconfigure_downward()
+        self.update()
+
+    def add_link(self, link):
+        super().add_link(link)
+        if not self.in_port.has_mother():
+            return
+
+        parent_node = self.in_port.mother.parentItem()
+        if parent_node.state != Node.SUCCESS:
+            if parent_node.ready_to_run():
+                parent_node.run()
+            if parent_node.state != Node.SUCCESS:
+                return
+        self._reset()
+
+    def reconfigure(self):
+        super().reconfigure()
+        if self.in_port.has_mother():
+            parent_node = self.in_port.mother.parentItem()
+            if parent_node.ready_to_run():
+                parent_node.run()
+                if parent_node.state == Node.SUCCESS:
+                    self._reset()
+                    return
+        self.in_data = None
+        self.state = Node.NOT_CONFIGURED
+        self.reconfigure_downward()
+        self.update()
+
+    def configure(self, check=None):
+        if not self.in_port.has_mother():
+            QMessageBox.critical(None, 'Error', 'Connect and run the input before configure this node!',
+                                 QMessageBox.Ok)
+            return
+
+        parent_node = self.in_port.mother.parentItem()
+        if parent_node.state != Node.SUCCESS:
+            if parent_node.ready_to_run():
+                parent_node.run()
+            else:
+                QMessageBox.critical(None, 'Error', 'Configure and run the input before configure this node!',
+                                     QMessageBox.Ok)
+                return
+            if parent_node.state != Node.SUCCESS:
+                QMessageBox.critical(None, 'Error', 'Configure and run the input before configure this node!',
+                                     QMessageBox.Ok)
+                return
+        self.in_data = parent_node.data
+        if 'vertical_operator' in self.in_data.metadata:
+            QMessageBox.critical(None, 'Error', 'Cannot re-define an operation over the vertical!', QMessageBox.Ok)
+            return
+        if self.state != Node.SUCCESS:
+            self._reset()
+        if super().configure():
+            self.vertical_operation = self.new_option
+            self.reconfigure_downward()
+
+    def save(self):
+        if self.vertical_operation is None:
+            vertical_operator = self._get_default_option()
+        else:
+            vertical_operator = self.vertical_operation
+        return '|'.join([self.category, self.name(), str(self.index()),
+                         str(self.pos().x()), str(self.pos().y()), str(vertical_operator)])
+
+    def load(self, options):
+        self.vertical_operation = options[0]
+        if self.vertical_operation not in VerticalAggregationNode.VERTICAL_OPERATIONS:
+            raise NotImplementedError('Vertical operation %s is not supported' % self.vertical_operation)
+
+    def run(self):
+        success = super().run_upward()
+        if not success:
+            self.fail('input failed.')
+            return
+        input_data = self.in_port.mother.parentItem().data
+        self.data = input_data.copy()
+        self.data.operator = operations.VERTICAL_AGGREGATION
+        self.data.metadata['vertical_operator'] = self.vertical_operation
         self.success()
 
 

@@ -434,6 +434,14 @@ class SerafinHeader:
         for var_ID, var_name, var_unit in selected_vars:
             self.add_variable(var_ID, var_name, var_unit)
 
+    def iter_on_all_variables(self):
+        """!
+        Iterate on variables
+        @return <str, bytes, bytes>: variable ID, name and unit
+        """
+        for var_ID, var_name, var_unit in zip(self.var_IDs, self.var_names, self.var_units):
+            yield var_ID, var_name, var_unit
+
     def transform_mesh_copy(self, transformations):
         """!
         @brief Apply transformations on 2D nodes of a mesh copy

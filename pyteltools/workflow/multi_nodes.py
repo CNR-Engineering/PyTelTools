@@ -9,6 +9,7 @@ import pyteltools.slf.misc as operations
 
 from .MultiNode import MultiNode, MultiOneInOneOutNode, MultiSingleInputNode, \
     MultiSingleOutputNode, MultiDoubleInputNode, MultiTwoInOneOutNode
+from .nodes_op import VerticalAggregationNode
 from .util import MultiLoadSerafinDialog, validate_input_options, validate_output_options
 
 
@@ -382,6 +383,20 @@ class MultiSelectSingleLayerNode(MultiOneInOneOutNode):
             self.state = MultiNode.NOT_CONFIGURED
             return
         self.options = (layer_selection,)
+
+
+class MultiVerticalAggregationNode(MultiOneInOneOutNode):
+    def __init__(self, index):
+        super().__init__(index)
+        self.category = 'Basic operations'
+        self.label = 'Vertical\nAggregation'
+
+    def load(self, options):
+        vertical_operation = options[0]
+        if vertical_operation not in VerticalAggregationNode.VERTICAL_OPERATIONS:
+            self.state = MultiNode.NOT_CONFIGURED
+            return
+        self.options = (vertical_operation,)
 
 
 class MultiSelectVariablesNode(MultiOneInOneOutNode):

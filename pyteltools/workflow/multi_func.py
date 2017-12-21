@@ -16,6 +16,7 @@ from pyteltools.slf.variables import do_calculations_in_frame, get_available_var
     get_necessary_equations, new_variables_from_US
 from pyteltools.slf.volume import TruncatedTriangularPrisms, VolumeCalculator
 
+from .nodes_op import VerticalAggregationNode  # use only class constants VERTICAL_OPERATIONS
 from .util import process_output_options, process_geom_output_options, process_vtk_output_options
 
 
@@ -238,7 +239,7 @@ def add_rouse(node_id, fid, data, options):
                                                        data.job_id)
     if 'US' not in data.selected_vars:
         return False, node_id, fid, None, fail_message('US not found', 'Add Rouse', data.job_id)
-        
+
     rouse_table = options[0]
     new_rouse = [rouse_table[i][0] for i in range(len(rouse_table))]
     new_names = [rouse_table[i][1] for i in range(len(rouse_table))]
@@ -323,9 +324,23 @@ def select_single_layer(node_id, fid, data, options):
         return False, node_id, fid, None, fail_message('layer %i is not inside %s' % (layer_selection, range_text),
                                                        'Select Single Layer', data.job_id)
     new_data = data.copy()
-    new_data.operator = operations.LAYER_SELECTION
-    new_data.metadata = {'layer_selection': layer_selection}
+    new_data.operator = operations.SELECT_LAYER
+    new_data.metadata = {'vertical_operator': 'Layer', 'layer_selection': layer_selection}
     return True, node_id, fid, new_data, success_message('Select Single Layer', data.job_id)
+
+
+def vertical_aggragation(node_id, fid, data, options):
+    if data.header.is_2d:
+        return False, node_id, fid, None, fail_message('the input file is not 3d', 'Select Single Layer', data.job_id)
+
+    vertical_operation = options[0]
+    if vertical_operation not in VerticalAggregationNode.VERTICAL_OPERATIONS:
+        raise NotImplementedError('Vertical operation %s is not supported' % vertical_operation)
+
+    new_data = data.copy()
+    new_data.operator = operations.VERTICAL_AGGREGATION
+    new_data.metadata = {'vertical_operator': vertical_operation, 'layer_selection': None}
+    return True, node_id, fid, new_data, success_message('Vertical Aggregation', data.job_id)
 
 
 def compute_max(node_id, fid, data, options):
@@ -452,8 +467,10 @@ def write_slf(node_id, fid, data, options):
             success, message = write_arrival_duration(data, filename)
         elif data.operator == operations.SYNCH_MAX:
             success, message = write_synch_max(data, filename)
-        elif data.operator == operations.LAYER_SELECTION:
-            success, message = write_slf_layer_selection(data, filename)
+        elif data.operator == operations.SELECT_LAYER:
+            success, message = write_slf_single_layer(data, filename)
+        elif data.operator == operations.VERTICAL_AGGREGATION:
+            success, message = write_slf_vertical_aggregation(data, filename)
         elif data.operator == operations.PROJECT:
             success, message = write_project_mesh(data, filename)
         else:
@@ -691,12 +708,13 @@ def write_project_mesh(first_input, filename):
     return True, message
 
 
-def write_slf_layer_selection(input_data, filename):
-    selected_vars = [var for var in input_data.selected_vars if var in input_data.header.var_IDs]
+def write_slf_single_layer(input_data, filename):
     output_header = input_data.header.copy_as_2d()
-    output_header.set_variables(selected_vars)
     if input_data.to_single:
         output_header.to_single_precision()
+    selected_variables = [(var, input_data.selected_vars_names[var][0],
+                                input_data.selected_vars_names[var][1]) for var in input_data.selected_vars]
+    output_header.set_variables(selected_variables)
 
     with Serafin.Read(input_data.filename, input_data.language) as input_stream:
         input_stream.header = input_data.header
@@ -712,6 +730,38 @@ def write_slf_layer_selection(input_data, filename):
                              values.shape[1] // input_stream.header.nb_planes)
                 values_at_layer = values.reshape(new_shape)[:, input_data.metadata['layer_selection'] - 1, :]
                 output_stream.write_entire_frame(output_header, input_data.time[time_index], values_at_layer)
+
+    return True, success_message('Write Serafin', input_data.job_id)
+
+
+def write_slf_vertical_aggregation(input_data, filename):
+    output_header = input_data.header.copy_as_2d()
+    if input_data.to_single:
+        output_header.to_single_precision()
+    selected_variables = [(var, input_data.selected_vars_names[var][0],
+                           input_data.selected_vars_names[var][1]) for var in input_data.selected_vars]
+
+    with Serafin.Read(input_data.filename, input_data.language) as input_stream:
+        input_stream.header = input_data.header
+        input_stream.time = input_data.time
+        if input_data.metadata['vertical_operator'] == 'Min':
+            operation = operations.MIN
+        elif input_data.metadata['vertical_operator'] == 'Max':
+            operation = operations.MAX
+        elif input_data.metadata['vertical_operator'] == 'Mean':
+            operation = operations.MEAN
+        else:
+            raise NotImplementedError('Vertical operator %s is unknown.' % input_data.metadata['vertical_operator'])
+
+        vertical_calculator = operations.VerticalMaxMinMeanCalculator(operation, input_stream, output_header,
+                                                                      selected_variables)
+        output_header.set_variables(vertical_calculator.get_variables())  # sort variables
+
+        with Serafin.Write(filename, input_data.language, True) as output_stream:
+            output_stream.write_header(output_header)
+            for time_index in input_data.selected_time_indices:
+                vars_2d = vertical_calculator.max_min_mean_in_frame(time_index)
+                output_stream.write_entire_frame(output_header, input_data.time[time_index], vars_2d)
 
     return True, success_message('Write Serafin', input_data.job_id)
 
@@ -936,7 +986,7 @@ def interpolate_points(node_id, fid, data, aux_data, options, csv_separator, fmt
 
     csv_data.write(filename, csv_separator)
     return True, node_id, fid, None, \
-                 success_message('Interpolate on Points', data.job_id, 
+                 success_message('Interpolate on Points', data.job_id,
                                  '%s point%s inside the mesh' % (nb_inside, 's are' if nb_inside > 1 else ' is'))
 
 
@@ -985,7 +1035,7 @@ def interpolate_lines(node_id, fid, data, aux_data, options, csv_separator, fmt_
             os.remove(filename)
         except PermissionError:
             pass
-        return False, node_id, fid, None, fail_message('no polyline intersects the mesh continuously', 
+        return False, node_id, fid, None, fail_message('no polyline intersects the mesh continuously',
                                                        'Interpolate along Lines', data.job_id)
 
     header = ['line', 'time', 'x', 'y', 'distance'] + selected_vars
@@ -1306,7 +1356,7 @@ def write_vtk(node_id, fid, data, options):
 FUNCTIONS = {'Select Variables': select_variables, 'Add Rouse': add_rouse, 'Select Time': select_time,
              'Select Single Frame': select_single_frame,
              'Select First Frame': select_first_frame, 'Select Last Frame': select_last_frame,
-             'Select Single Layer': select_single_layer,
+             'Select Single Layer': select_single_layer, 'Vertical Aggregation': vertical_aggragation,
              'Max': compute_max, 'Min': compute_min, 'Mean': compute_mean,
              'Convert to Single Precision': convert_to_single, 'Compute Arrival Duration': arrival_duration,
              'Load 2D Polygons': read_polygons, 'Load 2D Open Polylines': read_polylines, 'Load 2D Points': read_points,

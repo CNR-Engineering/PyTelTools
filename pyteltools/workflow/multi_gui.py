@@ -28,6 +28,7 @@ NODES = {'Input/Output': {'Load Serafin 2D': MultiLoadSerafin2DNode, 'Load Seraf
                               'Select First Frame': MultiSelectFirstFrameNode,
                               'Select Last Frame': MultiSelectLastFrameNode,
                               'Select Single Layer': MultiSelectSingleLayerNode,
+                              'Vertical Aggregation': MultiVerticalAggregationNode,
                               'Add Transformation': MultiAddTransformationNode},
          'Operators': {'Max': MultiComputeMaxNode, 'Min': MultiComputeMinNode, 'Mean': MultiComputeMeanNode,
                        'Project B on A': MultiProjectMeshNode, 'A Minus B': MultiMinusNode,
@@ -250,7 +251,8 @@ class MultiScene(QGraphicsScene):
                     QApplication.processEvents()
 
             return True
-        except (IndexError, ValueError, KeyError):
+        except (IndexError, ValueError, KeyError) as e:
+            logger.exception(e)
             logger.error("An exception occured while loading project in MULTI.")
             self.reinit()
             self.table.reinit()

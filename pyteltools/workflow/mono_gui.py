@@ -22,6 +22,7 @@ NODES = {'Input/Output': {'Load Serafin 2D': LoadSerafin2DNode, 'Load Serafin 3D
                               'Select Time': SelectTimeNode, 'Select Single Frame': SelectSingleFrameNode,
                               'Select First Frame': SelectFirstFrameNode, 'Select Last Frame': SelectLastFrameNode,
                               'Select Single Layer': SelectSingleLayerNode,
+                              'Vertical Aggregation': VerticalAggregationNode,
                               'Add Rouse Numbers': AddRouseNode,
                               'Convert to Single Precision': ConvertToSinglePrecisionNode,
                               'Add Transformation': AddTransformationNode},
@@ -225,7 +226,8 @@ class MonoScene(QGraphicsScene):
 
             self.update()
             return True
-        except (IndexError, ValueError, KeyError):
+        except (IndexError, ValueError, KeyError) as e:
+            logger.exception(e)
             logger.error("An exception occured while loading project in MONO.")
             self.reinit()
             return False

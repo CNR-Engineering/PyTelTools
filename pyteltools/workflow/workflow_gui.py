@@ -184,7 +184,7 @@ if __name__ == '__main__':
             else:
                 QMessageBox.critical(None, 'Error', 'The project file is not valid.', QMessageBox.Ok)
         else:
-            QMessageBox.critical(None, 'Error', "The project file '%s' could not be found." % args.workspace, 
+            QMessageBox.critical(None, 'Error', "The project file '%s' could not be found." % args.workspace,
                                  QMessageBox.Ok)
 
     if not loaded:

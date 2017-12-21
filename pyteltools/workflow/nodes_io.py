@@ -405,6 +405,40 @@ class WriteSerafinNode(OneInOneOutNode):
         self.success('Output saved to {}.'.format(self.filename))
         return True
 
+    def _run_vertical_aggregation(self, input_data):
+        """!
+        @brief Write Serafin with `Vertical Aggregation` operator
+        @param input_data <slf.datatypes.SerafinData>: input SerafinData stream
+        """
+        output_header = input_data.build_2d_output_header()
+        if input_data.metadata['vertical_operator'] == 'Min':
+            operation_type = operations.MIN
+        elif input_data.metadata['vertical_operator'] == 'Max':
+            operation_type = operations.MAX
+        elif input_data.metadata['vertical_operator'] == 'Mean':
+            operation_type = operations.MEAN
+        else:
+            raise NotImplementedError('Vertical operator %s is unknown.' % input_data.metadata['vertical_operator'])
+        selected_variables = []
+        for var in input_data.selected_vars:
+            name, unit = input_data.selected_vars_names[var]
+            selected_variables.append((var, name, unit))
+        with Serafin.Read(input_data.filename, input_data.language) as input_stream:
+            input_stream.header = input_data.header
+            input_stream.time = input_data.time
+            vertical_calculator = operations.VerticalMaxMinMeanCalculator(operation_type, input_stream, output_header,
+                                                                          selected_variables)
+            output_header.set_variables(vertical_calculator.get_variables())  # sort variables
+            with Serafin.Write(self.filename, input_data.language, True) as output_stream:
+                output_stream.write_header(output_header)
+                for i, time_index in enumerate(input_data.selected_time_indices):
+                    vars_2d = vertical_calculator.max_min_mean_in_frame(time_index)
+                    output_stream.write_entire_frame(output_header, input_data.time[time_index], vars_2d)
+                    self.progress_bar.setValue(100 * (i+1) / len(input_data.selected_time_indices))
+                    QApplication.processEvents()
+        self.success('Output saved to {}.'.format(self.filename))
+        return True
+
     def run(self):
         success = super().run_upward()
         if not success:
@@ -455,8 +489,10 @@ class WriteSerafinNode(OneInOneOutNode):
                 success = self._run_synch_max(input_data)
             elif input_data.operator == operations.ARRIVAL_DURATION:
                 success = self._run_arrival_duration(input_data)
-            elif input_data.operator == operations.LAYER_SELECTION:
+            elif input_data.operator == operations.SELECT_LAYER:
                 success = self._run_layer_selection(input_data)
+            elif input_data.operator == operations.VERTICAL_AGGREGATION:
+                success = self._run_vertical_aggregation(input_data)
             else:
                 raise NotImplementedError('Operator "%s" is not implemented in MONO' % input_data.operator)
 

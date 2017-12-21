@@ -16,34 +16,41 @@ from .variables import do_calculation, get_available_variables, get_necessary_eq
 # constants
 OPERATORS = ['+', '-', '*', '/', '^', 'sqrt', 'sin', 'cos', 'atan']
 MAX, MIN, MEAN, ARRIVAL_DURATION, PROJECT, DIFF, REV_DIFF, \
-    MAX_BETWEEN, MIN_BETWEEN, SYNCH_MAX, LAYER_SELECTION = 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10
+    MAX_BETWEEN, MIN_BETWEEN, SYNCH_MAX, SELECT_LAYER, VERTICAL_AGGREGATION = 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11
 
 OPERATIONS = {'+': np.add, '-': np.subtract, '*': np.multiply, '/': np.divide, '^': np.power,
                'sqrt': np.sqrt, 'sin': np.sin, 'cos': np.cos, 'atan': np.arctan}
 _PRECEDENCE = {'(': 1, '-': 2, '+': 2, '*': 3, '/': 3, '^': 4, 'sqrt': 5, 'sin': 5, 'cos': 5, 'atan': 5}
 
-_VECTORS = {'U': ('V', 'M'), 'V': ('U', 'M'), 'QSX': ('QSY', 'QS'), 'QSY': ('QSX', 'QS'),
-            'QSBLX': ('QSBLY', 'QSBL'), 'QSBLY': ('QSBLX', 'QSBL'),
-            'QSSUSPX': ('QSSUSPY', 'QSSUSP'), 'QSSUSPY': ('QSSUSPX', 'QSSUSP'),
-            'I': ('J', 'Q'), 'J': ('I', 'Q')}
-_VECTORS_BROTHERS = {('U', 'V'): 'M', ('I', 'J'): 'Q', ('X', 'Y'): '.', ('QSX', 'QSY'): 'QS',
-                     ('QSBLX', 'QSBLY'): 'QSBL', ('QSSUSPX', 'QSSUSPY'): 'QSSUSP'}
+_VECTORS_2D_BROTHERS = {('U', 'V'): 'M', ('I', 'J'): 'Q', ('X', 'Y'): '.', ('QSX', 'QSY'): 'QS',
+                        ('QSBLX', 'QSBLY'): 'QSBL', ('QSSUSPX', 'QSSUSPY'): 'QSSUSP'}
+_VECTORS_2D = {}
+for (vx, vy), vm in _VECTORS_2D_BROTHERS.items():
+    _VECTORS_2D[vx] = (vy, vm)
+    _VECTORS_2D[vy] = (vx, vm)
 
-_VECTORS_2D = {('U', 'V'): {'fr': 'VITESSE', 'en': 'VELOCITY'},
-               ('I', 'J'): {'fr': 'DEBIT', 'en': 'FLOWRATE'}, ('X', 'Y'): {'fr': 'VENT', 'en': 'WIND'},
-               ('QSX', 'QSY'): {'fr': 'DEBIT_SOLIDE', 'en': 'SOLID_DISCHARGE'},
-               ('QSBLX', 'QSBLY'): {'fr': 'QS_CHARRIAGE', 'en': 'QS_BEDLOAD'},
-               ('QSSUPSX', 'QSSUSPY'): {'fr': 'QS_SUSPENSION', 'en': 'QS_SUSPENSION'}}
-_VECTORS_3D = {('U', 'V', 'W'): {'fr': 'VITESSE', 'en': 'VELOCITY'},
-               ('NUX', 'NUY', 'NUZ'): {'fr': 'NU_POUR_VITESSE', 'en': 'NU_FOR_VELOCITY'},
-               ('UCONV', 'VCONV', 'WCONV'): {'fr': 'CONVECTION', 'en': 'ADVECTION'}}
+_VECTORS_3D_BROTHERS = {('U', 'V', 'W'): 'M', ('NUX', 'NUY', 'NUZ'): 'NU'}
+_VECTORS_3D = {}
+for (vx, vy, vz), vm in _VECTORS_3D_BROTHERS.items():
+    _VECTORS_3D[vx] = (vy, vz, vm)
+    _VECTORS_3D[vy] = (vx, vz, vm)
+    _VECTORS_3D[vz] = (vx, vy, vm)
+
+_VECTORS_2D_NAME = {('U', 'V'): {'fr': 'VITESSE', 'en': 'VELOCITY'},
+                    ('I', 'J'): {'fr': 'DEBIT', 'en': 'FLOWRATE'}, ('X', 'Y'): {'fr': 'VENT', 'en': 'WIND'},
+                    ('QSX', 'QSY'): {'fr': 'DEBIT_SOLIDE', 'en': 'SOLID_DISCHARGE'},
+                    ('QSBLX', 'QSBLY'): {'fr': 'QS_CHARRIAGE', 'en': 'QS_BEDLOAD'},
+                    ('QSSUPSX', 'QSSUSPY'): {'fr': 'QS_SUSPENSION', 'en': 'QS_SUSPENSION'}}
+_VECTORS_3D_NAME = {('U', 'V', 'W'): {'fr': 'VITESSE', 'en': 'VELOCITY'},
+                    ('NUX', 'NUY', 'NUZ'): {'fr': 'NU_POUR_VITESSE', 'en': 'NU_FOR_VELOCITY'},
+                    ('UCONV', 'VCONV', 'WCONV'): {'fr': 'CONVECTION', 'en': 'ADVECTION'}}
 
 
 def scalars_vectors(known_vars, selected_vars, us_equation=None):
     """!
-    @brief Separate the scalars from vectors, allowing different max/min computations
+    @brief Separate the 2D scalars from vectors, allowing different max/min computations
     @param known_vars <list>: the list of variable IDs with known values
-    @param selected_vars <str>: the selected variables IDs
+    @param selected_vars <str, bytes, bytes>: the selected variables IDs
     @return <tuple>: the list of scalars, the list of vectors, the list of additional equations for magnitudes
     """
     scalars = []
@@ -52,8 +59,8 @@ def scalars_vectors(known_vars, selected_vars, us_equation=None):
     additional_equations = get_necessary_equations(known_vars, list(map(lambda x: x[0], selected_vars)),
                                                    is_2d=True, us_equation=us_equation)
     for var, name, unit in selected_vars:
-        if var in _VECTORS:
-            brother, mother = _VECTORS[var]
+        if var in _VECTORS_2D:
+            brother, mother = _VECTORS_2D[var]
             if mother in known_vars:  # if the magnitude is known
                 vectors.append((var, name, unit))
             elif brother in known_vars:  # if the magnitude is unknown but the orthogonal field is known
@@ -65,6 +72,45 @@ def scalars_vectors(known_vars, selected_vars, us_equation=None):
                     vectors.append((var, name, unit))
                     additional_equations.extend(get_necessary_equations(known_vars, [mother],
                                                                         is_2d=True, us_equation=us_equation))
+                    continue
+                # if the magnitude is not computable, use scalar operation instead
+                logger.warning('The variable %s will be considered to be scalar instead of vector.' % var)
+                scalars.append((var, name, unit))
+        else:
+            scalars.append((var, name, unit))
+    additional_equations = list(set(additional_equations))
+    additional_equations.sort(key=lambda x: x.output.order)
+    return scalars, vectors, additional_equations
+
+
+def scalars_vectors_3d(known_vars, selected_vars):
+    """!
+    @brief Separate the 3D scalars from vectors, allowing different max/min computations
+    @param known_vars <list>: the list of variable IDs with known values
+    @param selected_vars <str, bytes, bytes>: the selected variables IDs
+    @return <tuple>: the list of scalars, the list of vectors, the list of additional equations for magnitudes
+
+    """
+    scalars = []
+    vectors = []
+    computable_variables = list(map(lambda x: x.ID(), get_available_variables(known_vars, is_2d=False)))
+    additional_equations = get_necessary_equations(known_vars, list(map(lambda x: x[0], selected_vars)),
+                                                   is_2d=False, us_equation=None)
+    for var, name, unit in selected_vars:
+        if var in _VECTORS_3D:
+            brother, sister, mother = _VECTORS_3D[var]
+            if mother in known_vars:  # if the magnitude is known
+                vectors.append((var, name, unit))
+            elif brother in known_vars and sister in known_vars:
+                # if the magnitude is unknown but the orthogonal field is known
+                vectors.append((var, name, unit))
+                additional_equations.extend(get_necessary_equations(known_vars, [mother],
+                                                                    is_2d=False, us_equation=None))
+            else:
+                if mother in computable_variables:
+                    vectors.append((var, name, unit))
+                    additional_equations.extend(get_necessary_equations(known_vars, [mother],
+                                                                        is_2d=False, us_equation=None))
                     continue
                 # if the magnitude is not computable, use scalar operation instead
                 logger.warning('The variable %s will be considered to be scalar instead of vector.' % var)
@@ -193,13 +239,13 @@ def detect_vector_couples(variables, available_variables):
     for var in variables:
         if var in coupled:
             continue
-        if var in _VECTORS:
-            brother, mother = _VECTORS[var]
+        if var in _VECTORS_2D:
+            brother, mother = _VECTORS_2D[var]
             if brother in variables:
                 coupled.append(var)
                 coupled.append(brother)
 
-                if (var, brother) not in _VECTORS_BROTHERS:
+                if (var, brother) not in _VECTORS_2D_BROTHERS:
                     angles.append((brother, var))
                 else:
                     angles.append((var, brother))
@@ -218,12 +264,12 @@ def detect_vector_couples(variables, available_variables):
 def detect_vector_vtk(is_2d, variables, variable_names, language):
     scalars, vectors, names = [], [], {}
     if is_2d:
-        for couple, name_dic in _VECTORS_2D.items():
+        for couple, name_dic in _VECTORS_2D_NAME.items():
             if all(u in variables for u in couple):
                 vectors.append(couple)
                 names[couple] = name_dic[language]
     else:
-        for triple, name_dic in _VECTORS_3D.items():
+        for triple, name_dic in _VECTORS_3D_NAME.items():
             if all(u in variables for u in triple):
                 vectors.append(triple)
                 names[triple] = name_dic[language]
@@ -507,6 +553,105 @@ class ScalarMaxMinMeanCalculator:
             self.max_min_mean_in_frame(time_index)
 
 
+class VerticalMaxMinMeanCalculator:
+    """!
+    Compute max/min/mean of 3D scalar variables from a Serafin input stream
+    Variable Z has to be present in the input Serafin
+    """
+    def __init__(self, operation, input_stream, output_header, selected_vars, add_vars=[]):
+        if operation not in (MIN, MAX, MEAN):
+            raise NotImplementedError('Operation %s is not supported' % operation)
+        self.operation = operation
+        self.input_stream = input_stream
+        self.add_vars = add_vars
+
+        scalars, vectors, additional_equations = scalars_vectors_3d(output_header.var_IDs,  selected_vars)
+        self.selected_scalars = scalars
+        self.selected_vectors = vectors
+        self.additional_equations = additional_equations
+
+        self.nb_var = len(scalars) + len(vectors) + len(add_vars)
+        self.nb_nodes_2d = input_stream.header.nb_nodes_2d
+        self.nb_planes = input_stream.header.nb_planes
+
+    def get_variables(self):
+        return self.selected_scalars + self.selected_vectors
+
+    def _additional_computation_in_frame(self, time_index):
+        computed_values = {}
+        for equation in self.additional_equations:
+            input_var_IDs = list(map(lambda x: x.ID(), equation.input))
+
+            # read (if needed) input variables values
+            for input_var_ID in input_var_IDs:
+                if input_var_ID not in computed_values:
+                    computed_values[input_var_ID] = self.input_stream.read_var_in_frame_as_3d(time_index, input_var_ID)
+            # compute additional variables
+            output_values = do_calculation(equation, [computed_values[var_ID] for var_ID in input_var_IDs])
+            computed_values[equation.output.ID()] = output_values.reshape((self.nb_planes, self.nb_nodes_2d))
+            print(equation.output.ID())
+        return computed_values
+
+    def max_min_mean_in_frame(self, time_index, add_vars=[]):
+        """!
+
+        """
+        if self.additional_equations is not None:
+            computed_values = self._additional_computation_in_frame(time_index)
+        else:
+            computed_values = {}
+
+        for i, (var, name, unit) in enumerate(self.selected_scalars + self.selected_vectors):
+            if var not in computed_values:
+                computed_values[var] = self.input_stream.read_var_in_frame_as_3d(time_index, var)
+        Z = computed_values['Z']
+
+        # Compute dimensionless layer ponderations for mean operation
+        weight = None
+        if self.operation == MEAN:
+            diff_upper = Z - np.roll(Z, 1, axis=0)
+            diff_upper[0, :] = 0.0
+            diff_lower = np.roll(Z, -1, axis=0) - Z
+            diff_lower[-1, :] = 0.0
+            diff = (diff_upper + diff_lower) / 2
+            weight = diff / diff.sum(axis=0)
+            # weight.shape = (nb_planes, nb_nodes_2d)
+            # weight.sum(axis=0) = array([ 1.,  1.,  1., ...,  1.,  1.,  1.], dtype=float32)
+
+        vars_2d = np.empty((self.nb_var, self.nb_nodes_2d))
+        magnitude_index = {}
+        i = 0
+        for i, (var, name, unit) in enumerate(self.selected_scalars + self.selected_vectors):
+            if self.operation == MEAN:
+                var_3d = weight * computed_values[var]
+                vars_2d[i, :] = var_3d.sum(axis=0)
+            else:
+                if var in [v for v, _, _ in self.selected_scalars]:
+                    if self.operation == MAX:
+                        vars_2d[i, :] = np.amax(computed_values[var], axis=0)
+                    else:  # self.operation == MIN
+                        vars_2d[i, :] = np.amin(computed_values[var], axis=0)
+                else:  # var in self.selected_vectors
+                    _, _, mother = _VECTORS_3D[var]
+                    if mother not in magnitude_index:
+                        if self.operation == MAX:
+                            magnitude_index[mother] = np.argmax(computed_values[mother], axis=0)
+                        else:  # self.operation == MIN
+                            magnitude_index[mother] = np.argmin(computed_values[mother], axis=0)
+                    vars_2d[i, :] = np.choose(magnitude_index[mother], computed_values[var])
+
+        for j, var_ID in enumerate(self.add_vars):
+            pos = i + j + 1
+            if var_ID == 'B':
+                vars_2d[pos, :] = Z[0, :]
+            elif var_ID == 'S':
+                vars_2d[pos, :] = Z[-1, :]
+            else:  # var_ID == 'H'
+                vars_2d[pos, :] = Z[-1, :] - Z[0, :]
+
+        return vars_2d
+
+
 class VectorMaxMinMeanCalculator:
     """!
     Compute max/min/mean of vector variables from a Serafin input stream
@@ -522,7 +667,7 @@ class VectorMaxMinMeanCalculator:
 
         self.current_values = {}
         for var, _, _ in selected_vectors:
-            mother = _VECTORS[var][1]
+            mother = _VECTORS_2D[var][1]
             if self.maxmin == MAX:
                 self.current_values[var] = np.ones((self.nb_nodes,)) * (-float('Inf'))
                 self.current_values[mother] = np.ones((self.nb_nodes,)) * (-float('Inf'))
@@ -555,7 +700,7 @@ class VectorMaxMinMeanCalculator:
             return
 
         for var, _, _ in self.selected_vectors:
-            mother = _VECTORS[var][1]
+            mother = _VECTORS_2D[var][1]
 
             if mother not in computed_values:
                 computed_values[mother] = self.input_stream.read_var_in_frame(time_index, mother)
@@ -643,7 +788,7 @@ class Condition:
         self.literal_expression = literal_expression
         self.comparator = comparator
         self.threshold = threshold
-        
+
         if self.comparator == '>':
             self.test_condition = lambda value: value > self.threshold
         elif self.comparator == '<':
@@ -652,7 +797,7 @@ class Condition:
             self.test_condition = lambda value: value >= self.threshold
         else:
             self.test_condition = lambda value: value <= self.threshold
-            
+
     def __repr__(self):
         return ' '.join(self.expression) + ' %s %s' % (self.comparator, str(self.threshold))
 

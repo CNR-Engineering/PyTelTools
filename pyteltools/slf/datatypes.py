@@ -26,6 +26,8 @@ class SerafinData:
 
         self.operator = None
         self.metadata = {}
+        # * select single layer: 'layer_selection': an integer
+        # * vertical aggregation: 'vertical_operator': 'Min', 'Max' or 'Mean'
 
     def read(self):
         with Serafin.Read(self.filename, self.language) as input_stream:
