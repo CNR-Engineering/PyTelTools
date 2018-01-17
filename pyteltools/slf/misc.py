@@ -19,7 +19,7 @@ MAX, MIN, MEAN, ARRIVAL_DURATION, PROJECT, DIFF, REV_DIFF, \
     MAX_BETWEEN, MIN_BETWEEN, SYNCH_MAX, SELECT_LAYER, VERTICAL_AGGREGATION = 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11
 
 OPERATIONS = {'+': np.add, '-': np.subtract, '*': np.multiply, '/': np.divide, '^': np.power,
-               'sqrt': np.sqrt, 'sin': np.sin, 'cos': np.cos, 'atan': np.arctan}
+              'sqrt': np.sqrt, 'sin': np.sin, 'cos': np.cos, 'atan': np.arctan}
 _PRECEDENCE = {'(': 1, '-': 2, '+': 2, '*': 3, '/': 3, '^': 4, 'sqrt': 5, 'sin': 5, 'cos': 5, 'atan': 5}
 
 _VECTORS_2D_BROTHERS = {('U', 'V'): 'M', ('I', 'J'): 'Q', ('X', 'Y'): '.', ('QSX', 'QSY'): 'QS',
@@ -614,7 +614,9 @@ class VerticalMaxMinMeanCalculator:
             diff_lower = np.roll(Z, -1, axis=0) - Z
             diff_lower[-1, :] = 0.0
             diff = (diff_upper + diff_lower) / 2
-            weight = diff / diff.sum(axis=0)
+            diff_sum = diff.sum(axis=0)
+            with np.errstate(divide='ignore', invalid='ignore'):
+                weight = diff / diff_sum
             # weight.shape = (nb_planes, nb_nodes_2d)
             # weight.sum(axis=0) = array([ 1.,  1.,  1., ...,  1.,  1.,  1.], dtype=float32)
 

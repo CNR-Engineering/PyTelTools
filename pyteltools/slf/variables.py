@@ -24,7 +24,7 @@ def get_necessary_equations(known_var_IDs, needed_var_IDs, is_2d, us_equation=No
 
 
 def do_calculations_in_frame(equations, input_serafin, time_index, selected_output_IDs,
-                             output_float_type, is_2d, us_equation):
+                             output_float_type, is_2d, us_equation, ori_values = {}):
     """!
     @brief Return the selected 2D variables values in a single time frame
     @param equations <[slf.variables_utils.Equation]>: list of all equations necessary to compute selected variables
@@ -34,9 +34,10 @@ def do_calculations_in_frame(equations, input_serafin, time_index, selected_outp
     @param output_float_type <numpy.dtype>: float32 or float64 according to the output file type
     @param is_2d <bool>: True if input data is 2D
     @param us_equation <slf.variables_utils.Equation>: user-specified friction law equation
+    @param ori_values <{numpy.ndarray}>: known values before calculations
     @return <numpy.ndarray>: the values of the selected output variables
     """
-    computed_values = {}
+    computed_values = ori_values
     for equation in equations:
         input_var_IDs = list(map(lambda x: x.ID(), equation.input))
 
@@ -51,14 +52,19 @@ def do_calculations_in_frame(equations, input_serafin, time_index, selected_outp
                 computed_values['US'] = do_calculation(us_equation, [computed_values['W'],
                                                                      computed_values['H'],
                                                                      computed_values['M']])
+                # Clean US values in case of negative or null water depth
+                computed_values['US'] = np.where(computed_values['H'] > 0, computed_values['US'],
+                                                 np.zeros(input_serafin.header.nb_nodes, dtype=output_float_type))
+
             # handle the very special case for ROUSE (equation depending on user-specified value)
             elif equation.output.ID() == 'ROUSE':
                 computed_values[equation.input[0].ID()] = equation.operator(computed_values['US'])
                 continue
 
-        # handle the normal case
-        output_values = do_calculation(equation, [computed_values[var_ID] for var_ID in input_var_IDs])
-        computed_values[equation.output.ID()] = output_values
+        # handle the normal case (if not already done)
+        if equation.output.ID() not in computed_values.keys():
+            computed_values[equation.output.ID()] = do_calculation(equation,
+                                                                [computed_values[var_ID] for var_ID in input_var_IDs])
 
     # reconstruct the output values array in the order of the selected IDs
     nb_selected_vars = len(selected_output_IDs)

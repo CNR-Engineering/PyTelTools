@@ -124,10 +124,13 @@ def do_calculation(equation, input_values):
     operation = OPERATIONS[equation.operator]
     nb_operands = len(input_values)
     if nb_operands == 1:
-        return operation(input_values[0])
+        with np.errstate(divide='ignore', invalid='ignore'):
+            return operation(input_values[0])
     elif nb_operands == 2:
-        return operation(input_values[0], input_values[1])
-    return operation(input_values[0], input_values[1], input_values[2])
+        with np.errstate(divide='ignore', invalid='ignore'):
+            return operation(input_values[0], input_values[1])
+    with np.errstate(divide='ignore', invalid='ignore'):
+        return operation(input_values[0], input_values[1], input_values[2])
 
 
 def get_available_variables(computables, basic_equations):
