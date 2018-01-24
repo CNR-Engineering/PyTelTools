@@ -78,7 +78,8 @@ class Polyline:
 
     def segments(self):
         prev_x, prev_y = None, None
-        for x, y in self.coords():
+        for coord in self.coords():
+            x, y = coord[:2]  # ignore elevation if 3D
             if prev_x is None:
                 prev_x, prev_y = x, y
             else:
