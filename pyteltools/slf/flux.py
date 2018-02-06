@@ -17,10 +17,11 @@ class PossibleFluxComputation:
     @brief Determine which flux computations are possible from a set of variables and which flux type it is
     """
     COMMON_FLUXES = {
-        'Liquid flux (m3/s)': [('U', 'V', 'H'), ('I', 'J'), ('M', 'H'), ('Q',)],
-        'Solid flux TOTAL (m3/s)': [('QSX', 'QSY'), ('QS',)],
-        'Solid flux BEDLOAD (m3/s)': [('QSBLX', 'QSBLY'), ('QSBL',)],
-        'Solid flux SUSPENSION (m3/s)': [('QSSUSPX', 'QSSUSPY'), ('QSSUSP',)],
+        'Cross sectional area (m²)': [('H',)],
+        'Liquid flux (m³/s)': [('U', 'V', 'H'), ('I', 'J'), ('M', 'H'), ('Q',)],
+        'Solid flux TOTAL (m³/s)': [('QSX', 'QSY'), ('QS',)],
+        'Solid flux BEDLOAD (m³/s)': [('QSBLX', 'QSBLY'), ('QSBL',)],
+        'Solid flux SUSPENSION (m³/s)': [('QSSUSPX', 'QSSUSPY'), ('QSSUSP',)],
     }
 
     def __init__(self, var_IDs, var_names):
@@ -46,11 +47,11 @@ class PossibleFluxComputation:
                 if 'TRACEUR' in str_name or 'TRACER' in str_name:
                     yield 'Solid flux (kg/s): (U, V, H, %s)' % str_name
             if 'QS CLASS' in str_name:
-                yield 'Solid flux TOTAL (m3/s): (%s)' % str_name
+                yield 'Solid flux TOTAL (m³/s): (%s)' % str_name
             if 'QS BEDLOAD CL' in str_name:
-                yield 'Solid flux BEDLOAD (m3/s): (%s)' % str_name
+                yield 'Solid flux BEDLOAD (m³/s): (%s)' % str_name
             if 'QS SUSP. CL' in str_name:
-                yield 'Solid flux SUSPENSION (m3/s): (%s)' % str_name
+                yield 'Solid flux SUSPENSION (m³/s): (%s)' % str_name
 
     @staticmethod
     def get_variables(possible_flux):
