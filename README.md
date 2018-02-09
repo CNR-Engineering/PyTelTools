@@ -25,7 +25,7 @@ PyTelTools can be installed as a Python module (A) or an external program (B).
 The recommended installation is within Python (A) as it becomes fully integrated with Python and more easier to install, upgrade and use.
 
 ### A) Installation as Python module
-If you want to use a [virtual environnement](https://virtualenv.pypa.io/en/stable/) do the following:
+If you want to use a [virtual environment](https://virtualenv.pypa.io/en/stable/) do the following:
 ```bash
 $ virtualenv venv --python=python3
 $ source venv/bin/activate
