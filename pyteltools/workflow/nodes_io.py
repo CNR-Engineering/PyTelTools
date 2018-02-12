@@ -140,7 +140,8 @@ class WriteSerafinNode(OneInOneOutNode):
                 for i, time_index in enumerate(input_data.selected_time_indices):
                     values = do_calculations_in_frame(input_data.equations, input_stream, time_index,
                                                       input_data.selected_vars, output_header.np_float_type,
-                                                      is_2d=output_header.is_2d, us_equation=input_data.us_equation)
+                                                      is_2d=output_header.is_2d, us_equation=input_data.us_equation,
+                                                      ori_values={})
                     output_stream.write_entire_frame(output_header, input_data.time[time_index], values)
 
                     self.progress_bar.setValue(100 * (i+1) / len(input_data.selected_time_indices))
@@ -395,7 +396,8 @@ class WriteSerafinNode(OneInOneOutNode):
                     # FIXME Optimization: Do calculations only on target layer and avoid reshaping afterwards
                     values = do_calculations_in_frame(input_data.equations, input_stream, time_index,
                                                       input_data.selected_vars, output_header.np_float_type,
-                                                      is_2d=output_header.is_2d, us_equation=input_data.us_equation)
+                                                      is_2d=output_header.is_2d, us_equation=input_data.us_equation,
+                                                      ori_values={})
                     new_shape = (values.shape[0], input_stream.header.nb_planes,
                                  values.shape[1] // input_stream.header.nb_planes)
                     values_at_layer = values.reshape(new_shape)[:,input_data.metadata['layer_selection'] - 1,:]

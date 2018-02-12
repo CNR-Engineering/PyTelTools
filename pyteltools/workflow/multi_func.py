@@ -501,7 +501,8 @@ def write_simple_slf(input_data, filename):
                 # FIXME Optimization: Do calculations only on target layer and avoid reshaping afterwards
                 values = do_calculations_in_frame(input_data.equations, input_stream, time_index,
                                                   input_data.selected_vars, output_header.np_float_type,
-                                                  is_2d=output_header.is_2d, us_equation=input_data.us_equation)
+                                                  is_2d=output_header.is_2d, us_equation=input_data.us_equation,
+                                                  ori_values={})
                 output_stream.write_entire_frame(output_header, input_data.time[time_index], values)
     return True, success_message('Write Serafin', input_data.job_id)
 

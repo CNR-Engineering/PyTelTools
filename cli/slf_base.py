@@ -12,6 +12,7 @@ from tqdm import tqdm
 from pyteltools.geom.transformation import Transformation
 from pyteltools.slf import Serafin
 from pyteltools.slf.variables import do_calculations_in_frame, get_necessary_equations
+from pyteltools.slf.variable.variables_2d import FRICTION_LAWS, get_US_equation, STRICKLER_ID
 from pyteltools.utils.cli import logger, PyTelToolsArgParse
 
 
@@ -38,13 +39,11 @@ def slf_base(args):
                 logger.warn('Input file is already single precision! Argument `--to_single_precision` is ignored')
 
         # Remove variables if necessary
-        output_header.empty_variables()
-        for var_ID, var_name, var_unit in zip(resin.header.var_IDs, resin.header.var_names, resin.header.var_units):
-            if args.var2del is not None:
+        if args.var2del:
+            output_header.empty_variables()
+            for var_ID, var_name, var_unit in zip(resin.header.var_IDs, resin.header.var_names, resin.header.var_units):
                 if var_ID not in args.var2del:
                     output_header.add_variable(var_ID, var_name, var_unit)
-            else:
-                output_header.add_variable(var_ID, var_name, var_unit)
 
         # Add new derived variables
         if args.var2add is not None:
@@ -54,8 +53,9 @@ def slf_base(args):
                 else:
                     output_header.add_variable_from_ID(var_ID)
 
+        us_equation = get_US_equation(args.friction_law)
         necessary_equations = get_necessary_equations(resin.header.var_IDs, output_header.var_IDs,
-                                                      is_2d=resin.header.is_2d)
+                                                      is_2d=resin.header.is_2d, us_equation=us_equation)
 
         with Serafin.Write(args.out_slf, args.lang, overwrite=args.force) as resout:
             resout.write_header(output_header)
@@ -63,7 +63,7 @@ def slf_base(args):
             for time_index, time in tqdm(resin.subset_time(args.start, args.end, args.ech), unit='frame'):
                 values = do_calculations_in_frame(necessary_equations, resin, time_index, output_header.var_IDs,
                                                   output_header.np_float_type, is_2d=output_header.is_2d,
-                                                  us_equation=None)
+                                                  us_equation=us_equation, ori_values={})
                 resout.write_entire_frame(output_header, time, values)
 
 
@@ -73,6 +73,9 @@ group_var = parser.add_argument_group('Serafin variables (optional)',
     'See variables abbrevations on https://github.com/CNR-Engineering/PyTelTools/wiki/Notations-of-variables')
 group_var.add_argument('--var2del', nargs='+', help='variable(s) to delete', default=[], metavar=('VA', 'VB'))
 group_var.add_argument('--var2add', nargs='+', help='variable(s) to add', default=[], metavar=('VA', 'VB'))
+help_friction_laws = ', '.join(['%i=%s' %(i, law) for i, law in enumerate(FRICTION_LAWS)])
+group_var.add_argument('--friction_law', type=int, help='friction law identifier: %s' % help_friction_laws,
+                       choices=range(len(FRICTION_LAWS)), default=STRICKLER_ID)
 
 group_temp = parser.add_argument_group('Temporal operations (optional)')
 group_temp.add_argument('--ech', type=int, help='frequency sampling of input', default=1)

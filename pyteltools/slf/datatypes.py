@@ -30,12 +30,15 @@ class SerafinData:
         # * vertical aggregation: 'vertical_operator': 'Min', 'Max' or 'Mean'
 
     def read(self):
-        with Serafin.Read(self.filename, self.language) as input_stream:
-            input_stream.read_header()
-            input_stream.get_time()
+        try:
+            with Serafin.Read(self.filename, self.language) as input_stream:
+                input_stream.read_header()
+                input_stream.get_time()
 
-            self.header = input_stream.header.copy()
-            self.time = input_stream.time[:]
+                self.header = input_stream.header.copy()
+                self.time = input_stream.time[:]
+        except PermissionError:
+            raise Serafin.SerafinRequestError('Permission denied (Is the file opened by another application?).')
 
         if self.header.date is not None:
             try:

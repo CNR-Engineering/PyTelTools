@@ -27,6 +27,7 @@ from pyteltools.slf.flux import TriangularVectorField
 from pyteltools.slf.interpolation import MeshInterpolator
 import pyteltools.slf.misc as operations
 from pyteltools.slf import Serafin
+from pyteltools.slf.variable.variables_2d import CHEZY_ID, MANNING_ID, NIKURADSE_ID, STRICKLER_ID
 from pyteltools.slf.volume import TruncatedTriangularPrisms, VolumeCalculator
 
 
@@ -1242,14 +1243,14 @@ class FrictionLawMessage(QDialog):
 
     def getChoice(self):
         if self.chezy.isChecked():
-            return 0
+            return CHEZY_ID
         elif self.strickler.isChecked():
-            return 1
+            return STRICKLER_ID
         elif self.manning.isChecked():
-            return 2
+            return MANNING_ID
         elif self.nikuradse.isChecked():
-            return 3
-        return -1
+            return NIKURADSE_ID
+        return None
 
 
 class SettlingVelocityMessage(QDialog):

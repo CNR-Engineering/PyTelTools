@@ -5,8 +5,7 @@ Unittest for slf.variables module
 import unittest
 
 from pyteltools.slf.variables import get_necessary_equations
-from pyteltools.slf.variable.variables_2d import CHEZY_EQUATION, MANNING_EQUATION, NIKURADSE_EQUATION, \
-    STRICKLER_EQUATION
+from pyteltools.slf.variable.variables_2d import get_US_equation, CHEZY_ID, MANNING_ID, NIKURADSE_ID, STRICKLER_ID
 
 
 eq_name = lambda eqs: list(map(lambda x: x.output.ID(), eqs))
@@ -71,25 +70,25 @@ class VariablesTestCase(unittest.TestCase):
         self.assertEqual(eq_name(get_necessary_equations(['U', 'V', 'S', 'J', 'B'], ['Q', 'U', 'M', 'H'], True, None)), ['H', 'M', 'I', 'Q'])
 
     def test_TAU_equation(self):
-        self.assertEqual(eq_name(get_necessary_equations(['U', 'V', 'J', 'W', 'H', 'B', 'I'], ['TAU'], True, CHEZY_EQUATION)), ['M', 'US', 'TAU'])
-        self.assertEqual(eq_name(get_necessary_equations(['U', 'V', 'M', 'Q', 'W', 'H'], ['TAU', 'Q', 'U', 'V'], True, NIKURADSE_EQUATION)), ['US', 'TAU'])
-        self.assertEqual(eq_name(get_necessary_equations(['U', 'V', 'M', 'US', 'Q', 'W', 'H'], ['I', 'TAU', 'Q', 'U', 'V'], True, STRICKLER_EQUATION)), ['I', 'TAU'])
-        self.assertEqual(eq_name(get_necessary_equations(['U', 'V', 'M', 'US', 'W', 'H'], ['Q', 'TAU', 'US'], True, MANNING_EQUATION)), ['I', 'J', 'Q', 'TAU'])
-        self.assertEqual(eq_name(get_necessary_equations(['U', 'V', 'M', 'US', 'W', 'S', 'B'], ['Q', 'TAU'], True, STRICKLER_EQUATION)), ['H', 'I', 'J', 'Q', 'TAU'])
+        self.assertEqual(eq_name(get_necessary_equations(['U', 'V', 'J', 'W', 'H', 'B', 'I'], ['TAU'], True, get_US_equation(CHEZY_ID))), ['M', 'US', 'TAU'])
+        self.assertEqual(eq_name(get_necessary_equations(['U', 'V', 'M', 'Q', 'W', 'H'], ['TAU', 'Q', 'U', 'V'], True, get_US_equation(NIKURADSE_ID))), ['US', 'TAU'])
+        self.assertEqual(eq_name(get_necessary_equations(['U', 'V', 'M', 'US', 'Q', 'W', 'H'], ['I', 'TAU', 'Q', 'U', 'V'], True, get_US_equation(STRICKLER_ID))), ['I', 'TAU'])
+        self.assertEqual(eq_name(get_necessary_equations(['U', 'V', 'M', 'US', 'W', 'H'], ['Q', 'TAU', 'US'], True, get_US_equation(MANNING_ID))), ['I', 'J', 'Q', 'TAU'])
+        self.assertEqual(eq_name(get_necessary_equations(['U', 'V', 'M', 'US', 'W', 'S', 'B'], ['Q', 'TAU'], True, get_US_equation(STRICKLER_ID))), ['H', 'I', 'J', 'Q', 'TAU'])
 
     def test_DMAX_equation(self):
         self.assertEqual(eq_name(get_necessary_equations(['US'], ['DMAX'], True, None)), ['TAU', 'DMAX'])
         self.assertEqual(eq_name(get_necessary_equations(['U', 'V', 'H', 'W', 'TAU', 'US'], ['DMAX'], True, None)), ['DMAX'])
-        self.assertEqual(eq_name(get_necessary_equations(['U', 'V', 'J', 'W', 'H', 'B', 'I'], ['DMAX'], True, CHEZY_EQUATION)), ['M', 'US', 'TAU', 'DMAX'])
-        self.assertEqual(eq_name(get_necessary_equations(['U', 'V', 'M', 'B', 'Q', 'W', 'S'], ['DMAX', 'H', 'Q', 'TAU', 'U', 'V'], True, STRICKLER_EQUATION)), ['H', 'US', 'TAU', 'DMAX'])
+        self.assertEqual(eq_name(get_necessary_equations(['U', 'V', 'J', 'W', 'H', 'B', 'I'], ['DMAX'], True, get_US_equation(CHEZY_ID))), ['M', 'US', 'TAU', 'DMAX'])
+        self.assertEqual(eq_name(get_necessary_equations(['U', 'V', 'M', 'B', 'Q', 'W', 'S'], ['DMAX', 'H', 'Q', 'TAU', 'U', 'V'], True, get_US_equation(STRICKLER_ID))), ['H', 'US', 'TAU', 'DMAX'])
         self.assertEqual(eq_name(get_necessary_equations(['US', 'I', 'H', 'U', 'V'], ['M', 'DMAX', 'Q'], True, None)), ['M', 'J', 'Q', 'TAU', 'DMAX'])
         self.assertEqual(eq_name(get_necessary_equations(['US', 'I', 'H', 'U', 'V'], ['M', 'DMAX', 'Q'], True, None)), ['M', 'J', 'Q', 'TAU', 'DMAX'])
 
     def test_FROPT_equation(self):
         self.assertEqual(eq_name(get_necessary_equations(['US', 'MU'], ['FROTP'], True, None)), ['TAU', 'FROTP'])
         self.assertEqual(eq_name(get_necessary_equations(['U', 'MU', 'H', 'W', 'TAU', 'US'], ['FROTP'], True, None)), ['FROTP'])
-        self.assertEqual(eq_name(get_necessary_equations(['U', 'V', 'J', 'W', 'H', 'MU', 'I'], ['FROTP'], True, CHEZY_EQUATION)), ['M', 'US', 'TAU', 'FROTP'])
-        self.assertEqual(eq_name(get_necessary_equations(['U', 'MU', 'M', 'B', 'Q', 'W', 'S'], ['FROTP', 'DMAX', 'H', 'Q', 'TAU', 'U', 'V'], True, STRICKLER_EQUATION)), ['H', 'US', 'TAU', 'DMAX', 'FROTP'])
+        self.assertEqual(eq_name(get_necessary_equations(['U', 'V', 'J', 'W', 'H', 'MU', 'I'], ['FROTP'], True, get_US_equation(CHEZY_ID))), ['M', 'US', 'TAU', 'FROTP'])
+        self.assertEqual(eq_name(get_necessary_equations(['U', 'MU', 'M', 'B', 'Q', 'W', 'S'], ['FROTP', 'DMAX', 'H', 'Q', 'TAU', 'U', 'V'], True, get_US_equation(STRICKLER_ID))), ['H', 'US', 'TAU', 'DMAX', 'FROTP'])
         self.assertEqual(eq_name(get_necessary_equations(['US', 'I', 'H', 'MU', 'V'], ['M', 'DMAX', 'Q', 'FROTP'], True, None)), ['M', 'J', 'Q', 'TAU', 'DMAX', 'FROTP'])
         self.assertEqual(eq_name(get_necessary_equations(['US', 'MU', 'H', 'U', 'V'], ['FROTP', 'M', 'DMAX', 'Q'], True, None)), ['M', 'I', 'J', 'Q', 'TAU', 'DMAX', 'FROTP'])
 

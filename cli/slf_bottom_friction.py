@@ -5,10 +5,9 @@ Compute bottom friction force on multiple zones
 Outputs:
 * write a SerafinOutput variables : 'W', 'US', 'TAU'
 * write the values in stdout
-
-Assumes Strickler friction law
 """
 
+import csv
 import numpy as np
 from shapefile import ShapefileException
 from shapely.geometry import Point
@@ -18,16 +17,22 @@ from tqdm import tqdm
 from pyteltools.geom import Shapefile
 from pyteltools.slf import Serafin
 from pyteltools.slf.variables import do_calculations_in_frame, get_necessary_equations
-from pyteltools.slf.variable.variables_2d import STRICKLER_EQUATION
+from pyteltools.slf.variable.variables_2d import FRICTION_LAWS, STRICKLER_ID
 from pyteltools.slf.volume import VolumeCalculator
 from pyteltools.utils.cli import logger, PyTelToolsArgParse
 
 
 def slf_bottom_friction(args):
+    # Check argument consistency
+    if args.in_strickler_zones is not None or args.in_strickler_attr is not None:
+        if args.in_strickler_zones is None or args.in_strickler_attr is None:
+            logger.critical('Both arguments `--in_strickler_zones` and `--in_strickler_attr` have to be defined.')
+            sys.exit(2)
+
     # Read polygons to compute volume
     if not args.in_polygons.endswith('.shp'):
         logger.critical('File "%s" is not a shp file.' % args.in_polygons)
-        sys.exit(2)
+        sys.exit(3)
     polygons = []
     try:
         for polygon in Shapefile.get_polygons(args.in_polygons):
@@ -59,14 +64,14 @@ def slf_bottom_friction(args):
         if args.in_strickler_zones is not None:
             if not args.in_strickler_zones.endswith('.shp'):
                 logger.critical('File "%s" is not a shp file.' % args.in_strickler_zones)
-                sys.exit(2)
+                sys.exit(3)
 
             attributes = Shapefile.get_numeric_attribute_names(args.in_strickler_zones)
             try:
                 index_attr = [attr for _, attr in attributes].index(args.in_strickler_attr)
             except ValueError:
                 logger.critical('Attribute "%s" is not found.' % args.in_strickler_attr)
-                sys.exit(2)
+                sys.exit(1)
 
             strickler_zones = []
             try:
@@ -95,9 +100,12 @@ def slf_bottom_friction(args):
                 logger.critical('The variable W is missing.')
                 sys.exit(1)
 
+        us_equation = None
+        if args.friction_law:
+            us_equation = get_US_equation(args.friction_law)
+
         resin.get_time()
-        necessary_equations = get_necessary_equations(in_varIDs, out_varIDs, is_2d=True,
-                                                      us_equation=STRICKLER_EQUATION)
+        necessary_equations = get_necessary_equations(in_varIDs, out_varIDs, is_2d=True, us_equation=us_equation)
 
         calculator = VolumeCalculator(VolumeCalculator.NET, 'TAU', None, resin, names, polygons, 1)
         calculator.construct_triangles(tqdm)
@@ -111,23 +119,33 @@ def slf_bottom_friction(args):
         with Serafin.Write(args.out_slf, args.lang, args.force) as resout:
             resout.write_header(output_header)
 
-            for time_index, time in enumerate(tqdm(resin.time)):
-                values = do_calculations_in_frame(necessary_equations, resin, time_index, out_varIDs,
-                                                  resin.header.np_float_type, is_2d=True,
-                                                  us_equation=STRICKLER_EQUATION, ori_values=ori_values)
+            mode = 'w' if args.force else 'x'
+            with open(args.out_csv, mode, newline='') as csvfile:
+                csvwriter = csv.writer(csvfile, delimiter=args.sep)
+                csvwriter.writerow(['time'] + names)
 
-                resout.write_entire_frame(output_header, time, values)
+                for time_index, time in enumerate(tqdm(resin.time)):
+                    values = do_calculations_in_frame(necessary_equations, resin, time_index, out_varIDs,
+                                                      resin.header.np_float_type, is_2d=True,
+                                                      us_equation=STRICKLER_EQUATION, ori_values=ori_values)
+                    resout.write_entire_frame(output_header, time, values)
 
-                for j in range(len(calculator.polygons)):
-                    weight = calculator.weights[j]
-                    volume = calculator.volume_in_frame_in_polygon(weight, values[pos_TAU], calculator.polygons[j])
-                    print('Polygon %d: %f N' % (j, volume))
+                    row = [time]
+                    for j in range(len(calculator.polygons)):
+                        weight = calculator.weights[j]
+                        volume = calculator.volume_in_frame_in_polygon(weight, values[pos_TAU], calculator.polygons[j])
+                        row.append(volume)
+                    csvwriter.writerow(row)
 
 
-parser = PyTelToolsArgParse(description=__doc__, add_args=['in_slf', 'out_slf'])
+parser = PyTelToolsArgParse(description=__doc__, add_args=['in_slf', 'out_slf', 'out_csv'])
 parser.add_argument('in_polygons', help='polygons file (*.shp)')
+
 parser.add_argument('--in_strickler_zones', help='strickler zones file (*.shp)')
 parser.add_argument('--in_strickler_attr', help='attribute to read strickler values `--in_stricker_zone`')
+help_friction_laws = ', '.join(['%i=%s' %(i, law) for i, law in enumerate(FRICTION_LAWS)])
+group_var.add_argument('--friction_law', type=int, help='friction law identifier: %s' % help_friction_laws,
+                       choices=range(len(FRICTION_LAWS)), default=STRICKLER_ID)
 parser.add_group_general(['force', 'verbose'])
 
 

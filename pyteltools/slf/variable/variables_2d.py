@@ -70,11 +70,9 @@ BASIC_2D_EQUATIONS = {'H': Equation((S, B), H, MINUS), 'S': Equation((H, B), S, 
                       'QSSUSPX': Equation((QSSUSP, U, V), QSSUSPX, COMPUTE_COMPONENT_X),
                       'QSSUSPY': Equation((QSSUSP, U, V), QSSUSPY, COMPUTE_COMPONENT_Y)}
 
-# define special equations
-CHEZY_EQUATION = Equation((W, H, M), US, COMPUTE_CHEZY)
-STRICKLER_EQUATION = Equation((W, H, M), US, COMPUTE_STRICKLER)
-MANNING_EQUATION = Equation((W, H, M), US, COMPUTE_MANNING)
-NIKURADSE_EQUATION = Equation((W, H, M), US, COMPUTE_NIKURADSE)
+# define special friction law identifiers
+CHEZY_ID, STRICKLER_ID, MANNING_ID, NIKURADSE_ID = 0, 1, 2, 3
+FRICTION_LAWS = ['Chézy', 'Strickler', 'Manning', 'Nikuradse']
 
 
 # a very special equation
@@ -264,13 +262,16 @@ def get_US_equation(friction_law):
     @param friction_law <int>: an integer specifying the friction law to use
     @return <Equation>: the corresponding friction law equation
     """
-    if friction_law == 0:
-        return CHEZY_EQUATION
-    elif friction_law == 1:
-        return STRICKLER_EQUATION
-    elif friction_law == 2:
-        return MANNING_EQUATION
-    return NIKURADSE_EQUATION
+    if friction_law == CHEZY_ID:
+        return Equation((W, H, M), US, COMPUTE_CHEZY)
+    elif friction_law == STRICKLER_ID:
+        return Equation((W, H, M), US, COMPUTE_STRICKLER)
+    elif friction_law == MANNING_ID:
+        return Equation((W, H, M), US, COMPUTE_MANNING)
+    elif friction_law == NIKURADSE_ID:
+        return Equation((W, H, M), US, COMPUTE_NIKURADSE)
+    else:
+        return None
 
 
 def new_variables_from_US(known_vars):

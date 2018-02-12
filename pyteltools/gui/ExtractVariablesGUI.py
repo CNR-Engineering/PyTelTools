@@ -34,7 +34,8 @@ class ExtractVariablesThread(OutputThread):
                 return
             values = do_calculations_in_frame(self.necessary_equations, self.input_stream, time_index,
                                               self.output_header.var_IDs, self.output_header.np_float_type,
-                                              is_2d=self.output_header.is_2d, us_equation=self.us_equation)
+                                              is_2d=self.output_header.is_2d, us_equation=self.us_equation,
+                                              ori_values={})
 
             self.output_stream.write_entire_frame(self.output_header, self.input_stream.time[time_index], values)
 
