@@ -27,7 +27,8 @@ class PossibleFluxComputation:
     def __init__(self, var_IDs, var_names):
         """!
         Determine all possible flux computations
-        @param <slf.Serafin.SerafinHeader>: input Serafin header
+        @param var_IDs <[str]>: variables identifiers
+        @param var_names <[bytes]>: variable names
         """
         self.var_IDs = var_IDs
         self.var_names = var_names

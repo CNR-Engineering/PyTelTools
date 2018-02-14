@@ -6,7 +6,8 @@ from .variables_utils import *
 
 
 # define variables
-spec = """U,VITESSE U,VELOCITY U,M/S
+spec = """Z,COTE Z,ELEVATION Z,M
+U,VITESSE U,VELOCITY U,M/S
 V,VITESSE V,VELOCITY V,M/S
 W,VITESSE W,VELOCITY W,M/S
 NUX,NUX POUR VITESSE,NUX FOR VELOCITY,M2/S
@@ -15,10 +16,10 @@ NUZ,NUZ POUR VITESSE,NUZ FOR VELOCITY,M2/S
 M,VITESSE SCALAIRE,SCALAR VELOCITY,M/S
 NU,NU POUR VITESSE,NU FOR VELOCITY,M2/S"""
 
-basic_3D_vars_IDs = ['U', 'V', 'W', 'NUX', 'NUY', 'NUZ', 'M', 'NU']
+basic_3D_vars_IDs = ['Z', 'U', 'V', 'W', 'NUX', 'NUY', 'NUZ', 'M', 'NU']
 VARIABLES_3D = build_variables(spec)
 
-U, V, W, NUX, NUY, NUZ, M, NU = [VARIABLES_3D[var] for var in basic_3D_vars_IDs]
+Z, U, V, W, NUX, NUY, NUZ, M, NU = [VARIABLES_3D[var] for var in basic_3D_vars_IDs]
 
 
 # define equations

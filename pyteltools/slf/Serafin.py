@@ -75,6 +75,17 @@ class SerafinHeader:
         @param file <_io.BufferedReader>: input Serafin stream
         @param file_size <int>: file size (in bytes)
         @param language <str>: Serafin variable name language ('fr' or 'en')
+
+        Some attributes:
+        - nb_nodes <int>: number of 3D nodes
+        - nb_nodes_2d <int>: number of 2D nodes (equals to nb_nodes if it 2D)
+        - nb_elements <int>: number of 3D elements
+        - nb_nodes_per_elem <int>: number of nodes per element
+
+        - x <numpy.1D-array>: east coordinates (shape = (nb_nodes,))
+        - y <numpy.1D-array>: north coordinates (shape = (nb_nodes,))
+        - ikle: connectivity table with 1-indexed nodes number (shape = (nb_nodes_per_elem * nb_elements,))
+        - ipobo: array with 0 values for inner nodes and boundary 1-indexed node number for the others (shape = (nb_nodes,))
         """
         self.file_size = file_size
         if language not in ('fr', 'en'):
@@ -232,8 +243,15 @@ class SerafinHeader:
                 var_id = var_table[name]
             self.var_IDs.append(var_id)
 
-        # Build ikle2d
-        if not self.is_2d:
+        self.ikle_2d = None
+        self._build_ikle_2d()
+
+        logger.debug('Finished reading the header')
+
+    def _build_ikle_2d(self):
+        if self.is_2d:
+            self.ikle_2d = self.ikle.reshape(self.nb_elements, self.nb_nodes_per_elem)
+        else:
             ikle = self.ikle.reshape(self.nb_elements, self.nb_nodes_per_elem)
             self.ikle_2d = np.empty([self.nb_elements // (self.nb_planes - 1), 3], dtype=int)
             nb_lines = self.ikle_2d.shape[0]
@@ -242,10 +260,6 @@ class SerafinHeader:
                 raise SerafinValidationError('The number of elements is not divisible by (number of planes - 1)')
             for i in range(nb_lines):
                 self.ikle_2d[i] = ikle[i, [0, 1, 2]]
-        else:
-            self.ikle_2d = self.ikle.reshape(self.nb_elements, self.nb_nodes_per_elem)
-
-        logger.debug('Finished reading the header')
 
     def _set_as_single_precision(self):
         """Set Serafin as single precision"""
@@ -337,7 +351,10 @@ class SerafinHeader:
         return copy.deepcopy(self)
 
     def copy_as_2d(self):
-        """Returns a 2D equivalent copy of the current instance"""
+        """!
+        Returns a 2D equivalent copy of the current instance
+        @return <slf.Serafin.SerafinHeader>: output Serafin header
+        """
         if self.is_2d:
             raise SerafinRequestError('Cannot convert header to a 2D equivalent because the input is not 3D')
 
@@ -360,6 +377,52 @@ class SerafinHeader:
         new_header.ipobo = self.ipobo[:self.nb_nodes_2d]
         new_header.x = self.x[:self.nb_nodes_2d]
         new_header.y = self.y[:self.nb_nodes_2d]
+
+        # Update sizes
+        new_header._set_header_size()
+        new_header._set_frame_size()
+        new_header.file_size = new_header._expected_file_size()
+
+        return new_header
+
+    def copy_as_3d(self, nb_planes):
+        """!
+        Returns a 3D equivalent copy of the current instance
+        @param nb_planes <int>: number of planes
+        @return <slf.Serafin.SerafinHeader>: output Serafin header
+        """
+        if not self.is_2d:
+            raise SerafinRequestError('Cannot convert header to a 3D equivalent because the input is not 2D')
+        if nb_planes < 2:
+            raise SerafinRequestError('A 3D file has to contain at least 2 planes')
+        ori_params = self.params
+        new_header = self.copy()
+
+        # Overwrites relevant attributes
+        new_header.nb_planes = nb_planes
+        new_params = list(ori_params)
+        new_params[6] = new_header.nb_planes
+        new_header.params = tuple(new_params)
+        new_header.is_2d = False
+        new_header.nb_elements *= (nb_planes - 1)
+        new_header.nb_nodes *= nb_planes
+        new_header.nb_nodes_per_elem = 6
+
+        ikle_bottom_pattern = np.concatenate((self.ikle_2d, self.ikle_2d + new_header.nb_nodes_2d), axis=1)
+        ikle = np.empty((nb_planes - 1, self.nb_elements, new_header.nb_nodes_per_elem), dtype=int)
+        for i in range(nb_planes - 1):
+            ikle[i] = ikle_bottom_pattern + i * new_header.nb_nodes_2d
+        new_header.ikle = ikle.flatten()
+        new_header._build_ikle_2d()
+
+        ipobo = np.empty((nb_planes, new_header.nb_nodes_2d), dtype=int)
+        for i in range(nb_planes):
+            ipobo[i] = self.ipobo + i * self.ipobo.max()
+            ipobo[i][self.ipobo == 0] = 0
+        new_header.ipobo = ipobo.flatten()
+
+        new_header.x = np.tile(self.x, nb_planes)
+        new_header.y = np.tile(self.y, nb_planes)
 
         # Update sizes
         new_header._set_header_size()
@@ -422,6 +485,7 @@ class SerafinHeader:
                 var_name = VARIABLES_3D[var_ID].name(self.language)
                 var_unit = VARIABLES_3D[var_ID].unit()
         except KeyError:
+            print(self.is_2d)
             raise SerafinRequestError('The variable "%s" is not known (lang=%s)' % (var_ID, self.language))
         self.add_variable_str(var_ID, var_name, var_unit)
 
