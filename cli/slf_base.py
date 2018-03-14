@@ -26,6 +26,9 @@ def slf_base(args):
         # Shift mesh coordinates if necessary
         if args.shift:
             output_header.transform_mesh([Transformation(0, 1, 1, args.shift[0], args.shift[1], 0)])
+        # Set mesh origin coordinates
+        if args.set_mesh_origin:
+            output_header.set_mesh_origin(args.set_mesh_origin[0], args.set_mesh_origin[1])
 
         # Toggle output file endianness if necessary
         if args.toggle_endianness:
@@ -68,6 +71,8 @@ def slf_base(args):
 
 
 parser = PyTelToolsArgParse(description=__doc__, add_args=['in_slf', 'out_slf', 'shift'])
+
+parser.add_argument('--set_mesh_origin', type=float, nargs=2, help='Mesh origin coordinates (x, y)', metavar=('X', 'Y'))
 
 group_var = parser.add_argument_group('Serafin variables (optional)',
     'See variables abbrevations on https://github.com/CNR-Engineering/PyTelTools/wiki/Notations-of-variables')

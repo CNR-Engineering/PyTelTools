@@ -24,6 +24,9 @@ PY_ARCGIS = 'C:\\Python27\\ArcGIS10.5\\python.exe'
 
 # ~> SERAFIN
 
+# Use to define mesh origin coordinates (in iparam array)
+ENABLE_MESH_ORIGIN = True
+
 # Serafin extensions for file name filtering (default extension is the first)
 SERAFIN_EXT = ['.srf', '.slf', '.res', '.geo']
 

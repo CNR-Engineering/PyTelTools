@@ -13,6 +13,7 @@ import numpy as np
 import os
 import struct
 
+from pyteltools.conf import settings
 from pyteltools.slf.variable.variables_2d import VARIABLES_2D
 from pyteltools.slf.variable.variables_3d import VARIABLES_3D
 
@@ -152,6 +153,7 @@ class SerafinHeader:
         file.read(4)
         self.params = self.unpack_int(file.read(40), 10)
         file.read(4)
+        self.mesh_origin = self.params[2], self.params[3]
         self.nb_planes = self.params[6]
 
         self.is_2d = (self.nb_planes == 0)
@@ -207,13 +209,17 @@ class SerafinHeader:
         # x coordinates
         file.read(4)
         coord_size = self.nb_nodes * self.float_size
-        self.x = np.array(self.unpack_float(file.read(coord_size), self.nb_nodes), dtype=self.np_float_type)
+        self.x_stored = np.array(self.unpack_float(file.read(coord_size), self.nb_nodes), dtype=self.np_float_type)
         file.read(4)
 
         # y coordinates
         file.read(4)
-        self.y = np.array(self.unpack_float(file.read(coord_size), self.nb_nodes), dtype=self.np_float_type)
+        self.y_stored = np.array(self.unpack_float(file.read(coord_size), self.nb_nodes), dtype=self.np_float_type)
         file.read(4)
+
+        self.x = None
+        self.y = None
+        self._compute_mesh_coordinates()
 
         # Compute and set header and frame sizes
         self._set_header_size()
@@ -321,6 +327,15 @@ class SerafinHeader:
             self.endian = '>'
         logger.debug('Toggle endianness to %s' % ('big' if self.endian == '>' else 'litte'))
 
+    def _compute_mesh_coordinates(self):
+        """Compute mesh coordinates from origin"""
+        if settings.ENABLE_MESH_ORIGIN:
+            self.x = self.mesh_origin[0] + self.x_stored
+            self.y = self.mesh_origin[1] + self.y_stored
+        else:
+            self.x = self.x_stored
+            self.y = self.y_stored
+
     def _set_header_size(self):
         """Set header size"""
         nb_ikle_values = self.nb_elements * self.nb_nodes_per_elem
@@ -375,8 +390,9 @@ class SerafinHeader:
         npd = new_header.nb_nodes_per_elem
         new_header.ikle = np.take(self.ikle, [2*npd*i+j for i in range(new_header.nb_elements) for j in range(3)])
         new_header.ipobo = self.ipobo[:self.nb_nodes_2d]
-        new_header.x = self.x[:self.nb_nodes_2d]
-        new_header.y = self.y[:self.nb_nodes_2d]
+        new_header.x_stored = self.x_stored[:self.nb_nodes_2d]
+        new_header.y_stored = self.y_stored[:self.nb_nodes_2d]
+        new_header._compute_mesh_coordinates()
 
         # Update sizes
         new_header._set_header_size()
@@ -421,8 +437,9 @@ class SerafinHeader:
             ipobo[i][self.ipobo == 0] = 0
         new_header.ipobo = ipobo.flatten()
 
-        new_header.x = np.tile(self.x, nb_planes)
-        new_header.y = np.tile(self.y, nb_planes)
+        new_header.x_stored = np.tile(self.x_stored, nb_planes)
+        new_header.y_stored = np.tile(self.y_stored, nb_planes)
+        new_header._compute_mesh_coordinates()
 
         # Update sizes
         new_header._set_header_size()
@@ -489,6 +506,18 @@ class SerafinHeader:
             raise SerafinRequestError('The variable "%s" is not known (lang=%s)' % (var_ID, self.language))
         self.add_variable_str(var_ID, var_name, var_unit)
 
+    def set_mesh_origin(self, x, y):
+        """!
+        @brief: Set mesh origin coordinates
+        @param x <float>: X-coordinate of the origin
+        @param y <float>: Y-coordinate of the origin
+        """
+        self.mesh_origin = (x, y)
+        params = list(self.params)
+        params[2] = x
+        params[3] = y
+        self.params = tuple(params)
+
     def set_variables(self, selected_vars):
         """!
         @brief: Set new variables
@@ -518,8 +547,10 @@ class SerafinHeader:
         for t in transformations:
             points = [t(p) for p in points]
         new_header = self.copy()
-        new_header.x = np.array([p[0] for p in points])
-        new_header.y = np.array([p[1] for p in points])
+        new_header.x_stored = np.array([p[0] for p in points])
+        new_header.y_stored = np.array([p[1] for p in points])
+        self.set_mesh_origin(0, 0)
+        self._compute_mesh_coordinates()
         return new_header
 
     def transform_mesh(self, transformations):
@@ -532,8 +563,10 @@ class SerafinHeader:
         points = [np.array([x, y, 0]) for x, y in zip(self.x, self.y)]
         for t in transformations:
             points = [t(p) for p in points]
-        self.x = np.array([p[0] for p in points])
-        self.y = np.array([p[1] for p in points])
+        self.x_stored = np.array([p[0] for p in points])
+        self.y_stored = np.array([p[1] for p in points])
+        self.set_mesh_origin(0, 0)
+        self._compute_mesh_coordinates()
 
 
 class Serafin:
@@ -742,12 +775,12 @@ class Write(Serafin):
 
         # X coordinates
         self.file.write(header.pack_int(header.float_size * header.nb_nodes))
-        self.file.write(header.pack_float(*header.x, nb=header.nb_nodes))
+        self.file.write(header.pack_float(*header.x_stored, nb=header.nb_nodes))
         self.file.write(header.pack_int(header.float_size * header.nb_nodes))
 
         # Y coordinates
         self.file.write(header.pack_int(header.float_size * header.nb_nodes))
-        self.file.write(header.pack_float(*header.y, nb=header.nb_nodes))
+        self.file.write(header.pack_float(*header.y_stored, nb=header.nb_nodes))
         self.file.write(header.pack_int(header.float_size * header.nb_nodes))
 
     def write_entire_frame(self, header, time_to_write, values):
