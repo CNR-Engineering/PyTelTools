@@ -545,8 +545,11 @@ class LoadSerafinDialog(QDialog):
 
         self.table = QTableWidget()
         self.table.setColumnCount(2)
-        self.table.horizontalHeader().setDefaultSectionSize(100)
+        self.table.horizontalHeader().setDefaultSectionSize(150)
         self.table.setHorizontalHeaderLabels(['Folder', 'Job ID'])
+
+        self.message_field = QPlainTextEdit()
+        self.message_field.setFixedHeight(50)
 
         self.open_button = QPushButton('Open', None, icon=QWidget().style().standardIcon(QStyle.SP_DialogOpenButton))
         self.open_button.setFixedSize(100, 50)
@@ -588,8 +591,11 @@ class LoadSerafinDialog(QDialog):
         vlayout.addWidget(QLabel('Click on the cells to modify Job ID.'), Qt.AlignRight)
         vlayout.addStretch()
         vlayout.addWidget(buttons)
+        vlayout.addStretch()
+        vlayout.addWidget(self.message_field)
         self.setLayout(vlayout)
         self.setWindowTitle('Select input file')
+        self.resize(350, 350)
 
     def check(self):
         if not self.success:

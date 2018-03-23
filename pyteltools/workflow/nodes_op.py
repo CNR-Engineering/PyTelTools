@@ -4,10 +4,10 @@ from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 
+from pyteltools.geom.transformation import load_transformation_map
 from pyteltools.gui.util import DoubleSliderBox, FrictionLawMessage, SettlingVelocityMessage, SimpleTimeDateSelection,\
     TimeRangeSlider, VariableTable
 import pyteltools.slf.misc as operations
-from pyteltools.geom.transformation import load_transformation_map
 from pyteltools.slf.Serafin import SLF_EIT
 from pyteltools.slf.variables import get_available_variables, get_necessary_equations, get_US_equation, \
     new_variables_from_US

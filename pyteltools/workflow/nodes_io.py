@@ -33,6 +33,7 @@ class LoadSerafin2DNode(SingleOutputNode):
     def configure(self, check=None):
         old_options = (self.dir_path, self.slf_name, self.job_id)
         dlg = LoadSerafinDialog(old_options)
+        dlg.message_field.appendPlainText(self.message)
         if dlg.exec_() == QDialog.Accepted:
             self.state = Node.READY
             self.dir_path, self.slf_name, self.job_id = dlg.dir_path, dlg.slf_name, dlg.job_id
@@ -858,6 +859,7 @@ class LoadSerafin3DNode(SingleOutputNode):
     def configure(self, check=None):
         old_options = (self.dir_path, self.slf_name, self.job_id)
         dlg = LoadSerafinDialog(old_options)
+        dlg.message_field.appendPlainText(self.message)
         if dlg.exec_() == QDialog.Accepted:
             self.state = Node.READY
             self.dir_path, self.slf_name, self.job_id = dlg.dir_path, dlg.slf_name, dlg.job_id
