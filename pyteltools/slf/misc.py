@@ -589,7 +589,6 @@ class VerticalMaxMinMeanCalculator:
             # compute additional variables
             output_values = do_calculation(equation, [computed_values[var_ID] for var_ID in input_var_IDs])
             computed_values[equation.output.ID()] = output_values.reshape((self.nb_planes, self.nb_nodes_2d))
-            print(equation.output.ID())
         return computed_values
 
     def max_min_mean_in_frame(self, time_index, add_vars=[]):

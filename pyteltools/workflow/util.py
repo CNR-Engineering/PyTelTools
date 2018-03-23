@@ -985,7 +985,9 @@ class VerticalCrossSectionPlotViewer(PlotViewer):
 
         self.create_actions()
         self.toolBar.addAction(self.select_variable_act)
-        self.toolBar.addAction(self.selectSectionAct)
+        self.toolBar.addAction(self.select_section_prev_act)
+        self.toolBar.addAction(self.section_section_act)
+        self.toolBar.addAction(self.select_section_next_act)
         self.toolBar.addSeparator()
         self.toolBar.addAction(self.change_color_style_act)
         self.toolBar.addAction(self.change_color_range_act)
@@ -1009,9 +1011,13 @@ class VerticalCrossSectionPlotViewer(PlotViewer):
                                               icon=self.style().standardIcon(QStyle.SP_DialogHelpButton))
         self.change_color_range_act = QAction('Change\ncolor range', self, triggered=self.change_color_range,
                                               icon=self.style().standardIcon(QStyle.SP_DialogHelpButton))
-        self.selectSectionAct = QAction('Select\nsection', self,
-                                        icon=self.style().standardIcon(QStyle.SP_FileDialogDetailedView),
-                                        triggered=self.select_section)
+        self.select_section_prev_act = QAction('', self, icon=self.style().standardIcon(QStyle.SP_ArrowLeft),
+                                               triggered=self.select_section_prev)
+        self.section_section_act = QAction('Select\nsection', self,
+                                           icon=self.style().standardIcon(QStyle.SP_FileDialogDetailedView),
+                                           triggered=self.select_section)
+        self.select_section_next_act = QAction('', self, icon=self.style().standardIcon(QStyle.SP_ArrowRight),
+                                               triggered=self.select_section_next)
         self.select_variable_act_short = QAction('Select variable', self, triggered=self.select_variable,
                                                  icon=self.style().standardIcon(QStyle.SP_FileDialogDetailedView))
         self.change_color_style_act_short = QAction('Change color style', self, triggered=self.change_color_style,
@@ -1021,6 +1027,20 @@ class VerticalCrossSectionPlotViewer(PlotViewer):
         self.selectSectionAct_short = QAction('Select section', self,
                                               icon=self.style().standardIcon(QStyle.SP_FileDialogDetailedView),
                                               triggered=self.select_section)
+
+    def select_section_prev(self):
+        current_index = self.section_names.index(self.current_section)
+        new_index = max(current_index - 1, 0)
+        self.current_section = self.section_names[new_index]
+        self.color_limits = None
+        self.replot()
+
+    def select_section_next(self):
+        current_index = self.section_names.index(self.current_section)
+        new_index = min(current_index + 1, len(self.section_names) - 1)
+        self.current_section = self.section_names[new_index]
+        self.color_limits = None
+        self.replot()
 
     def select_section(self):
         msg = QDialog()
@@ -1160,6 +1180,7 @@ class VerticalCrossSectionPlotViewer(PlotViewer):
         if compute:
             self.triang, self.values = self.compute()
 
+        self._update_next_prev()
         self.canvas.figure.clear()   # remove the old color bar
         self.canvas.axes = self.canvas.figure.add_subplot(111)
 
@@ -1184,6 +1205,14 @@ class VerticalCrossSectionPlotViewer(PlotViewer):
         self.current_title = self._defaultTitle()
         self.canvas.axes.set_title(self.current_title)
         self.canvas.draw()
+
+    def _update_next_prev(self):
+        """Enable/disable next and previous action depending on position"""
+        current_index = self.section_names.index(self.current_section)
+        enable_prev = False if current_index == 0 else True
+        enable_next = False if current_index == len(self.section_names) - 1 else True
+        self.select_section_prev_act.setEnabled(enable_prev)
+        self.select_section_next_act.setEnabled(enable_next)
 
     def get_data(self, data, sections, line_interpolators, section_indices):
         self.data = data
@@ -1227,7 +1256,9 @@ class VerticalProfilePlotViewer(TemporalPlotViewer):
         self.create_actions()
         self.current_columns = ('Point 1',)
         self.toolBar.addAction(self.select_variable_act)
+        self.toolBar.addAction(self.select_point_prev_act)
         self.toolBar.addAction(self.selectColumnsAct)
+        self.toolBar.addAction(self.select_point_next_act)
         self.toolBar.addSeparator()
         self.toolBar.addAction(self.change_color_style_act)
         self.toolBar.addAction(self.change_color_range_act)
@@ -1246,6 +1277,10 @@ class VerticalProfilePlotViewer(TemporalPlotViewer):
         self.menuBar.addMenu(self.color_menu)
 
     def create_actions(self):
+        self.select_point_prev_act = QAction('', self, icon=self.style().standardIcon(QStyle.SP_ArrowLeft),
+                                             triggered=self.select_point_prev)
+        self.select_point_next_act = QAction('', self, icon=self.style().standardIcon(QStyle.SP_ArrowRight),
+                                             triggered=self.select_point_next)
         self.select_variable_act = QAction('Select\nvariable', self, triggered=self.select_variable,
                                            icon=self.style().standardIcon(QStyle.SP_FileDialogDetailedView))
         self.change_color_style_act = QAction('Change\ncolor style', self, triggered=self.change_color_style,
@@ -1258,6 +1293,20 @@ class VerticalProfilePlotViewer(TemporalPlotViewer):
                                                     icon=self.style().standardIcon(QStyle.SP_DialogHelpButton))
         self.change_color_range_act_short = QAction('Change color range', self, triggered=self.change_color_range,
                                                     icon=self.style().standardIcon(QStyle.SP_DialogHelpButton))
+
+    def select_point_prev(self):
+        current_index = self.columns.index(self.current_columns[0])
+        new_index = max(current_index - 1, 0)
+        self.current_columns = [self.columns[new_index]]
+        self.color_limits = None
+        self.replot()
+
+    def select_point_next(self):
+        current_index = self.columns.index(self.current_columns[0])
+        new_index = min(current_index + 1, len(self.columns) - 1)
+        self.current_columns = [self.columns[new_index]]
+        self.color_limits = None
+        self.replot()
 
     def selectColumns(self, unique_selection=False):
         super().selectColumns(True)
@@ -1354,6 +1403,7 @@ class VerticalProfilePlotViewer(TemporalPlotViewer):
         if compute:
             self.y, self.z = self.compute()
 
+        self._update_next_prev()
         self.canvas.figure.clear()   # remove the old color bar
         self.canvas.axes = self.canvas.figure.add_subplot(111)
 
@@ -1375,6 +1425,7 @@ class VerticalProfilePlotViewer(TemporalPlotViewer):
 
         self.canvas.axes.set_xlabel(self.current_xlabel)
         self.canvas.axes.set_ylabel(self.current_ylabel)
+        self.current_title = self._defaultTitle()
         self.canvas.axes.set_title(self.current_title)
         if self.timeFormat in [1, 2]:
             self.canvas.axes.set_xticklabels(self.str_datetime if self.timeFormat == 1 else self.str_datetime_bis)
@@ -1382,6 +1433,14 @@ class VerticalProfilePlotViewer(TemporalPlotViewer):
                 label.set_rotation(45)
                 label.set_fontsize(8)
         self.canvas.draw()
+
+    def _update_next_prev(self):
+        """Enable/disable next and previous action depending on position"""
+        current_index = self.columns.index(self.current_columns[0])
+        enable_prev = False if current_index == 0 else True
+        enable_next = False if current_index == len(self.columns) - 1 else True
+        self.select_point_prev_act.setEnabled(enable_prev)
+        self.select_point_next_act.setEnabled(enable_next)
 
     def get_data(self, data, points, point_interpolators, indices):
         self.data = data

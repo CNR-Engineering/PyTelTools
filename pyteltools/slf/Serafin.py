@@ -502,7 +502,6 @@ class SerafinHeader:
                 var_name = VARIABLES_3D[var_ID].name(self.language)
                 var_unit = VARIABLES_3D[var_ID].unit()
         except KeyError:
-            print(self.is_2d)
             raise SerafinRequestError('The variable "%s" is not known (lang=%s)' % (var_ID, self.language))
         self.add_variable_str(var_ID, var_name, var_unit)
 
