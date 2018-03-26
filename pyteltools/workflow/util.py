@@ -978,6 +978,7 @@ class VerticalCrossSectionPlotViewer(PlotViewer):
         self.cmap = None
         self.current_style = settings.DEFAULT_COLOR_STYLE
         self.color_styles = settings.COLOR_SYLES
+        self.show_mesh = False
 
         self.slider = SimpleTimeDateSelection()
         self.slider.index.editingFinished.connect(self.select_frame)
@@ -991,6 +992,7 @@ class VerticalCrossSectionPlotViewer(PlotViewer):
         self.toolBar.addSeparator()
         self.toolBar.addAction(self.change_color_style_act)
         self.toolBar.addAction(self.change_color_range_act)
+        self.toolBar.addAction(self.toggle_mesh_act)
         self.toolBar.addSeparator()
         self.toolBar.addWidget(self.slider)
 
@@ -1024,6 +1026,8 @@ class VerticalCrossSectionPlotViewer(PlotViewer):
                                                     icon=self.style().standardIcon(QStyle.SP_DialogHelpButton))
         self.change_color_range_act_short = QAction('Change color range', self, triggered=self.change_color_range,
                                                     icon=self.style().standardIcon(QStyle.SP_DialogHelpButton))
+        self.toggle_mesh_act = QAction('Show\nmesh', self, triggered=self.toggle_mesh, checkable=True,
+                                       icon=self.style().standardIcon(QStyle.SP_DialogApplyButton))
         self.selectSectionAct_short = QAction('Select section', self,
                                               icon=self.style().standardIcon(QStyle.SP_FileDialogDetailedView),
                                               triggered=self.select_section)
@@ -1033,14 +1037,14 @@ class VerticalCrossSectionPlotViewer(PlotViewer):
         new_index = max(current_index - 1, 0)
         self.current_section = self.section_names[new_index]
         self.color_limits = None
-        self.replot()
+        self.replot(compute=True)
 
     def select_section_next(self):
         current_index = self.section_names.index(self.current_section)
         new_index = min(current_index + 1, len(self.section_names) - 1)
         self.current_section = self.section_names[new_index]
         self.color_limits = None
-        self.replot()
+        self.replot(compute=True)
 
     def select_section(self):
         msg = QDialog()
@@ -1065,7 +1069,11 @@ class VerticalCrossSectionPlotViewer(PlotViewer):
         msg.exec_()
         self.current_section = combo.currentText()
         self.color_limits = None
-        self.replot()
+        self.replot(False)
+
+    def toggle_mesh(self):
+        self.show_mesh = not self.show_mesh
+        self.replot(False)
 
     def _defaultTitle(self):
         value = {'fr': 'Valeurs', 'en': 'Values'}[self.language]
@@ -1192,6 +1200,8 @@ class VerticalCrossSectionPlotViewer(PlotViewer):
             levels = build_levels_from_minmax(np.nanmin(self.values), np.nanmax(self.values))
             self.canvas.axes.tricontourf(self.triang, self.values, cmap=self.current_style, levels=levels,
                                          extend='both')
+        if self.show_mesh:
+            self.canvas.axes.triplot(self.triang, 'ko-')
 
         divider = make_axes_locatable(self.canvas.axes)
         cax = divider.append_axes('right', size='5%', pad=0.2)
