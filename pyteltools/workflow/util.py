@@ -971,7 +971,7 @@ class VerticalCrossSectionPlotViewer(PlotViewer):
         self.section_names = []
         self.sections = []
         self.line_interpolators = []
-        self.triang, self.values = None, None
+        self.triang, self.values, self.z_values, self.var_values = None, None, None, None
         self.nplan = -1
 
         self.color_limits = None
@@ -979,6 +979,14 @@ class VerticalCrossSectionPlotViewer(PlotViewer):
         self.current_style = settings.DEFAULT_COLOR_STYLE
         self.color_styles = settings.COLOR_SYLES
         self.show_mesh = False
+
+        self.aspect_ratio_check = QCheckBox('Aspect\nratio')
+        self.aspect_ratio = QLineEdit('1.0')
+        self.aspect_ratio.setAlignment(Qt.AlignCenter)
+        self.aspect_ratio.setMaximumWidth(50)
+        self.aspect_ratio_check.stateChanged.connect(self.aspect_ratio_changed)
+        self.aspect_ratio.editingFinished.connect(self.aspect_ratio_changed)
+        self._set_aspect_ratio_value()
 
         self.slider = SimpleTimeDateSelection()
         self.slider.index.editingFinished.connect(self.select_frame)
@@ -993,6 +1001,10 @@ class VerticalCrossSectionPlotViewer(PlotViewer):
         self.toolBar.addAction(self.change_color_style_act)
         self.toolBar.addAction(self.change_color_range_act)
         self.toolBar.addAction(self.toggle_mesh_act)
+        self.toolBar.addSeparator()
+        #self.toolBar.addWidget(QLabel('Aspect\nratio'))
+        self.toolBar.addWidget(self.aspect_ratio_check)
+        self.toolBar.addWidget(self.aspect_ratio)
         self.toolBar.addSeparator()
         self.toolBar.addWidget(self.slider)
 
@@ -1037,14 +1049,14 @@ class VerticalCrossSectionPlotViewer(PlotViewer):
         new_index = max(current_index - 1, 0)
         self.current_section = self.section_names[new_index]
         self.color_limits = None
-        self.replot(compute=True)
+        self.replot(read_var=False)
 
     def select_section_next(self):
         current_index = self.section_names.index(self.current_section)
         new_index = min(current_index + 1, len(self.section_names) - 1)
         self.current_section = self.section_names[new_index]
         self.color_limits = None
-        self.replot(compute=True)
+        self.replot(read_var=False)
 
     def select_section(self):
         msg = QDialog()
@@ -1069,11 +1081,11 @@ class VerticalCrossSectionPlotViewer(PlotViewer):
         msg.exec_()
         self.current_section = combo.currentText()
         self.color_limits = None
-        self.replot(False)
+        self.replot(read_var=False)
 
     def toggle_mesh(self):
         self.show_mesh = not self.show_mesh
-        self.replot(False)
+        self.replot(read_var=False, compute=False)
 
     def _defaultTitle(self):
         value = {'fr': 'Valeurs', 'en': 'Values'}[self.language]
@@ -1113,11 +1125,11 @@ class VerticalCrossSectionPlotViewer(PlotViewer):
         msg.exec_()
         self.current_var = combo.currentText().split(' (')[0]
         self.color_limits = None
-        self.replot()
+        self.replot(read_var=True, compute=True)
 
     def change_color(self, style):
         self.current_style = style
-        self.replot(False)
+        self.replot(read_var=False, compute=False)
 
     def change_color_style(self):
         msg = ColorMapStyleDialog(self)
@@ -1141,7 +1153,7 @@ class VerticalCrossSectionPlotViewer(PlotViewer):
             return
 
         self.color_limits = (cmin, cmax)
-        self.replot(False)
+        self.replot(read_var=False, compute=False)
 
     def select_frame(self):
         text = self.slider.index.text()
@@ -1153,7 +1165,19 @@ class VerticalCrossSectionPlotViewer(PlotViewer):
             return
         if 0 <= index < len(self.data.time):
             self.time_index = index
-            self.replot(compute=True)
+            self.replot()
+
+    def _set_aspect_ratio_value(self):
+        self.aspect_ratio_value = 'auto'
+        try:
+            if self.aspect_ratio_check.isChecked():
+                self.aspect_ratio_value = float(self.aspect_ratio.text())
+        except ValueError:
+            pass
+
+    def aspect_ratio_changed(self):
+        self._set_aspect_ratio_value()
+        self.replot(read_var=False, compute=False)
 
     def compute(self):
         """!
@@ -1165,16 +1189,9 @@ class VerticalCrossSectionPlotViewer(PlotViewer):
         point_y = np.empty((npt, self.nplan))
         point_values = np.empty((npt, self.nplan))
 
-        with Serafin.Read(self.data.filename, self.data.language) as input_stream:
-            input_stream.header = self.data.header
-            input_stream.time = self.data.time
-
-            z = input_stream.read_var_in_frame_as_3d(self.time_index, 'Z').T
-            values = input_stream.read_var_in_frame_as_3d(self.time_index, self.current_var).T
-
         for i_pt, ((x, y, (i, j, k), interpolator), distance) in enumerate(zip(line_interpolator, distances)):
-            point_y[i_pt] = interpolator.dot(z[[i, j, k]])
-            point_values[i_pt] = interpolator.dot(values[[i, j, k]])
+            point_y[i_pt] = interpolator.dot(self.z_values[[i, j, k]])
+            point_values[i_pt] = interpolator.dot(self.var_values[[i, j, k]])
 
         triangles = [((ipt - 1) * self.nplan + iplan - 1, (ipt - 1) * self.nplan + iplan, ipt * self.nplan + iplan - 1)
                      for ipt in range(1, npt) for iplan in range(1, self.nplan)] + \
@@ -1184,7 +1201,17 @@ class VerticalCrossSectionPlotViewer(PlotViewer):
 
         return triang, point_values.flatten()
 
-    def replot(self, compute=True):
+    def read_var(self):
+        """Read current variable values"""
+        with Serafin.Read(self.data.filename, self.data.language) as input_stream:
+            input_stream.header = self.data.header
+            input_stream.time = self.data.time
+            self.z_values = input_stream.read_var_in_frame_as_3d(self.time_index, 'Z').T
+            self.var_values = input_stream.read_var_in_frame_as_3d(self.time_index, self.current_var).T
+
+    def replot(self, read_var=True, compute=True):
+        if read_var:
+            self.read_var()
         if compute:
             self.triang, self.values = self.compute()
 
@@ -1194,7 +1221,7 @@ class VerticalCrossSectionPlotViewer(PlotViewer):
 
         if self.color_limits is not None:
             levels = np.linspace(self.color_limits[0], self.color_limits[1], settings.NB_COLOR_LEVELS)
-            self.canvas.axes.tricontourf(self.triang, self.values, cmap=self.current_style, levels=levels,
+            self.canvas.axes.tricontourf(self.triang, self.var_values, cmap=self.current_style, levels=levels,
                                          extend='both', vmin=self.color_limits[0], vmax=self.color_limits[1])
         else:
             levels = build_levels_from_minmax(np.nanmin(self.values), np.nanmax(self.values))
@@ -1212,6 +1239,7 @@ class VerticalCrossSectionPlotViewer(PlotViewer):
 
         self.canvas.axes.set_xlabel(self.current_xlabel)
         self.canvas.axes.set_ylabel(self.current_ylabel)
+        self.canvas.axes.set_aspect(self.aspect_ratio_value, 'datalim')
         self.current_title = self._defaultTitle()
         self.canvas.axes.set_title(self.current_title)
         self.canvas.draw()
