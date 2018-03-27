@@ -1002,7 +1002,6 @@ class VerticalCrossSectionPlotViewer(PlotViewer):
         self.toolBar.addAction(self.change_color_range_act)
         self.toolBar.addAction(self.toggle_mesh_act)
         self.toolBar.addSeparator()
-        #self.toolBar.addWidget(QLabel('Aspect\nratio'))
         self.toolBar.addWidget(self.aspect_ratio_check)
         self.toolBar.addWidget(self.aspect_ratio)
         self.toolBar.addSeparator()
@@ -1216,12 +1215,12 @@ class VerticalCrossSectionPlotViewer(PlotViewer):
             self.triang, self.values = self.compute()
 
         self._update_next_prev()
-        self.canvas.figure.clear()   # remove the old color bar
+        self.canvas.figure.clear()  # remove the old color bar
         self.canvas.axes = self.canvas.figure.add_subplot(111)
 
         if self.color_limits is not None:
             levels = np.linspace(self.color_limits[0], self.color_limits[1], settings.NB_COLOR_LEVELS)
-            self.canvas.axes.tricontourf(self.triang, self.var_values, cmap=self.current_style, levels=levels,
+            self.canvas.axes.tricontourf(self.triang, self.values, cmap=self.current_style, levels=levels,
                                          extend='both', vmin=self.color_limits[0], vmax=self.color_limits[1])
         else:
             levels = build_levels_from_minmax(np.nanmin(self.values), np.nanmax(self.values))
@@ -1230,8 +1229,9 @@ class VerticalCrossSectionPlotViewer(PlotViewer):
         if self.show_mesh:
             self.canvas.axes.triplot(self.triang, 'ko-')
 
-        divider = make_axes_locatable(self.canvas.axes)
-        cax = divider.append_axes('right', size='5%', pad=0.2)
+        self.canvas.axes.set_aspect(aspect=self.aspect_ratio_value, adjustable='datalim')
+        self.canvas.figure.subplots_adjust(right=0.80)  # left side (80% of figure width) for plot
+        cax = self.canvas.figure.add_axes([0.84, 0.05, 0.03, 0.9])  # right side (20% of figure width) for colorbar
         cax.set_title(self.current_var)
         self.cmap = cm.ScalarMappable(cmap=self.current_style)
         self.cmap.set_array(levels)
@@ -1239,7 +1239,6 @@ class VerticalCrossSectionPlotViewer(PlotViewer):
 
         self.canvas.axes.set_xlabel(self.current_xlabel)
         self.canvas.axes.set_ylabel(self.current_ylabel)
-        self.canvas.axes.set_aspect(self.aspect_ratio_value, 'datalim')
         self.current_title = self._defaultTitle()
         self.canvas.axes.set_title(self.current_title)
         self.canvas.draw()
