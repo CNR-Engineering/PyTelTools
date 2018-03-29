@@ -966,19 +966,21 @@ class VerticalCrossSectionPlotViewer(PlotViewer):
         super().__init__()
         self.data = None
         self.current_var = ''
+        self.current_vars2read = []
         self.current_section = ''
         self.time_index = -1
         self.section_names = []
         self.sections = []
         self.line_interpolators = []
-        self.triang, self.values, self.z_values, self.var_values = None, None, None, None
+        self.triang, self.values, self.z_values, self.vars_values = None, None, None, None
         self.nplan = -1
 
         self.color_limits = None
         self.cmap = None
         self.current_style = settings.DEFAULT_COLOR_STYLE
         self.color_styles = settings.COLOR_SYLES
-        self.show_mesh = False
+        self.display_mesh = False
+        self.revert_section = False
 
         self.aspect_ratio_check = QCheckBox('Aspect\nratio')
         self.aspect_ratio = QLineEdit('1.0')
@@ -993,6 +995,7 @@ class VerticalCrossSectionPlotViewer(PlotViewer):
         self.slider.value.textChanged.connect(lambda text: self.select_frame())
 
         self.create_actions()
+        self.toolBar.addAction(self.save_all_act)
         self.toolBar.addAction(self.select_variable_act)
         self.toolBar.addAction(self.select_section_prev_act)
         self.toolBar.addAction(self.section_section_act)
@@ -1000,7 +1003,8 @@ class VerticalCrossSectionPlotViewer(PlotViewer):
         self.toolBar.addSeparator()
         self.toolBar.addAction(self.change_color_style_act)
         self.toolBar.addAction(self.change_color_range_act)
-        self.toolBar.addAction(self.toggle_mesh_act)
+        self.toolBar.addAction(self.toggle_mesh_display_act)
+        self.toolBar.addAction(self.toggle_revert_act)
         self.toolBar.addSeparator()
         self.toolBar.addWidget(self.aspect_ratio_check)
         self.toolBar.addWidget(self.aspect_ratio)
@@ -1018,6 +1022,8 @@ class VerticalCrossSectionPlotViewer(PlotViewer):
         self.menuBar.addMenu(self.color_menu)
 
     def create_actions(self):
+        self.save_all_act = QAction('Save\nall sections', self, shortcut='Ctrl+S', triggered=self.save_all_sections,
+                                    icon=self.style().standardIcon(QStyle.SP_DialogSaveButton))
         self.select_variable_act = QAction('Select\nvariable', self, triggered=self.select_variable,
                                            icon=self.style().standardIcon(QStyle.SP_FileDialogDetailedView))
         self.change_color_style_act = QAction('Change\ncolor style', self, triggered=self.change_color_style,
@@ -1037,24 +1043,78 @@ class VerticalCrossSectionPlotViewer(PlotViewer):
                                                     icon=self.style().standardIcon(QStyle.SP_DialogHelpButton))
         self.change_color_range_act_short = QAction('Change color range', self, triggered=self.change_color_range,
                                                     icon=self.style().standardIcon(QStyle.SP_DialogHelpButton))
-        self.toggle_mesh_act = QAction('Show\nmesh', self, triggered=self.toggle_mesh, checkable=True,
-                                       icon=self.style().standardIcon(QStyle.SP_DialogApplyButton))
+        self.toggle_mesh_display_act = QAction('Show\nmesh', self, triggered=self.toggle_mesh_display, checkable=True,
+                                               icon=self.style().standardIcon(QStyle.SP_DialogApplyButton))
+        self.toggle_revert_act = QAction('Revert\nSection', self, triggered=self.toggle_revert_section,
+                                         checkable=True, icon=self.style().standardIcon(QStyle.SP_BrowserReload))
         self.selectSectionAct_short = QAction('Select section', self,
                                               icon=self.style().standardIcon(QStyle.SP_FileDialogDetailedView),
                                               triggered=self.select_section)
+
+    def save_all_sections(self):
+        qpb_folder = QPushButton(QWidget().style().standardIcon(QStyle.SP_DialogOpenButton), 'Select folder')
+        qpb_folder.setToolTip('Select <b>folder</b>')
+        qle_folder = QLineEdit()
+        qle_prefix = QLineEdit()
+
+        def select_folder():
+            folder = QFileDialog.getExistingDirectory(None, 'Select a folder', QDir.currentPath())
+            if folder != '':
+                qle_folder.setText(folder)
+        qpb_folder.clicked.connect(select_folder)
+
+        def run_save_all_sections():
+            if qle_folder.text() != '':
+                current_section = self.current_section
+                nb_sections = len(self.section_names)
+                for i in range(nb_sections):
+                    self.current_section = self.section_names[i]
+                    self.replot(read_var=False)
+                    filename = os.path.join(qle_folder.text(), qle_prefix.text() + '_section-' + str(i) + '.png')
+                    try:
+                        self.canvas.print_png(filename)
+                    except IOError:
+                        QMessageBox.critical(msg, 'Error', 'File error for %s' % filename, QMessageBox.Ok)
+                        return
+                self.current_section = current_section
+                self.replot(read_var=False)
+                QMessageBox.information(msg, 'Save for all sections', 'Successfully generated %i files' % nb_sections)
+            else:
+                QMessageBox.critical(msg, 'Error', 'Select folder first')
+
+        qpb_folder.setFixedHeight(30)
+        qle_folder.setFixedHeight(30)
+        qle_prefix.setFixedHeight(30)
+        msg = QDialog()
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel,
+                                   Qt.Horizontal, msg)
+        buttons.accepted.connect(run_save_all_sections)
+        buttons.rejected.connect(msg.reject)
+        vlayout = QVBoxLayout()
+        vlayout.setSpacing(10)
+        hlayout = QHBoxLayout()
+        hlayout.addWidget(qpb_folder)
+        hlayout.addWidget(qle_folder)
+        vlayout.addLayout(hlayout)
+        vlayout.addWidget(QLabel('File prefix'))
+        vlayout.addWidget(qle_prefix)
+        vlayout.addStretch()
+        vlayout.addWidget(buttons)
+        msg.setLayout(vlayout)
+        msg.setWindowTitle('Save *.png for all sections')
+        msg.resize(350, 150)
+        msg.exec_()
 
     def select_section_prev(self):
         current_index = self.section_names.index(self.current_section)
         new_index = max(current_index - 1, 0)
         self.current_section = self.section_names[new_index]
-        self.color_limits = None
         self.replot(read_var=False)
 
     def select_section_next(self):
         current_index = self.section_names.index(self.current_section)
         new_index = min(current_index + 1, len(self.section_names) - 1)
         self.current_section = self.section_names[new_index]
-        self.color_limits = None
         self.replot(read_var=False)
 
     def select_section(self):
@@ -1079,12 +1139,15 @@ class VerticalCrossSectionPlotViewer(PlotViewer):
         msg.resize(300, 150)
         msg.exec_()
         self.current_section = combo.currentText()
-        self.color_limits = None
         self.replot(read_var=False)
 
-    def toggle_mesh(self):
-        self.show_mesh = not self.show_mesh
+    def toggle_mesh_display(self):
+        self.display_mesh = not self.display_mesh
         self.replot(read_var=False, compute=False)
+
+    def toggle_revert_section(self):
+        self.revert_section = not self.revert_section
+        self.replot(read_var=False)
 
     def _defaultTitle(self):
         value = {'fr': 'Valeurs', 'en': 'Values'}[self.language]
@@ -1093,18 +1156,20 @@ class VerticalCrossSectionPlotViewer(PlotViewer):
         return '%s %s %s %s %s' % (value, of, self.current_var, at, self.current_section)
 
     def _defaultXLabel(self):
-        return 'Distance (m)'
+        return settings.X_AXIS_LABEL_CROSS_SECTION
 
     def _defaultYLabel(self):
-        return {'fr': 'Cote Z', 'en': 'Elevation Z'}[self.language]
+        if settings.Y_AXIS_LABEL_CROSS_SECTION == '':
+            return {'fr': 'Cote Z (m)', 'en': 'Elevation Z (m)'}[self.language]
+        else:
+            return settings.Y_AXIS_LABEL_CROSS_SECTION
 
     def select_variable(self):
         msg = QDialog()
         combo = QComboBox()
         combo.setFixedHeight(30)
-        variables = [var for var in self.data.header.var_IDs if var != 'Z']
-        names = [name.decode(Serafin.SLF_EIT).strip()
-                 for var, name in zip(self.data.header.var_IDs, self.data.header.var_names) if var in variables]
+
+        variables, names = self._get_var_list()
         for var, name in zip(variables, names):
             combo.addItem(var + ' (%s)' % name)
         combo.setCurrentIndex(variables.index(self.current_var))
@@ -1123,8 +1188,15 @@ class VerticalCrossSectionPlotViewer(PlotViewer):
         msg.resize(300, 150)
         msg.exec_()
         self.current_var = combo.currentText().split(' (')[0]
+        self._set_vars2read()
         self.color_limits = None
         self.replot(read_var=True, compute=True)
+
+    def _set_vars2read(self):
+        if self.current_var == 'Un':
+            self.current_vars2read = ['U', 'V']
+        else:
+            self.current_vars2read = [self.current_var]
 
     def change_color(self, style):
         self.current_style = style
@@ -1136,22 +1208,50 @@ class VerticalCrossSectionPlotViewer(PlotViewer):
             self.change_color(msg.color_box.currentText())
 
     def change_color_range(self):
-        value, ok = QInputDialog.getText(None, 'Change color bar range',
-                                         'Enter the new color range',
-                                         text=', '.join(map(lambda x: '{:+f}'.format(x),
-                                                            self.cmap.get_clim())))
-        if not ok:
-            return
-        try:
-            cmin, cmax = map(float, value.split(','))
-        except ValueError:
-            QMessageBox.critical(self, 'Error', 'Invalid input.', QMessageBox.Ok)
-            return
-        if cmax <= cmin:
-            QMessageBox.critical(self, 'Error', 'Values are not increasing.', QMessageBox.Ok)
-            return
+        msg = QDialog()
+        change_color_activate = QCheckBox('User define color range')
+        change_color_limits = QLineEdit(', '.join(map(lambda x: '{:+f}'.format(x), self.cmap.get_clim())))
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, Qt.Horizontal, msg)
+        buttons.accepted.connect(msg.accept)
+        buttons.rejected.connect(msg.reject)
 
-        self.color_limits = (cmin, cmax)
+        if self.color_limits is None:
+            change_color_activate.setChecked(False)
+        else:
+            change_color_activate.setChecked(True)
+
+        def update_change_color_limits():
+            if change_color_activate.isChecked():
+                change_color_limits.setEnabled(True)
+            else:
+                change_color_limits.setEnabled(False)
+        update_change_color_limits()
+        change_color_activate.stateChanged.connect(update_change_color_limits)
+
+        vlayout = QVBoxLayout()
+        vlayout.setSpacing(10)
+        vlayout.addWidget(change_color_activate)
+        vlayout.addWidget(QLabel('Set minimum and maximum values'))
+        vlayout.addWidget(change_color_limits)
+        vlayout.addStretch()
+        vlayout.addWidget(buttons)
+        msg.setLayout(vlayout)
+        msg.setWindowTitle('Change color range')
+        msg.resize(300, 150)
+        msg.exec_()
+
+        if change_color_activate.isChecked():
+            try:
+                cmin, cmax = map(float, change_color_limits.text().split(','))
+            except ValueError:
+                QMessageBox.critical(self, 'Error', 'Invalid input.', QMessageBox.Ok)
+                return
+            if cmax <= cmin:
+                QMessageBox.critical(self, 'Error', 'Values are not increasing.', QMessageBox.Ok)
+                return
+            self.color_limits = (cmin, cmax)
+        else:
+            self.color_limits = None
         self.replot(read_var=False, compute=False)
 
     def select_frame(self):
@@ -1184,13 +1284,16 @@ class VerticalCrossSectionPlotViewer(PlotViewer):
         """
         line_interpolator, distances = self.line_interpolators[int(self.current_section.split()[1]) - 1]
         npt = len(distances)
+        if self.revert_section:
+            distances = np.amax(distances) - distances
+
         point_x = np.array([[distances[i]] * self.nplan for i in range(npt)])
         point_y = np.empty((npt, self.nplan))
         point_values = np.empty((npt, self.nplan))
 
         for i_pt, ((x, y, (i, j, k), interpolator), distance) in enumerate(zip(line_interpolator, distances)):
             point_y[i_pt] = interpolator.dot(self.z_values[[i, j, k]])
-            point_values[i_pt] = interpolator.dot(self.var_values[[i, j, k]])
+            point_values[i_pt] = interpolator.dot(self.vars_values[self.current_var][[i, j, k]])
 
         triangles = [((ipt - 1) * self.nplan + iplan - 1, (ipt - 1) * self.nplan + iplan, ipt * self.nplan + iplan - 1)
                      for ipt in range(1, npt) for iplan in range(1, self.nplan)] + \
@@ -1200,15 +1303,31 @@ class VerticalCrossSectionPlotViewer(PlotViewer):
 
         return triang, point_values.flatten()
 
+    def _get_var_list(self):
+        variables = [var for var in self.data.header.var_IDs if var != 'Z']
+        names = [name.decode(Serafin.SLF_EIT).strip()
+                 for var, name in zip(self.data.header.var_IDs, self.data.header.var_names) if var in variables]
+        # Add normal velocity TODO
+        # if set(['U', 'V']).issubset(self.data.header.var_IDs):
+        #     variables.insert(0, 'Un')
+        #     names.insert(0, 'Computed Normal Velocity')
+        return variables, names
+
     def read_var(self):
         """Read current variable values"""
+        self.vars_values = {}
         with Serafin.Read(self.data.filename, self.data.language) as input_stream:
             input_stream.header = self.data.header
             input_stream.time = self.data.time
             self.z_values = input_stream.read_var_in_frame_as_3d(self.time_index, 'Z').T
-            self.var_values = input_stream.read_var_in_frame_as_3d(self.time_index, self.current_var).T
+            for varID in self.current_vars2read:
+                self.vars_values[varID] = input_stream.read_var_in_frame_as_3d(self.time_index, varID).T
+        # if self.current_var == 'Un': TODO
+        #     self.vars_values['Un'] = np.sqrt(np.square(self.vars_values['U']) + np.square(self.vars_values['V']))
 
     def replot(self, read_var=True, compute=True):
+        if not self.current_vars2read:
+            self._set_vars2read()
         if read_var:
             self.read_var()
         if compute:
@@ -1226,7 +1345,7 @@ class VerticalCrossSectionPlotViewer(PlotViewer):
             levels = build_levels_from_minmax(np.nanmin(self.values), np.nanmax(self.values))
             self.canvas.axes.tricontourf(self.triang, self.values, cmap=self.current_style, levels=levels,
                                          extend='both')
-        if self.show_mesh:
+        if self.display_mesh:
             self.canvas.axes.triplot(self.triang, 'ko-')
 
         self.canvas.axes.set_aspect(aspect=self.aspect_ratio_value, adjustable='datalim')
@@ -1257,7 +1376,7 @@ class VerticalCrossSectionPlotViewer(PlotViewer):
         self.line_interpolators = line_interpolators
         self.section_indices = section_indices
 
-        self.current_var = [var for var in self.data.header.var_IDs if var != 'Z'][0]
+        self.current_var = self._get_var_list()[0][0]  # first possible variable by default
         self.section_names = ['Section %d' % (i+1) for i in self.section_indices]
         self.current_section = self.section_names[0]
 
