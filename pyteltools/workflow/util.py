@@ -1284,16 +1284,34 @@ class VerticalCrossSectionPlotViewer(PlotViewer):
         """
         line_interpolator, distances = self.line_interpolators[int(self.current_section.split()[1]) - 1]
         npt = len(distances)
-        if self.revert_section:
+
+        # Compute normal vectors: a vector per orthogonal to the section, anticlockwise
+        normal_vectors = np.empty((npt, 2))
+        coords = np.array([(x, y) for i, (x, y, _, _) in enumerate(line_interpolator)])
+        normal_vectors[:, 0] = - (np.ediff1d(coords[:, 1], to_begin=0) + np.ediff1d(coords[:, 1], to_end=0))
+        normal_vectors[:, 1] = np.ediff1d(coords[:, 0], to_begin=0) + np.ediff1d(coords[:, 0], to_end=0)
+        normal_vector_norm = np.linalg.norm(normal_vectors, axis=1)
+        for i in range(2):
+            normal_vectors[:, i] = normal_vectors[:, i]/normal_vector_norm
+
+        if self.revert_section:  # Only the distances are reverted ('Un' values are not affected)
             distances = np.amax(distances) - distances
 
         point_x = np.array([[distances[i]] * self.nplan for i in range(npt)])
         point_y = np.empty((npt, self.nplan))
         point_values = np.empty((npt, self.nplan))
 
-        for i_pt, ((x, y, (i, j, k), interpolator), distance) in enumerate(zip(line_interpolator, distances)):
-            point_y[i_pt] = interpolator.dot(self.z_values[[i, j, k]])
-            point_values[i_pt] = interpolator.dot(self.vars_values[self.current_var][[i, j, k]])
+        if self.current_var == 'Un':
+            for i_pt, ((_, _, (i, j, k), interpolator), distance) in enumerate(zip(line_interpolator, distances)):
+                point_y[i_pt] = interpolator.dot(self.z_values[[i, j, k]])
+                point_u = interpolator.dot(self.vars_values['U'][[i, j, k]])
+                point_v = interpolator.dot(self.vars_values['V'][[i, j, k]])
+                uv = np.column_stack((point_u, point_v))
+                point_values[i_pt] = uv.dot(normal_vectors[i_pt])
+        else:
+            for i_pt, ((_, _, (i, j, k), interpolator), distance) in enumerate(zip(line_interpolator, distances)):
+                point_y[i_pt] = interpolator.dot(self.z_values[[i, j, k]])
+                point_values[i_pt] = interpolator.dot(self.vars_values[self.current_var][[i, j, k]])
 
         triangles = [((ipt - 1) * self.nplan + iplan - 1, (ipt - 1) * self.nplan + iplan, ipt * self.nplan + iplan - 1)
                      for ipt in range(1, npt) for iplan in range(1, self.nplan)] + \
@@ -1307,10 +1325,10 @@ class VerticalCrossSectionPlotViewer(PlotViewer):
         variables = [var for var in self.data.header.var_IDs if var != 'Z']
         names = [name.decode(Serafin.SLF_EIT).strip()
                  for var, name in zip(self.data.header.var_IDs, self.data.header.var_names) if var in variables]
-        # Add normal velocity TODO
-        # if set(['U', 'V']).issubset(self.data.header.var_IDs):
-        #     variables.insert(0, 'Un')
-        #     names.insert(0, 'Computed Normal Velocity')
+        # Add normal velocity
+        if set(['U', 'V']).issubset(self.data.header.var_IDs):
+            variables.insert(0, 'Un')
+            names.insert(0, 'Computed Normal Velocity')
         return variables, names
 
     def read_var(self):
@@ -1322,15 +1340,13 @@ class VerticalCrossSectionPlotViewer(PlotViewer):
             self.z_values = input_stream.read_var_in_frame_as_3d(self.time_index, 'Z').T
             for varID in self.current_vars2read:
                 self.vars_values[varID] = input_stream.read_var_in_frame_as_3d(self.time_index, varID).T
-        # if self.current_var == 'Un': TODO
-        #     self.vars_values['Un'] = np.sqrt(np.square(self.vars_values['U']) + np.square(self.vars_values['V']))
 
     def replot(self, read_var=True, compute=True):
         if not self.current_vars2read:
             self._set_vars2read()
         if read_var:
             self.read_var()
-        if compute:
+        if compute or not self.vars_values:
             self.triang, self.values = self.compute()
 
         self._update_next_prev()
