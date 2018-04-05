@@ -1163,23 +1163,24 @@ class VerticalCrossSectionPlotViewer(PlotViewer):
             qcb_interp_grid.setChecked(False)
 
         # Define event functions and connexions
-        def update_qfl_scale_vectors():
-            if qcb_display_vectors.isChecked():
-                qds_scale_x.setEnabled(True)
-                qds_scale_y.setEnabled(True)
-            else:
-                qds_scale_x.setEnabled(False)
-                qds_scale_y.setEnabled(False)
-        update_qfl_scale_vectors()
-
-        def update_qfl_regular_grid():
-            if qcb_interp_grid.isChecked():
+        def update_qfl_regular_grid(parent_enable=True):
+            if qcb_interp_grid.isChecked() and parent_enable:
                 qds_dx.setEnabled(True)
                 qds_dy.setEnabled(True)
             else:
                 qds_dx.setEnabled(False)
                 qds_dy.setEnabled(False)
-        update_qfl_regular_grid()
+
+        def update_qfl_scale_vectors():
+            display_vectors = qcb_display_vectors.isChecked()
+            if display_vectors:
+                qds_scale_x.setEnabled(True)
+                qds_scale_y.setEnabled(True)
+            else:
+                qds_scale_x.setEnabled(False)
+                qds_scale_y.setEnabled(False)
+            update_qfl_regular_grid(display_vectors)
+        update_qfl_scale_vectors()
 
         def run():
             self.tangential_vel_scales = None
@@ -1504,13 +1505,22 @@ class VerticalCrossSectionPlotViewer(PlotViewer):
                 x = np.arange(np.amin(self.triang.x), np.amax(self.triang.x), dx)
                 y = np.arange(np.amin(self.triang.y), np.amax(self.triang.y), dy)
                 xv, yv = np.meshgrid(x, y)
+
+                # Add mask to ignore zero-area triangles and avoid an invalid triangulation
+                # Solution taken from http://matplotlib.1069221.n5.nabble.com/Matplotlib-with-invalid-triangulations-td47627.html
+                xy = np.dstack((self.triang.x[self.triang.triangles], self.triang.y[self.triang.triangles]))  # shape (ntri,3,2)
+                twice_area = np.cross(xy[:, 1, :] - xy[:, 0, :], xy[:, 2, :] - xy[:, 0, :])  # shape (ntri)
+                mask = twice_area < 1e-3  # shape (ntri). Hardcoded threshold of 0.001 m²
+                if np.any(mask):
+                    self.triang.set_mask(mask)
                 try:
                     ut = mtri.LinearTriInterpolator(self.triang, self.values_ut)(xv, yv)
                     w = mtri.LinearTriInterpolator(self.triang, self.values_w)(xv, yv)
                     self.canvas.axes.quiver(xv, yv, kx*ut, ky*w, angles='xy', scale_units='xy', scale=1)
                 except RuntimeError as e:
                     QMessageBox.critical(self, 'Error', 'Error with the grid interpolation: %s\n'
-                                         'Tangential velocities will not be displayed.' % e, QMessageBox.Ok)
+                                         'Velocities at nodes will be displayed.' % e, QMessageBox.Ok)
+                    self.tangential_vel_grid = None
             else:
                 self.canvas.axes.quiver(self.triang.x, self.triang.y, kx*self.values_ut, ky*self.values_w,
                                         angles='xy', scale_units='xy', scale=1)
