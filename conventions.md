@@ -47,6 +47,12 @@ import pyteltools.slf.misc as operations
 * variables, functions, methods: lowercase_with_underscores
 * class: CapWords
 
+PyQt element prefixes :
+* `qcb` = QCheckBox
+* `qds` = QDoubleSpinBox
+* `qle` = QLineEdit
+* `qpb` = QPushButton
+
 ### Common custom methods for PyQt5
 * `_initWidgets()`: fix element sizes, tooltips, ...
 * `_setLayout()`: add widgets, items and finally calls `setLayouts()`
@@ -61,7 +67,7 @@ Use with following logging levels (with corresponding numeric value) :
 
 ## CLI exiting code
 * 0 = successful termination
-* 1 = different kind of errors/inconsistencies: in input/output, error during computation, ... 
+* 1 = different kind of errors/inconsistencies: in input/output, error during computation, ...
 * 2 = error or inconsistencies with command-line arguments
 * 3 = file error (parser, writer)
 

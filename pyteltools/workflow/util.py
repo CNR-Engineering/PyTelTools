@@ -972,7 +972,8 @@ class VerticalCrossSectionPlotViewer(PlotViewer):
         self.section_names = []
         self.sections = []
         self.line_interpolators = []
-        self.triang, self.values, self.z_values, self.vars_values = None, None, None, None
+        self.triang, self.values, self.z_values, self.vars_values, self.values_w, self.values_ut = \
+            None, None, None, None, None, None
         self.nplan = -1
 
         self.color_limits = None
@@ -981,6 +982,8 @@ class VerticalCrossSectionPlotViewer(PlotViewer):
         self.color_styles = settings.COLOR_SYLES
         self.display_mesh = False
         self.revert_section = False
+        self.tangential_vel_scales = None
+        self.tangential_vel_grid = None
 
         self.aspect_ratio_check = QCheckBox('Aspect\nratio')
         self.aspect_ratio = QLineEdit('1.0')
@@ -1003,6 +1006,7 @@ class VerticalCrossSectionPlotViewer(PlotViewer):
         self.toolBar.addSeparator()
         self.toolBar.addAction(self.change_color_style_act)
         self.toolBar.addAction(self.change_color_range_act)
+        self.toolBar.addAction(self.change_tangential_vel_act)
         self.toolBar.addAction(self.toggle_mesh_display_act)
         self.toolBar.addAction(self.toggle_revert_act)
         self.toolBar.addSeparator()
@@ -1043,6 +1047,8 @@ class VerticalCrossSectionPlotViewer(PlotViewer):
                                                     icon=self.style().standardIcon(QStyle.SP_DialogHelpButton))
         self.change_color_range_act_short = QAction('Change color range', self, triggered=self.change_color_range,
                                                     icon=self.style().standardIcon(QStyle.SP_DialogHelpButton))
+        self.change_tangential_vel_act = QAction('Tangential\nvelocities', self, triggered=self.change_tangential_vel,
+                                               icon=self.style().standardIcon(QStyle.SP_DialogHelpButton))
         self.toggle_mesh_display_act = QAction('Show\nmesh', self, triggered=self.toggle_mesh_display, checkable=True,
                                                icon=self.style().standardIcon(QStyle.SP_DialogApplyButton))
         self.toggle_revert_act = QAction('Revert\nSection', self, triggered=self.toggle_revert_section,
@@ -1052,16 +1058,17 @@ class VerticalCrossSectionPlotViewer(PlotViewer):
                                               triggered=self.select_section)
 
     def save_all_sections(self):
+        msg = QDialog()
         qpb_folder = QPushButton(QWidget().style().standardIcon(QStyle.SP_DialogOpenButton), 'Select folder')
-        qpb_folder.setToolTip('Select <b>folder</b>')
         qle_folder = QLineEdit()
         qle_prefix = QLineEdit()
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, Qt.Horizontal, msg)
 
+        # Define event functions and connexions
         def select_folder():
             folder = QFileDialog.getExistingDirectory(None, 'Select a folder', QDir.currentPath())
             if folder != '':
                 qle_folder.setText(folder)
-        qpb_folder.clicked.connect(select_folder)
 
         def run_save_all_sections():
             if qle_folder.text() != '':
@@ -1082,14 +1089,15 @@ class VerticalCrossSectionPlotViewer(PlotViewer):
             else:
                 QMessageBox.critical(msg, 'Error', 'Select folder first')
 
+        qpb_folder.clicked.connect(select_folder)
+        buttons.accepted.connect(run_save_all_sections)
+        buttons.rejected.connect(msg.reject)
+
+        # Build layout and run QDialog
+        qpb_folder.setToolTip('Select <b>folder</b>')
         qpb_folder.setFixedHeight(30)
         qle_folder.setFixedHeight(30)
         qle_prefix.setFixedHeight(30)
-        msg = QDialog()
-        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel,
-                                   Qt.Horizontal, msg)
-        buttons.accepted.connect(run_save_all_sections)
-        buttons.rejected.connect(msg.reject)
         vlayout = QVBoxLayout()
         vlayout.setSpacing(10)
         hlayout = QHBoxLayout()
@@ -1103,6 +1111,104 @@ class VerticalCrossSectionPlotViewer(PlotViewer):
         msg.setLayout(vlayout)
         msg.setWindowTitle('Save *.png for all sections')
         msg.resize(350, 150)
+        msg.exec_()
+
+    def change_tangential_vel(self):
+        # Tangential velocities can be computed only if U, V and W are present
+        variables = [var for var in self.data.header.var_IDs if var != 'Z']
+        if not {'U', 'V', 'W'}.issubset(variables):
+            QMessageBox.critical(self, 'Error', '3D velocity variables are not found.', QMessageBox.Ok)
+            return
+
+        msg = QDialog()
+
+        qcb_display_vectors = QCheckBox('Display tangential velocities')
+        qds_scale_x = QDoubleSpinBox()
+        qds_scale_x.setValue(1.0)
+        qds_scale_x.setRange(0, 1e6)
+        qds_scale_y = QDoubleSpinBox()
+        qds_scale_y.setValue(1.0)
+        qds_scale_y.setRange(0, 1e6)
+        qfl_scale_vectors = QFormLayout()
+        qfl_scale_vectors.addRow(QLabel('Scale factor for X (m/(m/s))'), qds_scale_x)
+        qfl_scale_vectors.addRow(QLabel('Scale factor for Y (m/(m/s))'), qds_scale_y)
+
+        qcb_interp_grid = QCheckBox('Interpolate on a regular grid')
+        qds_dx = QDoubleSpinBox()
+        qds_dx.setValue(1.0)
+        qds_dx.setRange(0, 9e9)
+        qds_dy = QDoubleSpinBox()
+        qds_dy.setValue(1.0)
+        qds_dy.setRange(0, 9e9)
+        qfl_regular_grid = QFormLayout()
+        qfl_regular_grid.addRow(QLabel('X distance (m)'), qds_dx)
+        qfl_regular_grid.addRow(QLabel('Y distance (m)'), qds_dy)
+
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, Qt.Horizontal, msg)
+
+        # Initialize states
+        if self.tangential_vel_scales:
+            qcb_display_vectors.setChecked(True)
+            kx, ky = self.tangential_vel_scales
+            qds_scale_x.setValue(kx)
+            qds_scale_y.setValue(ky)
+        else:
+            qcb_display_vectors.setChecked(False)
+        if self.tangential_vel_grid is not None:
+            qcb_interp_grid.setChecked(True)
+            dx, dy = self.tangential_vel_grid
+            qds_dx.setValue(dx)
+            qds_dy.setValue(dy)
+        else:
+            qcb_interp_grid.setChecked(False)
+
+        # Define event functions and connexions
+        def update_qfl_scale_vectors():
+            if qcb_display_vectors.isChecked():
+                qds_scale_x.setEnabled(True)
+                qds_scale_y.setEnabled(True)
+            else:
+                qds_scale_x.setEnabled(False)
+                qds_scale_y.setEnabled(False)
+        update_qfl_scale_vectors()
+
+        def update_qfl_regular_grid():
+            if qcb_interp_grid.isChecked():
+                qds_dx.setEnabled(True)
+                qds_dy.setEnabled(True)
+            else:
+                qds_dx.setEnabled(False)
+                qds_dy.setEnabled(False)
+        update_qfl_regular_grid()
+
+        def run():
+            self.tangential_vel_scales = None
+            self.tangential_vel_grid = None
+            if qcb_display_vectors.isChecked():
+                self.tangential_vel_scales = (qds_scale_x.value(), qds_scale_y.value())
+                if qcb_interp_grid.isChecked():
+                    self.tangential_vel_grid = (qds_dx.value(), qds_dy.value())
+            self._set_vars2read()
+            self.replot(read_var=True, compute=True)
+            msg.accept()
+
+        qcb_display_vectors.stateChanged.connect(update_qfl_scale_vectors)
+        qcb_interp_grid.stateChanged.connect(update_qfl_regular_grid)
+        buttons.accepted.connect(run)
+        buttons.rejected.connect(msg.reject)
+
+        # Build layout and run QDialog
+        vlayout = QVBoxLayout()
+        vlayout.setSpacing(10)
+        vlayout.addWidget(qcb_display_vectors)
+        vlayout.addLayout(qfl_scale_vectors)
+        vlayout.addWidget(qcb_interp_grid)
+        vlayout.addLayout(qfl_regular_grid)
+        vlayout.addStretch()
+        vlayout.addWidget(buttons)
+        msg.setLayout(vlayout)
+        msg.setWindowTitle('Tangential velocities')
+        msg.resize(300, 150)
         msg.exec_()
 
     def select_section_prev(self):
@@ -1173,8 +1279,7 @@ class VerticalCrossSectionPlotViewer(PlotViewer):
         for var, name in zip(variables, names):
             combo.addItem(var + ' (%s)' % name)
         combo.setCurrentIndex(variables.index(self.current_var))
-        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel,
-                                   Qt.Horizontal, msg)
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, Qt.Horizontal, msg)
         buttons.accepted.connect(msg.accept)
         buttons.rejected.connect(msg.reject)
         vlayout = QVBoxLayout()
@@ -1194,9 +1299,16 @@ class VerticalCrossSectionPlotViewer(PlotViewer):
 
     def _set_vars2read(self):
         if self.current_var == 'Un':
-            self.current_vars2read = ['U', 'V']
+            self.current_vars2read = []
         else:
             self.current_vars2read = [self.current_var]
+        if self.current_var == 'Un' or self.tangential_vel_scales:
+            for varID in ('U', 'V'):
+                if varID not in self.current_vars2read:
+                    self.current_vars2read.append(varID)
+        if self.tangential_vel_scales:
+            if 'W' not in self.current_vars2read:
+                self.current_vars2read.append('W')
 
     def change_color(self, style):
         self.current_style = style
@@ -1212,8 +1324,6 @@ class VerticalCrossSectionPlotViewer(PlotViewer):
         change_color_activate = QCheckBox('User define color range')
         change_color_limits = QLineEdit(', '.join(map(lambda x: '{:+f}'.format(x), self.cmap.get_clim())))
         buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, Qt.Horizontal, msg)
-        buttons.accepted.connect(msg.accept)
-        buttons.rejected.connect(msg.reject)
 
         if self.color_limits is None:
             change_color_activate.setChecked(False)
@@ -1226,7 +1336,27 @@ class VerticalCrossSectionPlotViewer(PlotViewer):
             else:
                 change_color_limits.setEnabled(False)
         update_change_color_limits()
+
+        def run():
+            if change_color_activate.isChecked():
+                try:
+                    cmin, cmax = map(float, change_color_limits.text().split(','))
+                except ValueError:
+                    QMessageBox.critical(self, 'Error', 'Invalid input.', QMessageBox.Ok)
+                    return
+                if cmax <= cmin:
+                    QMessageBox.critical(self, 'Error', 'Values are not increasing.', QMessageBox.Ok)
+                    return
+                self.color_limits = (cmin, cmax)
+            else:
+                self.color_limits = None
+            self._set_vars2read()
+            self.replot(read_var=False, compute=False)
+            msg.accept()
+
         change_color_activate.stateChanged.connect(update_change_color_limits)
+        buttons.accepted.connect(run)
+        buttons.rejected.connect(msg.reject)
 
         vlayout = QVBoxLayout()
         vlayout.setSpacing(10)
@@ -1239,20 +1369,6 @@ class VerticalCrossSectionPlotViewer(PlotViewer):
         msg.setWindowTitle('Change color range')
         msg.resize(300, 150)
         msg.exec_()
-
-        if change_color_activate.isChecked():
-            try:
-                cmin, cmax = map(float, change_color_limits.text().split(','))
-            except ValueError:
-                QMessageBox.critical(self, 'Error', 'Invalid input.', QMessageBox.Ok)
-                return
-            if cmax <= cmin:
-                QMessageBox.critical(self, 'Error', 'Values are not increasing.', QMessageBox.Ok)
-                return
-            self.color_limits = (cmin, cmax)
-        else:
-            self.color_limits = None
-        self.replot(read_var=False, compute=False)
 
     def select_frame(self):
         text = self.slider.index.text()
@@ -1285,48 +1401,64 @@ class VerticalCrossSectionPlotViewer(PlotViewer):
         line_interpolator, distances = self.line_interpolators[int(self.current_section.split()[1]) - 1]
         npt = len(distances)
 
-        # Compute normal vectors: a vector per orthogonal to the section, anticlockwise
-        normal_vectors = np.empty((npt, 2))
-        coords = np.array([(x, y) for i, (x, y, _, _) in enumerate(line_interpolator)])
-        normal_vectors[:, 0] = - (np.ediff1d(coords[:, 1], to_begin=0) + np.ediff1d(coords[:, 1], to_end=0))
-        normal_vectors[:, 1] = np.ediff1d(coords[:, 0], to_begin=0) + np.ediff1d(coords[:, 0], to_end=0)
-        normal_vector_norm = np.linalg.norm(normal_vectors, axis=1)
-        for i in range(2):
-            normal_vectors[:, i] = normal_vectors[:, i]/normal_vector_norm
+        if self.current_var == 'Un' or self.tangential_vel_scales:
+            # Compute normal vectors: one vector at each point, which is (anticlockwise) orthogonal to cross-section
+            #   (At a turning point, the normal vector is based on the segment defined by the next and previous point)
+            # Normal and tangential vectors are normalized
+            normal_vectors = np.empty((npt, 2))
+            tangential_vectors = np.empty((npt, 2))
+            coords = np.array([(x, y) for i, (x, y, _, _) in enumerate(line_interpolator)])
+            normal_vectors[:, 0] = - (np.ediff1d(coords[:, 1], to_begin=0) + np.ediff1d(coords[:, 1], to_end=0))
+            normal_vectors[:, 1] = np.ediff1d(coords[:, 0], to_begin=0) + np.ediff1d(coords[:, 0], to_end=0)
+            normal_vector_norm = np.linalg.norm(normal_vectors, axis=1)
+            normal_vectors = normal_vectors/normal_vector_norm[:, None]
+            tangential_vectors[:, 0] = - normal_vectors[:, 1]
+            tangential_vectors[:, 1] = normal_vectors[:, 0]
 
-        if self.revert_section:  # Only the distances are reverted ('Un' values are not affected)
+        if self.revert_section:  # Only the distances and tangencial velocities are reverted (normal velocities are not affected)
             distances = np.amax(distances) - distances
+            tangential_vectors = - tangential_vectors
 
         point_x = np.array([[distances[i]] * self.nplan for i in range(npt)])
         point_y = np.empty((npt, self.nplan))
         point_values = np.empty((npt, self.nplan))
 
-        if self.current_var == 'Un':
-            for i_pt, ((_, _, (i, j, k), interpolator), distance) in enumerate(zip(line_interpolator, distances)):
-                point_y[i_pt] = interpolator.dot(self.z_values[[i, j, k]])
+        point_ut = np.empty((npt, self.nplan))
+        point_w = np.empty((npt, self.nplan))
+
+        for i_pt, ((_, _, (i, j, k), interpolator), distance) in enumerate(zip(line_interpolator, distances)):
+            point_y[i_pt] = interpolator.dot(self.z_values[[i, j, k]])
+
+            if self.current_var == 'Un' or self.tangential_vel_scales:  # Compute normal and tangential velocities
                 point_u = interpolator.dot(self.vars_values['U'][[i, j, k]])
                 point_v = interpolator.dot(self.vars_values['V'][[i, j, k]])
                 uv = np.column_stack((point_u, point_v))
+
+            if self.current_var == 'Un':
                 point_values[i_pt] = uv.dot(normal_vectors[i_pt])
-        else:
-            for i_pt, ((_, _, (i, j, k), interpolator), distance) in enumerate(zip(line_interpolator, distances)):
-                point_y[i_pt] = interpolator.dot(self.z_values[[i, j, k]])
+            else:
                 point_values[i_pt] = interpolator.dot(self.vars_values[self.current_var][[i, j, k]])
+
+            if self.tangential_vel_scales:
+                point_ut[i_pt] = uv.dot(tangential_vectors[i_pt])
+                point_w[i_pt] = interpolator.dot(self.vars_values['W'][[i, j, k]])
 
         triangles = [((ipt - 1) * self.nplan + iplan - 1, (ipt - 1) * self.nplan + iplan, ipt * self.nplan + iplan - 1)
                      for ipt in range(1, npt) for iplan in range(1, self.nplan)] + \
                     [((ipt - 1) * self.nplan + iplan, ipt * self.nplan + iplan - 1, ipt * self.nplan + iplan)
                      for ipt in range(1, npt) for iplan in range(1, self.nplan)]
-        triang = mtri.Triangulation(point_x.flatten(), point_y.flatten(), triangles)
 
-        return triang, point_values.flatten()
+        self.triang = mtri.Triangulation(point_x.flatten(), point_y.flatten(), triangles)
+        self.values = point_values.flatten()
+        self.values_ut = point_ut.flatten()
+        self.values_w = point_w.flatten()
 
     def _get_var_list(self):
         variables = [var for var in self.data.header.var_IDs if var != 'Z']
         names = [name.decode(Serafin.SLF_EIT).strip()
                  for var, name in zip(self.data.header.var_IDs, self.data.header.var_names) if var in variables]
         # Add normal velocity
-        if set(['U', 'V']).issubset(self.data.header.var_IDs):
+        if {'U', 'V'}.issubset(self.data.header.var_IDs):
             variables.insert(0, 'Un')
             names.insert(0, 'Computed Normal Velocity')
         return variables, names
@@ -1347,7 +1479,7 @@ class VerticalCrossSectionPlotViewer(PlotViewer):
         if read_var:
             self.read_var()
         if compute or not self.vars_values:
-            self.triang, self.values = self.compute()
+            self.compute()
 
         self._update_next_prev()
         self.canvas.figure.clear()  # remove the old color bar
@@ -1364,9 +1496,28 @@ class VerticalCrossSectionPlotViewer(PlotViewer):
         if self.display_mesh:
             self.canvas.axes.triplot(self.triang, 'ko-')
 
+        if self.tangential_vel_scales:
+            kx, ky = self.tangential_vel_scales
+
+            if self.tangential_vel_grid:
+                dx, dy = self.tangential_vel_grid
+                x = np.arange(np.amin(self.triang.x), np.amax(self.triang.x), dx)
+                y = np.arange(np.amin(self.triang.y), np.amax(self.triang.y), dy)
+                xv, yv = np.meshgrid(x, y)
+                try:
+                    ut = mtri.LinearTriInterpolator(self.triang, self.values_ut)(xv, yv)
+                    w = mtri.LinearTriInterpolator(self.triang, self.values_w)(xv, yv)
+                    self.canvas.axes.quiver(xv, yv, kx*ut, ky*w, angles='xy', scale_units='xy', scale=1)
+                except RuntimeError as e:
+                    QMessageBox.critical(self, 'Error', 'Error with the grid interpolation: %s\n'
+                                         'Tangential velocities will not be displayed.' % e, QMessageBox.Ok)
+            else:
+                self.canvas.axes.quiver(self.triang.x, self.triang.y, kx*self.values_ut, ky*self.values_w,
+                                        angles='xy', scale_units='xy', scale=1)
+
         self.canvas.axes.set_aspect(aspect=self.aspect_ratio_value, adjustable='datalim')
         self.canvas.figure.subplots_adjust(right=0.80)  # left side (80% of figure width) for plot
-        cax = self.canvas.figure.add_axes([0.84, 0.05, 0.03, 0.9])  # right side (20% of figure width) for colorbar
+        cax = self.canvas.figure.add_axes([0.84, 0.1, 0.03, 0.8])  # right side (20% of figure width) for colorbar
         cax.set_title(self.current_var)
         self.cmap = cm.ScalarMappable(cmap=self.current_style)
         self.cmap.set_array(levels)
