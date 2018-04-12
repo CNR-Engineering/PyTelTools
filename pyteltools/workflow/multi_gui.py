@@ -15,12 +15,12 @@ from .util import logger
 
 
 NODES = {'Input/Output': {'Load Serafin 2D': MultiLoadSerafin2DNode, 'Load Serafin 3D': MultiLoadSerafin3DNode,
-                          'Write Serafin': MultiWriteSerafinNode, 'Write LandXML': MultiWriteLandXMLNode,
-                          'Load 2D Polygons': MultiLoadPolygon2DNode, 'Write shp': MultiWriteShpNode,
-                          'Write vtk': MultiWriteVtkNode,
-                          'Load 2D Open Polylines': MultiLoadOpenPolyline2DNode,
-                          'Load 2D Points': MultiLoadPoint2DNode,
-                          'Load Reference Serafin': MultiLoadReferenceSerafinNode},
+                          'Load Reference Serafin': MultiLoadReferenceSerafinNode,
+                          'Load 2D Points': MultiLoadPoint2DNode, 'Load 2D Open Polylines': MultiLoadOpenPolyline2DNode,
+                          'Load 2D Polygons': MultiLoadPolygon2DNode,
+                          'Write CSV': MultiWriteCsvNode, 'Write LandXML': MultiWriteLandXMLNode,
+                          'Write shp': MultiWriteShpNode,
+                          'Write vtk': MultiWriteVtkNode, 'Write Serafin': MultiWriteSerafinNode},
          'Basic operations': {'Select Variables': MultiSelectVariablesNode, 'Add Rouse Numbers': MultiAddRouseNode,
                               'Convert to Single Precision': MultiConvertToSinglePrecisionNode,
                               'Select Time': MultiSelectTimeNode,

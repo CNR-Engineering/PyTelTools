@@ -109,6 +109,18 @@ class MultiLoadReferenceSerafinNode(MultiSingleOutputNode):
         self.options = filename,
 
 
+class MultiWriteCsvNode(MultiSingleInputNode):
+    def __init__(self, index):
+        super().__init__(index)
+        self.category = 'Input/Output'
+        self.label = 'Write\nCSV'
+
+    def load(self, options):
+        success, self.options = validate_output_options(options)
+        if not success:
+            self.state = MultiNode.NOT_CONFIGURED
+
+
 class MultiWriteLandXMLNode(MultiSingleInputNode):
     def __init__(self, index):
         super().__init__(index)

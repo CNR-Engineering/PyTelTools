@@ -1235,6 +1235,37 @@ def add_transform(node_id, fid, data, options):
     return True, node_id, fid, new_data, success_message('Add Transformation', data.job_id)
 
 
+def write_csv(node_id, fid, data, options):
+    if not data.header.is_2d:
+        return False, node_id, fid, None, fail_message('the input file is not 2D', 'Write CSV', data.job_id)
+    if len(data.selected_time_indices) == 0:
+        return False, node_id, fid, None, fail_message('the input data has no frame', 'Write CSV', data.job_id)
+    available_vars = [var for var in data.selected_vars if var in data.header.var_IDs]
+    if len(available_vars) == 0:
+        return False, node_id, fid, None, fail_message('no variable available', 'Write CSV', data.job_id)
+
+    suffix, in_source_folder, dir_path, double_name, overwrite = options
+    filename = process_output_options(data.filename, data.job_id, '.csv',
+                                      suffix, in_source_folder, dir_path, double_name)
+
+    if not overwrite:
+        if os.path.exists(filename):
+            return True, node_id, fid, None, success_message('Write CSV', data.job_id, 'file already exists')
+    try:
+        with open(filename, 'w'):
+            pass
+    except PermissionError:
+        try:
+            os.remove(filename)
+        except PermissionError:
+            pass
+        return False, node_id, fid, None, fail_message('access denied', 'Write CSV', data.job_id)
+
+    operations.slf_to_csv(data.filename, data.header, filename, available_vars, data.selected_time_indices)
+
+    return True, node_id, fid, None, success_message('Write CSV', data.job_id)
+
+
 def write_landxml(node_id, fid, data, options):
     if not data.header.is_2d:
         return False, node_id, fid, None, fail_message('the input file is not 2D', 'Write LandXML',
@@ -1272,6 +1303,9 @@ def write_landxml(node_id, fid, data, options):
     operations.scalar_to_xml(data.filename, data.header, filename, selected_var, selected_frame)
 
     return True, node_id, fid, None, success_message('Write LandXML', data.job_id)
+
+
+
 
 
 def write_shp(node_id, fid, data, options):
@@ -1366,7 +1400,7 @@ FUNCTIONS = {'Select Variables': select_variables, 'Add Rouse': add_rouse, 'Sele
              'Project Lines': project_lines, 'Project B on A': project_mesh, 'A Minus B': minus,
              'B Minus A': reverse_minus, 'Max(A,B)': max_between,
              'Min(A,B)': min_between, 'Add Transformation': add_transform, 'Write LandXML': write_landxml,
-             'Write shp': write_shp, 'Write vtk': write_vtk,
+             'Write CSV': write_csv, 'Write shp': write_shp, 'Write vtk': write_vtk,
              'Load Serafin 2D': read_slf_2d, 'Load Serafin 3D': read_slf_3d,
              'Load Reference Serafin': read_slf_reference}
 

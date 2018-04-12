@@ -323,6 +323,42 @@ def slf_to_shp(slf_name, slf_header, shp_name, variables, time_index):
     w.save(shp_name)
 
 
+def slf_to_csv(slf_name, slf_header, csv_name, selected_vars, selected_time_indices):
+    """!
+    @brief Write CSV file for a set of variables and frames
+    @param slf_name <str>: path to the input Serafin file
+    @param slf_header <slf.Serafin.SerafinHeader>: input Serafin header
+    @param selected_vars <[str]>: selected variables
+    @param selected_time_indices <[int]>: selected time indices
+    @param csv_name <str>: output CSV filename
+    """
+    with Serafin.Read(slf_name, slf_header.language) as input_stream:
+        input_stream.header = slf_header
+        input_stream.get_time()
+
+        with open(csv_name, 'w') as csv:
+            # Write CSV header
+            fieldnames = ['id_node', 'x', 'y', 'time'] + selected_vars
+            csv.write(settings.CSV_SEPARATOR.join(fieldnames) + '\n')
+
+            values = np.empty((len(selected_vars), input_stream.header.nb_nodes_2d))
+            for time_index in selected_time_indices:
+                time = input_stream.time[time_index]
+
+                # Read values for current frame
+                for i_var, var_ID in enumerate(selected_vars):
+                    values[i_var] = input_stream.read_var_in_frame(time_index, var_ID)
+
+                # Write values for current frame
+                for i_pt in range(input_stream.header.nb_nodes_2d):
+                    csv.write(str(i_pt + 1) + settings.CSV_SEPARATOR)
+                    csv.write(settings.CSV_SEPARATOR.join([settings.FMT_COORD.format(input_stream.header.x[i_pt]),
+                                                           settings.FMT_COORD.format(input_stream.header.y[i_pt])]))
+                    csv.write(settings.CSV_SEPARATOR + settings.FMT_FLOAT.format(time) + settings.CSV_SEPARATOR)
+                    csv.write(settings.CSV_SEPARATOR.join([settings.FMT_FLOAT.format(v) for v in values[:, i_pt]]))
+                    csv.write('\n')
+
+
 def slf_to_xml(slf_name, slf_header, xml_name, scalar, time_index):
     """!
     @brief Write LandXML file from a scalar variable of a Serafin file

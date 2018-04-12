@@ -909,6 +909,84 @@ class LoadSerafin3DNode(SingleOutputNode):
         self.success()
 
 
+class WriteCsvNode(SingleInputNode):
+    def __init__(self, index):
+        super().__init__(index)
+        self.in_port.data_type = ('slf',)
+        self.category = 'Input/Output'
+        self.label = 'Write\nCSV'
+        self.state = Node.READY
+
+        self.panel = None
+        self.suffix = '_scalar'
+        self.double_name = False
+        self.overwrite = False
+        self.in_source_folder = True
+        self.dir_path = ''
+
+    def get_option_panel(self):
+        return self.panel
+
+    def configure(self, check=None):
+        old_options = (self.suffix, self.in_source_folder, self.dir_path, self.double_name, self.overwrite)
+        self.panel = GeomOutputOptionPanel(old_options)
+        if super().configure(self.panel.check):
+            self.suffix, self.in_source_folder, self.dir_path, \
+                         self.double_name, self.overwrite = self.panel.get_options()
+
+    def save(self):
+        return '|'.join([self.category, self.name(), str(self.index()),
+                         str(self.pos().x()), str(self.pos().y()), self.suffix,
+                         str(int(self.in_source_folder)), self.dir_path,
+                         str(int(self.double_name)), str(int(self.overwrite))])
+
+    def load(self, options):
+        logger.debug('Calling WriteCsvNode.load with options:')
+        logger.debug(options)
+        success, (suffix, in_source_folder, dir_path, double_name, overwrite) = validate_output_options(options)
+        if success:
+            self.state = Node.READY
+            self.suffix, self.in_source_folder, self.dir_path, self.double_name, self.overwrite = \
+                suffix, in_source_folder, dir_path, double_name, overwrite
+
+    def run(self):
+        success = super().run_upward()
+        if not success:
+            self.fail('input failed.')
+            return
+
+        input_data = self.in_port.mother.parentItem().data
+        if not input_data.header.is_2d:
+            self.fail('the input file is not 2D')
+            return
+        available_var = [var for var in input_data.selected_vars if var in input_data.header.var_IDs]
+        if len(available_var) == 0:
+            self.fail('no variable available')
+            return
+
+        filename = process_output_options(input_data.filename, input_data.job_id, '.csv',
+                                          self.suffix, self.in_source_folder, self.dir_path, self.double_name)
+        if not self.overwrite:
+            if os.path.exists(filename):
+                self.success('File already exists.')
+                return
+        try:
+            with open(filename, 'w'):
+                pass
+        except PermissionError:
+            try:
+                os.remove(filename)
+            except PermissionError:
+                pass
+            self.fail('Access denied.')
+            return
+
+        operations.slf_to_csv(input_data.filename, input_data.header, filename, input_data.selected_vars,
+                              input_data.selected_time_indices)
+
+        self.success()
+
+
 class WriteLandXMLNode(SingleInputNode):
     def __init__(self, index):
         super().__init__(index)
