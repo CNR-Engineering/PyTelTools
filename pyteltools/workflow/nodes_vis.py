@@ -1084,8 +1084,7 @@ class VerticalCrossSectionNode(DoubleInputNode):
         else:
             return
 
-        section_id = int(self.plot_viewer.current_section.split()[1]) - 1
-        line = self.plot_viewer.sections[section_id]
+        line = self.plot_viewer.sections[self.plot_viewer.current_section_index]
         compute_options = (line, self.plot_viewer.current_var, self.first_in_port.mother.parentItem().data.language)
         dlg = MultiSaveVerticalCrossSectionDialog(self, input_options, output_options, compute_options)
         dlg.run()

@@ -91,6 +91,7 @@ COLOR_SYLES = ['ocean', 'gist_earth', 'terrain', 'gnuplot', 'gnuplot2', 'CMRmap'
 X_AXIS_LABEL, Y_AXIS_LABEL = 'X (m)', 'Y (m)'
 X_AXIS_LABEL_CROSS_SECTION = 'Distance (m)'
 Y_AXIS_LABEL_CROSS_SECTION = ''  # If empty then it is automatically computed from input Serafin language
+TITLE_CROSS_SECTION = ''
 
 # Number of bins for EWSD distribution (for GUI `Compare Resultats`)
 NB_BINS_EWSD = 100

@@ -1259,6 +1259,13 @@ class VerticalCrossSectionPlotViewer(PlotViewer):
         self.replot(read_var=False)
 
     def _defaultTitle(self):
+        if settings.TITLE_CROSS_SECTION != '':
+            try:
+                return settings.TITLE_CROSS_SECTION.format(varID=self.current_var,
+                                                           section_id=self.current_section)
+            except KeyError:
+                logger.warning('TITLE_CROSS_SECTION is invalid: keyword `%s` is not allowed'.format(
+                               settings.TITLE_CROSS_SECTION))
         value = {'fr': 'Valeurs', 'en': 'Values'}[self.language]
         of = {'fr': 'de', 'en': 'of'}[self.language]
         at = {'fr': 'à la', 'en': 'at'}[self.language]
