@@ -968,6 +968,7 @@ class VerticalCrossSectionPlotViewer(PlotViewer):
         self.current_var = ''
         self.current_vars2read = []
         self.current_section = ''
+        self.current_section_index = -1
         self.time_index = -1
         self.section_names = []
         self.sections = []
@@ -1074,10 +1075,10 @@ class VerticalCrossSectionPlotViewer(PlotViewer):
             if qle_folder.text() != '':
                 current_section = self.current_section
                 nb_sections = len(self.section_names)
-                for i in range(nb_sections):
-                    self.current_section = self.section_names[i]
+                for section_name in self.section_names:
+                    self.current_section = section_name
                     self.replot(read_var=False)
-                    filename = os.path.join(qle_folder.text(), qle_prefix.text() + '_section-' + str(i) + '.png')
+                    filename = os.path.join(qle_folder.text(), qle_prefix.text() + '_' + section_name + '.png')
                     try:
                         self.canvas.print_png(filename)
                     except IOError:
@@ -1214,14 +1215,14 @@ class VerticalCrossSectionPlotViewer(PlotViewer):
 
     def select_section_prev(self):
         current_index = self.section_names.index(self.current_section)
-        new_index = max(current_index - 1, 0)
-        self.current_section = self.section_names[new_index]
+        self.current_section_index = max(current_index - 1, 0)
+        self.current_section = self.section_names[self.current_section_index]
         self.replot(read_var=False)
 
     def select_section_next(self):
         current_index = self.section_names.index(self.current_section)
-        new_index = min(current_index + 1, len(self.section_names) - 1)
-        self.current_section = self.section_names[new_index]
+        self.current_section_index = min(current_index + 1, len(self.section_names) - 1)
+        self.current_section = self.section_names[self.current_section_index]
         self.replot(read_var=False)
 
     def select_section(self):
@@ -1246,6 +1247,7 @@ class VerticalCrossSectionPlotViewer(PlotViewer):
         msg.resize(300, 150)
         msg.exec_()
         self.current_section = combo.currentText()
+        self.current_section_index = combo.currentIndex()
         self.replot(read_var=False)
 
     def toggle_mesh_display(self):
@@ -1399,7 +1401,7 @@ class VerticalCrossSectionPlotViewer(PlotViewer):
         """!
         Compute current cross section
         """
-        line_interpolator, distances = self.line_interpolators[int(self.current_section.split()[1]) - 1]
+        line_interpolator, distances = self.line_interpolators[self.current_section_index]
         npt = len(distances)
 
         if self.current_var == 'Un' or self.tangential_vel_scales:
@@ -1541,9 +1543,8 @@ class VerticalCrossSectionPlotViewer(PlotViewer):
 
     def _update_next_prev(self):
         """Enable/disable next and previous action depending on position"""
-        current_index = self.section_names.index(self.current_section)
-        enable_prev = False if current_index == 0 else True
-        enable_next = False if current_index == len(self.section_names) - 1 else True
+        enable_prev = False if self.current_section_index == 0 else True
+        enable_next = False if self.current_section_index == len(self.section_names) - 1 else True
         self.select_section_prev_act.setEnabled(enable_prev)
         self.select_section_next_act.setEnabled(enable_next)
 
@@ -1554,8 +1555,9 @@ class VerticalCrossSectionPlotViewer(PlotViewer):
         self.section_indices = section_indices
 
         self.current_var = self._get_var_list()[0][0]  # first possible variable by default
-        self.section_names = ['Section %d' % (i+1) for i in self.section_indices]
-        self.current_section = self.section_names[0]
+        self.section_names = [self.sections[i].id for i in self.section_indices]
+        self.current_section_index = 0  # default value
+        self.current_section = self.section_names[self.current_section_index]
 
         # initialize the plot
         self.language = self.data.language

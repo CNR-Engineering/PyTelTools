@@ -150,6 +150,10 @@ class PolylineData:
     def is_empty(self):
         return len(self.lines) == 0
 
+    def id_are_unique(self):
+        ids = [line.id for line in self.lines]
+        return len(ids) == len(set(ids))
+
 
 class PointData:
     def __init__(self):

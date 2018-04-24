@@ -45,6 +45,7 @@ class Mesh2D:
         @brief Return the triangles in the mesh intersecting the bounding box
         @param bounding_box <tuple>: (left, bottom, right, top) of a 2d geometrical object
         @return <[tuple]>: The list of triangles (i,j,k) intersecting the bounding box
+           /!\ The returned list is not sorted
         """
         return list(self.index.intersection(bounding_box, objects='raw'))
 

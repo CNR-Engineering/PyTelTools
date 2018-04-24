@@ -10,7 +10,7 @@ class Polyline:
     """!
     @brief Custom (open or closed) polyline class
     """
-    def __init__(self, coordinates, attributes=None, z_array=None, m_array=None):
+    def __init__(self, coordinates, attributes=None, z_array=None, m_array=None, id=None):
         self._nb_points = len(coordinates)
         self._is_2d = len(coordinates[0]) == 2
         if z_array is not None:
@@ -41,6 +41,10 @@ class Polyline:
                 self.m = m_array[:]
             else:
                 self.m = [None] * self._nb_points
+        self.id = id
+
+    def set_id(self, id):
+        self.id = id
 
     def to_3d(self, z_array):
         return Polyline(self.coords(), self.attributes(), z_array)
