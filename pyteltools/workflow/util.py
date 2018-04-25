@@ -1073,10 +1073,11 @@ class VerticalCrossSectionPlotViewer(PlotViewer):
 
         def run_save_all_sections():
             if qle_folder.text() != '':
-                current_section = self.current_section
+                current_section_index = self.current_section_index
                 nb_sections = len(self.section_names)
-                for section_name in self.section_names:
+                for i, section_name in enumerate(self.section_names):
                     self.current_section = section_name
+                    self.current_section_index = i
                     self.replot(read_var=False)
                     filename = os.path.join(qle_folder.text(), qle_prefix.text() + '_' + section_name + '.png')
                     try:
@@ -1084,7 +1085,8 @@ class VerticalCrossSectionPlotViewer(PlotViewer):
                     except IOError:
                         QMessageBox.critical(msg, 'Error', 'File error for %s' % filename, QMessageBox.Ok)
                         return
-                self.current_section = current_section
+                self.current_section_index = current_section_index
+                self.current_section = self.section_names[self.current_section_index]
                 self.replot(read_var=False)
                 QMessageBox.information(msg, 'Save for all sections', 'Successfully generated %i files' % nb_sections)
             else:
