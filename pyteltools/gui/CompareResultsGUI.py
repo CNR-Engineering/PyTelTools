@@ -295,10 +295,8 @@ class InputTab(SerafinInputTab):
         if not success:
             return
 
-            # check if the mesh is identical to the reference
-        if not np.all(self.ref_data.header.x == data.header.x) or \
-           not np.all(self.ref_data.header.y == data.header.y) or \
-           not np.all(self.ref_data.header.ikle == data.header.ikle):
+        # check if the mesh is identical to the reference
+        if not self.ref_data.header.same_2D_mesh(data.header):
             QMessageBox.critical(self, 'Error', 'The mesh is not identical to the reference.', QMessageBox.Ok)
             return
 

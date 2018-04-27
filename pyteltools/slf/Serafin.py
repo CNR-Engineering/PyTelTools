@@ -448,6 +448,17 @@ class SerafinHeader:
 
         return new_header
 
+    def same_2D_mesh(self, other):
+        """!
+        @brief: Check if the other mesh is identical on the horizontal
+        @param other <SerafinHeader>: header to compare
+        @return: bool
+        """
+        if self.nb_nodes_2d != other.nb_nodes_2d or self.nb_elements != other.nb_elements:  # Speedup to avoid unnecessary check
+            return False
+        return np.all(self.x_stored == other.x_stored) and np.all(self.y_stored == other.y_stored) and \
+               np.all(self.ikle == other.ikle) and np.all(self.ipobo == other.ipobo)
+
     def is_double_precision(self):
         return self.float_type == 'd'
 
