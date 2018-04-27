@@ -495,7 +495,7 @@ class ComputeVolumeNode(TwoInOneOutNode):
         # process options
         fmt_float = self.scene().fmt_float
         polygons = self.second_in_port.mother.parentItem().data.lines
-        polygon_names = ['Polygon %d' % (i+1) for i in range(len(polygons))]
+        polygon_names = [poly.id for poly in polygons]
         if self.sup_volume:
             volume_type = VolumeCalculator.POSITIVE
         else:
@@ -549,7 +549,7 @@ class ComputeVolumeNode(TwoInOneOutNode):
         if not self.data.table:
             return False
         polygons = self.second_in_port.mother.parentItem().data.lines
-        polygon_names = ['Polygon %d' % (i+1) for i in range(len(polygons))]
+        polygon_names = [poly.id for poly in polygons]
         headers = ['time'] + polygon_names
         if self.sup_volume:
             for name in polygon_names:
@@ -764,7 +764,7 @@ class ComputeFluxNode(TwoInOneOutNode):
         # process options
         fmt_float = self.scene().fmt_float
         sections = self.second_in_port.mother.parentItem().data.lines
-        section_names = ['Section %d' % (i+1) for i in range(len(sections))]
+        section_names = [poly.id for poly in sections]
 
         var_IDs = PossibleFluxComputation.get_variables(self.flux_options)
         flux_type = PossibleFluxComputation.get_flux_type(var_IDs)
@@ -815,7 +815,8 @@ class ComputeFluxNode(TwoInOneOutNode):
         if not self.data.table:
             return False
         sections = self.second_in_port.mother.parentItem().data.lines
-        section_names = ['Section %d' % (i + 1) for i in range(len(sections))]
+        section_names = [poly.id for poly in sections]
+
         headers = ['time'] + section_names
         if not all(h in self.data.table[0] for h in headers):
             return False
@@ -1199,13 +1200,12 @@ class ProjectLinesNode(DoubleInputNode):
         return option_panel
 
     def _select(self):
-        self.new_options = int(self.reference_box.currentText().split()[1]) - 1
+        self.new_options = self.reference_box.currentIndex()
 
     def _prepare_options(self, nb_lines):
         self.reference_box = QComboBox()
         self.reference_box.setFixedSize(400, 30)
-        for i in range(1, nb_lines+1):
-            self.reference_box.addItem('Line %d' % i)
+        self.reference_box.addItems([poly.id for poly in self.second_in_port.mother.parentItem().data.lines])
         if self.reference_index > -1:
             self.reference_box.setCurrentIndex(self.reference_index)
 

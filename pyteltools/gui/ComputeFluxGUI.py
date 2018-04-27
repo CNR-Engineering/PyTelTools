@@ -37,7 +37,7 @@ class FluxCalculatorThread(OutputThread):
         QApplication.processEvents()
         logging.info('Finished processing the mesh')
 
-        return self.calculator.run(ProgressBarIterator.prepare(self.tick.emit, (20, 100)))
+        return self.calculator.run(iter_pbar=ProgressBarIterator.prepare(self.tick.emit, (20, 100)))
 
     def write_csv(self, output_stream):
         result = self.run_calculator()
@@ -245,7 +245,7 @@ class InputTab(SerafinInputTab):
         progressBar = OutputProgressDialog()
 
         # do the calculations
-        names = ['Section %d' % (i+1) for i in range(len(self.polylines))]
+        names = [poly.id for poly in self.polylines]
 
         try:
             with Serafin.Read(self.data.filename, self.data.language) as input_stream:
@@ -351,10 +351,9 @@ class ImageTab(FluxPlotViewer):
     def locateSectionsEvent(self):
         if not self.has_map:
             self.map.canvas.reinitFigure(self.input.mesh, self.input.polylines,
-                                         map(self.column_labels.get, ['Section %d' % (i+1)
-                                                                      for i in range(len(self.input.polylines))]),
-                                         map(self.column_colors.get, [self.column_labels['Section %d' % (i+1)]
-                                                                      for i in range(len(self.input.polylines))]))
+                                         map(self.column_labels.get, [poly.id for poly in self.input.polylines]),
+                                         map(self.column_colors.get, [self.column_labels[poly.id]
+                                                                      for poly in self.input.polylines]))
 
             self.has_map = True
         self.locateSections.setEnabled(False)
@@ -367,7 +366,7 @@ class ImageTab(FluxPlotViewer):
 
         # reinitialize old graphical parameters
         super().reset()
-        self.current_columns = ('Section 1',)
+        self.current_columns = tuple()  # Has to be initialized manually
 
 
 class ComputeFluxGUI(PyTelToolWidget):

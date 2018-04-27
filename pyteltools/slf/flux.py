@@ -330,7 +330,7 @@ class FluxCalculator:
         else:
             return TriangularVectorField.mass_flux(intersections, values[0], values[1], values[2], values[3])
 
-    def run(self, iter_pbar, fmt_float=settings.FMT_FLOAT):
+    def run(self, iter_pbar=lambda x: x, fmt_float=settings.FMT_FLOAT):
         """!
         Separate the major part of the computation, allowing a GUI override
         @param iter_pbar: iterable progress bar

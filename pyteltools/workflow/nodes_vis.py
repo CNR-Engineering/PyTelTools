@@ -255,8 +255,7 @@ class LocateOpenLinesNode(DoubleInputNode):
     def _prepare(self):
         mesh = Mesh2D(self.first_in_port.mother.parentItem().data.header)
         line_data = self.second_in_port.mother.parentItem().data
-        self.map.canvas.reinitFigure(mesh, line_data.lines,
-                                     ['Line %d' % (i+1) for i in range(len(line_data))],
+        self.map.canvas.reinitFigure(mesh, line_data.lines, [line.id for line in line_data.lines],
                                      list(islice(cycle(['b', 'r', 'g', 'y', 'k', 'c', '#F28AD6', 'm']),
                                           len(line_data))))
 
@@ -333,8 +332,7 @@ class LocatePolygonsNode(DoubleInputNode):
     def _prepare(self):
         mesh = Mesh2D(self.first_in_port.mother.parentItem().data.header)
         line_data = self.second_in_port.mother.parentItem().data
-        self.map.canvas.reinitFigure(mesh, line_data.lines,
-                                     ['Polygon %d' % (i+1) for i in range(len(line_data))])
+        self.map.canvas.reinitFigure(mesh, line_data.lines, [line.id for line in line_data.lines])
         self.map.canvas.draw()
         self.has_map = True
 

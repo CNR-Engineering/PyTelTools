@@ -487,7 +487,7 @@ class FluxTestCase(unittest.TestCase):
         for coord in coords:
             coord = list(map(list, coord))
             self.sections.append(Polyline(coord))
-        self.names = ['Section %d' % (i + 1) for i in range(len(self.sections))]
+        self.names = [poly.id for poly in self.sections]
 
     def tearDown(self):
         # remove the test Serafin

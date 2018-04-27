@@ -89,7 +89,7 @@ COLOR_SYLES = ['ocean', 'gist_earth', 'terrain', 'gnuplot', 'gnuplot2', 'CMRmap'
 
 # Default axis label for coordinates
 X_AXIS_LABEL, Y_AXIS_LABEL = 'X (m)', 'Y (m)'
-X_AXIS_LABEL_CROSS_SECTION = 'Distance (m)'
+X_AXIS_LABEL_DISTANCE = 'Distance (m)'
 Y_AXIS_LABEL_CROSS_SECTION = ''  # If empty then it is automatically computed from input Serafin language
 TITLE_CROSS_SECTION = ''
 

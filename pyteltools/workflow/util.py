@@ -14,6 +14,7 @@ import warnings
 warnings.filterwarnings('ignore', category=RuntimeWarning, module='matplotlib')
 
 from pyteltools.conf import settings
+from pyteltools.geom import Shapefile
 from pyteltools.gui.util import FluxPlotViewer, MapCanvas, PointLabelEditor, PointPlotViewer, PlotViewer, \
     read_csv, SimpleTimeDateSelection, TemporalPlotViewer, VolumePlotViewer
 from pyteltools.slf.datatypes import SerafinData
@@ -23,7 +24,8 @@ from pyteltools.utils.cli import new_logger
 
 
 EPS_VALUE = 0.001  # Relative tolerance (of 0.1%) above which min and max are modified to avoid a crash of colormap [#2]
-
+INDEX_FROM_1 = '[Index from 1]'
+INDEX_VALUE = '[Value]'
 
 logger = new_logger(__name__)
 
@@ -709,7 +711,7 @@ class SimpleVolumePlotViewer(VolumePlotViewer):
         self.time_seconds = self.data['time']
 
         self.start_time = csv_data.metadata['start time']
-        self.current_columns = ('Polygon 1',)
+        self.current_columns = (list(self.data.keys())[1],)  # default preview: first polygon
 
         self.var_ID = csv_data.metadata['var']
         self.second_var_ID = csv_data.metadata['second var']
@@ -807,7 +809,7 @@ class SimpleFluxPlotViewer(FluxPlotViewer):
 
         self.flux_title = csv_data.metadata['flux title']
         self.start_time = csv_data.metadata['start time']
-        self.current_columns = ('Section 1',)
+        self.current_columns = (list(self.data.keys())[1],)  # default preview: first section
 
         self.var_IDs = csv_data.metadata['var IDs']
         self.datetime = list(map(lambda x: self.start_time + datetime.timedelta(seconds=x), self.data['time']))
@@ -1274,7 +1276,7 @@ class VerticalCrossSectionPlotViewer(PlotViewer):
         return '%s %s %s %s %s' % (value, of, self.current_var, at, self.current_section)
 
     def _defaultXLabel(self):
-        return settings.X_AXIS_LABEL_CROSS_SECTION
+        return settings.X_AXIS_LABEL_DISTANCE
 
     def _defaultYLabel(self):
         if settings.Y_AXIS_LABEL_CROSS_SECTION == '':
@@ -2914,3 +2916,78 @@ class VectorMapViewer(QWidget):
         if compute:
             self.values = self.compute()
         self.canvas.replot(self.mesh, self.values)
+
+
+class GeomInputOptionPanel(QWidget):
+    def __init__(self, parent, file_type, file_formats, id_label):
+        """
+        :param parent: object (usually a SingleOutputNode) with some compulsory attributes are: id, filename
+        :param file_type: '2D Points', '2D Open Polylines', '2D Polygons'
+        :param file_formats: list of possible file extensions
+        :param id_label: label for the identifier
+        """
+        super().__init__()
+        self.parent = parent
+        self.file_type = file_type
+        self.file_formats = file_formats
+        self.id_label = id_label
+
+        self.qpb_open = QPushButton(QWidget().style().standardIcon(QStyle.SP_DialogOpenButton), 'Load 2D open polyline')
+        self.qle_filename = QLineEdit(self.parent.filename)
+        self.qcb_id = QComboBox()
+
+        self._init_widgets()
+        self._set_connections()
+        self._init_layout()
+
+    def _init_widgets(self):
+        self.qpb_open.setToolTip('<b>Open</b> a %s file' % ', '.join(self.file_formats))
+        self.qpb_open.setFixedHeight(30)
+        self.qle_filename.setReadOnly(True)
+        self.qle_filename.setFixedHeight(30)
+        self.qcb_id.addItem(INDEX_FROM_1)
+        self.qcb_id.setFixedHeight(30)
+
+    def _init_layout(self):
+        vlayout = QVBoxLayout()
+        hlayout = QHBoxLayout()
+        hlayout.addWidget(self.qpb_open)
+        hlayout.addWidget(self.qle_filename)
+        vlayout.addLayout(hlayout)
+        hlayout = QHBoxLayout()
+        hlayout.addWidget(QLabel('%s identifier' % self.id_label))
+        hlayout.addWidget(self.qcb_id)
+        vlayout.addLayout(hlayout)
+        self.setLayout(vlayout)
+
+    def _set_connections(self):
+        self.qle_filename.textChanged.connect(self._update_qle_id)
+        self.qcb_id.currentIndexChanged.connect(self._update_id)
+        self.qpb_open.clicked.connect(self._open)
+        if self.parent.filename != '':
+            self._update_qle_id()
+
+    def _update_id(self):
+        self.parent.id = self.qcb_id.currentText()
+
+    def _update_qle_id(self):
+        old_id = self.parent.id
+        self.qcb_id.clear()
+        self.qcb_id.addItem(INDEX_FROM_1)
+        if self.qle_filename.text().endswith('.i2s'):
+            self.qcb_id.addItem(INDEX_VALUE)
+        elif self.qle_filename.text().endswith('.shp'):
+            self.qcb_id.addItems([fields[0] for fields in Shapefile.get_all_fields(self.qle_filename.text())])
+        else:
+            raise NotImplementedError
+        index = self.qcb_id.findText(old_id, Qt.MatchFixedString)
+        if index >= 0:
+            self.qcb_id.setCurrentIndex(index)
+
+    def _open(self):
+        filename, _ = QFileDialog.getOpenFileName(None, 'Open a %s file' % self.file_type, '',
+                          '%s file (%s)' % (self.file_type, ' '.join(['*' + f for f in self.file_formats])),
+                          QDir.currentPath(), options=QFileDialog.Options() | QFileDialog.DontUseNativeDialog)
+        if filename:
+            self.parent.filename = filename
+            self.qle_filename.setText(filename)

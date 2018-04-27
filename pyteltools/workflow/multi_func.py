@@ -126,13 +126,15 @@ def read_polygons(node_id, filename):
     if is_i2s:
         with BlueKenue.Read(filename) as f:
             f.read_header()
-            for poly in f.get_polygons():
+            for i, poly in enumerate(f.get_polygons()):
+                poly.set_id('Polygon %i' % (i + 1))
                 data.add_line(poly)
         data.set_fields(['Value'])
     else:
         try:
-            for polygon in Shapefile.get_polygons(filename):
-                data.add_line(polygon)
+            for i, poly in enumerate(Shapefile.get_polygons(filename)):
+                poly.set_id('Polygon %i' % (i + 1))
+                data.add_line(poly)
         except ShapefileException as e:
             message = fail_message(e, 'Load 2D Polygons', 'all')
             return False, node_id, None, message
@@ -159,12 +161,14 @@ def read_polylines(node_id, filename):
     if is_i2s:
         with BlueKenue.Read(filename) as f:
             f.read_header()
-            for poly in f.get_open_polylines():
+            for i, poly in enumerate(f.get_open_polylines()):
+                poly.set_id('Line %i' % (i + 1))
                 data.add_line(poly)
         data.set_fields(['Value'])
     else:
         try:
-            for poly in Shapefile.get_open_polylines(filename):
+            for i, poly in enumerate(Shapefile.get_open_polylines(filename)):
+                poly.set_id('Line %i' % (i + 1))
                 data.add_line(poly)
         except ShapefileException as e:
             message = fail_message(e, 'Load 2D Open Polylines', 'all')
@@ -822,22 +826,27 @@ def compute_volume(node_id, fid, data, aux_data, options, csv_separator, fmt_flo
         data.index = mesh.index
         data.triangles = mesh.triangles
 
-    # run the calculator
-    with Serafin.Read(data.filename, data.language) as input_stream:
-        input_stream.header = data.header
-        input_stream.time = data.time
+    try:
+        # run the calculator
+        with Serafin.Read(data.filename, data.language) as input_stream:
+            input_stream.header = data.header
+            input_stream.time = data.time
 
-        calculator = VolumeCalculator(volume_type, first_var, second_var, input_stream,
-                                      polygon_names, polygons, 1)
-        calculator.time_indices = data.selected_time_indices
-        calculator.mesh = mesh
-        calculator.construct_weights()
+            calculator = VolumeCalculator(volume_type, first_var, second_var, input_stream,
+                                          polygon_names, polygons, 1)
+            calculator.time_indices = data.selected_time_indices
+            calculator.mesh = mesh
+            calculator.construct_weights()
 
-        csv_data = CSVData(data.filename, calculator.get_csv_header())
+            csv_data = CSVData(data.filename, calculator.get_csv_header())
 
-        result = calculator.run(fmt_float)
-        for row in result:
-            csv_data.add_row(row)
+            result = calculator.run(fmt_float)
+            for row in result:
+                csv_data.add_row(row)
+    except (Serafin.SerafinRequestError, Serafin.SerafinValidationError) as e:
+        return False, node_id, fid, None, fail_message(e.message, 'Compute Volume', data.job_id)
+    except PermissionError:
+        return False, node_id, fid, None, fail_message('access denied', 'Compute Volume', data.job_id)
 
     csv_data.write(filename, csv_separator)
     return True, node_id, fid, None, success_message('Compute Volume', data.job_id)
@@ -855,7 +864,7 @@ def compute_flux(node_id, fid, data, aux_data, options, csv_separator, fmt_float
         return False, node_id, fid, None, fail_message('variable not available', 'Compute Flux', data.job_id)
 
     sections = aux_data.lines
-    section_names = ['Section %d' % (i+1) for i in range(len(sections))]
+    section_names = ['Line %d' % (i+1) for i in range(len(sections))]  #FIXME: replace by section identifier
     flux_type = PossibleFluxComputation.get_flux_type(var_IDs)
 
     # process output options
@@ -886,21 +895,27 @@ def compute_flux(node_id, fid, data, aux_data, options, csv_separator, fmt_float
         data.index = mesh.index
         data.triangles = mesh.triangles
 
-   # run the calculator
-    with Serafin.Read(data.filename, data.language) as input_stream:
-        input_stream.header = data.header
-        input_stream.time = data.time
+    try:
+        # run the calculator
+        with Serafin.Read(data.filename, data.language) as input_stream:
+            input_stream.header = data.header
+            input_stream.time = data.time
 
-        calculator = FluxCalculator(flux_type, var_IDs,
-                                    input_stream, section_names, sections, 1)
-        calculator.time_indices = data.selected_time_indices
-        calculator.mesh = mesh
-        calculator.construct_intersections()
+            calculator = FluxCalculator(flux_type, var_IDs,
+                                        input_stream, section_names, sections, 1)
+            calculator.time_indices = data.selected_time_indices
+            calculator.mesh = mesh
+            calculator.construct_intersections()
 
-        csv_data = CSVData(data.filename, ['time'] + section_names)
-        result = calculator.run(fmt_float)
-        for row in result:
-            csv_data.add_row(row)
+            csv_data = CSVData(data.filename, ['time'] + section_names)
+
+            result = calculator.run(fmt_float=fmt_float)
+            for row in result:
+                csv_data.add_row(row)
+    except (Serafin.SerafinRequestError, Serafin.SerafinValidationError) as e:
+        return False, node_id, fid, None, fail_message(e.message, 'Compute Flux', data.job_id)
+    except PermissionError:
+        return False, node_id, fid, None, fail_message('access denied', 'Compute Flux', data.job_id)
 
     csv_data.write(filename, csv_separator)
     return True, node_id, fid, None, success_message('Compute Flux', data.job_id)
@@ -1042,14 +1057,19 @@ def interpolate_lines(node_id, fid, data, aux_data, options, csv_separator, fmt_
     header = ['line', 'time', 'x', 'y', 'distance'] + selected_vars
     csv_data = CSVData(data.filename, header)
 
-    with Serafin.Read(data.filename, data.language) as input_stream:
-        input_stream.header = data.header
-        input_stream.time = data.time
+    try:
+        with Serafin.Read(data.filename, data.language) as input_stream:
+            input_stream.header = data.header
+            input_stream.time = data.time
 
-        for _, _, row in MeshInterpolator.interpolate_along_lines(input_stream, selected_vars,
-                                                                  data.selected_time_indices, indices_nonempty,
-                                                                  line_interpolators, fmt_float):
-            csv_data.add_row(row)
+            for _, _, row in MeshInterpolator.interpolate_along_lines(input_stream, selected_vars,
+                                                                      data.selected_time_indices, indices_nonempty,
+                                                                      line_interpolators, fmt_float):
+                csv_data.add_row(row)
+    except (Serafin.SerafinRequestError, Serafin.SerafinValidationError) as e:
+        return False, node_id, fid, None, fail_message(e.message, 'Interpolate along Lines', data.job_id)
+    except PermissionError:
+        return False, node_id, fid, None, fail_message('access denied', 'Interpolate along Lines', data.job_id)
 
     csv_data.write(filename, csv_separator)
     return True, node_id, fid, None, \

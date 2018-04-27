@@ -13,13 +13,10 @@ from pyteltools.slf import Serafin
 from pyteltools.slf.variables import do_calculations_in_frame
 
 from .Node import Node, SingleInputNode, SingleOutputNode, OneInOneOutNode
-from .util import GeomOutputOptionPanel, LoadSerafinDialog, logger, OutputOptionPanel, \
+from .util import GeomInputOptionPanel, GeomOutputOptionPanel, INDEX_FROM_1, \
+    LoadSerafinDialog, logger, OutputOptionPanel, \
     process_geom_output_options, process_output_options, process_vtk_output_options, \
     validate_input_options, validate_output_options, VtkOutputOptionPanel
-
-
-INDEX_FROM_1 = '[Index from 1]'
-INDEX_VALUE = '[Value]'
 
 
 class LoadSerafin2DNode(SingleOutputNode):
@@ -517,27 +514,12 @@ class LoadPolygon2DNode(SingleOutputNode):
         self.category = 'Input/Output'
         self.label = 'Load 2D\nPolygons'
         self.out_port.data_type = ('polygon 2d',)
-        self.name_box = None
         self.filename = ''
+        self.id = INDEX_FROM_1
         self.data = None
 
     def get_option_panel(self):
-        open_button = QPushButton(QWidget().style().standardIcon(QStyle.SP_DialogOpenButton),
-                                  'Load Polygon')
-        open_button.setToolTip('<b>Open</b> a .shp or .i2s file')
-        open_button.setFixedHeight(30)
-
-        option_panel = QWidget()
-        layout = QHBoxLayout()
-        layout.addWidget(open_button)
-        self.name_box = QLineEdit(self.filename)
-        self.name_box.setReadOnly(True)
-        self.name_box.setFixedHeight(30)
-        layout.addWidget(self.name_box)
-        option_panel.setLayout(layout)
-
-        open_button.clicked.connect(self._open)
-        return option_panel
+        return GeomInputOptionPanel(self, '2D Polygones', ['shp', 'i2s'], 'Polygon')
 
     def configure(self, check=None):
         if super().configure():
@@ -546,14 +528,6 @@ class LoadPolygon2DNode(SingleOutputNode):
                 self.update()
             else:
                 self.reconfigure_downward()
-
-    def _open(self):
-        filename, _ = QFileDialog.getOpenFileName(None, 'Open a polygon file', '',
-                                                  'Polygon file (*.i2s *.shp)', QDir.currentPath(),
-                                                  options=QFileDialog.Options() | QFileDialog.DontUseNativeDialog)
-        if filename:
-            self.filename = filename
-            self.name_box.setText(filename)
 
     def save(self):
         return '|'.join([self.category, self.name(), str(self.index()),
@@ -577,22 +551,38 @@ class LoadPolygon2DNode(SingleOutputNode):
         self.data = PolylineData()
         is_i2s = self.filename[-4:] == '.i2s'
         if is_i2s:
+            self.data.set_fields(['Value'])
             with BlueKenue.Read(self.filename) as f:
                 f.read_header()
-                for poly in f.get_polygons():
+                for i, poly in enumerate(f.get_polygons()):
+                    if self.id == INDEX_FROM_1:
+                        id = 'Polygon %i' % (i + 1)
+                    else:
+                        id = str(poly.attributes()[0])
+                    poly.set_id(id)
                     self.data.add_line(poly)
-            self.data.set_fields(['Value'])
         else:
+            self.data.set_fields(Shapefile.get_all_fields(self.filename))
+            field_index = [field[0] for field in self.data.fields].index(self.id) if self.id != INDEX_FROM_1 else -1
             try:
-                for polygon in Shapefile.get_polygons(self.filename):
-                    self.data.add_line(polygon)
+                for i, poly in enumerate(Shapefile.get_polygons(self.filename)):
+                    if self.id == INDEX_FROM_1:
+                        id = 'Polygon %i' % (i + 1)
+                    else:
+                        id = str(poly.attributes()[field_index])
+                    poly.set_id(id)
+                    self.data.add_line(poly)
             except ShapefileException as e:
                 self.fail(e)
                 return
-            self.data.set_fields(Shapefile.get_all_fields(self.filename))
 
         if self.data.is_empty():
             self.fail('the file does not contain any polygon.')
+            return
+
+        if not self.data.id_are_unique():
+            self.data = PolylineData()
+            self.fail('the identifiers with `%s` are not unique. Try to use another field or a numbering.' % self.id)
             return
 
         self.success('The file contains {} polygon{}.'.format(len(self.data),
@@ -605,64 +595,12 @@ class LoadOpenPolyline2DNode(SingleOutputNode):
         self.category = 'Input/Output'
         self.label = 'Load 2D\nOpen\nPolylines'
         self.out_port.data_type = ('polyline 2d',)
-        self.qle_filename = None
-        self.qcb_id = None
         self.filename = ''
         self.id = INDEX_FROM_1
         self.data = None
 
     def get_option_panel(self):
-        qpb_open = QPushButton(QWidget().style().standardIcon(QStyle.SP_DialogOpenButton), 'Load 2D open polyline')
-        qpb_open.setToolTip('<b>Open</b> a .shp or .i2s file')
-        qpb_open.setFixedHeight(30)
-        self.qle_filename = QLineEdit(self.filename)
-        self.qle_filename.setReadOnly(True)
-        self.qle_filename.setFixedHeight(30)
-        self.qcb_id = QComboBox()
-        self.qcb_id.addItem(INDEX_FROM_1)
-        self.qcb_id.setFixedHeight(30)
-
-        option_panel = QWidget()
-        vlayout = QVBoxLayout()
-        hlayout = QHBoxLayout()
-        hlayout.addWidget(qpb_open)
-        hlayout.addWidget(self.qle_filename)
-        vlayout.addLayout(hlayout)
-        hlayout = QHBoxLayout()
-        hlayout.addWidget(QLabel('Polyline identifier'))
-        hlayout.addWidget(self.qcb_id)
-        vlayout.addLayout(hlayout)
-        option_panel.setLayout(vlayout)
-
-        self.qle_filename.textChanged.connect(self._update_qle_id)
-        self.qcb_id.currentIndexChanged.connect(self._update_id)
-        qpb_open.clicked.connect(self._open)
-        if self.filename != '':
-            self._update_qle_id()
-        return option_panel
-
-    def _update_id(self):
-        self.id = self.qcb_id.currentText()
-
-    def _update_qle_id(self):
-        old_id = self.id
-        self.qcb_id.clear()
-        self.qcb_id.addItem(INDEX_FROM_1)
-        if self.qle_filename.text().endswith('.i2s'):
-            self.qcb_id.addItem(INDEX_VALUE)
-        else:
-            self.qcb_id.addItems([fields[0] for fields in Shapefile.get_all_fields(self.qle_filename.text())])
-        index = self.qcb_id.findText(old_id, Qt.MatchFixedString)
-        if index >= 0:
-            self.qcb_id.setCurrentIndex(index)
-
-    def _open(self):
-        filename, _ = QFileDialog.getOpenFileName(None, 'Open a 2D open polyline file', '',
-                                                  'Polyline file (*.i2s *.shp)', QDir.currentPath(),
-                                                  options=QFileDialog.Options() | QFileDialog.DontUseNativeDialog)
-        if filename:
-            self.filename = filename
-            self.qle_filename.setText(filename)
+        return GeomInputOptionPanel(self, '2D Open Polylines', ['shp', 'i2s'], 'Polyline')
 
     def configure(self, check=None):
         if super().configure():
@@ -738,35 +676,12 @@ class LoadPoint2DNode(SingleOutputNode):
         self.category = 'Input/Output'
         self.label = 'Load 2D\nPoints'
         self.out_port.data_type = ('point 2d',)
-        self.name_box = None
         self.filename = ''
+        self.id = INDEX_FROM_1
         self.data = None
 
     def get_option_panel(self):
-        open_button = QPushButton(QWidget().style().standardIcon(QStyle.SP_DialogOpenButton),
-                                  'Load 2D points')
-        open_button.setToolTip('<b>Open</b> a .shp file')
-        open_button.setFixedHeight(30)
-
-        option_panel = QWidget()
-        layout = QHBoxLayout()
-        layout.addWidget(open_button)
-        self.name_box = QLineEdit(self.filename)
-        self.name_box.setReadOnly(True)
-        self.name_box.setFixedHeight(30)
-        layout.addWidget(self.name_box)
-        option_panel.setLayout(layout)
-
-        open_button.clicked.connect(self._open)
-        return option_panel
-
-    def _open(self):
-        filename, _ = QFileDialog.getOpenFileName(None, 'Open a point file', '',
-                                                  'Shapefile (*.shp)', QDir.currentPath(),
-                                                  options=QFileDialog.Options() | QFileDialog.DontUseNativeDialog)
-        if filename:
-            self.filename = filename
-            self.name_box.setText(filename)
+        return GeomInputOptionPanel(self, '2D Points', ['shp'], 'Point')
 
     def configure(self, check=None):
         if super().configure():

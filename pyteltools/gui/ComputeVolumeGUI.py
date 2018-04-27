@@ -102,6 +102,7 @@ class ImageTab(VolumePlotViewer):
         # get the new data
         csv_file = self.input.csvNameBox.text()
         self.data, headers = read_csv(csv_file, self.input.parent.csv_separator)
+        self.current_columns = (list(self.data.keys())[1],)  # default preview: first polygon
 
         self.var_ID = self.input.var_ID
         self.second_var_ID = self.input.second_var_ID
@@ -131,8 +132,7 @@ class ImageTab(VolumePlotViewer):
     def locatePolygonsEvent(self):
         if not self.has_map:
             self.map.canvas.reinitFigure(self.input.mesh, self.input.polygons,
-                                         map(self.column_labels.get, ['Polygon %d' % (i+1)
-                                                                      for i in range(len(self.input.polygons))]))
+                                         map(self.column_labels.get, [poly.id for poly in self.input.polygons]))
             self.has_map = True
         self.locatePolygons.setEnabled(False)
         self.locatePolygons_short.setEnabled(False)
@@ -141,9 +141,7 @@ class ImageTab(VolumePlotViewer):
     def reset(self):
         self.has_map = False
         self.map.close()
-
         super().reset()
-        self.current_columns = ('Polygon 1',)
 
 
 class InputTab(SerafinInputTab):
@@ -357,8 +355,7 @@ class InputTab(SerafinInputTab):
         else:
             self.second_var_ID = VolumeCalculator.INIT_VALUE
 
-        names = ['Polygon %d' % (i+1) for i in range(len(self.polygons))]
-
+        names = [poly.id for poly in self.polygons]
         try:
             with Serafin.Read(self.data.filename, self.data.language) as input_stream:
                 input_stream.header = self.data.header

@@ -208,8 +208,7 @@ class InputTab(SerafinInputTab):
 
     def btnMapEvent(self):
         if not self.has_map:
-            self.map.canvas.reinitFigure(self.mesh, self.lines,
-                                         ['Line %d' % (i+1) for i in range(len(self.lines))],
+            self.map.canvas.reinitFigure(self.mesh, self.lines, [poly.id for poly in self.lines],
                                          list(islice(cycle(['b', 'r', 'g', 'y', 'k', 'c', '#F28AD6', 'm']),
                                               len(self.lines))))
 

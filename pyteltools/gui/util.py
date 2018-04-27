@@ -7,7 +7,6 @@ from PyQt5.QtGui import *
 from PyQt5.QtWidgets import *
 from shapefile import ShapefileException
 import shapely
-import struct
 
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT
@@ -99,12 +98,14 @@ def open_polygons():
     if is_i2s:
         with BlueKenue.Read(filename) as f:
             f.read_header()
-            for poly in f.get_polygons():
+            for i, poly in enumerate(f.get_polygons()):
+                poly.set_id('TRUC %i' % i)
                 polygons.append(poly)
     else:
         try:
-            for polygon in Shapefile.get_polygons(filename):
-                polygons.append(polygon)
+            for i, poly in enumerate(Shapefile.get_polygons(filename)):
+                poly.set_id('TRUC %i' % i)
+                polygons.append(poly)
         except ShapefileException as e:
             QMessageBox.critical(None, 'Error', e, QMessageBox.Ok)
             return False, '', []
@@ -129,12 +130,14 @@ def open_polylines():
     if is_i2s:
         with BlueKenue.Read(filename) as f:
             f.read_header()
-            for polyline in f.get_open_polylines():
-                polylines.append(polyline)
+            for i, poly in enumerate(f.get_open_polylines()):
+                poly.set_id('TRUC %i' % i)
+                polylines.append(poly)
     else:
         try:
-            for polyline in Shapefile.get_open_polylines(filename):
-                polylines.append(polyline)
+            for i, poly in enumerate(Shapefile.get_open_polylines(filename)):
+                poly.set_id('TRUC %i' % i)
+                polylines.append(poly)
         except ShapefileException as e:
             QMessageBox.critical(None, 'Error', e, QMessageBox.Ok)
             return False, '', []
@@ -1901,7 +1904,7 @@ class PlotViewer(QWidget):
         # check the file name consistency
         if not filename:
             return
-        if len(filename) < 5 or filename[-4:] != '.png':
+        if len(filename) < 5 or not filename.endswith('.png'):
             filename += '.png'
 
         self.canvas.print_png(filename)
@@ -2208,8 +2211,6 @@ class VolumePlotViewer(TemporalPlotViewer):
         self.second_var_ID = None
         self.language = 'fr'
 
-        self.current_columns = ('Polygon 1',)
-
         self.setWindowTitle('Visualize the temporal evolution of volumes')
 
         self.poly_menu = QMenu('&Polygons', self)
@@ -2255,7 +2256,7 @@ class FluxPlotViewer(TemporalPlotViewer):
                                            icon=self.style().standardIcon(QStyle.SP_DialogApplyButton))
         self.cumulative_flux_act.toggled.connect(self.changeFluxType)
 
-        self.current_columns = ('Section 1',)
+        self.current_columns = tuple()  # Has to be initialized manually
         self.poly_menu = QMenu('&Sections', self)
         self.poly_menu.addAction(self.selectColumnsAct_short)
         self.poly_menu.addAction(self.editColumnNamesAct_short)
@@ -2593,6 +2594,7 @@ class MultiVarLinePlotViewer(QWidget):
         self.plotViewer.toolBar.addAction(self.plotViewer.yLabelAct)
         self.plotViewer.toolBar.addSeparator()
         self.plotViewer.toolBar.addAction(self.plotViewer.titleAct)
+        self.plotViewer.current_xlabel = settings.X_AXIS_LABEL_DISTANCE
         self.plotViewer.canvas.figure.canvas.mpl_connect('motion_notify_event', self.plotViewer.mouseMove)
 
         # put it in a group box to get a nice border
@@ -2679,12 +2681,10 @@ class MultiVarLinePlotViewer(QWidget):
                                  QMessageBox.Ok)
             return
 
-        self.plotViewer.current_title = 'Values of variables along line %s' \
-                                         % self.control.lineBox.currentText().split()[1]
-        self.plotViewer.current_ylabel = 'Value (%s)' \
-                                         % self.control.unitBox.currentText().split(': ')[1]
+        self.plotViewer.current_title = 'Values of variables along %s' % self.control.lineBox.currentText()
+        self.plotViewer.current_ylabel = 'Value (%s)' % self.control.unitBox.currentText().split(': ')[1]
 
-        line_id = int(self.control.lineBox.currentText().split()[1]) - 1
+        line_id = [poly.id for poly in self.lines].index(self.control.lineBox.currentText())
         if self.control.intersection.isChecked():
             line_interpolator, distances = self.line_interpolators[line_id]
         else:
@@ -2733,7 +2733,7 @@ class MultiVarLinePlotViewer(QWidget):
         self.control.varList.clear()
         self.plotViewer.defaultPlot()
         self.plotViewer.current_title = ''
-        self.plotViewer.current_xlabel = 'Cumulative distance (M)'
+        self.plotViewer.current_xlabel = settings.X_AXIS_LABEL_DISTANCE
         self.plotViewer.current_ylabel = ''
         self.control.timeSelection.clearText()
 
@@ -2753,10 +2753,9 @@ class MultiVarLinePlotViewer(QWidget):
         frames = list(map(lambda x: start_time + datetime.timedelta(seconds=x), self.time))
         self.control.timeSelection.initTime(self.time, frames)
 
-        for i in range(len(self.lines)):
-            id_line = str(i+1)
+        for i, line in enumerate(self.lines):
             if self.line_interpolators[i][0]:
-                self.control.lineBox.addItem('Line %s' % id_line)
+                self.control.lineBox.addItem(line.id)
 
         self.var_table = {}
         for var_ID, var_name, var_unit in zip(self.header.var_IDs, self.header.var_names,
@@ -2880,6 +2879,7 @@ class MultiFrameLinePlotViewer(QWidget):
         self.plotViewer.toolBar.addAction(self.plotViewer.yLabelAct)
         self.plotViewer.toolBar.addSeparator()
         self.plotViewer.toolBar.addAction(self.plotViewer.titleAct)
+        self.plotViewer.current_xlabel = settings.X_AXIS_LABEL_DISTANCE
         self.plotViewer.canvas.figure.canvas.mpl_connect('motion_notify_event', self.plotViewer.mouseMove)
 
         self.frame_colors = {}
@@ -2956,13 +2956,12 @@ class MultiFrameLinePlotViewer(QWidget):
             return
 
         current_var = self.control.varBox.currentText().split(' (')[0]
-        self.plotViewer.current_title = 'Values of %s along line %s' % (current_var,
-                                                                        self.control.lineBox.currentText().split()[1])
+        self.plotViewer.current_title = 'Values of %s along %s' % (current_var, self.control.lineBox.currentText())
         var_index = self.header.var_IDs.index(current_var)
         self.plotViewer.current_ylabel = '%s (%s)' % (self.header.var_names[var_index].decode(Serafin.SLF_EIT).strip(),
                                                       self.header.var_units[var_index].decode(Serafin.SLF_EIT).strip())
 
-        line_id = int(self.control.lineBox.currentText().split()[1]) - 1
+        line_id = [poly.id for poly in self.lines].index(self.control.lineBox.currentText())
         if self.control.intersection.isChecked():
             line_interpolator, distances = self.line_interpolators[line_id]
         else:
@@ -3007,7 +3006,7 @@ class MultiFrameLinePlotViewer(QWidget):
         self.control.varBox.clear()
         self.plotViewer.defaultPlot()
         self.plotViewer.current_title = ''
-        self.plotViewer.current_xlabel = 'Cumulative distance (M)'
+        self.plotViewer.current_xlabel = settings.X_AXIS_LABEL_DISTANCE
         self.plotViewer.current_ylabel = ''
         self.control.timeTable.setRowCount(0)
         self.frame_colors = {}
@@ -3043,10 +3042,9 @@ class MultiFrameLinePlotViewer(QWidget):
             self.frame_colors[index] = self.plotViewer.defaultColors[j]
             j += 1
 
-        for i in range(len(self.lines)):
-            id_line = str(i+1)
+        for i, line in enumerate(self.lines):
             if self.line_interpolators[i][0]:
-                self.control.lineBox.addItem('Line %s' % id_line)
+                self.control.lineBox.addItem(line.id)
         for var_ID, var_name in zip(self.header.var_IDs, self.header.var_names):
             var_name = var_name.decode(Serafin.SLF_EIT).strip()
             self.control.varBox.addItem('%s (%s)' % (var_ID, var_name))
@@ -3201,7 +3199,7 @@ class ProjectLinesPlotViewer(QWidget):
         self.setWindowTitle('Project Lines')
 
     def editColor(self):
-        line_labels = {i: 'Line %d' % (i+1) for i in self.line_colors}
+        line_labels = {i: self.lines[i].id for i in self.line_colors}
         msg = ColumnColorEditor('Line', list(self.getSelection().keys()),
                                 line_labels, self.line_colors,
                                 self.plotViewer.defaultColors, self.plotViewer.colorToName)
@@ -3227,11 +3225,12 @@ class ProjectLinesPlotViewer(QWidget):
         for row in range(self.control.varTable.rowCount()):
             for j in range(len(variables)):
                 if self.control.varTable.item(row, j+1).checkState() == Qt.Checked:
-                    line_id = int(self.control.varTable.item(row, 0).text()) - 1
-                    if line_id not in self.current_vars:
-                        self.current_vars[line_id] = [variables[j]]
+                    line_id = self.control.varTable.item(row, 0).text()
+                    line_index = [poly.id for poly in self.lines].index(line_id)
+                    if line_index not in self.current_vars:
+                        self.current_vars[line_index] = [variables[j]]
                     else:
-                        self.current_vars[line_id].append(variables[j])
+                        self.current_vars[line_index].append(variables[j])
         return self.current_vars
 
     def _updateTable(self, text):
@@ -3252,12 +3251,11 @@ class ProjectLinesPlotViewer(QWidget):
         self.control.varTable.setColumnCount(nb_vars + 1)
         self.control.varTable.setHorizontalHeaderLabels(['Line'] + vars)
 
-        for i in range(len(self.lines)):
-            id_line = str(i+1)
+        for i, line in enumerate(self.lines):
             if self.line_interpolators[i][0]:
                 offset = self.control.varTable.rowCount()
                 self.control.varTable.insertRow(offset)
-                self.control.varTable.setItem(offset, 0, QTableWidgetItem(id_line))
+                self.control.varTable.setItem(offset, 0, QTableWidgetItem(line.id))
                 for j, var in enumerate(vars):
                     var_item = QTableWidgetItem('')
                     var_item.setCheckState(Qt.Unchecked)
@@ -3298,11 +3296,10 @@ class ProjectLinesPlotViewer(QWidget):
             QMessageBox.critical(self, 'Error', 'Select at least one variable to plot.',
                                  QMessageBox.Ok)
             return
-        ref_id = int(self.control.lineBox.currentText().split()[1]) - 1
-        self.plotViewer.current_title = 'Values of variables along line %d' \
-                                        % (ref_id+1)
-        self.plotViewer.current_ylabel = 'Value (%s)' \
-                                         % (self.control.unitBox.currentText().split(': ')[1])
+        ref_id = self.control.lineBox.currentText()
+        ref_index = [poly.id for poly in self.lines].index(ref_id)
+        self.plotViewer.current_title = 'Values of variables along %s' % ref_id
+        self.plotViewer.current_ylabel = 'Value (%s)' % (self.control.unitBox.currentText().split(': ')[1])
 
         line_interpolators = {}
         if self.control.intersection.isChecked():
@@ -3314,7 +3311,7 @@ class ProjectLinesPlotViewer(QWidget):
                 line_interpolator, distances = self.line_interpolators_internal[line_id]
                 line_interpolators[line_id] = line_interpolator
 
-        reference = self.lines[ref_id]
+        reference = self.lines[ref_index]
         max_distance = reference.length()
         time_index = int(self.control.timeSelection.index.text()) - 1
         distances, values = self._compute(time_index, line_interpolators, reference, max_distance)
@@ -3412,10 +3409,9 @@ class ProjectLinesPlotViewer(QWidget):
         self._updateTable(self.control.unitBox.currentText())
 
         j = 0
-        for i in range(len(self.lines)):
-            id_line = str(i+1)
+        for i, line in enumerate(self.lines):
             if self.line_interpolators[i][0]:
                 j %= len(self.plotViewer.defaultColors)
-                self.control.lineBox.addItem('Line %s' % id_line)
+                self.control.lineBox.addItem(line.id)
                 self.line_colors[i] = self.plotViewer.defaultColors[j]   # initialize default line colors
                 j += 1

@@ -233,8 +233,7 @@ class InputTab(SerafinInputTab):
 
     def btnMapEvent(self):
         if not self.has_map:
-            self.map.canvas.reinitFigure(self.mesh, self.lines,
-                                         ['Line %d' % (i+1) for i in range(len(self.lines))],
+            self.map.canvas.reinitFigure(self.mesh, self.lines, [poly.id for poly in self.lines],
                                          list(islice(cycle(['b', 'r', 'g', 'y', 'k', 'c', '#F28AD6', 'm']),
                                               len(self.lines))))
 
@@ -355,10 +354,9 @@ class CSVTab(QWidget):
             start_time = datetime.datetime(1900, 1, 1, 0, 0, 0)
         frames = list(map(lambda x: start_time + datetime.timedelta(seconds=x), self.input.data.time))
         self.timeSelection.initTime(self.input.data.time, frames)
-        for i in range(len(self.input.lines)):
-            id_line = str(i+1)
+        for i, poly in enumerate(self.input.lines):
             if self.input.line_interpolators[i][0]:
-                self.referenceLine.addItem('Line %s' % id_line)
+                self.referenceLine.addItem(poly.id)
 
     def reset(self):
         self.firstTable.setRowCount(0)
