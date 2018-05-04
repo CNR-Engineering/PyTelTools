@@ -137,6 +137,13 @@ class TransformationMap:
         path.reverse()
         return path
 
+    def get_index(self, coordinate_system):
+        """!
+        @brief Get coordinate system index
+        @param coordinate_system <str>: label of the coordinate system
+        """
+        return self.labels.index(coordinate_system)
+
     def get_transformation(self, from_index, to_index):
         """!
         @brief Get the series of transformations needed to transform coordinates in the first system to the second
