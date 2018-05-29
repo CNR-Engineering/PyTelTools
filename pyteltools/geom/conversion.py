@@ -117,7 +117,7 @@ class XYZConverter(PointFileConverter):
                 f.write('\n')
 
     def to_shp(self, new_shapes, to_file, z_name):
-        shp.write_bk_points(to_file, z_name, new_shapes)
+        shp.write_shp_points(to_file, z_name, new_shapes)
 
 
 class BKLineConverter(LineFileConverter):
@@ -220,9 +220,9 @@ class BKLineConverter(LineFileConverter):
             else:
                 open_lines.append(line)
         if shape_type % 5 == 0:
-            shp.write_bk_lines(to_file, shape_type, closed_lines, attribute_name)
+            shp.write_shp_lines(to_file, shape_type, closed_lines, attribute_name)
         else:
-            shp.write_bk_lines(to_file, shape_type, open_lines, attribute_name)
+            shp.write_shp_lines(to_file, shape_type, open_lines, attribute_name)
 
 
 class ShpPointConverter(PointFileConverter):
@@ -415,8 +415,6 @@ class ShpLineConverter(LineFileConverter):
         self.shape_type = shape_type
         self.OUT_TYPE = {'shp Polyline': 3, 'shp Polygon': 5, 'shp PolylineZ': 13, 'shp PolygonZ': 15,
                          'shp PolylineM': 23, 'shp PolygonM': 25, 'csv': 0, 'i2s': 1, 'i3s': 2}
-        self.i2s_header = [':FileType i2s  ASCII  EnSim 1.0\n', ':EndHeader\n']
-        self.i3s_header = [':FileType i3s  ASCII  EnSim 1.0\n', ':EndHeader\n']
         self.fields = []
         self.numeric_fields = []
 
@@ -601,7 +599,7 @@ class ShpLineConverter(LineFileConverter):
                 attributes.append(poly.attributes()[attribute_index])
 
         with bk.Write(to_file) as f:
-            f.write_header(self.i2s_header)
+            f.write_header()
             f.write_lines(lines, attributes)
 
     def to_i3s(self, new_shapes, to_file, attribute_method):
@@ -616,7 +614,7 @@ class ShpLineConverter(LineFileConverter):
                 attributes.append(poly.attributes()[attribute_index])
 
         with bk.Write(to_file) as f:
-            f.write_header(self.i3s_header)
+            f.write_header()
             f.write_lines(new_shapes, attributes)
 
     def to_csv(self, new_shapes, to_file):
@@ -934,7 +932,4 @@ class ShpMultiPointConverter(GeomFileConverter):
                     line.extend(decoded_attributes)
                     f.write(self.csv_separator.join(map(str, line)))
                     f.write('\n')
-
-
-
 

@@ -123,7 +123,7 @@ def get_points(input_filename, indices=None, with_z=False):
         raise ShpException('Error while reading Shapefile. Inconsistent bytes.')
 
 
-def write_bk_points(output_filename, z_name, points):
+def write_shp_points(output_filename, z_name, points):
     w = shapefile.Writer(shapefile.POINTZ)
     w.field(z_name, 'N', decimal=6)
 
@@ -133,7 +133,7 @@ def write_bk_points(output_filename, z_name, points):
     w.save(output_filename)
 
 
-def write_bk_lines(output_filename, shape_type, lines, attribute_name, m_array=None):
+def write_shp_lines(output_filename, shape_type, lines, attribute_name, m_array=None):
     w = shapefile.Writer(shapeType=shape_type)
     w.field(attribute_name, 'N', decimal=6)
 

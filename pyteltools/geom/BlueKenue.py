@@ -92,12 +92,22 @@ class Write(BlueKenue):
     """"!
     BlueKenue file writer
     """
+    I2S_HEADER = ':FileType i2s  ASCII  EnSim 1.0\n'
+    I3S_HEADER = ':FileType i3s  ASCII  EnSim 1.0\n'
+
     def __init__(self, filename):
         super().__init__(filename, 'w')
 
-    def write_header(self, header):
-        for line in header:
-            self.file.write(line)
+    def write_header(self, header=[]):
+        if header:
+            for line in header:
+                self.file.write(line)
+        else:
+            if self.filename.endswith('i2s'):
+                self.file.write(Write.I2S_HEADER)
+            else:
+                self.file.write(Write.I3S_HEADER)
+            self.file.write(':EndHeader\n')
 
     def write_lines(self, lines, attributes):
         for poly, attribute in zip(lines, attributes):
