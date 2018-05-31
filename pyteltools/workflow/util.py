@@ -1726,20 +1726,26 @@ class VerticalProfilePlotViewer(TemporalPlotViewer):
     def compute(self):
         (a, b, c), interpolator = self.point_interpolators[int(self.current_columns[0].split()[1])-1]
 
-        with Serafin.Read(self.data.filename, self.data.language) as input_stream:
-            input_stream.header = self.data.header
-            input_stream.time = self.data.time
+        try:
+            with Serafin.Read(self.data.filename, self.data.language) as input_stream:
+                input_stream.header = self.data.header
+                input_stream.time = self.data.time
 
-            point_y = np.empty((self.n, self.k))
-            point_values = np.empty((self.n, self.k))
+                point_y = np.empty((self.n, self.k))
+                point_values = np.empty((self.n, self.k))
 
-            for i in range(self.n):
-                z = input_stream.read_var_in_frame_as_3d(i, 'Z')
-                values = input_stream.read_var_in_frame_as_3d(i, self.current_var)
+                for i in range(self.n):
+                    z = input_stream.read_var_in_frame_as_3d(i, 'Z')
+                    values = input_stream.read_var_in_frame_as_3d(i, self.current_var)
 
-                for j in range(self.k):
-                    point_y[i, j] = z[j, [a, b, c]].dot(interpolator)
-                    point_values[i, j] = values[j, [a, b, c]].dot(interpolator)
+                    for j in range(self.k):
+                        point_y[i, j] = z[j, [a, b, c]].dot(interpolator)
+                        point_values[i, j] = values[j, [a, b, c]].dot(interpolator)
+        except (Serafin.SerafinRequestError, Serafin.SerafinValidationError) as e:
+            QMessageBox.critical(None, 'Error', 'Error while reading input file:\n%s' % e, QMessageBox.Ok)
+        except PermissionError:
+            QMessageBox.critical(None, 'Permission denied',
+                                 'Permission denied (Is the file opened by another application?).', QMessageBox.Ok)
 
         y = point_y.flatten()
         z = point_values.flatten()
@@ -2932,7 +2938,7 @@ class GeomInputOptionPanel(QWidget):
         self.file_formats = file_formats
         self.id_label = id_label
 
-        self.qpb_open = QPushButton(QWidget().style().standardIcon(QStyle.SP_DialogOpenButton), 'Load 2D open polyline')
+        self.qpb_open = QPushButton(QWidget().style().standardIcon(QStyle.SP_DialogOpenButton), 'Load %s' % file_type)
         self.qle_filename = QLineEdit(self.parent.filename)
         self.qcb_id = QComboBox()
 

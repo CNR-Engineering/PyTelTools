@@ -117,6 +117,9 @@ def read_polygons(node_id, filename):
     try:
         with open(filename):
             pass
+    except FileNotFoundError:
+        message = fail_message('file not found', 'Load 2D Polygons', 'all')
+        return False, node_id, None, message
     except PermissionError:
         message = fail_message('access denied', 'Load 2D Polygons', 'all')
         return False, node_id, None, message
@@ -152,6 +155,9 @@ def read_polylines(node_id, filename):
     try:
         with open(filename):
             pass
+    except FileNotFoundError:
+        message = fail_message('file not found', 'Load 2D Open Polylines', 'all')
+        return False, node_id, None, message
     except PermissionError:
         message = fail_message('access denied', 'Load 2D Open Polylines', 'all')
         return False, node_id, None, message
@@ -187,6 +193,9 @@ def read_points(node_id, filename):
     try:
         with open(filename):
             pass
+    except FileNotFoundError:
+        message = fail_message('file not found', 'Load 2D Points', 'all')
+        return False, node_id, None, message
     except PermissionError:
         message = fail_message('access denied', 'Load 2D Points', 'all')
         return False, node_id, None, message
