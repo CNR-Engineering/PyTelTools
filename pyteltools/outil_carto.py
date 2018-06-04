@@ -10,6 +10,18 @@ from PyQt5.QtGui import *
 from PyQt5.QtWidgets import *
 
 from pyteltools.conf import settings
+from pyteltools.utils.logging import new_logger
+
+
+logger = new_logger(__name__)
+
+def check_and_get_python_exec(parent):
+    python_path = settings.PY_ARCGIS
+    if not os.path.exists(python_path):
+        QMessageBox.critical(parent, 'Erreur', "ArcGIS n'est pas disponible! Chemin introuvable : %s" % python_path,
+                             QMessageBox.Ok)
+        return None
+    return python_path
 
 
 class LandXMLtoTinDialog(QDialog):
@@ -60,14 +72,11 @@ class LandXMLtoTinDialog(QDialog):
         green = QColor(180, 250, 165, 255)
         red = QColor(255, 160, 160, 255)
 
-        python_path = settings.PY_ARCGIS
-        if not os.path.exists(python_path):
-            QMessageBox.critical(self, 'Erreur', "ArcGIS n'est pas disponible!"
-                "Chemin introuvable : %s" % python_path,
-                QMessageBox.Ok)
+        python_path = check_and_get_python_exec(self)
+        if python_path is None:
             return
 
-        script_name = os.path.abspath(os.path.join('slf', 'data', 'landxml_to_tin.py'))
+        script_name = os.path.abspath(os.path.join('arcpy_scripts', 'landxml_to_tin.py'))
 
         for i, (dir_name, dir_path) in enumerate(zip(self.dir_names, self.dir_paths)):
             xml_name = os.path.join(dir_path, 'gis', self.xml_name)
@@ -86,10 +95,16 @@ class LandXMLtoTinDialog(QDialog):
                     QApplication.processEvents()
                     continue
 
-            out = subprocess.Popen([python_path, script_name, xml_name, os.path.join(dir_path, 'gis'),
-                                    self.xml_name[:-4]], stdout=subprocess.PIPE)
-            result, returncode = out.communicate()[0], out.returncode
-            if returncode == 1:
+            cmdn = [python_path, script_name, xml_name, os.path.join(dir_path, 'gis'), self.xml_name[:-4]]
+            logger.debug('Running: %s' % ' '.join(cmdn))
+            out = subprocess.Popen(cmdn, stdout=subprocess.PIPE)
+            (stdout, stderr), returncode = out.communicate(), out.returncode
+            if stdout is not None:
+                logger.debug(stdout)
+            if returncode == 0:
+                if stderr is not None:
+                    logger.error(stderr)
+            elif returncode == 1:
                 self.table.item(i, 1).setBackground(red)
                 QApplication.processEvents()
                 fail_messages.append("%s : arcpy n'est pas disponible." % dir_name)
@@ -246,13 +261,11 @@ class MxdToPngDialog(QDialog):
         green = QColor(180, 250, 165, 255)
         red = QColor(255, 160, 160, 255)
 
-        python_path = 'C:\\Python27\\ArcGIS10.1\\python.exe'
-        if not os.path.exists(python_path):
-            QMessageBox.critical(self, 'Erreur', "ArcGIS10.1 n'est pas disponible!",
-                                 QMessageBox.Ok)
+        python_path = check_and_get_python_exec(self)
+        if python_path is None:
             return False
 
-        script_name = os.path.abspath(os.path.join('slf', 'data', 'mxd_to_png.py'))
+        script_name = os.path.abspath(os.path.join('arcpy_scripts', 'mxd_to_png.py'))
         tmp_id = str(uuid.uuid4())
 
         for i, (dir_name, dir_path) in enumerate(zip(self.dir_names, self.dir_paths)):
@@ -276,9 +289,10 @@ class MxdToPngDialog(QDialog):
             shutil.copyfile(self.mxd_path, tmp_mxd)
 
             # mxd to png
-            out = subprocess.Popen([python_path, script_name, tmp_mxd, png_name],
-                                   stdout=subprocess.PIPE)
-            result, returncode = out.communicate()[0], out.returncode
+            cmdn = [python_path, script_name, tmp_mxd, png_name]
+            logger.debug('Running: %s' % ' '.join(cmdn))
+            out = subprocess.Popen(cmdn, stdout=subprocess.PIPE)
+            (stdout, stderr), returncode = out.communicate(), out.returncode
 
             # move .png to the specified folder
             if self.png_together:
@@ -291,6 +305,11 @@ class MxdToPngDialog(QDialog):
             except PermissionError:
                 continue
 
+            if stdout is not None:
+                logger.debug(stdout)
+            if returncode == 0:
+                if stderr is not None:
+                    logger.error(stderr)
             if returncode == 1:
                 fail_messages.append("%s : arcpy.mapping n'est pas disponible." % dir_name)
                 self.table.item(i, 1).setBackground(red)
@@ -387,13 +406,16 @@ class LandXMLtoTin(QWidget):
         w.setWindowTitle('Choisir un ou plusieurs dossiers contenant un sous-dossier gis')
         w.setFileMode(QFileDialog.DirectoryOnly)
         w.setOption(QFileDialog.DontUseNativeDialog, True)
+        file_view = w.findChild(QListView, 'listView')
+        if file_view:
+            file_view.setSelectionMode(QAbstractItemView.MultiSelection)
         tree = w.findChild(QTreeView)
         if tree:
             tree.setSelectionMode(QAbstractItemView.MultiSelection)
-            tree.setSelectionBehavior(QAbstractItemView.SelectRows)
 
         if w.exec_() != QDialog.Accepted:
             return
+
         current_dir = w.directory().path()
         self.dir_names = []
         self.dir_paths = []
@@ -406,28 +428,28 @@ class LandXMLtoTin(QWidget):
                 QMessageBox.critical(self, 'Erreur', 'Pas de sous-dossier gis dans le dossier %s !' % name,
                                      QMessageBox.Ok)
                 return
-        all_slfs = set()
+        all_xmls = set()
         for name, path in zip(self.dir_names, self.dir_paths):
-            slfs = set()
+            xmls = set()
             for f in os.listdir(os.path.join(path, 'gis')):
-                if os.path.isfile(os.path.join(path, 'gis', f)) and f[-4:] == '.xml':
-                    slfs.add(f)
-            if not slfs:
+                if os.path.isfile(os.path.join(path, 'gis', f)) and f.endswith(".xml"):
+                    xmls.add(f)
+            if not xmls:
                 QMessageBox.critical(self, 'Erreur', "Le dossier '%s/gis' ne contient pas de fichier .xml !" % name,
                                      QMessageBox.Ok)
                 return
-            if not all_slfs:
-                all_slfs = slfs.copy()
+            if not all_xmls:
+                all_xmls = xmls.copy()
             else:
-                all_slfs.intersection_update(slfs)
-            if not all_slfs:
+                all_xmls.intersection_update(xmls)
+            if not all_xmls:
                 QMessageBox.critical(self, 'Erreur', 'Pas de fichier .xml avec un nom identique !',
                                      QMessageBox.Ok)
                 return
 
         self.fileBox.clear()
-        for slf in all_slfs:
-            self.fileBox.addItem(slf)
+        for xml in all_xmls:
+            self.fileBox.addItem(xml)
         self.btnRun.setEnabled(True)
 
     def run(self):
@@ -491,10 +513,12 @@ class MxdToPng(QWidget):
         w.setWindowTitle('Choisir un ou plusieurs dossiers')
         w.setFileMode(QFileDialog.DirectoryOnly)
         w.setOption(QFileDialog.DontUseNativeDialog, True)
+        file_view = w.findChild(QListView, 'listView')
+        if file_view:
+            file_view.setSelectionMode(QAbstractItemView.MultiSelection)
         tree = w.findChild(QTreeView)
         if tree:
             tree.setSelectionMode(QAbstractItemView.MultiSelection)
-            tree.setSelectionBehavior(QAbstractItemView.SelectRows)
 
         if w.exec_() != QDialog.Accepted:
             return

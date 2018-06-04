@@ -1,5 +1,6 @@
 import sys
 
+
 try:
     import arcpy
 except ModuleNotFoundError:
@@ -14,9 +15,8 @@ except:
 
 try:
     arcpy.LandXMLToTin_3d(xml_name, tin_folder, tin_name, '1')
-except:
+except Exception as e:
+    sys.stderr.write(str(e))
     sys.exit(3)
 
 sys.exit(0)
-
-

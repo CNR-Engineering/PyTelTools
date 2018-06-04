@@ -20,7 +20,7 @@ from pyteltools.gui.util import FluxPlotViewer, MapCanvas, PointLabelEditor, Poi
 from pyteltools.slf.datatypes import SerafinData
 from pyteltools.slf.interpolation import MeshInterpolator
 from pyteltools.slf import Serafin
-from pyteltools.utils.cli import new_logger
+from pyteltools.utils.logging import new_logger
 
 
 EPS_VALUE = 0.001  # Relative tolerance (of 0.1%) above which min and max are modified to avoid a crash of colormap [#2]
