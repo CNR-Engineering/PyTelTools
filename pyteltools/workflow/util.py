@@ -15,11 +15,12 @@ warnings.filterwarnings('ignore', category=RuntimeWarning, module='matplotlib')
 
 from pyteltools.conf import settings
 from pyteltools.geom import Shapefile
-from pyteltools.gui.util import FluxPlotViewer, MapCanvas, PointLabelEditor, PointPlotViewer, PlotViewer, \
-    read_csv, SimpleTimeDateSelection, TemporalPlotViewer, VolumePlotViewer
+from pyteltools.gui.util import FluxPlotViewer, MapCanvas, MultiFolderDialog, PointLabelEditor, PointPlotViewer,\
+    PlotViewer, read_csv, SimpleTimeDateSelection, TemporalPlotViewer, VolumePlotViewer
 from pyteltools.slf.datatypes import SerafinData
 from pyteltools.slf.interpolation import MeshInterpolator
 from pyteltools.slf import Serafin
+
 from pyteltools.utils.logging import new_logger
 
 
@@ -451,15 +452,7 @@ class MultiLoadDialog(QDialog):
                                       QMessageBox.Ok | QMessageBox.Cancel, QMessageBox.Ok)
             if msg == QMessageBox.Cancel:
                 return
-        w = QFileDialog()
-        w.setWindowTitle('Choose one or more folders')
-        w.setFileMode(QFileDialog.DirectoryOnly)
-        w.setOption(QFileDialog.DontUseNativeDialog, True)
-        tree = w.findChild(QTreeView)
-        if tree:
-            tree.setSelectionMode(QAbstractItemView.MultiSelection)
-            tree.setSelectionBehavior(QAbstractItemView.SelectRows)
-
+        w = MultiFolderDialog('Choose one or more folders')
         if w.exec_() != QDialog.Accepted:
             return
         self.success = False
@@ -467,8 +460,8 @@ class MultiLoadDialog(QDialog):
         current_dir = w.directory().path()
         dir_names = []
         self.dir_paths = []
-        for index in tree.selectionModel().selectedRows():
-            name = tree.model().data(index)
+        for index in w.tree.selectionModel().selectedRows():
+            name = w.tree.model().data(index)
             dir_names.append(name)
             if os.path.exists(os.path.join(current_dir, name)):
                 self.dir_paths.append(os.path.join(current_dir, name))
@@ -625,20 +618,13 @@ class LoadSerafinDialog(QDialog):
             if msg == QMessageBox.Cancel:
                 return
         self.success = False
-        w = QFileDialog()
-        w.setWindowTitle('Choose one or more folders')
-        w.setFileMode(QFileDialog.DirectoryOnly)
-        w.setOption(QFileDialog.DontUseNativeDialog, True)
-        tree = w.findChild(QTreeView)
-        if tree:
-            tree.setSelectionBehavior(QAbstractItemView.SelectRows)
-
+        w = MultiFolderDialog('Choose one or more folders')
         if w.exec_() != QDialog.Accepted:
             return
         current_dir = w.directory().path()
         dir_name = ''
-        for index in tree.selectionModel().selectedRows():
-            name = tree.model().data(index)
+        for index in w.tree.selectionModel().selectedRows():
+            name = w.tree.model().data(index)
             dir_name = name
             if os.path.exists(os.path.join(current_dir, name)):
                 self.dir_path = os.path.join(current_dir, name)

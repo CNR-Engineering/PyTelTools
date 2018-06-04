@@ -12,7 +12,7 @@ try:
     mxd = arcpy.mapping.MapDocument(mxd_path)
     layers = arcpy.mapping.ListLayers(mxd)
 except Exception as e:
-    sys.stderr.write(e)
+    sys.stderr.write(str(e))
     sys.exit(2)
 
 try:

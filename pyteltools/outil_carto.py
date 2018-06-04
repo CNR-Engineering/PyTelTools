@@ -10,6 +10,7 @@ from PyQt5.QtGui import *
 from PyQt5.QtWidgets import *
 
 from pyteltools.conf import settings
+from pyteltools.gui.util import MultiFolderDialog
 from pyteltools.utils.logging import new_logger
 
 
@@ -402,25 +403,15 @@ class LandXMLtoTin(QWidget):
 
     def btnOpenEvent(self):
         self.btnRun.setEnabled(False)
-        w = QFileDialog()
-        w.setWindowTitle('Choisir un ou plusieurs dossiers contenant un sous-dossier gis')
-        w.setFileMode(QFileDialog.DirectoryOnly)
-        w.setOption(QFileDialog.DontUseNativeDialog, True)
-        file_view = w.findChild(QListView, 'listView')
-        if file_view:
-            file_view.setSelectionMode(QAbstractItemView.MultiSelection)
-        tree = w.findChild(QTreeView)
-        if tree:
-            tree.setSelectionMode(QAbstractItemView.MultiSelection)
-
+        w = MultiFolderDialog('Choisir un ou plusieurs dossiers contenant un sous-dossier gis')
         if w.exec_() != QDialog.Accepted:
             return
 
         current_dir = w.directory().path()
         self.dir_names = []
         self.dir_paths = []
-        for index in tree.selectionModel().selectedRows():
-            name = tree.model().data(index)
+        for index in w.tree.selectionModel().selectedRows():
+            name = w.tree.model().data(index)
             self.dir_names.append(name)
             self.dir_paths.append(os.path.join(current_dir, name))
         for name, path in zip(self.dir_names, self.dir_paths):
@@ -509,24 +500,14 @@ class MxdToPng(QWidget):
 
     def btnOpenEvent(self):
         self.btnRun.setEnabled(False)
-        w = QFileDialog()
-        w.setWindowTitle('Choisir un ou plusieurs dossiers')
-        w.setFileMode(QFileDialog.DirectoryOnly)
-        w.setOption(QFileDialog.DontUseNativeDialog, True)
-        file_view = w.findChild(QListView, 'listView')
-        if file_view:
-            file_view.setSelectionMode(QAbstractItemView.MultiSelection)
-        tree = w.findChild(QTreeView)
-        if tree:
-            tree.setSelectionMode(QAbstractItemView.MultiSelection)
-
+        w = MultiFolderDialog('Choisir un ou plusieurs dossiers')
         if w.exec_() != QDialog.Accepted:
             return
         current_dir = w.directory().path()
         self.dir_names = []
         self.dir_paths = []
-        for index in tree.selectionModel().selectedRows():
-            name = tree.model().data(index)
+        for index in w.tree.selectionModel().selectedRows():
+            name = w.tree.model().data(index)
             self.dir_names.append(name)
             self.dir_paths.append(os.path.join(current_dir, name))
             if not os.path.exists(os.path.join(current_dir, name, 'gis')):
@@ -539,7 +520,7 @@ class MxdToPng(QWidget):
             mxds[name] = []
             sig_path = os.path.join(path, 'gis')
             for f in os.listdir(sig_path):
-                if os.path.isfile(os.path.join(sig_path, f)) and f[-4:] == '.mxd':
+                if os.path.isfile(os.path.join(sig_path, f)) and f.endswith('.mxd'):
                     found = True
                     mxds[name].append((f, sig_path))
         if not found:

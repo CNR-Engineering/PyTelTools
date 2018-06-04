@@ -92,19 +92,17 @@ def open_polygons():
     if not test_open(filename):
         return False, '', []
 
-    is_i2s = filename.endswith('.i2s')
-
     polygons = []
-    if is_i2s:
+    if filename.endswith('.i2s'):
         with BlueKenue.Read(filename) as f:
             f.read_header()
             for i, poly in enumerate(f.get_polygons()):
-                poly.set_id('TRUC %i' % i)
+                poly.set_id('Polygon %i' % i)
                 polygons.append(poly)
     else:
         try:
             for i, poly in enumerate(Shapefile.get_polygons(filename)):
-                poly.set_id('TRUC %i' % i)
+                poly.set_id('Polygon %i' % i)
                 polygons.append(poly)
         except ShapefileException as e:
             QMessageBox.critical(None, 'Error', e, QMessageBox.Ok)
@@ -124,19 +122,17 @@ def open_polylines():
     if not test_open(filename):
         return False, '', []
 
-    is_i2s = filename.endswith('.i2s')
-
     polylines = []
-    if is_i2s:
+    if filename.endswith('.i2s'):
         with BlueKenue.Read(filename) as f:
             f.read_header()
             for i, poly in enumerate(f.get_open_polylines()):
-                poly.set_id('TRUC %i' % i)
+                poly.set_id('Polyline %i' % i)
                 polylines.append(poly)
     else:
         try:
             for i, poly in enumerate(Shapefile.get_open_polylines(filename)):
-                poly.set_id('TRUC %i' % i)
+                poly.set_id('Polyline %i' % i)
                 polylines.append(poly)
         except ShapefileException as e:
             QMessageBox.critical(None, 'Error', e, QMessageBox.Ok)
@@ -3415,3 +3411,20 @@ class ProjectLinesPlotViewer(QWidget):
                 self.control.lineBox.addItem(line.id)
                 self.line_colors[i] = self.plotViewer.defaultColors[j]   # initialize default line colors
                 j += 1
+
+
+class MultiFolderDialog(QFileDialog):
+    """
+    Dialog to select one or more folders
+    """
+    def __init__(self, title):
+        super().__init__()
+        self.setWindowTitle(title)
+        self.setFileMode(QFileDialog.DirectoryOnly)
+        self.setOption(QFileDialog.DontUseNativeDialog, True)
+        file_view = self.findChild(QListView, 'listView')
+        if file_view:
+            file_view.setSelectionMode(QAbstractItemView.MultiSelection)
+        self.tree = self.findChild(QTreeView)
+        if self.tree:
+            self.tree.setSelectionMode(QAbstractItemView.MultiSelection)
