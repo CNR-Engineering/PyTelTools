@@ -291,7 +291,7 @@ class MxdToPngDialog(QDialog):
             shutil.copyfile(self.mxd_path, tmp_mxd)
 
             # mxd to png
-            cmdn = [python_path, script_name, tmp_mxd, png_name, settings.ARCPY_PNG_DPI]
+            cmdn = [python_path, script_name, tmp_mxd, png_name, str(settings.ARCPY_PNG_DPI)]
             logger.debug('Running: %s' % ' '.join(cmdn))
             out = subprocess.Popen(cmdn, stdout=subprocess.PIPE)
             (stdout, stderr), returncode = out.communicate(), out.returncode

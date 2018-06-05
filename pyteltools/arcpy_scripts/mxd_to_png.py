@@ -6,7 +6,7 @@ try:
 except ModuleNotFoundError:
     sys.exit(1)
 
-mxd_path, png_name, resolution = sys.argv[1], sys.argv[2], sys.argv[3]
+mxd_path, png_name, resolution = sys.argv[1], sys.argv[2], int(sys.argv[3])
 
 try:
     mxd = arcpy.mapping.MapDocument(mxd_path)
