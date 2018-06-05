@@ -6,7 +6,7 @@ try:
 except ModuleNotFoundError:
     sys.exit(1)
 
-mxd_path, png_name = sys.argv[1], sys.argv[2]
+mxd_path, png_name, resolution = sys.argv[1], sys.argv[2], sys.argv[3]
 
 try:
     mxd = arcpy.mapping.MapDocument(mxd_path)
@@ -16,7 +16,7 @@ except Exception as e:
     sys.exit(2)
 
 try:
-    arcpy.mapping.ExportToPNG(mxd, png_name, resolution=96)
+    arcpy.mapping.ExportToPNG(mxd, png_name, resolution=resolution)
 except Exception as e:
     sys.stderr.write(str(e))
     sys.exit(3)

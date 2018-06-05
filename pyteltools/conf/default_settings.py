@@ -50,6 +50,9 @@ CSV_SEPARATOR = ';'
 # Write XYZ header
 WRITE_XYZ_HEADER = True
 
+# Arcpy png resolution
+ARCPY_PNG_DPI = 192
+
 # ~> VISUALIZATION
 
 # Figure size (in inches)

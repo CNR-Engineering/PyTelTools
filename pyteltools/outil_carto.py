@@ -102,10 +102,10 @@ class LandXMLtoTinDialog(QDialog):
             (stdout, stderr), returncode = out.communicate(), out.returncode
             if stdout is not None:
                 logger.debug(stdout)
-            if returncode == 0:
+            if returncode != 0:
                 if stderr is not None:
                     logger.error(stderr)
-            elif returncode == 1:
+            if returncode == 1:
                 self.table.item(i, 1).setBackground(red)
                 QApplication.processEvents()
                 fail_messages.append("%s : arcpy n'est pas disponible." % dir_name)
@@ -251,9 +251,10 @@ class MxdToPngDialog(QDialog):
         self.btnClose.setEnabled(True)
 
     def _png_path(self, dir_name, dir_path):
+        png_name = os.path.splitext(self.mxd_name)[0] + '.png'
         if self.png_together:
-            return self.png_path, '%s_%s.png' % (dir_name, self.mxd_name)
-        return os.path.join(dir_path, 'gis'), '%s.png' % self.mxd_name
+            return self.png_path, '%s_%s' % (dir_name, png_name)
+        return os.path.join(dir_path, 'gis'), png_name
 
     def _run(self):
         fail_messages = []
@@ -290,7 +291,7 @@ class MxdToPngDialog(QDialog):
             shutil.copyfile(self.mxd_path, tmp_mxd)
 
             # mxd to png
-            cmdn = [python_path, script_name, tmp_mxd, png_name]
+            cmdn = [python_path, script_name, tmp_mxd, png_name, settings.ARCPY_PNG_DPI]
             logger.debug('Running: %s' % ' '.join(cmdn))
             out = subprocess.Popen(cmdn, stdout=subprocess.PIPE)
             (stdout, stderr), returncode = out.communicate(), out.returncode
@@ -308,7 +309,7 @@ class MxdToPngDialog(QDialog):
 
             if stdout is not None:
                 logger.debug(stdout)
-            if returncode == 0:
+            if returncode != 0:
                 if stderr is not None:
                     logger.error(stderr)
             if returncode == 1:
