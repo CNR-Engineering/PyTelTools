@@ -16,7 +16,7 @@ from pyteltools.slf.volume import VolumeCalculator
 class TestHeader:
     def __init__(self):
         self.title = bytes('DUMMY SERAFIN', Serafin.SLF_EIT).ljust(72)
-        self.file_type = bytes('SERAFIND', Serafin.SLF_EIT).ljust(8)
+        self.file_format = bytes('SERAFIND', Serafin.SLF_EIT).ljust(8)
         self.float_type = 'd'
         self.float_size = 8
 
