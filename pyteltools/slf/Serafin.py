@@ -562,15 +562,14 @@ class SerafinHeader:
 
         # Read title
         self.title = file.read(72)
-        self.file_format = file.read(8)
+        file_format = file.read(8)
         file.read(4)
-        self._set_file_format_and_precision(self.file_format)
 
         try:
-            data_format = self.file_format.decode(SLF_EIT)
+            data_format = file_format.decode(SLF_EIT)
             logger.debug('The file type is: "%s"' % data_format)
         except UnicodeDecodeError:
-            raise SerafinValidationError('File type is unreadable: %s' % self.file_format)
+            raise SerafinValidationError('File type is unreadable: %s' % file_format)
         self._set_file_format_and_precision(data_format)
 
         # Read the number of linear and quadratic variables
