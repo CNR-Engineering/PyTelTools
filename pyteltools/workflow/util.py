@@ -10,6 +10,7 @@ from matplotlib import cm
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import matplotlib.pyplot as plt
 import matplotlib.tri as mtri
+from shapefile import ShapefileException
 import warnings
 warnings.filterwarnings('ignore', category=RuntimeWarning, module='matplotlib')
 
@@ -2969,7 +2970,11 @@ class GeomInputOptionPanel(QWidget):
         if self.qle_filename.text().endswith('.i2s'):
             self.qcb_id.addItem(INDEX_VALUE)
         elif self.qle_filename.text().endswith('.shp'):
-            self.qcb_id.addItems([fields[0] for fields in Shapefile.get_all_fields(self.qle_filename.text())])
+            try:
+                self.qcb_id.addItems([fields[0] for fields in Shapefile.get_all_fields(self.qle_filename.text())])
+            except ShapefileException as e:
+                QMessageBox.critical(self, 'Error', str(e), QMessageBox.Ok)
+                return
         else:
             raise NotImplementedError
         index = self.qcb_id.findText(old_id, Qt.MatchFixedString)

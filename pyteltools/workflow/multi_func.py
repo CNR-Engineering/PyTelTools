@@ -125,8 +125,7 @@ def read_polygons(node_id, filename):
         return False, node_id, None, message
 
     data = PolylineData()
-    is_i2s = filename.endswith('.i2s')
-    if is_i2s:
+    if filename.endswith('.i2s'):
         with BlueKenue.Read(filename) as f:
             f.read_header()
             for i, poly in enumerate(f.get_polygons()):
@@ -138,11 +137,10 @@ def read_polygons(node_id, filename):
             for i, poly in enumerate(Shapefile.get_polygons(filename)):
                 poly.set_id('Polygon %i' % (i + 1))
                 data.add_line(poly)
+            data.set_fields(Shapefile.get_all_fields(filename))
         except ShapefileException as e:
             message = fail_message(e, 'Load 2D Polygons', 'all')
             return False, node_id, None, message
-
-        data.set_fields(Shapefile.get_all_fields(filename))
 
     if data.is_empty():
         message = fail_message('the file does not contain any polygon', 'Load 2D Polygons', 'all')
@@ -163,8 +161,7 @@ def read_polylines(node_id, filename):
         return False, node_id, None, message
 
     data = PolylineData()
-    is_i2s = filename.endswith('.i2s')
-    if is_i2s:
+    if filename.endswith('.i2s'):
         with BlueKenue.Read(filename) as f:
             f.read_header()
             for i, poly in enumerate(f.get_open_polylines()):
@@ -176,11 +173,10 @@ def read_polylines(node_id, filename):
             for i, poly in enumerate(Shapefile.get_open_polylines(filename)):
                 poly.set_id('Line %i' % (i + 1))
                 data.add_line(poly)
+            data.set_fields(Shapefile.get_all_fields(filename))
         except ShapefileException as e:
             message = fail_message(e, 'Load 2D Open Polylines', 'all')
             return False, node_id, None, message
-
-        data.set_fields(Shapefile.get_all_fields(filename))
 
     if data.is_empty():
         message = fail_message('the file does not contain any open polyline', 'Load 2D Open Polylines', 'all')
@@ -205,11 +201,10 @@ def read_points(node_id, filename):
         for point, attribute in Shapefile.get_points(filename):
             data.add_point(point)
             data.add_attribute(attribute)
+        data.set_fields(Shapefile.get_all_fields(filename))
     except ShapefileException as e:
         message = fail_message(e, 'Load 2D Points', 'all')
         return False, node_id, None, message
-
-    data.set_fields(Shapefile.get_all_fields(filename))
 
     if data.is_empty():
         message = fail_message('the file does not contain any point', 'Load 2D Points', 'all')

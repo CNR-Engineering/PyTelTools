@@ -549,8 +549,7 @@ class LoadPolygon2DNode(SingleOutputNode):
             self.fail('Access denied.')
             return
         self.data = PolylineData()
-        is_i2s = self.filename[-4:] == '.i2s'
-        if is_i2s:
+        if self.filename.endswith('.i2s'):
             self.data.set_fields(['Value'])
             with BlueKenue.Read(self.filename) as f:
                 f.read_header()
@@ -562,9 +561,9 @@ class LoadPolygon2DNode(SingleOutputNode):
                     poly.set_id(id)
                     self.data.add_line(poly)
         else:
-            self.data.set_fields(Shapefile.get_all_fields(self.filename))
-            field_index = [field[0] for field in self.data.fields].index(self.id) if self.id != INDEX_FROM_1 else -1
             try:
+                self.data.set_fields(Shapefile.get_all_fields(self.filename))
+                field_index = [field[0] for field in self.data.fields].index(self.id) if self.id != INDEX_FROM_1 else -1
                 for i, poly in enumerate(Shapefile.get_polygons(self.filename)):
                     if self.id == INDEX_FROM_1:
                         id = 'Polygon %i' % (i + 1)
@@ -630,8 +629,7 @@ class LoadOpenPolyline2DNode(SingleOutputNode):
             self.fail('Access denied.')
             return
         self.data = PolylineData()
-        is_i2s = self.filename[-4:] == '.i2s'
-        if is_i2s:
+        if self.filename.endswith('.i2s'):
             self.data.set_fields(['Value'])
             with BlueKenue.Read(self.filename) as f:
                 f.read_header()
@@ -643,9 +641,9 @@ class LoadOpenPolyline2DNode(SingleOutputNode):
                     poly.set_id(id)
                     self.data.add_line(poly)
         else:
-            self.data.set_fields(Shapefile.get_all_fields(self.filename))
-            field_index = [field[0] for field in self.data.fields].index(self.id) if self.id != INDEX_FROM_1 else -1
             try:
+                self.data.set_fields(Shapefile.get_all_fields(self.filename))
+                field_index = [field[0] for field in self.data.fields].index(self.id) if self.id != INDEX_FROM_1 else -1
                 for i, poly in enumerate(Shapefile.get_open_polylines(self.filename)):
                     if self.id == INDEX_FROM_1:
                         id = 'Section %i' % (i + 1)
@@ -715,15 +713,14 @@ class LoadPoint2DNode(SingleOutputNode):
             for point, attribute in Shapefile.get_points(self.filename):
                 self.data.add_point(point)
                 self.data.add_attribute(attribute)
+            self.data.set_fields(Shapefile.get_all_fields(self.filename))
         except ShapefileException as e:
             self.fail(e)
             return
-        self.data.set_fields(Shapefile.get_all_fields(self.filename))
         if self.data.is_empty():
             self.fail('the file does not contain any point.')
             return
-        self.success('The file contains {} point{}.'.format(len(self.data),
-                                                            's' if len(self.data) > 1 else ''))
+        self.success('The file contains {} point{}.'.format(len(self.data), 's' if len(self.data) > 1 else ''))
 
 
 class LoadReferenceSerafinNode(SingleOutputNode):
