@@ -18,7 +18,7 @@ class Polyline:
 
         self._is_closed = False
         if coordinates[0] == coordinates[-1]:
-            self._is_closed = True
+            self._is_closed = len(coordinates) > 2  # line with 2 coordinates which are identical can not be a polygon
             if z_array is not None:
                 self._is_closed = z_array[-1] == z_array[0]
         if z_array is None:
