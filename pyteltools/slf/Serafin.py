@@ -88,7 +88,7 @@ class SerafinHeader:
     - language <str>: language for variables ('fr' or 'en')
 
     - is_2d <bool>: True in 2D else False
-    - has_knolg <bool>: True if ipobo is replaced by KNOLG array (it is not supported yet if True?)
+    - has_knolg <bool>: True if ipobo is replaced by KNOLG array
     - date <[int]>: list with 6 integers (year, month, day, hour, minute and second) or None if not available
 
     - nb_var <int>: number of variables
@@ -113,7 +113,7 @@ class SerafinHeader:
     - y <numpy.1D-array>: north coordinates [shape = nb_nodes] (set by `_compute_mesh_coordinates`)
     - ikle <numpy.1D-array>: connectivity table with 1-indexed nodes number [shape = nb_nodes_per_elem * nb_elements]
     - ikle_2d <numpy.2D-array>: reshaped connectivity table [shape = (nb_elements, nb_nodes_per_elem)] (set by `_build_ikle_2d`)
-    - ipobo <numpy.1D-array>: array with 0 values for inner nodes and boundary 1-indexed node number for the others [shape = nb_nodes]
+    - ipobo <numpy.1D-array>: array with 0 values for inner nodes and 1-indexed node number for boundary nodes [shape = nb_nodes]
     """
     def __init__(self, title='', format_type='SERAFIN ', lang=settings.LANG, endian='>'):
         """
@@ -633,12 +633,9 @@ class SerafinHeader:
         file.read(4)
 
         # IPOBO
-        if self.has_knolg:
-            raise SerafinRequestError('Do not support the reading of KNOLG array')
-        else:
-            file.read(4)
-            self.ipobo = np.array(self.unpack_int(file.read(4 * self.nb_nodes), self.nb_nodes))
-            file.read(4)
+        file.read(4)
+        self.ipobo = np.array(self.unpack_int(file.read(4 * self.nb_nodes), self.nb_nodes))
+        file.read(4)
 
         # x coordinates
         file.read(4)
@@ -900,12 +897,9 @@ class Write(Serafin):
         self.file.write(header.pack_int(4 * nb_ikle_values))
 
         # IPOBO
-        if header.has_knolg:
-            raise SerafinRequestError('Do not support the writing of KNOLG array')
-        else:
-            self.file.write(header.pack_int(4 * header.nb_nodes))
-            self.file.write(header.pack_int(*header.ipobo, nb=header.nb_nodes))
-            self.file.write(header.pack_int(4 * header.nb_nodes))
+        self.file.write(header.pack_int(4 * header.nb_nodes))
+        self.file.write(header.pack_int(*header.ipobo, nb=header.nb_nodes))
+        self.file.write(header.pack_int(4 * header.nb_nodes))
 
         # X coordinates
         self.file.write(header.pack_int(header.float_size * header.nb_nodes))
