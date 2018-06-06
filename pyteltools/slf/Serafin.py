@@ -177,11 +177,16 @@ class SerafinHeader:
                 raise SerafinValidationError('The number of planes is less than 2')
 
     def _set_file_format_and_precision(self, file_format):
+        """!
+        @brief: Set some attributes to read/write single or double precision Serafin depending on file format
+        @file_format <str>: Serafin file format (max length is 8)
+        If file format is not recognized, the file is expected to be simple precision
+        """
         self.file_format = bytes(file_format, SLF_EIT).ljust(8)
         if file_format in ('SERAFIND', '       D'):
             self._set_as_double_precision()
         else:
-            if file_format not in ('SERAFIN ', 'SERAPHIN', '        '):
+            if file_format not in ('SERAFIN ', 'SERAFINS', 'SERAPHIN'):
                 logger.warning('Format "%s" is unknown and is forced to "SERAFIN "' % file_format)
                 self.file_format = bytes('SERAFIN', SLF_EIT).ljust(8)
             self._set_as_single_precision()
@@ -382,6 +387,16 @@ class SerafinHeader:
         new_header.file_size = new_header._expected_file_size()
 
         return new_header
+
+    def nearest_node(self, target_x, target_y):
+        """!
+        Find the nearest node of a target point (from x and y coordinates)
+        @param target_x <float>: east target coordinate
+        @param target_y <float>: north target coordinate
+        @return <int>: node number (1-indexed)
+        """
+        dist = np.sqrt(np.power(self.x - target_x, 2) + np.power(self.y - target_y, 2))
+        return np.argmin(dist) + 1
 
     def same_2D_mesh(self, other):
         """!
