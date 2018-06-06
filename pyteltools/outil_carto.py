@@ -11,7 +11,7 @@ from PyQt5.QtWidgets import *
 
 from pyteltools.conf import settings
 from pyteltools.gui.util import MultiFolderDialog
-from pyteltools.utils.logging import new_logger
+from pyteltools.utils.log import new_logger
 
 
 logger = new_logger(__name__)

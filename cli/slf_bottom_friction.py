@@ -19,7 +19,7 @@ from pyteltools.slf import Serafin
 from pyteltools.slf.variables import do_calculations_in_frame, get_necessary_equations
 from pyteltools.slf.variable.variables_2d import FRICTION_LAWS, STRICKLER_ID
 from pyteltools.slf.volume import VolumeCalculator
-from pyteltools.utils.cli import logger, PyTelToolsArgParse
+from pyteltools.utils.cli_base import logger, PyTelToolsArgParse
 
 
 def slf_bottom_friction(args):
@@ -144,8 +144,8 @@ parser.add_argument('in_polygons', help='polygons file (*.shp)')
 parser.add_argument('--in_strickler_zones', help='strickler zones file (*.shp)')
 parser.add_argument('--in_strickler_attr', help='attribute to read strickler values `--in_stricker_zone`')
 help_friction_laws = ', '.join(['%i=%s' %(i, law) for i, law in enumerate(FRICTION_LAWS)])
-group_var.add_argument('--friction_law', type=int, help='friction law identifier: %s' % help_friction_laws,
-                       choices=range(len(FRICTION_LAWS)), default=STRICKLER_ID)
+parser.add_argument('--friction_law', type=int, help='friction law identifier: %s' % help_friction_laws,
+                    choices=range(len(FRICTION_LAWS)), default=STRICKLER_ID)
 parser.add_group_general(['force', 'verbose'])
 
 

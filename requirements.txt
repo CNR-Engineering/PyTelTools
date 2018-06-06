@@ -10,3 +10,4 @@ scipy
 shapely
 simple-settings
 tqdm
+unittest2

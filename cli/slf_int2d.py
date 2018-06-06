@@ -12,7 +12,7 @@ from pyteltools.conf import settings
 from pyteltools.geom import Shapefile
 from pyteltools.slf import Serafin
 from pyteltools.slf.interpolation import MeshInterpolator
-from pyteltools.utils.cli import logger, PyTelToolsArgParse
+from pyteltools.utils.cli_base import logger, PyTelToolsArgParse
 
 
 def slf_int2d(args):

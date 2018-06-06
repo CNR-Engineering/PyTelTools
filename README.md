@@ -1,5 +1,5 @@
 # PyTelTools
-<img style="float: right" src="https://github.com/CNR-Engineering/PyTelTools_media/blob/master/icons/PyTelTools_with_text.png" width="256px" />
+<img style="float: right" src="https://github.com/CNR-Engineering/PyTelTools_media/raw/master/icons/PyTelTools_with_text.png" width="256px" />
 
 * [Documentations](#documentations)
 * [Installation and requirements](#installation-and-requirements)

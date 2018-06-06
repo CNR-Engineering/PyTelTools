@@ -11,7 +11,7 @@ from pyteltools.conf import settings
 from pyteltools.geom import BlueKenue, Shapefile
 from pyteltools.slf import Serafin
 from pyteltools.slf.volume import VolumeCalculator
-from pyteltools.utils.cli import logger, PyTelToolsArgParse
+from pyteltools.utils.cli_base import logger, PyTelToolsArgParse
 
 
 def slf_volume(args):

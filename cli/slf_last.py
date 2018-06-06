@@ -8,7 +8,7 @@ import sys
 
 from pyteltools.geom.transformation import Transformation
 from pyteltools.slf import Serafin
-from pyteltools.utils.cli import logger, PyTelToolsArgParse
+from pyteltools.utils.cli_base import logger, PyTelToolsArgParse
 
 
 def slf_last(args):

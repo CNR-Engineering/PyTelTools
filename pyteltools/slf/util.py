@@ -1,3 +1,3 @@
-from pyteltools.utils.logging import new_logger
+from pyteltools.utils.log import new_logger
 
 logger = new_logger(__name__)

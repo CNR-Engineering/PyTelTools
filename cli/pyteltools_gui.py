@@ -8,7 +8,7 @@ import sys
 
 from pyteltools.gui.classic_gui import exception_hook, ClassicMainWindow
 from pyteltools.main_interface import run_gui_app
-from pyteltools.utils.cli import PyTelToolsArgParse
+from pyteltools.utils.cli_base import PyTelToolsArgParse
 from pyteltools.workflow.workflow_gui import WorkflowWelcomeWindow
 
 

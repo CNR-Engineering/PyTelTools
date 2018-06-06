@@ -12,6 +12,7 @@ import sys
 
 sys.path.append(sys.argv[1])  # dirty method to import modules easily
 
+
 class CommandLineScript:
     def __init__(self, path):
         self.path = path

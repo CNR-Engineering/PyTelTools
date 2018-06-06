@@ -13,7 +13,7 @@ from pyteltools.geom.transformation import Transformation
 from pyteltools.slf import Serafin
 from pyteltools.slf.variables import do_calculations_in_frame, get_necessary_equations
 from pyteltools.slf.variable.variables_2d import FRICTION_LAWS, get_US_equation, STRICKLER_ID
-from pyteltools.utils.cli import logger, PyTelToolsArgParse
+from pyteltools.utils.cli_base import logger, PyTelToolsArgParse
 
 
 def slf_base(args):

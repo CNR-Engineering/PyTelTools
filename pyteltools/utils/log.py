@@ -19,7 +19,7 @@ def new_logger(name):
     """
     logger = logging.getLogger(name)
     if settings.COLOR_LOGS:
-        coloredlogs.install(level=settings.LOGGING_LEVEL, fmt=settings.LOGGING_FMT_CLI,
+        coloredlogs.install(logger=logger, level=settings.LOGGING_LEVEL, fmt=settings.LOGGING_FMT_CLI,
                             level_styles=LEVEL_STYLES, field_styles=FIELD_STYLES)
     else:
         handler = logging.StreamHandler()

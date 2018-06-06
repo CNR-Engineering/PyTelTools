@@ -10,7 +10,7 @@ from tqdm import tqdm
 from pyteltools.geom.transformation import Transformation
 import pyteltools.slf.misc as operations
 from pyteltools.slf import Serafin
-from pyteltools.utils.cli import logger, PyTelToolsArgParse
+from pyteltools.utils.cli_base import logger, PyTelToolsArgParse
 
 
 def slf_3d_to_2d(args):
