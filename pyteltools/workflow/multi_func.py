@@ -325,10 +325,13 @@ def select_last_frame(node_id, fid, data, options):
 def select_single_layer(node_id, fid, data, options):
     if data.header.is_2d:
         return False, node_id, fid, None, fail_message('the input file is not 3d', 'Select Single Layer', data.job_id)
+    if 'Z' not in data.selected_vars:
+        return False, node_id, fid, None, fail_message('the variable Z is not found', 'Select Single Layer',
+                                                       data.job_id)
 
     layer_selection = options[0]
     if layer_selection < 1 or layer_selection > data.header.nb_planes:
-        range_text = '[1, %s]' % (data.header.nb_planes)
+        range_text = '[1, %s]' % data.header.nb_planes
         return False, node_id, fid, None, fail_message('layer %i is not inside %s' % (layer_selection, range_text),
                                                        'Select Single Layer', data.job_id)
     new_data = data.copy()
@@ -337,9 +340,12 @@ def select_single_layer(node_id, fid, data, options):
     return True, node_id, fid, new_data, success_message('Select Single Layer', data.job_id)
 
 
-def vertical_aggragation(node_id, fid, data, options):
+def vertical_aggregation(node_id, fid, data, options):
     if data.header.is_2d:
-        return False, node_id, fid, None, fail_message('the input file is not 3d', 'Select Single Layer', data.job_id)
+        return False, node_id, fid, None, fail_message('the input file is not 3d', 'Vertical Aggregation', data.job_id)
+    if 'Z' not in data.selected_vars:
+        return False, node_id, fid, None, fail_message('the variable Z is not found', 'Vertical Aggregation',
+                                                       data.job_id)
 
     vertical_operation = options[0]
     if vertical_operation not in VerticalAggregationNode.VERTICAL_OPERATIONS:
@@ -1415,7 +1421,7 @@ def write_vtk(node_id, fid, data, options):
 FUNCTIONS = {'Select Variables': select_variables, 'Add Rouse': add_rouse, 'Select Time': select_time,
              'Select Single Frame': select_single_frame,
              'Select First Frame': select_first_frame, 'Select Last Frame': select_last_frame,
-             'Select Single Layer': select_single_layer, 'Vertical Aggregation': vertical_aggragation,
+             'Select Single Layer': select_single_layer, 'Vertical Aggregation': vertical_aggregation,
              'Max': compute_max, 'Min': compute_min, 'Mean': compute_mean,
              'Convert to Single Precision': convert_to_single, 'Compute Arrival Duration': arrival_duration,
              'Load 2D Polygons': read_polygons, 'Load 2D Open Polylines': read_polylines, 'Load 2D Points': read_points,

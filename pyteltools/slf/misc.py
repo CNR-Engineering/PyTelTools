@@ -639,14 +639,17 @@ class VerticalMaxMinMeanCalculator:
         for i, (var, name, unit) in enumerate(self.selected_scalars + self.selected_vectors):
             if var not in computed_values:
                 computed_values[var] = self.input_stream.read_var_in_frame_as_3d(time_index, var)
-        Z = computed_values['Z']
+        try:
+            z = computed_values['Z']
+        except KeyError:
+            raise Serafin.SerafinRequestError('the variable Z is not found')
 
         # Compute dimensionless layer ponderations for mean operation
         weight = None
         if self.operation == MEAN:
-            diff_upper = Z - np.roll(Z, 1, axis=0)
+            diff_upper = z - np.roll(z, 1, axis=0)
             diff_upper[0, :] = 0.0
-            diff_lower = np.roll(Z, -1, axis=0) - Z
+            diff_lower = np.roll(z, -1, axis=0) - z
             diff_lower[-1, :] = 0.0
             diff = (diff_upper + diff_lower) / 2
             diff_sum = diff.sum(axis=0)
@@ -680,11 +683,11 @@ class VerticalMaxMinMeanCalculator:
         for j, var_ID in enumerate(self.add_vars):
             pos = i + j + 1
             if var_ID == 'B':
-                vars_2d[pos, :] = Z[0, :]
+                vars_2d[pos, :] = z[0, :]
             elif var_ID == 'S':
-                vars_2d[pos, :] = Z[-1, :]
+                vars_2d[pos, :] = z[-1, :]
             else:  # var_ID == 'H'
-                vars_2d[pos, :] = Z[-1, :] - Z[0, :]
+                vars_2d[pos, :] = z[-1, :] - z[0, :]
 
         return vars_2d
 

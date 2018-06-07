@@ -931,6 +931,12 @@ class SelectSingleLayerNode(OneInOneOutNode):
             self.fail('input failed.')
             return
         input_data = self.in_port.mother.parentItem().data
+        if not input_data.header.is_2d:
+            self.fail('the input file is not 3d')
+            return
+        if 'Z' not in input_data.selected_vars:
+            self.fail('the variable Z is not found')
+            return
         self.data = input_data.copy()
         self.data.operator = operations.SELECT_LAYER
         self.data.metadata['layer_selection'] = self.layer_selection
@@ -1062,6 +1068,12 @@ class VerticalAggregationNode(OneInOneOutNode):
             self.fail('input failed.')
             return
         input_data = self.in_port.mother.parentItem().data
+        if not input_data.header.is_2d:
+            self.fail('the input file is not 3d')
+            return
+        if 'Z' not in input_data.selected_vars:
+            self.fail('the variable Z is not found')
+            return
         self.data = input_data.copy()
         self.data.operator = operations.VERTICAL_AGGREGATION
         self.data.metadata['vertical_operator'] = self.vertical_operation
