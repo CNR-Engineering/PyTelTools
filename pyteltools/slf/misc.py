@@ -126,16 +126,16 @@ def tighten_expression(expression):
     """!
     Remove the spaces and brackets to get a nice and short expression for display
     """
-    return re.sub('(\s+|\[|\])', '', expression)
+    return re.sub(r'(\s+|\[|\])', '', expression)
 
 
 def to_infix(expression):
     """!
     Convert an expression string to an infix expression (list of varIDs, constants, parenthesis and operators)
     """
-    return list(filter(None, map(lambda x: x.strip(), re.split('(\d+\.*\d+E*e*-*\d+(?=[^\]]*(?:\[|$))'
-                                                               '|(?!e)-(?=[^\]]*(?:\[|$))|(?!E)-(?=[^\]]*(?:\[|$))'
-                                                               '|\[^[a-zA-Z0-9_.-]*\]|[+*()^/](?=[^\]]*(?:\[|$)))',
+    return list(filter(None, map(lambda x: x.strip(), re.split(r'(\d+\.*\d+E*e*-*\d+(?=[^\]]*(?:\[|$))'
+                                                               r'|(?!e)-(?=[^\]]*(?:\[|$))|(?!E)-(?=[^\]]*(?:\[|$))'
+                                                               r'|\[^[a-zA-Z0-9_.-]*\]|[+*()^/](?=[^\]]*(?:\[|$)))',
                                                                expression))))
 
 

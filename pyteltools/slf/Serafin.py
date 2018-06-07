@@ -530,7 +530,7 @@ class SerafinHeader:
 
     def _set_as_2d(self):
         """!
-        /!\ nb_nodes_2d has to be consistant
+        Beware: nb_nodes_2d has to be consistant
         """
         self.is_2d = True
         self.nb_nodes_2d = self.nb_nodes

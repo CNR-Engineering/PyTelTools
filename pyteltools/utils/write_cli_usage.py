@@ -1,7 +1,7 @@
 """
 Write a markdown documentation file for command line scripts.
 
-/!\ Should be run from pyteltools repository root folder (same level as Makefile).
+Beware: Should be run from pyteltools repository root folder (same level as Makefile).
 """
 
 import importlib
