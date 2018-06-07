@@ -503,6 +503,7 @@ def write_slf(node_id, fid, data, options):
     except (Serafin.SerafinRequestError, Serafin.SerafinValidationError) as e:
         return False, node_id, fid, None, fail_message(e.message, 'Write Serafin', data.job_id)
 
+
 def write_simple_slf(input_data, filename):
     output_header = input_data.default_output_header()
     with Serafin.Read(input_data.filename, input_data.language) as input_stream:

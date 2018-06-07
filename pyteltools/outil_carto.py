@@ -16,6 +16,7 @@ from pyteltools.utils.log import new_logger
 
 logger = new_logger(__name__)
 
+
 def check_and_get_python_exec(parent):
     python_path = settings.PY_ARCGIS
     if not os.path.exists(python_path):
