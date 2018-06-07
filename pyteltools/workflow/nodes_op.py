@@ -931,7 +931,7 @@ class SelectSingleLayerNode(OneInOneOutNode):
             self.fail('input failed.')
             return
         input_data = self.in_port.mother.parentItem().data
-        if not input_data.header.is_2d:
+        if input_data.header.is_2d:
             self.fail('the input file is not 3d')
             return
         if 'Z' not in input_data.selected_vars:
@@ -1068,7 +1068,7 @@ class VerticalAggregationNode(OneInOneOutNode):
             self.fail('input failed.')
             return
         input_data = self.in_port.mother.parentItem().data
-        if not input_data.header.is_2d:
+        if input_data.header.is_2d:
             self.fail('the input file is not 3d')
             return
         if 'Z' not in input_data.selected_vars:
