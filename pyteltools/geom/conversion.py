@@ -867,14 +867,13 @@ class ShpMultiPointConverter(GeomFileConverter):
                 w.record(*new_attributes)
         w.save(to_file)
 
-    def to_pointz(self, new_shapes, to_file):
+    def to_pointz(self, new_shapes, to_file, m_array):
         w = shapefile.Writer(shapefile.POINTZ)
         w.field('ID_MultiPointZ', 'N', decimal=0)
 
         for field_name, field_type, field_length, decimal_length in self.fields:
             w.field(field_name, field_type, str(field_length), decimal_length)
 
-        # FIXME: Unresolved reference to m_array
         for i, (points, points_m, attributes) in enumerate(zip(new_shapes, m_array, self.attributes)):
             new_attributes = [i+1] + attributes
             for (x, y, z), m in zip(points, points_m):
