@@ -402,7 +402,7 @@ class WriteSerafinNode(OneInOneOutNode):
                                                       ori_values={})
                     new_shape = (values.shape[0], input_stream.header.nb_planes,
                                  values.shape[1] // input_stream.header.nb_planes)
-                    values_at_layer = values.reshape(new_shape)[:,input_data.metadata['layer_selection'] - 1,:]
+                    values_at_layer = values.reshape(new_shape)[:, input_data.metadata['layer_selection'] - 1, :]
                     output_stream.write_entire_frame(output_header, input_data.time[time_index], values_at_layer)
                     self.progress_bar.setValue(100 * (i+1) / len(input_data.selected_time_indices))
                     QApplication.processEvents()

@@ -1590,7 +1590,7 @@ class HTMLDelegate(QStyledItemDelegate):
 
     def sizeHint(self, option, index):
         options = QStyleOptionViewItem(option)
-        self.initStyleOption(options,index)
+        self.initStyleOption(options, index)
 
         doc = QTextDocument()
         doc.setHtml(options.text)
