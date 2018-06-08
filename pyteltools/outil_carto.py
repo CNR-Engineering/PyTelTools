@@ -594,5 +594,3 @@ if __name__ == '__main__':
     welcome = WelcomeToCarto()
     welcome.show()
     app.exec_()
-
-

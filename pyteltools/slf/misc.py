@@ -601,7 +601,7 @@ class VerticalMaxMinMeanCalculator:
         self.input_stream = input_stream
         self.add_vars = add_vars
 
-        scalars, vectors, additional_equations = scalars_vectors_3d(output_header.var_IDs,  selected_vars)
+        scalars, vectors, additional_equations = scalars_vectors_3d(output_header.var_IDs, selected_vars)
         self.selected_scalars = scalars
         self.selected_vectors = vectors
         self.additional_equations = additional_equations

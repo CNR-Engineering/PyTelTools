@@ -1,3 +1,4 @@
+# pylint: disable=C0326
 """!
 Read and write .shp files
 """

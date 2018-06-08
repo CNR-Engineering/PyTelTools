@@ -1,6 +1,9 @@
 import datetime
-from PyQt5.QtCore import *
-from PyQt5.QtWidgets import *
+from PyQt5.QtCore import Qt
+from PyQt5.QtWidgets import (QApplication, QCheckBox, QComboBox, QDialog, QGridLayout, QGroupBox,
+                             QHeaderView, QHBoxLayout, QLabel, QLineEdit, QMessageBox, QPushButton,
+                             QRadioButton, QSpacerItem, QStyle, QTableWidget, QTableWidgetItem, QTabWidget,
+                             QVBoxLayout, QWidget)
 import logging
 import numpy as np
 import sys
@@ -646,7 +649,7 @@ class ArrivalDurationTab(QWidget):
         canceled, filename = save_dialog('Serafin', self.data.filename)
         if canceled:
             return
-        
+
         # deduce header from selected variable IDs and write header
         output_header = self.getOutputHeader()
         output_message = 'Computing Arrival / Duration between frame %d and %d.' \
@@ -941,5 +944,3 @@ if __name__ == '__main__':
     widget = MaxMinMeanGUI()
     widget.show()
     app.exec_()
-
-

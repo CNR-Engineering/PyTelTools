@@ -1,8 +1,10 @@
 import datetime
 from itertools import cycle
 import logging
-from PyQt5.QtWidgets import *
-from PyQt5.QtCore import *
+from PyQt5.QtCore import Qt
+from PyQt5.QtWidgets import (QAction, QApplication, QComboBox, QGridLayout,  QHBoxLayout,
+                             QLabel, QLineEdit, QMenu, QMessageBox, QPlainTextEdit, QPushButton,
+                             QSpacerItem, QStyle, QTabWidget, QVBoxLayout)
 import sys
 
 from pyteltools.slf.flux import FluxCalculator, PossibleFluxComputation
@@ -62,7 +64,8 @@ class InputTab(SerafinInputTab):
 
     def _initWidgets(self):
         # create the button open Polygon
-        self.btnOpenPolyline = QPushButton('Load\nSections', self, icon=self.style().standardIcon(QStyle.SP_DialogOpenButton))
+        self.btnOpenPolyline = QPushButton('Load\nSections', self,
+                                           icon=self.style().standardIcon(QStyle.SP_DialogOpenButton))
         self.btnOpenPolyline.setToolTip('<b>Open</b> a .i2s or .shp file')
         self.btnOpenPolyline.setFixedSize(105, 50)
         self.btnOpenPolyline.setEnabled(False)
@@ -82,7 +85,8 @@ class InputTab(SerafinInputTab):
         self.timeSampling.setFixedWidth(50)
 
         # create the submit button
-        self.btnSubmit = QPushButton('Submit\n(to .csv)', self, icon=self.style().standardIcon(QStyle.SP_DialogSaveButton))
+        self.btnSubmit = QPushButton('Submit\n(to .csv)', self,
+                                     icon=self.style().standardIcon(QStyle.SP_DialogSaveButton))
         self.btnSubmit.setFixedSize(105, 50)
         self.btnSubmit.setEnabled(False)
 
@@ -222,7 +226,7 @@ class InputTab(SerafinInputTab):
         logging.info('Finished reading the polyline file %s' % filename)
         self.polygonNameBox.clear()
         self.polygonNameBox.appendPlainText(filename + '\n' + 'The file contains {} open polyline{}.'.format(
-                                            len(self.polylines), 's' if len(self.polylines) > 1 else ''))
+            len(self.polylines), 's' if len(self.polylines) > 1 else ''))
         self.csvNameBox.clear()
         self.btnSubmit.setEnabled(True)
         self.parent.imageTab.reset()
@@ -287,7 +291,8 @@ class ImageTab(FluxPlotViewer):
         canvas = LineMapCanvas()
         self.map = MapViewer(canvas)
         self.has_map = False
-        self.locateSections = QAction('Locate sections\non map', self, icon=self.style().standardIcon(QStyle.SP_DialogHelpButton),
+        self.locateSections = QAction('Locate sections\non map', self,
+                                      icon=self.style().standardIcon(QStyle.SP_DialogHelpButton),
                                       triggered=self.locateSectionsEvent)
         self.locateSections_short = QAction('Locate sections\non map', self,
                                             icon=self.style().standardIcon(QStyle.SP_DialogHelpButton),
@@ -407,5 +412,3 @@ if __name__ == '__main__':
     widget = ComputeFluxGUI()
     widget.show()
     app.exec_()
-
-

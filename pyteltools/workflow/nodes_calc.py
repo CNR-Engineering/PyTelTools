@@ -512,7 +512,7 @@ class ComputeVolumeNode(TwoInOneOutNode):
             self.construct_mesh(mesh)
             self.in_data.index = mesh.index
             self.in_data.triangles = mesh.triangles
-        
+
         # run the calculator
         with Serafin.Read(self.in_data.filename, self.in_data.language) as input_stream:
             input_stream.header = self.in_data.header
@@ -579,7 +579,7 @@ class ComputeVolumeNode(TwoInOneOutNode):
                 if not self.is_valid_csv():
                     self.data = None
                     self.fail('The existing file is not valid.')
-                    return 
+                    return
                 self.data.metadata = {'var': self.first_var, 'second var': self.second_var,
                                       'start time': self.in_data.start_time, 'language': self.in_data.language}
                 self.success('Reload existing file.')
@@ -780,7 +780,7 @@ class ComputeFluxNode(TwoInOneOutNode):
             self.construct_mesh(mesh)
             self.in_data.index = mesh.index
             self.in_data.triangles = mesh.triangles
-    
+
         # run the calculator
         with Serafin.Read(self.in_data.filename, self.in_data.language) as input_stream:
             input_stream.header = self.in_data.header
@@ -810,7 +810,7 @@ class ComputeFluxNode(TwoInOneOutNode):
 
                 self.progress_bar.setValue(100 * (i+1) / len(calculator.time_indices))
                 QApplication.processEvents()
-    
+
     def is_valid_csv(self):
         if not self.data.table:
             return False
@@ -842,7 +842,7 @@ class ComputeFluxNode(TwoInOneOutNode):
                 if not self.is_valid_csv():
                     self.data = None
                     self.fail('The existing file is not valid.')
-                    return 
+                    return
                 self.data.metadata = {'flux title': self.flux_options,
                                       'language': self.in_data.language, 'start time': self.in_data.start_time,
                                       'var IDs': PossibleFluxComputation.get_variables(self.flux_options)}
@@ -897,7 +897,8 @@ class InterpolateOnPointsNode(TwoInOneOutNode):
         old_options = (self.suffix, self.in_source_folder, self.dir_path, self.double_name, self.overwrite)
         self.panel = OutputOptionPanel(old_options)
         if super().configure(self.panel.check):
-            self.suffix, self.in_source_folder, self.dir_path, self.double_name, self.overwrite = self.panel.get_options()
+            self.suffix, self.in_source_folder, self.dir_path, self.double_name, self.overwrite = \
+                self.panel.get_options()
             self.reconfigure_downward()
 
     def save(self):
@@ -1021,7 +1022,7 @@ class InterpolateOnPointsNode(TwoInOneOutNode):
                 if not self.is_valid_csv(points.points, selected_vars):
                     self.data = None
                     self.fail('The existing file is not valid.')
-                    return 
+                    return
                 self.data.metadata = {'start time': self.in_data.start_time, 'var IDs': selected_vars,
                                       'language': self.in_data.language, 'points': points}
                 self.success('Reload existing file.')
@@ -1070,7 +1071,8 @@ class InterpolateAlongLinesNode(DoubleInputNode):
         old_options = (self.suffix, self.in_source_folder, self.dir_path, self.double_name, self.overwrite)
         self.panel = OutputOptionPanel(old_options)
         if super().configure(self.panel.check):
-            self.suffix, self.in_source_folder, self.dir_path, self.double_name, self.overwrite = self.panel.get_options()
+            self.suffix, self.in_source_folder, self.dir_path, self.double_name, self.overwrite = \
+                self.panel.get_options()
             self.reconfigure_downward()
 
     def save(self):
@@ -1098,7 +1100,7 @@ class InterpolateAlongLinesNode(DoubleInputNode):
             self.construct_mesh(mesh)
             self.in_data.index = mesh.index
             self.in_data.triangles = mesh.triangles
-            
+
         lines = self.second_in_port.mother.parentItem().data.lines
         nb_nonempty, indices_nonempty, line_interpolators, _ = mesh.get_line_interpolators(lines)
         if nb_nonempty == 0:
@@ -1358,8 +1360,6 @@ class ProjectLinesNode(DoubleInputNode):
                 QApplication.processEvents()
 
         self.data.write(filename, self.scene().csv_separator)
-        self.success('Output saved to %s\n{} line{} the mesh continuously.'.format(filename, nb_nonempty,
-                                                                                   's intersect' if nb_nonempty > 1
-                                                                                   else ' intersects'))
-
-
+        self.success('Output saved to %s\n%i line%s the mesh continuously.' % (filename, nb_nonempty,
+                                                                               's intersect' if nb_nonempty > 1
+                                                                               else ' intersects'))

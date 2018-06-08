@@ -284,5 +284,3 @@ def new_variables_from_US(known_vars):
     if 'MU' in known_vars:
         new_vars.append(FROTP)
     return new_vars
-
-

@@ -1038,7 +1038,7 @@ class VerticalCrossSectionPlotViewer(PlotViewer):
         self.change_color_range_act_short = QAction('Change color range', self, triggered=self.change_color_range,
                                                     icon=self.style().standardIcon(QStyle.SP_DialogHelpButton))
         self.change_tangential_vel_act = QAction('Tangential\nvelocities', self, triggered=self.change_tangential_vel,
-                                               icon=self.style().standardIcon(QStyle.SP_DialogHelpButton))
+                                                 icon=self.style().standardIcon(QStyle.SP_DialogHelpButton))
         self.toggle_mesh_display_act = QAction('Show\nmesh', self, triggered=self.toggle_mesh_display, checkable=True,
                                                icon=self.style().standardIcon(QStyle.SP_DialogApplyButton))
         self.toggle_revert_act = QAction('Revert\nSection', self, triggered=self.toggle_revert_section,
@@ -1255,8 +1255,8 @@ class VerticalCrossSectionPlotViewer(PlotViewer):
                 return settings.TITLE_CROSS_SECTION.format(varID=self.current_var,
                                                            section_id=self.current_section)
             except KeyError:
-                logger.warning('TITLE_CROSS_SECTION is invalid: keyword `%s` is not allowed'.format(
-                               settings.TITLE_CROSS_SECTION))
+                logger.warning('TITLE_CROSS_SECTION is invalid: keyword `%s` is not allowed' %
+                               settings.TITLE_CROSS_SECTION)
         value = {'fr': 'Valeurs', 'en': 'Values'}[self.language]
         of = {'fr': 'de', 'en': 'of'}[self.language]
         at = {'fr': 'à la', 'en': 'at'}[self.language]

@@ -211,6 +211,3 @@ if __name__ == '__main__':
     window = ClassicMainWindow()
     window.show()
     app.exec_()
-
-
-

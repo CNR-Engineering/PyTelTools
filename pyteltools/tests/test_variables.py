@@ -97,4 +97,3 @@ class VariablesTestCase(unittest.TestCase):
         self.assertEqual(eq_name(get_necessary_equations(['EF', 'H', 'S', 'DF'], ['QS', 'S'], True, None)), ['QS'])
         self.assertEqual(eq_name(get_necessary_equations(['QSX', 'EF', 'H', 'DF', 'QSY', 'B'], ['S', 'QS', 'H'], True, None)), ['S', 'QS'])
         self.assertEqual(eq_name(get_necessary_equations(['DMAX', 'US', 'QSX', 'EF', 'Q', 'DF', 'S', 'B'], ['H', 'QS'], True, None)), ['H', 'QS'])
-

@@ -1,7 +1,10 @@
 from copy import deepcopy
 import logging
-from PyQt5.QtCore import *
-from PyQt5.QtGui import *
+from PyQt5.QtCore import (QCoreApplication, QPoint, QRectF, Qt)
+from PyQt5.QtGui import (QColor, QTransform)
+from PyQt5.QtWidgets import (QAbstractItemView, QAction, QApplication, QGraphicsScene, QGraphicsView, QHBoxLayout,
+                             QMessageBox, QPlainTextEdit, QSizePolicy, QSplitter, QTableWidget, QTableWidgetItem,
+                             QToolBar, QToolButton, QVBoxLayout, QWidget)
 import os
 from time import time
 import sys
@@ -702,7 +705,7 @@ class MultiWidget(QWidget):
             second_id = node.second_ids[pair_index]
             if second_id in node.pending_data:
                 self.worker.add_task((fun, (node_id, fid,
-                                      data, node.pending_data[second_id], False)))
+                                            data, node.pending_data[second_id], False)))
                 return True
             else:
                 node.pending_data[fid] = data

@@ -154,4 +154,3 @@ def get_available_variables(computables, basic_equations):
         if not found_new_computable:
             break
     return available_vars
-

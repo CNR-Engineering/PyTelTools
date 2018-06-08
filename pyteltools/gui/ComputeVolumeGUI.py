@@ -1,8 +1,10 @@
 import datetime
 from itertools import cycle
 import logging
-from PyQt5.QtCore import *
-from PyQt5.QtWidgets import *
+from PyQt5.QtCore import Qt
+from PyQt5.QtWidgets import (QAction, QApplication, QCheckBox, QComboBox, QGridLayout,  QHBoxLayout,
+                             QLabel, QLineEdit, QMenu, QMessageBox, QPlainTextEdit, QPushButton,
+                             QSpacerItem, QStyle, QTabWidget, QVBoxLayout)
 import sys
 
 from pyteltools.slf import Serafin
@@ -326,7 +328,7 @@ class InputTab(SerafinInputTab):
         logging.info('Finished reading the polygon file %s' % filename)
         self.polygonNameBox.clear()
         self.polygonNameBox.appendPlainText(filename + '\n' + 'The file contains {} polygon{}.'.format(
-                                            len(self.polygons), 's' if len(self.polygons) > 1 else ''))
+            len(self.polygons), 's' if len(self.polygons) > 1 else ''))
         self.csvNameBox.clear()
         self.btnSubmit.setEnabled(True)
         self.parent.imageTab.reset()

@@ -1,6 +1,7 @@
 import logging
 import os.path
-from PyQt5.QtWidgets import *
+from PyQt5.QtWidgets import (QApplication, QFileDialog, QHBoxLayout, QMessageBox,
+                             QPushButton, QTabWidget, QVBoxLayout, QWidget)
 import sys
 
 from .mono_gui import MonoWidget

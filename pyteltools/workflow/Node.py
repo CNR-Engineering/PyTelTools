@@ -357,7 +357,7 @@ class Link(QGraphicsLineItem):
             tail_offset1 = QPointF(tail_dx, tail_dy)
             tail_offset2 = QPointF(-tail_dx, -tail_dy)
             self.selection_polygon = QPolygonF([self.line().p1()+offset1, self.line().p1()+offset2,
-                                                self.line().p2()+offset2,  self.tail.p2()+tail_offset2,
+                                                self.line().p2()+offset2, self.tail.p2()+tail_offset2,
                                                 self.tail.p2()+tail_offset1, self.line().p2()+offset1])
         else:
             head_angle = self.head.angle() * math.pi / 180

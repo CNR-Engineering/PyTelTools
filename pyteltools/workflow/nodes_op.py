@@ -1599,4 +1599,3 @@ class AddTransformationNode(OneInOneOutNode):
         self.data.transform_mesh(trans)
         self.data.metadata['transformation'] = trans
         self.success()
-

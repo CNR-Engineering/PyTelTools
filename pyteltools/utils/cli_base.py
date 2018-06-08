@@ -43,13 +43,13 @@ class PyTelToolsArgParse(argparse.ArgumentParser):
         Add pre-defined command line arguments
         @param arg_id <str>: argument identifier
         """
-        if 'in_slf' == arg_id:
+        if arg_id == 'in_slf':
             self.add_argument('in_slf', help='Serafin input filename')
-        elif 'out_slf' == arg_id:
+        elif arg_id == 'out_slf':
             self.add_argument('out_slf', help='Serafin output filename')
-        elif 'out_csv' == arg_id:
+        elif arg_id == 'out_csv':
             self.add_argument('out_csv', help='output csv file')
-        elif 'shift' == arg_id:
+        elif arg_id == 'shift':
             self.add_argument('--shift', type=float, nargs=2, help='translation (x_distance, y_distance)',
                               metavar=('X', 'Y'))
         else:

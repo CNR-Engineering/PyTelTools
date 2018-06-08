@@ -208,5 +208,3 @@ class MeshInterpolator(Mesh2D):
                     values = var_values[i_var]
                     row.append(fmt_float.format(interpolator.dot(values[[i, j, k]])))
                 yield u, row
-
-

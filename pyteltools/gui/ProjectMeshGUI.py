@@ -470,6 +470,3 @@ if __name__ == '__main__':
     widget = ProjectMeshGUI()
     widget.show()
     app.exec_()
-
-
-

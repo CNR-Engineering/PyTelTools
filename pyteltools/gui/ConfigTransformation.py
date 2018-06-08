@@ -860,4 +860,3 @@ if __name__ == '__main__':
     widget = TransformationMap()
     widget.show()
     app.exec_()
-

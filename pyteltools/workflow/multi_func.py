@@ -422,7 +422,8 @@ def arrival_duration(node_id, fid, data, options):
                 needed_vars.add(item[1:-1])
     available_vars = [var for var in data.selected_vars if var in data.header.var_IDs]
     if not all([var in available_vars for var in needed_vars]):
-        return False, node_id, fid, None, fail_message('variable not available', 'Compute Arrival Duration', data.job_id)
+        return False, node_id, fid, None, fail_message('variable not available',
+                                                       'Compute Arrival Duration', data.job_id)
     new_data = data.copy()
     new_data.operator = operations.ARRIVAL_DURATION
     new_data.metadata = {'conditions': conditions, 'table': table, 'time unit': time_unit}
@@ -524,7 +525,7 @@ def write_simple_slf(input_data, filename):
 
 def write_max_min_mean(input_data, filename):
     selected = [(var, input_data.selected_vars_names[var][0],
-                      input_data.selected_vars_names[var][1]) for var in input_data.selected_vars]
+                 input_data.selected_vars_names[var][1]) for var in input_data.selected_vars]
     scalars, vectors, additional_equations = operations.scalars_vectors(input_data.header.var_IDs,
                                                                         selected,
                                                                         input_data.us_equation)
@@ -729,7 +730,7 @@ def write_slf_single_layer(input_data, filename):
     if input_data.to_single:
         output_header.to_single_precision()
     selected_variables = [(var, input_data.selected_vars_names[var][0],
-                                input_data.selected_vars_names[var][1]) for var in input_data.selected_vars]
+                           input_data.selected_vars_names[var][1]) for var in input_data.selected_vars]
     output_header.set_variables(selected_variables)
 
     with Serafin.Read(input_data.filename, input_data.language) as input_stream:
@@ -1434,5 +1435,3 @@ FUNCTIONS = {'Select Variables': select_variables, 'Add Rouse': add_rouse, 'Sele
              'Write CSV': write_csv, 'Write shp': write_shp, 'Write vtk': write_vtk,
              'Load Serafin 2D': read_slf_2d, 'Load Serafin 3D': read_slf_3d,
              'Load Reference Serafin': read_slf_reference}
-
-

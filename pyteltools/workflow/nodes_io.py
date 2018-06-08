@@ -108,7 +108,8 @@ class WriteSerafinNode(OneInOneOutNode):
         old_options = (self.suffix, self.in_source_folder, self.dir_path, self.double_name, self.overwrite)
         self.panel = OutputOptionPanel(old_options)
         if super().configure(self.panel.check):
-            self.suffix, self.in_source_folder, self.dir_path, self.double_name, self.overwrite = self.panel.get_options()
+            self.suffix, self.in_source_folder, self.dir_path, self.double_name, self.overwrite = \
+                self.panel.get_options()
             self.reconfigure_downward()
 
     def save(self):
@@ -1210,4 +1211,3 @@ class WriteVtkNode(SingleInputNode):
                                   scalars, vectors, vtk_var_names, time_index)
 
         self.success()
-

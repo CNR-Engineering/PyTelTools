@@ -763,5 +763,3 @@ if __name__ == '__main__':
     widget = ExtractVariablesGUI()
     widget.show()
     app.exec_()
-
-

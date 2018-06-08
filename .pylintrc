@@ -1,0 +1,15 @@
+[MASTER]
+# Add files or directories to the blacklist. They should be base names, not
+# paths.
+ignore=pyteltools/tests
+
+extension-pkg-whitelist=PyQt5
+
+[TYPECHECK]
+# List of classes names for which member attributes should not be checked
+# (useful for classes with attributes dynamically set).
+ignored-classes=BaseGeometry,Serafin
+
+[FORMAT]
+# Maximum number of characters on a single line.
+max-line-length=120

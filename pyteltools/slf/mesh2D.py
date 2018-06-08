@@ -48,6 +48,3 @@ class Mesh2D:
            Beware: The returned list is not sorted
         """
         return list(self.index.intersection(bounding_box, objects='raw'))
-
-
-

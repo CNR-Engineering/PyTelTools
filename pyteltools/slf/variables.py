@@ -64,7 +64,7 @@ def do_calculations_in_frame(equations, input_serafin, time_index, selected_outp
         # handle the normal case (if not already done)
         if equation.output.ID() not in computed_values.keys():
             computed_values[equation.output.ID()] = do_calculation(equation,
-                                                                [computed_values[var_ID] for var_ID in input_var_IDs])
+                [computed_values[var_ID] for var_ID in input_var_IDs])
 
     # reconstruct the output values array in the order of the selected IDs
     nb_selected_vars = len(selected_output_IDs)
@@ -78,4 +78,3 @@ def do_calculations_in_frame(equations, input_serafin, time_index, selected_outp
         else:
             output_values[i, :] = computed_values[var_ID]
     return output_values
-

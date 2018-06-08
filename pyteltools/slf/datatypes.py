@@ -189,4 +189,3 @@ class PointData:
 
     def is_empty(self):
         return len(self.points) == 0
-

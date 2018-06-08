@@ -61,15 +61,15 @@ class MultiOutputPort(MultiPort):
 
     def connect(self, input_port):
         self.children.add(input_port)
-        
-        
+
+
 class Box(QGraphicsRectItem):
     WIDTH, HEIGHT = 80, 60
 
     def __init__(self, parent):
         super().__init__(0, 0, Box.WIDTH, Box.HEIGHT)
         self.setParentItem(parent)
-        
+
 
 class MultiNode(QGraphicsItem):
     """!
@@ -84,7 +84,7 @@ class MultiNode(QGraphicsItem):
         super().__init__()
         self._index = index
         self.box = Box(self)
-        
+
         self.setAcceptedMouseButtons(Qt.LeftButton)
         self.setFlag(QGraphicsItem.ItemIsSelectable)
 
@@ -198,7 +198,7 @@ class MultiLink(QGraphicsLineItem):
             tail_offset1 = QPointF(tail_dx, tail_dy)
             tail_offset2 = QPointF(-tail_dx, -tail_dy)
             self.selection_polygon = QPolygonF([self.line().p1()+offset1, self.line().p1()+offset2,
-                                                self.line().p2()+offset2,  self.tail.p2()+tail_offset2,
+                                                self.line().p2()+offset2, self.tail.p2()+tail_offset2,
                                                 self.tail.p2()+tail_offset1, self.line().p2()+offset1])
         else:
             head_angle = self.head.angle() * math.pi / 180

@@ -297,7 +297,7 @@ def load_transformation_map(filename):
                 transformations[i, j] = Transformation(angle, scalexy, scalez, dx, dy, dz)
                 transformations[j, i] = transformations[i, j].inverse()
         if len(labels) < 2:
-                raise ValueError
+            raise ValueError
         if not is_connected(list(range(len(labels))), transformations.keys()):
             raise ValueError
     except (ValueError, IndexError):

@@ -1990,7 +1990,7 @@ class PlotViewer(QWidget):
 class TemporalPlotViewer(PlotViewer):
     def __init__(self, column_name='Column'):
         super().__init__()
-        self.data = None
+        self.data = {}
         self.columns = []
         self.setMinimumWidth(600)
         self.canvas.figure.canvas.mpl_connect('motion_notify_event', self.mouseMove)

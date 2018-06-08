@@ -325,9 +325,3 @@ class VolumeCalculator:
         for line in result:
             output_stream.write(separator.join(line))
             output_stream.write('\n')
-
-
-
-
-
-

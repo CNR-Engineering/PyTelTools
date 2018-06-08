@@ -134,7 +134,7 @@ class TriangularVectorField(Mesh2D):
                             line.append(([0, 0], interpolator.get_interpolator_at(x, y)))
                         else:
                             line.append(([prev_y-y, x-prev_x],
-                                        interpolator.get_interpolator_at(x, y)))
+                                         interpolator.get_interpolator_at(x, y)))
                     intersections[i, j, k].append(line)
         return intersections
 

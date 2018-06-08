@@ -1,6 +1,8 @@
 import numpy as np
-from PyQt5.QtCore import *
-from PyQt5.QtWidgets import *
+from PyQt5.QtCore import Qt
+from PyQt5.QtWidgets import (QAction, QApplication, QComboBox, QGridLayout, QGroupBox, QHBoxLayout,
+                             QInputDialog, QLabel, QLineEdit, QMessageBox, QPlainTextEdit, QPushButton,
+                             QSpacerItem, QStyle, QTabWidget, QVBoxLayout, QWidget)
 import sys
 
 from pyteltools.conf import settings
@@ -118,13 +120,15 @@ class InputTab(SerafinInputTab):
         self.btnOpenTest.setEnabled(False)
 
         # create the button open the polygon file
-        self.btnOpenPolygon = QPushButton('Load polygons\n(optional)', self, icon=self.style().standardIcon(QStyle.SP_DialogOpenButton))
+        self.btnOpenPolygon = QPushButton('Load polygons\n(optional)', self,
+                                          icon=self.style().standardIcon(QStyle.SP_DialogOpenButton))
         self.btnOpenPolygon.setToolTip('<b>Open</b> a .i2s or .shp file')
         self.btnOpenPolygon.setFixedSize(135, 50)
         self.btnOpenPolygon.setEnabled(False)
 
         # create the button for locating polygons on map
-        self.locatePolygons = QPushButton('Locate polygons\non map', icon=self.style().standardIcon(QStyle.SP_DialogHelpButton))
+        self.locatePolygons = QPushButton('Locate polygons\non map',
+                                          icon=self.style().standardIcon(QStyle.SP_DialogHelpButton))
         self.locatePolygons.setToolTip('<b>Open</b> a map with polygons')
         self.locatePolygons.setFixedSize(135, 50)
         self.locatePolygons.setEnabled(False)
@@ -328,7 +332,7 @@ class InputTab(SerafinInputTab):
 
         self.polygonNameBox.clear()
         self.polygonNameBox.appendPlainText(filename + '\n' + 'The file contains {} polygon{}.'.format(
-                                            len(self.polygons), 's' if len(self.polygons) > 1 else ''))
+            len(self.polygons), 's' if len(self.polygons) > 1 else ''))
 
         self.polygonBox.clear()
         self.polygonBox.addItem('Entire mesh')
@@ -921,6 +925,3 @@ if __name__ == '__main__':
     widget = CompareResultsGUI()
     widget.show()
     app.exec_()
-
-
-

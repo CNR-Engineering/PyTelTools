@@ -931,4 +931,3 @@ class ShpMultiPointConverter(GeomFileConverter):
                     line.extend(decoded_attributes)
                     f.write(self.csv_separator.join(map(str, line)))
                     f.write('\n')
-

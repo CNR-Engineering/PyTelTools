@@ -121,6 +121,3 @@ class Write(BlueKenue):
         for p in points:
             self.file.write(' '.join(map(str, p)))
             self.file.write('\n')
-
-
-

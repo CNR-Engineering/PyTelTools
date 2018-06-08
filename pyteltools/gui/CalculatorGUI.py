@@ -1,6 +1,11 @@
 import os
-from PyQt5.QtCore import *
-from PyQt5.QtWidgets import *
+from PyQt5.QtCore import Qt
+from PyQt5.QtWidgets import (QAbstractItemView, QApplication, QComboBox, QDialog, QDialogButtonBox,
+                             QFileDialog, QGridLayout, QGroupBox, QHeaderView, QHBoxLayout,
+                             QLabel, QLineEdit, QListWidget, QListWidgetItem, QMessageBox,
+                             QPushButton, QRadioButton, QSpacerItem, QStackedLayout, QStyle,
+                             QTableWidget, QTableWidgetItem, QTabWidget, QTextEdit,
+                             QVBoxLayout, QWidget)
 import struct
 import sys
 
@@ -125,7 +130,8 @@ class ExpressionDialog(QDialog):
                                           'expressions to create a new expression. Example: B+H+(V^2)/(2*9.81)')
         self.simple_button.setChecked(True)
         self.condition_button = QRadioButton('Conditional expression\nUse existing conditions and expressions'
-                                             'to create a conditional expression. Example: IF (B > 0) THEN (B) ELSE (0)')
+                                             'to create a conditional expression. '
+                                             'Example: IF (B > 0) THEN (B) ELSE (0)')
         self.max_min_button = QRadioButton('Max/Min between two expressions\nUse two existing expressions and'
                                            'MAX or MIN to create a new expression. Example: MAX(B, RB+0.5)')
         self.masked_button = QRadioButton('Masked expression\nUse an expression containing polygonal values '
@@ -718,7 +724,8 @@ class InputTab(QWidget):
 
         self.polygon_box = QGroupBox('Add Polygonal Masks (optional)')
         self.polygon_box.setStyleSheet('QGroupBox {font-size: 12px;font-weight: bold;}')
-        self.polygon_button = QPushButton('Open\npolygons', self, icon=self.style().standardIcon(QStyle.SP_DialogOpenButton))
+        self.polygon_button = QPushButton('Open\npolygons', self,
+                                          icon=self.style().standardIcon(QStyle.SP_DialogOpenButton))
         self.polygon_button.setToolTip('<b>Open</b> a .shp file')
         self.polygon_button.setFixedSize(105, 50)
         self.polygon_table = QTableWidget()

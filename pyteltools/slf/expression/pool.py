@@ -496,5 +496,3 @@ class ComplexExpressionMultiPool:
     def evaluate_iterator(self, selected_names):
         for data, output_header, pool in zip(self.input_data, self.output_headers(selected_names), self.pools):
             yield data.filename, data.header, output_header, pool
-
-

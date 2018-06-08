@@ -1,6 +1,5 @@
 from datetime import datetime
-from PyQt5.QtWidgets import *
-
+from PyQt5.QtWidgets import QDialog
 
 from pyteltools.geom.transformation import load_transformation_map
 from pyteltools.slf.Serafin import SLF_EIT
@@ -67,7 +66,7 @@ class MultiLoadPolygon2DNode(MultiSingleOutputNode):
         success, filename = validate_input_options(options)
         if not success:
             self.state = MultiNode.NOT_CONFIGURED
-        self.options = filename,
+        self.options = (filename, )
 
 
 class MultiLoadOpenPolyline2DNode(MultiSingleOutputNode):
@@ -80,7 +79,7 @@ class MultiLoadOpenPolyline2DNode(MultiSingleOutputNode):
         success, filename = validate_input_options(options)
         if not success:
             self.state = MultiNode.NOT_CONFIGURED
-        self.options = filename,
+        self.options = (filename, )
 
 
 class MultiLoadPoint2DNode(MultiSingleOutputNode):
@@ -93,7 +92,7 @@ class MultiLoadPoint2DNode(MultiSingleOutputNode):
         success, filename = validate_input_options(options)
         if not success:
             self.state = MultiNode.NOT_CONFIGURED
-        self.options = filename,
+        self.options = (filename, )
 
 
 class MultiLoadReferenceSerafinNode(MultiSingleOutputNode):
@@ -106,7 +105,7 @@ class MultiLoadReferenceSerafinNode(MultiSingleOutputNode):
         success, filename = validate_input_options(options)
         if not success:
             self.state = MultiNode.NOT_CONFIGURED
-        self.options = filename,
+        self.options = (filename, )
 
 
 class MultiWriteCsvNode(MultiSingleInputNode):
@@ -168,7 +167,7 @@ class MultiAddTransformationNode(MultiOneInOneOutNode):
         if not filename:
             return
         try:
-            with open(filename) as f:
+            with open(filename):
                 pass
         except FileNotFoundError:
             self.state = MultiNode.NOT_CONFIGURED
@@ -391,7 +390,7 @@ class MultiSelectSingleLayerNode(MultiOneInOneOutNode):
 
     def load(self, options):
         layer_selection = int(options[0])
-        if layer_selection<=0:
+        if layer_selection <= 0:
             self.state = MultiNode.NOT_CONFIGURED
             return
         self.options = (layer_selection,)
@@ -488,4 +487,3 @@ class MultiMinBetweenNode(MultiTwoInOneOutNode):
         super().__init__(index)
         self.category = 'Operators'
         self.label = 'Min(A,B)'
-

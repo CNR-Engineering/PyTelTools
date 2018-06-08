@@ -48,4 +48,3 @@ class AndOrCondition(ComplexCondition):
 
     def evaluate(self, current_values):
         return self.func(current_values[self.first_condition.code()], current_values[self.second_condition.code()])
-

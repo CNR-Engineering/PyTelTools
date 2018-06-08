@@ -1051,7 +1051,7 @@ class VerticalCrossSectionNode(DoubleInputNode):
             levels = np.linspace(self.plot_viewer.color_limits[0], self.plot_viewer.color_limits[1],
                                  settings.NB_COLOR_LEVELS)
             axes.tricontourf(triang, point_values, cmap=self.plot_viewer.current_style, levels = levels,
-                            vmin=self.plot_viewer.color_limits[0], vmax=self.plot_viewer.color_limits[1])
+                             vmin=self.plot_viewer.color_limits[0], vmax=self.plot_viewer.color_limits[1])
         else:
             levels = build_levels_from_minmax(np.nanmin(point_values), np.nanmax(point_values))
             axes.tricontourf(triang, point_values, cmap=self.plot_viewer.current_style, levels=levels)
@@ -1207,7 +1207,7 @@ class VerticalTemporalProfileNode(DoubleInputNode):
         if self.plot_viewer.color_limits is not None:
             levels = np.linspace(self.plot_viewer.color_limits[0], self.plot_viewer.color_limits[1],
                                  settings.NB_COLOR_LEVELS)
-            axes.tricontourf(triang, z, cmap=self.plot_viewer.current_style, levels = levels,
+            axes.tricontourf(triang, z, cmap=self.plot_viewer.current_style, levels=levels,
                              vmin=self.plot_viewer.color_limits[0], vmax=self.plot_viewer.color_limits[1])
         else:
             levels = build_levels_from_minmax(np.nanmin(z), np.nanmax(z))
@@ -1478,8 +1478,6 @@ class PointAttributeTableNode(SingleInputNode):
         parent_node = self.in_port.mother.parentItem()
         if not self.has_table:
             self.table.get_data(parent_node.data.points, [], parent_node.data.fields_name,
-                               parent_node.data.attributes_decoded)
+                                parent_node.data.attributes_decoded)
             self.has_table = True
         self.success()
-
-

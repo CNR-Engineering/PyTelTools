@@ -1,4 +1,4 @@
-from PyQt5.QtWidgets import *
+from PyQt5.QtWidgets import (QApplication, QDialog, QHBoxLayout, QPushButton)
 import sys
 
 from pyteltools.gui.classic_gui import ClassicMainWindow as GUIWindow

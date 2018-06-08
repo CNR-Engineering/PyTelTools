@@ -1,6 +1,9 @@
 import logging
-from PyQt5.QtWidgets import *
-from PyQt5.QtCore import *
+from PyQt5.QtCore import Qt
+from PyQt5.QtWidgets import (QApplication, QCheckBox, QComboBox, QFileDialog, QGroupBox,
+                             QHBoxLayout, QLabel, QLineEdit, QMessageBox, QPlainTextEdit, QPushButton,
+                             QRadioButton, QSpacerItem, QStackedLayout, QStyle, QTabWidget,
+                             QVBoxLayout, QWidget)
 import shapefile
 import sys
 

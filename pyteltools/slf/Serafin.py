@@ -750,7 +750,7 @@ class Read(Serafin):
         """!
         @brief Read the file header and check the file consistency
         """
-        self.header = SerafinHeader(self.language)
+        self.header = SerafinHeader(lang=self.language)
         self.header.from_file(self.file, self.file_size)
 
     def get_time(self):
@@ -941,4 +941,3 @@ class Write(Serafin):
             self.file.write(header.pack_int(header.float_size * header.nb_nodes))
             self.file.write(header.pack_float(*values[i, :], nb=header.nb_nodes))
             self.file.write(header.pack_int(header.float_size * header.nb_nodes))
-

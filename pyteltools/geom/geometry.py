@@ -124,7 +124,8 @@ class Polyline:
         @brief (Used in volume calculation) Return the polygon or multipolygon in triangle but not in polygon
         @param triangle <shapely.geometry.Polygon>: A triangle
         @param polygon <shapely.geometry.Polygon>: A polygon
-        @return <bool, shapely.geometry.Polygon or shapely.geometry.Multipolygon>: The difference between triangle and polygon
+        @return <bool, shapely.geometry.Polygon or shapely.geometry.Multipolygon>:
+            The difference between triangle and polygon
         """
         diff = triangle.difference(polygon.polyline())
         if diff.geom_type == 'Polygon' or diff.geom_type == 'MultiPolygon':

@@ -144,4 +144,3 @@ class ReferenceMesh(TruncatedTriangularPrisms):
             volume_boundary = TruncatedTriangularPrisms.boundary_volume_in_polygon(self.triangle_polygon_intersection,
                                                                                    squared_values)
             return self.point_weight.dot(squared_values) + volume_boundary
-
