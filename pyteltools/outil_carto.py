@@ -202,7 +202,7 @@ class PngDialog(QDialog):
     def _open(self):
         path = QFileDialog.getExistingDirectory(None, 'Choisir un dossier', '',
                                                 options=QFileDialog.Options() | QFileDialog.ShowDirsOnly |
-                                                        QFileDialog.DontUseNativeDialog)
+                                                QFileDialog.DontUseNativeDialog)
         if not path:
             return
         self.pathBox.setText(path)

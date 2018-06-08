@@ -62,7 +62,7 @@ class ArrivalDurationThread(OutputThread):
         self.nb_frames = len(time_indices)
         self.calculators = []
 
-        for i, condition in enumerate(self.conditions):
+        for condition in self.conditions:
             self.calculators.append(operations.ArrivalDurationCalculator(self.input_stream, self.time_indices,
                                                                          condition))
 

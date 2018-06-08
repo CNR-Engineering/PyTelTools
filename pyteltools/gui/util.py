@@ -3395,8 +3395,7 @@ class ProjectLinesPlotViewer(QWidget):
         self.control.timeSelection.initTime(self.time, frames)
 
         self.var_table = {}
-        for var_ID, var_name, var_unit in zip(self.header.var_IDs, self.header.var_names,
-                                              self.header.var_units):
+        for var_ID, var_unit in zip(self.header.var_IDs, self.header.var_units):
             var_unit = var_unit.decode(Serafin.SLF_EIT).strip()
             if var_unit in self.var_table:
                 self.var_table[var_unit].append(var_ID)

@@ -40,7 +40,8 @@ with open(sys.argv[2], 'w') as fileout:
         fileout.write('* [%s.py](#%spy)\n' % (script.name, script.name))
     fileout.write('\n')
     fileout.write('A **help message** is provided for each script with the argument `-h` (e.g. `slf_base.py -h`).\n')
-    fileout.write('Help messages are gathered below for each script (and this file was in fact automatically generated).\n')
+    fileout.write('Help messages are gathered below for each script '
+                  '(and this file was in fact automatically generated).\n')
     fileout.write('\n')
 
     # Write help message for each script

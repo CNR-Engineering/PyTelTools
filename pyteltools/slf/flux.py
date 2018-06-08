@@ -179,7 +179,7 @@ class TriangularVectorField(Mesh2D):
                     first_f, second_f = endpoints_f[p], endpoints_f[p+1]
 
                     flux += (2 * (first_f * first_h + second_f * second_h)
-                               + (first_f * second_h + second_f * first_h)) * np.linalg.norm(endpoints[p+1][0])
+                             + (first_f * second_h + second_f * first_h)) * np.linalg.norm(endpoints[p+1][0])
 
         return flux / 6
 

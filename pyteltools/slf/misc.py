@@ -566,7 +566,7 @@ class ScalarMaxMinMeanCalculator:
             computed_values = {}
 
         values = np.empty((self.nb_var, self.nb_nodes))
-        for i, (var, name, unit) in enumerate(self.selected_scalars):
+        for i, (var, _, _) in enumerate(self.selected_scalars):
             if var not in computed_values:
                 computed_values[var] = self.input_stream.read_var_in_frame(time_index, var)
             values[i, :] = computed_values[var]
@@ -636,7 +636,7 @@ class VerticalMaxMinMeanCalculator:
         else:
             computed_values = {}
 
-        for i, (var, name, unit) in enumerate(self.selected_scalars + self.selected_vectors):
+        for i, (var, _, _) in enumerate(self.selected_scalars + self.selected_vectors):
             if var not in computed_values:
                 computed_values[var] = self.input_stream.read_var_in_frame_as_3d(time_index, var)
         try:
@@ -870,7 +870,7 @@ class ProjectMeshCalculator:
 
     def read_values_in_frame(self, time_index, read_second):
         values = []
-        for i, var_ID in enumerate(self.selected_vars):
+        for var_ID in self.selected_vars:
             if read_second:
                 values.append(self.second_in.read_var_in_frame(time_index, var_ID))
             else:
@@ -912,7 +912,7 @@ class ProjectMeshCalculator:
                              for i in range(self.nb_var)])
 
     def run(self, out_stream, out_header):
-        for i, (first_time_index, second_time_index) in enumerate(self.time_indices):
+        for first_time_index, second_time_index in self.time_indices:
             values = self.operation_in_frame(first_time_index, second_time_index)
             if self.use_reference:
                 out_stream.write_entire_frame(out_header,

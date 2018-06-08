@@ -130,7 +130,7 @@ class TruncatedTriangularPrisms(Mesh2D):
         # remaining cases: triangle crosses the plane z = 0
         nb_points_superior = sum(values > 0)
         if nb_points_superior == 1:  # positive tetrahedron
-            (z_bottom, _, bottom), (z_middle, _, middle), (z_top, _, top) = sorted(zip(values, [1, 2, 3], [p1, p2, p3]))
+            (z_bottom, _, _), (z_middle, _, _), (z_top, _, _) = sorted(zip(values, [1, 2, 3], [p1, p2, p3]))
             return area * z_top ** 3 / 3 / (z_top - z_middle) / (z_top - z_bottom)
         else:  # negative tetrahedron
             (z_bottom, _, bottom), (z_middle, _, middle), (z_top, _, top) = sorted(zip(values, [1, 2, 3], [p1, p2, p3]))

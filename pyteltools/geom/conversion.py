@@ -349,7 +349,7 @@ class ShpPointConverter(PointFileConverter):
         for field_name, field_type, field_length, decimal_length in self.fields:
             w.field(field_name, field_type, str(field_length), decimal_length)
 
-        for (x, y, z), attribute in zip(new_shapes, self.attributes):
+        for (x, y, _), attribute in zip(new_shapes, self.attributes):
             w.point(x, y, shapeType=shapefile.POINT)
             w.record(*attribute)
         w.save(to_file)
@@ -789,13 +789,13 @@ class ShpMultiPointConverter(GeomFileConverter):
             # construct z
             attribute_index = int(zfield.split(' - ')[0])
             new_shapes = []
-            for i, (points, attributes) in enumerate(zip(self.shapes, self.attributes)):
+            for points, attributes in zip(self.shapes, self.attributes):
                 new_z = attributes[attribute_index]
                 new_list = [(x, y, new_z) for x, y, _ in points]
                 new_shapes.append(np.array(new_list))
         elif zfield == '0':
             new_shapes = []
-            for i, (points, attributes) in enumerate(zip(self.shapes, self.attributes)):
+            for points, attributes in zip(self.shapes, self.attributes):
                 new_list = [(x, y, 0) for x, y, _ in points]
                 new_shapes.append(np.array(new_list))
         else:
@@ -862,7 +862,7 @@ class ShpMultiPointConverter(GeomFileConverter):
 
         for i, (points, attributes) in enumerate(zip(new_shapes, self.attributes)):
             new_attributes = [i+1] + attributes
-            for x, y, z in points:
+            for x, y, _ in points:
                 w.point(x, y, shapeType=shapefile.POINT)
                 w.record(*new_attributes)
         w.save(to_file)

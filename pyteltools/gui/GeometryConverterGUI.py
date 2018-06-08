@@ -107,7 +107,7 @@ class FileConverterInputTab(QWidget):
 
     def _handleOpenShapefile(self, filename):
         try:
-            with open(filename, 'r') as f:
+            with open(filename, 'r'):
                 pass
         except PermissionError:
             QMessageBox.critical(None, 'Error', 'Permission denied.', QMessageBox.Ok)
@@ -242,7 +242,7 @@ class FileConverterOutputTab(QWidget):
 
         self.convert_type = {'xyz': {'xyz': self.EMPTY, 'shp PointZ': self.BK_SHP, 'csv': self.EMPTY},
                              'i2s': {'i2s': self.EMPTY, 'shp Polyline': self.BK_SHP,
-                                                        'shp Polygon': self.BK_SHP, 'csv': self.EMPTY},
+                                     'shp Polygon': self.BK_SHP, 'csv': self.EMPTY},
                              'i3s': {'i3s': self.EMPTY, 'i2s': self.EMPTY,
                                      'shp PolylineZ': self.BK_SHP,
                                      'shp PolygonZ': self.BK_SHP, 'csv': self.EMPTY},
@@ -276,14 +276,14 @@ class FileConverterOutputTab(QWidget):
                                                 'shp PointZ': self.Z_AND_M, 'shp PointM': self.M_FROM_SHP,
                                                 'xyz': self.Z_FROM_SHP, 'csv': self.EMPTY},
                              'shp MultiPointZ': {'shp MultiPoint': self.EMPTY, 'shp MultiPointZ': self.Z_AND_M,
-                                                'shp MultiPointM': self.M_FROM_SHP, 'shp Point': self.EMPTY,
-                                                'shp PointZ': self.Z_AND_M, 'shp PointM': self.M_FROM_SHP,
-                                                'xyz': self.Z_FROM_SHP, 'csv': self.EMPTY},
+                                                 'shp MultiPointM': self.M_FROM_SHP, 'shp Point': self.EMPTY,
+                                                 'shp PointZ': self.Z_AND_M, 'shp PointM': self.M_FROM_SHP,
+                                                 'xyz': self.Z_FROM_SHP, 'csv': self.EMPTY},
                              'shp MultiPointM': {'shp MultiPoint': self.EMPTY, 'shp MultiPointZ': self.Z_AND_M,
-                                                'shp MultiPointM': self.M_FROM_SHP, 'shp Point': self.EMPTY,
-                                                'shp PointZ': self.Z_AND_M, 'shp PointM': self.M_FROM_SHP,
-                                                'xyz': self.Z_FROM_SHP, 'csv': self.EMPTY}
-                             }
+                                                 'shp MultiPointM': self.M_FROM_SHP, 'shp Point': self.EMPTY,
+                                                 'shp PointZ': self.Z_AND_M, 'shp PointM': self.M_FROM_SHP,
+                                                 'xyz': self.Z_FROM_SHP, 'csv': self.EMPTY}
+                            }
         self._initWidgets()
         self._setLayout()
         self._bindEvents()
@@ -685,7 +685,7 @@ class FileConverterOutputTab(QWidget):
                                  QMessageBox.Ok)
             return
         try:
-            with open(filename, 'w') as f:
+            with open(filename, 'w'):
                 pass
         except PermissionError:
             QMessageBox.critical(self, 'Error',

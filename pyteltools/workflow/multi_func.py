@@ -42,7 +42,7 @@ class Workers:
         self.started = True
 
     def stop(self):
-        for i in range(self.nb_processes):
+        for _ in range(self.nb_processes):
             self.task_queue.put('STOP')
         self.stopped = True
 

@@ -173,7 +173,7 @@ class MultiScene(QGraphicsScene):
                 nb_nodes, nb_links = map(int, f.readline().split())
 
                 # load nodes
-                for i in range(nb_nodes):
+                for _ in range(nb_nodes):
                     line = f.readline().rstrip().split('|')
                     category, name, index, x, y = line[:5]
                     if category == 'Visualization':  # ignore all visualization nodes

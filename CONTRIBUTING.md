@@ -53,11 +53,11 @@ Possible datatypes as input/output for workflow tools are currently:
   * `slf 3d`
   * `slf geom`
   * `slf out`
-* CSV
+* CSV output results
   * `point csv`
   * `volume csv`
   * `flux csv`
-* Geopositional data
+* Geometry data
   * `point 2d`
   * `polyline 2d`
   * `polygon 2d`

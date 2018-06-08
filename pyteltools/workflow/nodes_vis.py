@@ -257,7 +257,7 @@ class LocateOpenLinesNode(DoubleInputNode):
         line_data = self.second_in_port.mother.parentItem().data
         self.map.canvas.reinitFigure(mesh, line_data.lines, [line.id for line in line_data.lines],
                                      list(islice(cycle(['b', 'r', 'g', 'y', 'k', 'c', '#F28AD6', 'm']),
-                                          len(line_data))))
+                                                 len(line_data))))
 
         self.has_map = True
         self.map.canvas.draw()
@@ -670,8 +670,8 @@ class MultiFrameLinePlotNode(DoubleInputNode):
             input_data.triangles = mesh.triangles
 
         lines = self.second_in_port.mother.parentItem().data.lines
-        nb_nonempty, indices_nonempty, \
-                     line_interpolators, line_interpolators_internal = mesh.get_line_interpolators(lines)
+        nb_nonempty, indices_nonempty, line_interpolators, line_interpolators_internal = \
+            mesh.get_line_interpolators(lines)
         if nb_nonempty == 0:
             return False
         self.success()
@@ -830,8 +830,8 @@ class ProjectLinesPlotNode(DoubleInputNode):
             input_data.triangles = mesh.triangles
 
         lines = self.second_in_port.mother.parentItem().data.lines
-        nb_nonempty, indices_nonempty, \
-                     line_interpolators, line_interpolators_internal = mesh.get_line_interpolators(lines)
+        nb_nonempty, indices_nonempty, line_interpolators, line_interpolators_internal = \
+            mesh.get_line_interpolators(lines)
         if nb_nonempty == 0:
             return False
         self.success()
@@ -1010,7 +1010,7 @@ class VerticalCrossSectionNode(DoubleInputNode):
 
         sections = self.second_in_port.mother.parentItem().data.lines
 
-        line_interpolators, distances, line_interpolators_internal, distances_internal = \
+        _, _, line_interpolators_internal, distances_internal = \
             mesh.get_line_interpolators(sections)
 
         is_inside = [True if dist[0] else False for dist in distances_internal]
@@ -1050,7 +1050,7 @@ class VerticalCrossSectionNode(DoubleInputNode):
         if self.plot_viewer.color_limits is not None:
             levels = np.linspace(self.plot_viewer.color_limits[0], self.plot_viewer.color_limits[1],
                                  settings.NB_COLOR_LEVELS)
-            axes.tricontourf(triang, point_values, cmap=self.plot_viewer.current_style, levels = levels,
+            axes.tricontourf(triang, point_values, cmap=self.plot_viewer.current_style, levels=levels,
                              vmin=self.plot_viewer.color_limits[0], vmax=self.plot_viewer.color_limits[1])
         else:
             levels = build_levels_from_minmax(np.nanmin(point_values), np.nanmax(point_values))

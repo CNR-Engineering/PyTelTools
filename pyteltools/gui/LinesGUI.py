@@ -78,7 +78,8 @@ class InputTab(SerafinInputTab):
         self.linesNameBox.setFixedHeight(50)
 
         # create the map button
-        self.btnMap = QPushButton('Locate lines\non map', self, icon=self.style().standardIcon(QStyle.SP_DialogHelpButton))
+        self.btnMap = QPushButton('Locate lines\non map', self,
+                                  icon=self.style().standardIcon(QStyle.SP_DialogHelpButton))
         self.btnMap.setFixedSize(135, 50)
         self.btnMap.setEnabled(False)
 
@@ -241,7 +242,8 @@ class CSVTab(QWidget):
         self.intersect.setChecked(True)
 
         # create the submit button
-        self.btnSubmit = QPushButton('Submit\nto .csv', self, icon=self.style().standardIcon(QStyle.SP_DialogSaveButton))
+        self.btnSubmit = QPushButton('Submit\nto .csv', self,
+                                     icon=self.style().standardIcon(QStyle.SP_DialogSaveButton))
         self.btnSubmit.setToolTip('<b>Write</b> output to .csv')
         self.btnSubmit.setFixedSize(105, 50)
         self.btnSubmit.setEnabled(False)

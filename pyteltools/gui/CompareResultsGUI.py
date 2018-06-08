@@ -300,7 +300,7 @@ class InputTab(SerafinInputTab):
             return
 
         # check if the mesh is identical to the reference
-        if not self.ref_data.header.same_2D_mesh(data.header):
+        if not self.ref_data.header.same_2d_mesh(data.header):
             QMessageBox.critical(self, 'Error', 'The mesh is not identical to the reference.', QMessageBox.Ok)
             return
 

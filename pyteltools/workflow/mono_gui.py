@@ -91,11 +91,18 @@ class MonoScene(QGraphicsScene):
         self.csv_separator = settings.CSV_SEPARATOR
         self.fmt_float = settings.FMT_FLOAT
 
-        self._init_with_default_node()
+        self.nodes = {}
+        self.nb_nodes = 0
+        self.adj_list = {}
+        self.current_line = None
+        self.current_port = None
+        self.project_path = ''
 
         self.setSceneRect(QRectF(0, 0, settings.SCENE_SIZE[0], settings.SCENE_SIZE[1]))
         self.transform = QTransform()
         self.selectionChanged.connect(self.selection_changed)
+
+        self._init_with_default_node()
 
     def reinit(self):
         self.clear()
@@ -205,14 +212,14 @@ class MonoScene(QGraphicsScene):
             with open(filename, 'r') as f:
                 self.language, self.csv_separator = f.readline().rstrip().split('.')
                 nb_nodes, nb_links = map(int, f.readline().split())
-                for i in range(nb_nodes):
+                for _ in range(nb_nodes):
                     line = f.readline().rstrip().split('|')
                     category, name, index, x, y = line[:5]
                     node = NODES[category][name](int(index))
                     node.load(line[5:])
                     self.add_node(node, float(x), float(y))
 
-                for i in range(nb_links):
+                for _ in range(nb_links):
                     from_node_index, from_port_index, \
                                      to_node_index, to_port_index = map(int, f.readline().rstrip().split('|'))
                     from_node = self.nodes[from_node_index]
@@ -374,7 +381,7 @@ class MonoScene(QGraphicsScene):
         return suffix
 
     def not_connected(self):
-        nb_cc, labels = count_cc(list(self.adj_list.keys()), self.adj_list)
+        nb_cc, _ = count_cc(list(self.adj_list.keys()), self.adj_list)
         return nb_cc > 1
 
 
@@ -617,7 +624,6 @@ class MonoWidget(QWidget):
 
         if project_path is not None:
             self.scene.load(project_path)
-            start_time = time()
             self.scene.run_all()
 
 

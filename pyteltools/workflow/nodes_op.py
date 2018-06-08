@@ -108,7 +108,7 @@ class SelectVariablesNode(OneInOneOutNode):
 
             if 'US' not in self.in_data.selected_vars and self.us_equation is not None:
                 new_vars = new_variables_from_US(self.in_data.selected_vars)
-                for i, var in enumerate(new_vars):
+                for var in new_vars:
                     if var.ID() not in self.selected_vars:
                         row = self.first_table.rowCount()
                         self.first_table.insertRow(row)
@@ -173,7 +173,7 @@ class SelectVariablesNode(OneInOneOutNode):
         self.us_equation = get_US_equation(self.friction_law)
         new_vars = new_variables_from_US([var for var in self.in_data.header.var_IDs
                                           if var in self.in_data.selected_vars])
-        for i, var in enumerate(new_vars):
+        for var in new_vars:
             row = self.first_table.rowCount()
             self.first_table.insertRow(row)
             id_item = QTableWidgetItem(var.ID().strip())
@@ -970,7 +970,7 @@ class VerticalAggregationNode(OneInOneOutNode):
         vlayout.addWidget(QLabel('Operation over the vertical'))
         self.vertical_operation_box = QButtonGroup(option_panel)
         self.vertical_operation_box.setExclusive(True)
-        for i, operation_name in enumerate(VerticalAggregationNode.VERTICAL_OPERATIONS):
+        for operation_name in VerticalAggregationNode.VERTICAL_OPERATIONS:
             button = QRadioButton(operation_name)
             if operation_name == self.vertical_operation:
                 button.setChecked(True)

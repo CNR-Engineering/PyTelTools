@@ -2,7 +2,7 @@ import datetime
 from itertools import cycle
 import logging
 from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import (QAction, QApplication, QCheckBox, QComboBox, QGridLayout,  QHBoxLayout,
+from PyQt5.QtWidgets import (QAction, QApplication, QCheckBox, QComboBox, QGridLayout, QHBoxLayout,
                              QLabel, QLineEdit, QMenu, QMessageBox, QPlainTextEdit, QPushButton,
                              QSpacerItem, QStyle, QTabWidget, QVBoxLayout)
 import sys

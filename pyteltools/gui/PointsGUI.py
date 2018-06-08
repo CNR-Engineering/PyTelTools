@@ -4,7 +4,7 @@ import logging
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (QAction, QApplication, QDialog, QGridLayout, QHBoxLayout,
                              QLabel, QLineEdit, QMenu, QMessageBox, QPlainTextEdit, QPushButton,
-                             QSpacerItem, QStyle,QTabWidget, QVBoxLayout)
+                             QSpacerItem, QStyle, QTabWidget, QVBoxLayout)
 import sys
 
 from pyteltools.conf import settings
@@ -82,12 +82,14 @@ class InputTab(SerafinInputTab):
 
     def _initWidgets(self):
         # create the button open points
-        self.btnOpenPoints = QPushButton('Load\nPoints', self, icon=self.style().standardIcon(QStyle.SP_DialogOpenButton))
+        self.btnOpenPoints = QPushButton('Load\nPoints', self,
+                                         icon=self.style().standardIcon(QStyle.SP_DialogOpenButton))
         self.btnOpenPoints.setToolTip('<b>Open</b> a .shp file')
         self.btnOpenPoints.setFixedSize(105, 50)
         self.btnOpenPoints.setEnabled(False)
 
-        self.btnOpenAttributes = QPushButton('Attributes\nTable', self, icon=self.style().standardIcon(QStyle.SP_FileDialogListView))
+        self.btnOpenAttributes = QPushButton('Attributes\nTable', self,
+                                             icon=self.style().standardIcon(QStyle.SP_FileDialogListView))
         self.btnOpenAttributes.setToolTip('<b>Open</b> the attribute table')
         self.btnOpenAttributes.setFixedSize(105, 50)
         self.btnOpenAttributes.setEnabled(False)
@@ -105,12 +107,14 @@ class InputTab(SerafinInputTab):
         self.timeSampling.setFixedWidth(50)
 
         # create the map button
-        self.btnMap = QPushButton('Locate points\non map', self, icon=self.style().standardIcon(QStyle.SP_DialogHelpButton))
+        self.btnMap = QPushButton('Locate points\non map', self,
+                                  icon=self.style().standardIcon(QStyle.SP_DialogHelpButton))
         self.btnMap.setFixedSize(135, 50)
         self.btnMap.setEnabled(False)
 
         # create the submit button
-        self.btnSubmit = QPushButton('Submit\nto .csv', self, icon=self.style().standardIcon(QStyle.SP_DialogSaveButton))
+        self.btnSubmit = QPushButton('Submit\nto .csv', self,
+                                     icon=self.style().standardIcon(QStyle.SP_DialogSaveButton))
         self.btnSubmit.setToolTip('<b>Write</b> output to .csv')
         self.btnSubmit.setFixedSize(105, 50)
         self.btnSubmit.setEnabled(False)

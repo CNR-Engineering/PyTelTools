@@ -176,8 +176,8 @@ class InputTab(SerafinInputTab):
             self.linesNameBox.clear()
             self.linesNameBox.appendPlainText(old_filename + '\n' + 'The file contains {} open polyline{}.'
                                               '{} line{} the mesh continuously.'.format(
-                                              len(self.lines), 's' if len(self.lines) > 1 else '',
-                                              nb_nonempty, 's intersect' if nb_nonempty > 1 else ' intersects'))
+                                                  len(self.lines), 's' if len(self.lines) > 1 else '',
+                                                  nb_nonempty, 's intersect' if nb_nonempty > 1 else ' intersects'))
 
             self.has_map = False
             self.btnMap.setEnabled(True)

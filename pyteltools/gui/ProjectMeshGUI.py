@@ -125,9 +125,9 @@ class InputTab(SerafinInputTab):
 
     def _reinitCommonFrames(self):
         first_frames = list(map(lambda x: self.first_data.start_time
-                                                + datetime.timedelta(seconds=x), self.first_data.time))
+                                + datetime.timedelta(seconds=x), self.first_data.time))
         second_frames = list(map(lambda x: self.second_data.start_time
-                                                + datetime.timedelta(seconds=x), self.second_data.time))
+                                 + datetime.timedelta(seconds=x), self.second_data.time))
         self.common_frames = []
         for first_index, first_frame in enumerate(first_frames):
             for second_index, second_frame in enumerate(second_frames):
@@ -323,9 +323,9 @@ class SubmitTab(QWidget):
         self.infoBox.clear()
         self.infoBox.appendPlainText('The two files has {} common variables and {} common frames.\n'
                                      'The mesh A has {} / {} nodes inside the mesh B.'.format(
-                                     self.firstTable.rowCount() + self.secondTable.rowCount(),
-                                     len(self.input.common_frames),
-                                     sum(self.input.is_inside), self.input.first_data.header.nb_nodes))
+                                         self.firstTable.rowCount() + self.secondTable.rowCount(),
+                                         len(self.input.common_frames),
+                                         sum(self.input.is_inside), self.input.first_data.header.nb_nodes))
 
     def reset(self):
         self.firstTable.setRowCount(0)

@@ -1,9 +1,13 @@
 import datetime
 import numpy as np
 import os
-from PyQt5.QtCore import *
-from PyQt5.QtGui import *
-from PyQt5.QtWidgets import *
+from PyQt5.QtCore import (QDir, Qt)
+from PyQt5.QtGui import (QColor, QPalette)
+from PyQt5.QtWidgets import (QAbstractItemView, QAction, QApplication, QCheckBox, QComboBox,
+                             QDialog, QDialogButtonBox, QDoubleSpinBox, QFileDialog, QFormLayout, QGroupBox,
+                             QHBoxLayout, QInputDialog, QLabel, QLineEdit, QMenu, QMessageBox,
+                             QPlainTextEdit, QPushButton, QRadioButton, QScrollArea, QStackedLayout, QStyle,
+                             QTableWidget, QTableWidgetItem, QToolBar, QTreeView, QVBoxLayout, QWidget)
 
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT
 from matplotlib import cm
@@ -112,7 +116,7 @@ def validate_input_options(options):
     if not filename:
         return False, ''
     try:
-        with open(filename) as f:
+        with open(filename):
             pass
     except FileNotFoundError:
         return False, ''
@@ -449,7 +453,8 @@ class MultiLoadDialog(QDialog):
     def _open(self):
         if self.dir_paths:
             msg = QMessageBox.warning(None, 'Confirm load',
-                                      'Do you want to re-open source folders?\n(Your current selection will be cleared)',
+                                      'Do you want to re-open source folders?\n'
+                                      '(Your current selection will be cleared)',
                                       QMessageBox.Ok | QMessageBox.Cancel, QMessageBox.Ok)
             if msg == QMessageBox.Cancel:
                 return
@@ -961,10 +966,12 @@ class VerticalCrossSectionPlotViewer(PlotViewer):
         self.time_index = -1
         self.section_names = []
         self.sections = []
+        self.section_indices = []
         self.line_interpolators = []
         self.triang, self.values, self.z_values, self.vars_values, self.values_w, self.values_ut = \
             None, None, None, None, None, None
         self.nplan = -1
+        self.language = ''
 
         self.color_limits = None
         self.cmap = None
@@ -1401,13 +1408,13 @@ class VerticalCrossSectionPlotViewer(PlotViewer):
         """
         line_interpolator, distances = self.line_interpolators[self.current_section_index]
         npt = len(distances)
+        tangential_vectors = np.empty((npt, 2))
 
         if self.current_var == 'Un' or self.tangential_vel_scales:
             # Compute normal vectors: one vector at each point, which is (anticlockwise) orthogonal to cross-section
             #   (At a turning point, the normal vector is based on the segment defined by the next and previous point)
             # Normal and tangential vectors are normalized
             normal_vectors = np.empty((npt, 2))
-            tangential_vectors = np.empty((npt, 2))
             coords = np.array([(x, y) for i, (x, y, _, _) in enumerate(line_interpolator)])
             normal_vectors[:, 0] = - (np.ediff1d(coords[:, 1], to_begin=0) + np.ediff1d(coords[:, 1], to_end=0))
             normal_vectors[:, 1] = np.ediff1d(coords[:, 0], to_begin=0) + np.ediff1d(coords[:, 0], to_end=0)
@@ -1416,7 +1423,8 @@ class VerticalCrossSectionPlotViewer(PlotViewer):
             tangential_vectors[:, 0] = - normal_vectors[:, 1]
             tangential_vectors[:, 1] = normal_vectors[:, 0]
 
-        if self.revert_section:  # Only the distances and tangencial velocities are reverted (normal velocities are not affected)
+        if self.revert_section:
+            # Only the distances and tangencial velocities are reverted (normal velocities are not affected)
             distances = np.amax(distances) - distances
             tangential_vectors = - tangential_vectors
 
@@ -1427,7 +1435,7 @@ class VerticalCrossSectionPlotViewer(PlotViewer):
         point_ut = np.empty((npt, self.nplan))
         point_w = np.empty((npt, self.nplan))
 
-        for i_pt, ((_, _, (i, j, k), interpolator), distance) in enumerate(zip(line_interpolator, distances)):
+        for i_pt, (_, _, (i, j, k), interpolator) in enumerate(line_interpolator):
             point_y[i_pt] = interpolator.dot(self.z_values[[i, j, k]])
 
             if self.current_var == 'Un' or self.tangential_vel_scales:  # Compute normal and tangential velocities
@@ -2144,7 +2152,7 @@ class MultiInterpolationPlotDialog(QDialog):
 
     def load(self, row, input_file, job_id, language):
         try:
-            with open(input_file) as f:
+            with open(input_file):
                 pass
         except PermissionError:
             self.fail(row, 1)
@@ -2162,8 +2170,8 @@ class MultiInterpolationPlotDialog(QDialog):
         return MeshInterpolator(input_data.header, True)
 
     def interpolate(self, row, input_mesh):
-        nb_nonempty, indices_nonempty, \
-                     line_interpolators, line_interpolators_internal = input_mesh.get_line_interpolators(self.lines)
+        nb_nonempty, _, line_interpolators, line_interpolators_internal = \
+            input_mesh.get_line_interpolators(self.lines)
         if nb_nonempty == 0:
             self.fail(row, 2)
             return False, None, None
@@ -2234,11 +2242,11 @@ class MultiSaveMultiVarLinePlotDialog(MultiInterpolationPlotDialog):
                 line_var_values_internal = []
                 var_values = input_stream.read_var_in_frame(self.time_index, var)
 
-                for x, y, (i, j, k), interpolator in line_interpolator:
+                for _, _, (i, j, k), interpolator in line_interpolator:
                     line_var_values.append(interpolator.dot(var_values[[i, j, k]]))
                 values.append(line_var_values)
 
-                for x, y, (i, j, k), interpolator in line_interpolator_internal:
+                for _, _, (i, j, k), interpolator in line_interpolator_internal:
                     line_var_values_internal.append(interpolator.dot(var_values[[i, j, k]]))
                 values_internal.append(line_var_values_internal)
 
@@ -2302,11 +2310,11 @@ class MultiSaveMultiFrameLinePlotDialog(MultiInterpolationPlotDialog):
                 line_var_values_internal = []
                 var_values = input_stream.read_var_in_frame(index, self.current_var)
 
-                for x, y, (i, j, k), interpolator in line_interpolator:
+                for _, _, (i, j, k), interpolator in line_interpolator:
                     line_var_values.append(interpolator.dot(var_values[[i, j, k]]))
                 values.append(line_var_values)
 
-                for x, y, (i, j, k), interpolator in line_interpolator_internal:
+                for _, _, (i, j, k), interpolator in line_interpolator_internal:
                     line_var_values_internal.append(interpolator.dot(var_values[[i, j, k]]))
                 values_internal.append(line_var_values)
         return values, values_internal
@@ -2352,7 +2360,7 @@ class MultiSaveProjectLinesDialog(MultiInterpolationPlotDialog):
             self.fail(row, 1)
             return False
         # check variables
-        for line_id, variables in self.current_vars.items():
+        for _, variables in self.current_vars.items():
             for var in variables:
                 if var not in input_data.header.var_IDs:
                     self.fail(row, 1)
@@ -2433,7 +2441,7 @@ class MultiSaveProjectLinesDialog(MultiInterpolationPlotDialog):
                 continue
 
             success, line_interpolators, \
-                     line_interpolators_internal = self.check_interpolate(row,  all_line_interpolators,
+                     line_interpolators_internal = self.check_interpolate(row, all_line_interpolators,
                                                                           all_line_interpolators_internal)
             if not success:
                 continue
@@ -2457,7 +2465,7 @@ class MultiSaveVerticalProfileDialog(MultiInterpolationPlotDialog):
 
     def load(self, row, input_file, job_id, language):
         try:
-            with open(input_file) as f:
+            with open(input_file):
                 pass
         except PermissionError:
             self.fail(row, 1)
@@ -2486,7 +2494,7 @@ class MultiSaveVerticalProfileDialog(MultiInterpolationPlotDialog):
         return True, point_interpolator
 
     def compute(self, input_data, point_interpolator):
-        n, k, m = len(input_data.time), input_data.header.nb_planes, input_data.header.nb_nodes_2d
+        n, k = len(input_data.time), input_data.header.nb_planes
         point_x = np.array([[input_data.time[i]] * k for i in range(n)])
         x = point_x.flatten()
 
@@ -2548,7 +2556,7 @@ class MultiSaveVerticalCrossSectionDialog(MultiInterpolationPlotDialog):
 
     def load(self, row, input_file, job_id, language):
         try:
-            with open(input_file) as f:
+            with open(input_file):
                 pass
         except PermissionError:
             self.fail(row, 1)
@@ -2568,7 +2576,7 @@ class MultiSaveVerticalCrossSectionDialog(MultiInterpolationPlotDialog):
         return True
 
     def interpolate(self, row, input_mesh):
-        line_interpolators, distances, line_interpolators_internal, distances_internal = \
+        _, _, line_interpolators_internal, distances_internal = \
             input_mesh.get_line_interpolators([self.line])
         is_inside = True if distances_internal else False
 
@@ -2594,7 +2602,7 @@ class MultiSaveVerticalCrossSectionDialog(MultiInterpolationPlotDialog):
             z = input_stream.read_var_in_frame_as_3d(time_index, 'Z').T
             values = input_stream.read_var_in_frame_as_3d(time_index, self.current_var).T
 
-        for i_pt, ((x, y, (i, j, k), interpolator), distance) in enumerate(zip(line_interpolator, distances)):
+        for i_pt, ((_, _, (i, j, k), interpolator), distance) in enumerate(zip(line_interpolator, distances)):
             point_y[i_pt] = interpolator.dot(z[[i, j, k]])
             point_values[i_pt] = interpolator.dot(values[[i, j, k]])
 
@@ -2614,7 +2622,7 @@ class MultiSaveVerticalCrossSectionDialog(MultiInterpolationPlotDialog):
         for row, input_data in zip(successful_rows, successful_input_data):
             # interpolation
             mesh = self.build_mesh(input_data)
-            success, distances, line_interp = self.interpolate(row, mesh)
+            success, _, line_interp = self.interpolate(row, mesh)
             if not success:
                 continue
 
@@ -2983,8 +2991,8 @@ class GeomInputOptionPanel(QWidget):
 
     def _open(self):
         filename, _ = QFileDialog.getOpenFileName(None, 'Open a %s file' % self.file_type, '',
-                          '%s file (%s)' % (self.file_type, ' '.join(['*' + f for f in self.file_formats])),
-                          QDir.currentPath(), options=QFileDialog.Options() | QFileDialog.DontUseNativeDialog)
+            '%s file (%s)' % (self.file_type, ' '.join(['*' + f for f in self.file_formats])),
+            QDir.currentPath(), options=QFileDialog.Options() | QFileDialog.DontUseNativeDialog)
         if filename:
             self.parent.filename = filename
             self.qle_filename.setText(filename)

@@ -159,7 +159,7 @@ class WriteSerafinNode(OneInOneOutNode):
         @param input_data <slf.datatypes.SerafinData>: input SerafinData stream
         """
         selected = [(var, input_data.selected_vars_names[var][0],
-                          input_data.selected_vars_names[var][1]) for var in input_data.selected_vars]
+                     input_data.selected_vars_names[var][1]) for var in input_data.selected_vars]
         scalars, vectors, additional_equations = operations.scalars_vectors(input_data.header.var_IDs,
                                                                             selected,
                                                                             input_data.us_equation)
@@ -1176,7 +1176,7 @@ class WriteVtkNode(SingleInputNode):
         skip = []
         for time_index in input_data.selected_time_indices:
             filename = process_vtk_output_options(input_data.filename, input_data.job_id, time_index,
-                                                   self.suffix, self.in_source_folder, self.dir_path, self.double_name)
+                                                  self.suffix, self.in_source_folder, self.dir_path, self.double_name)
             filenames.append(filename)
             if not self.overwrite:
                 if os.path.exists(filename):

@@ -8,13 +8,17 @@ Conventions
 * comment language: English
 * shebang: `#!/usr/bin/env python`
 
-## Module imports
-Avoid any import with * except for PyQt5:
-```python
-from PyQt5.QtCore import *
-from PyQt5.QtGui import *
-from PyQt5.QtWidgets import *
+## pylint
+![pylint Score](https://mperlet.github.io/pybadge/badges/8.50.svg)
+
+Simply run pylint with: 
 ```
+pylint pyteltools
+```
+The configuration file `.pylintrc` will be used.
+
+## Module imports
+Avoid any wildcard imports.
 
 ### Group and order imports
 Three groups for line imports are separated by an empty line:
