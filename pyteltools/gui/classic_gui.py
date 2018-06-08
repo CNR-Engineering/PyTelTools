@@ -1,6 +1,8 @@
 import sys
-from PyQt5.QtCore import *
-from PyQt5.QtWidgets import *
+from PyQt5.QtCore import Qt
+from PyQt5.QtWidgets import (QApplication, QComboBox, QDialog, QDialogButtonBox, QFrame, QGroupBox, QHBoxLayout,
+                             QLabel, QListWidget, QListView, QPushButton, QRadioButton, QSplitter, QStackedLayout,
+                             QVBoxLayout, QWidget)
 
 from pyteltools.conf import settings
 

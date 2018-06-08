@@ -5,9 +5,11 @@ import uuid
 import shutil
 import subprocess
 
-from PyQt5.QtCore import *
-from PyQt5.QtGui import *
-from PyQt5.QtWidgets import *
+from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QColor
+from PyQt5.QtWidgets import (QAbstractItemView, QApplication, QCheckBox, QComboBox, QDialog, QDialogButtonBox,
+                             QFileDialog, QGroupBox, QHBoxLayout, QLabel, QLineEdit, QMessageBox, QPushButton,
+                             QRadioButton, QSpacerItem, QStyle, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget)
 
 from pyteltools.conf import settings
 from pyteltools.gui.util import MultiFolderDialog
@@ -54,7 +56,8 @@ class LandXMLtoTinDialog(QDialog):
 
         vlayout = QVBoxLayout()
         vlayout.setSpacing(10)
-        vlayout.addWidget(QLabel("(Les fichiers tin seront sauvegardés dans le dossier gis avec le même nom que LandXML)\n"
+        vlayout.addWidget(QLabel("(Les fichiers tin seront sauvegardés dans le dossier gis "
+                                 "avec le même nom que LandXML)\n"
                                  "Patientez jusqu'à ce que toutes les cases jaunes deviennet vertes..."))
         vlayout.addWidget(self.table)
         vlayout.addStretch()

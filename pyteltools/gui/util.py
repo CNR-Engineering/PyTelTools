@@ -2,9 +2,17 @@ import datetime
 import logging
 import numpy as np
 import os
-from PyQt5.QtCore import *
-from PyQt5.QtGui import *
-from PyQt5.QtWidgets import *
+from PyQt5.QtCore import (QSize, Qt, QThread, pyqtSignal)
+from PyQt5.QtGui import (QAbstractTextDocumentLayout, QTextDocument, QPainter, QPalette)
+from PyQt5.QtWidgets import (QAbstractItemView, QAction, QApplication, QCheckBox, QComboBox,
+                             QDialog, QDialogButtonBox, QFileDialog, QFrame, QGridLayout, QGroupBox,
+                             QHeaderView, QHBoxLayout, QInputDialog, QLabel, QLineEdit, QListWidget,
+                             QListView, QListWidgetItem, QMenu, QMessageBox, QMenuBar,
+                             QPlainTextEdit, QProgressDialog, QPushButton, QRadioButton,
+                             QSizePolicy, QSpacerItem, QScrollArea, QSlider, QSplitter, QStatusBar,
+                             QStyle, QStyledItemDelegate, QStyleOptionSlider, QStyleOptionViewItem,
+                             QTableWidget, QTableWidgetItem, QTextEdit, QTreeView, QToolBar, QToolTip,
+                             QVBoxLayout, QWidget)
 from shapefile import ShapefileException
 import shapely
 

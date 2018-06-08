@@ -1,6 +1,8 @@
 import os
-from PyQt5.QtWidgets import *
-from PyQt5.QtCore import *
+from PyQt5.QtCore import Qt
+from PyQt5.QtWidgets import (QApplication, QCheckBox, QComboBox, QDialog, QGridLayout,
+                             QHeaderView, QHBoxLayout, QLabel, QMessageBox, QPushButton,
+                             QSpacerItem, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget)
 
 from pyteltools.conf import settings
 from pyteltools.gui.util import ConditionDialog

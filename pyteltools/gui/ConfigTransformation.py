@@ -1,7 +1,9 @@
 import numpy as np
-from PyQt5.QtCore import *
-from PyQt5.QtGui import *
-from PyQt5.QtWidgets import *
+from PyQt5.QtCore import (QPoint, QRect, Qt)
+from PyQt5.QtGui import (QBrush, QColor, QPainter, QPen)
+from PyQt5.QtWidgets import (QApplication, QDialog, QDialogButtonBox, QFileDialog, QGridLayout, QGroupBox,
+                             QHBoxLayout, QLabel, QLineEdit, QMessageBox, QPlainTextEdit, QPushButton,
+                             QRadioButton, QSpacerItem, QStatusBar, QVBoxLayout, QWidget)
 import sys
 
 from pyteltools.geom.transformation import Transformation, is_connected, transformation_optimization as optimize

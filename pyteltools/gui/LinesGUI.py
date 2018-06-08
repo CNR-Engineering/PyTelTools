@@ -1,7 +1,9 @@
 from itertools import islice, cycle
 import logging
-from PyQt5.QtCore import *
-from PyQt5.QtWidgets import *
+from PyQt5.QtCore import Qt
+from PyQt5.QtWidgets import (QApplication, QCheckBox, QGridLayout, QHBoxLayout,
+                             QLabel, QLineEdit, QMessageBox, QPlainTextEdit, QPushButton,
+                             QSpacerItem, QStyle, QTabWidget, QVBoxLayout, QWidget)
 import sys
 
 from pyteltools.conf import settings

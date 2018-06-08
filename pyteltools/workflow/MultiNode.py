@@ -1,7 +1,7 @@
 import math
-from PyQt5.QtWidgets import *
-from PyQt5.QtCore import *
-from PyQt5.QtGui import *
+from PyQt5.QtCore import (QLineF, QPointF, QRectF, Qt)
+from PyQt5.QtGui import (QBrush, QColor, QPainterPath, QPen, QPolygonF)
+from PyQt5.QtWidgets import (QGraphicsItem, QGraphicsLineItem, QGraphicsRectItem)
 
 
 class MultiPort(QGraphicsRectItem):

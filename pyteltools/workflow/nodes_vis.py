@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 from matplotlib import cm
 import matplotlib.tri as mtri
 from mpl_toolkits.axes_grid1 import make_axes_locatable
-from PyQt5.QtWidgets import *
+from PyQt5.QtWidgets import (QAction, QDialog, QMessageBox, QStyle)
 
 from pyteltools.conf import settings
 from pyteltools.gui.util import LineMapCanvas, MapCanvas, MapViewer, PointAttributeTable, PolygonMapCanvas, \

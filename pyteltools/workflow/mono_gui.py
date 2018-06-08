@@ -1,4 +1,8 @@
 import logging
+from PyQt5.QtCore import (QCoreApplication, QLineF, QPoint, QRectF, QMimeData)
+from PyQt5.QtGui import (QDrag, QPen, QTransform)
+from PyQt5.QtWidgets import (QDialogButtonBox, QToolBar, QToolButton, QSizePolicy, QSplitter,
+                             QTreeWidget, QTreeWidgetItem, QGraphicsScene, QGraphicsView, QGraphicsLineItem)
 import sys
 from time import time
 

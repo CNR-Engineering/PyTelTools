@@ -2,8 +2,11 @@ import datetime
 from itertools import islice, cycle
 import logging
 import sys
-from PyQt5.QtCore import *
-from PyQt5.QtWidgets import *
+from PyQt5.QtCore import Qt
+from PyQt5.QtWidgets import (QApplication, QCheckBox, QComboBox, QGridLayout, QHBoxLayout,
+                             QLabel, QLineEdit, QMessageBox, QPlainTextEdit, QPushButton,
+                             QSpacerItem, QStyle, QTabWidget,
+                             QVBoxLayout, QWidget)
 
 from pyteltools.conf import settings
 from pyteltools.slf import Serafin

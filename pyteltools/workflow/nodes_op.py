@@ -1,8 +1,10 @@
 from copy import deepcopy
 import datetime
-from PyQt5.QtWidgets import *
-from PyQt5.QtCore import *
-from PyQt5.QtGui import *
+from PyQt5.QtCore import (QDir, Qt)
+from PyQt5.QtGui import QColor
+from PyQt5.QtWidgets import (QButtonGroup, QComboBox, QDialog, QFileDialog, QGroupBox,
+                             QHBoxLayout, QLabel, QLineEdit, QMessageBox, QPushButton, QRadioButton,
+                             QSpacerItem, QTableWidgetItem, QVBoxLayout, QWidget)
 
 from pyteltools.geom.transformation import load_transformation_map
 from pyteltools.gui.util import DoubleSliderBox, FrictionLawMessage, SettlingVelocityMessage, SimpleTimeDateSelection,\

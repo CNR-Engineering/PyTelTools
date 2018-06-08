@@ -1,7 +1,8 @@
 import numpy as np
 import os
-from PyQt5.QtCore import *
-from PyQt5.QtWidgets import *
+from PyQt5.QtCore import QDir
+from PyQt5.QtWidgets import (QApplication, QDialog, QFileDialog, QHBoxLayout, QLineEdit,
+                             QPushButton, QStyle, QWidget)
 from shapefile import ShapefileException
 
 from pyteltools.conf import settings

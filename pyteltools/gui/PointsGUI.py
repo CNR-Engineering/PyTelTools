@@ -1,8 +1,10 @@
 import datetime
 from itertools import cycle
 import logging
-from PyQt5.QtCore import *
-from PyQt5.QtWidgets import *
+from PyQt5.QtCore import Qt
+from PyQt5.QtWidgets import (QAction, QApplication, QDialog, QGridLayout, QHBoxLayout,
+                             QLabel, QLineEdit, QMenu, QMessageBox, QPlainTextEdit, QPushButton,
+                             QSpacerItem, QStyle,QTabWidget, QVBoxLayout)
 import sys
 
 from pyteltools.conf import settings

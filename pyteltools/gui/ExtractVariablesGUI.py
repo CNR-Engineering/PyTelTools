@@ -1,8 +1,10 @@
 import datetime
 import logging
-from PyQt5.QtCore import *
-from PyQt5.QtGui import *
-from PyQt5.QtWidgets import *
+from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QColor
+from PyQt5.QtWidgets import (QAbstractItemView, QApplication, QCheckBox, QDialog, QGridLayout,
+                             QHeaderView, QHBoxLayout, QLabel, QMessageBox, QPlainTextEdit, QPushButton,
+                             QSizePolicy, QSpacerItem, QStyle, QTableWidgetItem, QTabWidget, QVBoxLayout, QWidget)
 import sys
 
 from pyteltools.conf import settings
