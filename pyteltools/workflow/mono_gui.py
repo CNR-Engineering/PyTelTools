@@ -249,12 +249,6 @@ class MonoScene(QGraphicsScene):
         for root in roots:
             self.nodes[root].run_downward()
 
-    def global_config(self):
-        dlg = GlobalConfigDialog(self.language, self.csv_separator)
-        value = dlg.exec_()
-        if value == QDialog.Accepted:
-            self.language, self.csv_separator = dlg.new_options
-
     def _to_sources(self):
         roots = []
         visited = {node: False for node in self.nodes}
@@ -595,6 +589,7 @@ class NodeTree(QTreeWidget):
 class MonoWidget(QWidget):
     def __init__(self, parent=None, project_path=None):
         super().__init__()
+        self.parent = parent
         mono = MonoPanel(parent)
         node_list = NodeTree()
         self.scene = mono.view.scene()
@@ -602,7 +597,7 @@ class MonoWidget(QWidget):
         left_panel = QWidget()
         config_button = QPushButton('Global\nConfiguration')
         config_button.setMinimumHeight(40)
-        config_button.clicked.connect(self.scene.global_config)
+        config_button.clicked.connect(self.global_config)
 
         vlayout = QVBoxLayout()
         vlayout.addWidget(config_button)
@@ -625,6 +620,13 @@ class MonoWidget(QWidget):
         if project_path is not None:
             self.scene.load(project_path)
             self.scene.run_all()
+
+    def global_config(self):
+        dlg = GlobalConfigDialog(self.scene.language, self.scene.csv_separator)
+        value = dlg.exec_()
+        if value == QDialog.Accepted:
+            self.scene.language, self.scene.csv_separator = dlg.new_options
+        self.parent.reload()
 
 
 if __name__ == '__main__':

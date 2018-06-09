@@ -61,11 +61,11 @@ class ProjectWindow(QWidget):
 
     def switch_tab(self, index):
         if index == 1:
-            self.mono_to_multi()
+            self.check_and_reload()
         else:
-            self.multi_to_mono()
+            self.reload()
 
-    def mono_to_multi(self):
+    def check_and_reload(self):
         if not self.save():
             self.tab.setCurrentIndex(0)
             QMessageBox.critical(None, 'Error', 'You have duplicated suffix.', QMessageBox.Ok)
@@ -76,7 +76,7 @@ class ProjectWindow(QWidget):
             return
         self.load(self.filename)
 
-    def multi_to_mono(self):
+    def reload(self):
         self.save()
         self.load(self.filename)
 
