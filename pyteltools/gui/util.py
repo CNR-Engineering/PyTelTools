@@ -3424,14 +3424,15 @@ class MultiFolderDialog(QFileDialog):
     """
     Dialog to select one or more folders
     """
-    def __init__(self, title):
+    def __init__(self, title, multi_selection=True):
         super().__init__()
         self.setWindowTitle(title)
         self.setFileMode(QFileDialog.DirectoryOnly)
         self.setOption(QFileDialog.DontUseNativeDialog, True)
-        file_view = self.findChild(QListView, 'listView')
-        if file_view:
-            file_view.setSelectionMode(QAbstractItemView.MultiSelection)
+        if multi_selection:
+            file_view = self.findChild(QListView, 'listView')
+            if file_view:
+                file_view.setSelectionMode(QAbstractItemView.MultiSelection)
         self.tree = self.findChild(QTreeView)
-        if self.tree:
+        if multi_selection and self.tree:
             self.tree.setSelectionMode(QAbstractItemView.MultiSelection)

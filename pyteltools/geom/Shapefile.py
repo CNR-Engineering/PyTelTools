@@ -83,7 +83,7 @@ def get_numeric_attribute_names(input_filename):
     """!
     Get all numeric attributes of a shapefile
     @param input_filename <str>: path to shapefile
-    @return <[str], [int]>: list of field names and indices
+    @return <[(int, str)>: list of field names and indices
     """
     for i, (field_name, field_type, _, _) in enumerate(get_all_fields(input_filename)):
         if field_type == 'N' or field_type == 'F':

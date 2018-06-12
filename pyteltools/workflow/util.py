@@ -479,16 +479,17 @@ class MultiLoadDialog(QDialog):
                                  QMessageBox.Ok)
             return
         all_slfs = set()
+        dirs_without_slf = []
         for name, path in zip(dir_names, self.dir_paths):
             slfs = set()
             for f in os.listdir(path):
                 if os.path.isfile(os.path.join(path, f)) and os.path.splitext(f)[1] in self.extensions:
                     slfs.add(f)
             if not slfs:
-                QMessageBox.critical(None, 'Error', "The folder %s doesn't have any %s file (%s)!"
-                                     % (name, self.file_format, ', '.join(self.extensions)), QMessageBox.Ok)
-                self.dir_paths = []
-                return
+                dirs_without_slf.append(name)
+                dir_names.remove(name)
+                self.dir_paths.remove(path)
+                continue
             if not all_slfs:
                 all_slfs = slfs.copy()
             else:
@@ -499,6 +500,15 @@ class MultiLoadDialog(QDialog):
                                      QMessageBox.Ok)
                 self.dir_paths = []
                 return
+        if not self.dir_paths:
+            QMessageBox.critical(None, 'Error',
+                                 'These folders do not contain any %s file (%s)!'
+                                 % (self.file_format, ', '.join(self.extensions)),
+                                 QMessageBox.Ok)
+            return
+        if dirs_without_slf:
+            QMessageBox.warning(None, 'Warning', "Folders without any %s file (%s) have been ignored:\n%s"
+                % (self.file_format, ', '.join(self.extensions), dirs_without_slf), QMessageBox.Ok)
         self.nb_files = len(dir_names)
         all_slfs = list(all_slfs)
         all_slfs.sort()
@@ -624,7 +634,7 @@ class LoadSerafinDialog(QDialog):
             if msg == QMessageBox.Cancel:
                 return
         self.success = False
-        w = MultiFolderDialog('Choose one or more folders')
+        w = MultiFolderDialog('Choose one or more folders', False)
         if w.exec_() != QDialog.Accepted:
             return
         current_dir = w.directory().path()

@@ -877,10 +877,10 @@ class Write(Serafin):
         """!
         @brief Write Serafin header from attributes
         """
-        logger.debug('Writing header with %i nodes, %i elements%s and %i variable%s' %
-                     header.nb_nodes, header.nb_elements,
-                     '' if header.is_2d else ', %i layers' % header.nb_planes,
-                     header.nb_var, ['', 's'][header.nb_var > 1])
+        logger.debug('Writing header with %i nodes, %i elements %s and %i variable %s' %
+                     (header.nb_nodes, header.nb_elements,
+                      '' if header.is_2d else ', %i layers' % header.nb_planes,
+                      header.nb_var, ['', 's'][header.nb_var > 1]))
 
         # Title and file type
         self.file.write(header.pack_int(80))
