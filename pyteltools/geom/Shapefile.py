@@ -22,7 +22,7 @@ def get_lines(input_filename, shape_type):
     for record in sf.shapeRecords():
         if record.shape.shapeType == shape_type:
             attributes = record.record
-            if shape_type > 10:
+            if shape_type == shapefile.POLYLINEZ:
                 poly = Polyline(record.shape.points, attributes, record.shape.z)
             else:
                 poly = Polyline(record.shape.points, attributes)
@@ -32,7 +32,7 @@ def get_lines(input_filename, shape_type):
 def get_open_polylines(input_filename):
     try:
         shape_type = get_shape_type(input_filename)
-        if shape_type in (3, 13):
+        if shape_type in (shapefile.POLYLINE, shapefile.POLYLINEZ, shapefile.POLYLINEM):
             for poly in get_lines(input_filename, shape_type):
                 yield poly
     except error:
@@ -42,7 +42,7 @@ def get_open_polylines(input_filename):
 def get_polygons(input_filename):
     try:
         shape_type = get_shape_type(input_filename)
-        if shape_type in (5, 15):
+        if shape_type in (shapefile.POLYGON, shapefile.POLYGONZ, shapefile.POLYGONM):
             for poly in get_lines(input_filename, shape_type):
                 yield poly
     except error:
