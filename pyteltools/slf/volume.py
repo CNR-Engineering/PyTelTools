@@ -224,10 +224,10 @@ class VolumeCalculator:
         if self.second_var_ID == VolumeCalculator.INIT_VALUE:
             self.init_values = input_stream.read_var_in_frame(0, self.var_ID)
 
-    def construct_triangles(self, iter_pbar=lambda *args: args):
+    def construct_triangles(self, iter_pbar=lambda x, unit: x):
         self.mesh = TruncatedTriangularPrisms(self.input_stream.header, True, iter_pbar)
 
-    def construct_weights(self, iter_pbar=lambda iter, unit: iter):
+    def construct_weights(self, iter_pbar=lambda x, unit: x):
         """!
         Construct the point weights/intersections etc. depending on the volume type, for every polygons
         """

@@ -12,7 +12,7 @@ class Mesh2D:
     The general representation of mesh in Serafin 2D.
     The basis for interpolation, volume calculations etc.
     """
-    def __init__(self, input_header, construct_index=False, iter_pbar=lambda x: x):
+    def __init__(self, input_header, construct_index=False, iter_pbar=lambda x, unit: x):
         """!
         @param input_header <slf.Serafin.SerafinHeader>: input Serafin header
         @param construct_index <bool>: perform the index construction
