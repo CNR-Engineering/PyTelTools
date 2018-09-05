@@ -24,7 +24,7 @@ def get_necessary_equations(known_var_IDs, needed_var_IDs, is_2d, us_equation=No
 
 
 def do_calculations_in_frame(equations, input_serafin, time_index, selected_output_IDs,
-                             output_float_type, is_2d, us_equation, ori_values = {}):
+                             output_float_type, is_2d, us_equation, ori_values={}):
     """!
     @brief Return the selected 2D variables values in a single time frame
     @param equations <[slf.variables_utils.Equation]>: list of all equations necessary to compute selected variables

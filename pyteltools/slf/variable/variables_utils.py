@@ -47,6 +47,9 @@ class Equation:
         self.output = output_variable
         self.operator = operator
 
+    def __repr__(self):
+        return "%s -> %s (%s)" % (self.input, self.output, self.operator)
+
 
 def build_variables(spec):
     """!
