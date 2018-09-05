@@ -51,26 +51,28 @@ def slf_sedi_chain(args):
         output_header.add_variable_from_ID('B')
         output_header.add_variable_from_ID('EV')
 
-        initial_bottom = resin.read_var_in_frame(0, 'B')
         with Serafin.Write(args.out_slf, args.lang, overwrite=args.force) as resout:
             resout.write_header(output_header)
 
             prev_time = None
             prev_tau = None
+            initial_bottom = resin.read_var_in_frame(0, 'B')
+            bottom = copy(initial_bottom)
             for time_index, time in enumerate(resin.time):
                 tau = do_calculations_in_frame(necessary_equations, resin, time_index, ['TAU'],
                                                output_header.np_float_type, is_2d=True, us_equation=None,
                                                ori_values={})[0]
-                if prev_time is None:
-                    bottom = copy(initial_bottom)
-                else:
-                    dt = (time - prev_time)
-                    centered_tau = (prev_tau + tau)/2
-                    bottom += args.ws * args.C * (1 - np.clip(centered_tau/args.Tcd, a_min=None, a_max=1.0)) * dt
-                    bottom -= args.M * (np.clip(centered_tau/args.Tce, a_min=1.0, a_max=None) - 1.0) * dt
+                if prev_time is not None:
+                    dt = time - prev_time
+                    mean_tau = (prev_tau + tau)/2
+                    if args.Tcd > 0:
+                        bottom += args.Cmud * args.ws * args.C * \
+                                  (1 - np.clip(mean_tau/args.Tcd, a_min=None, a_max=1.)) * dt
+                    if args.Tce > 0:
+                        bottom -= args.Cmud * args.M * (np.clip(mean_tau/args.Tce, a_min=1., a_max=None) - 1.) * dt
 
                 evol_bottom = bottom - initial_bottom
-                resout.write_entire_frame(output_header, time, np.vstack((evol_bottom, bottom)))
+                resout.write_entire_frame(output_header, time, np.vstack((bottom, evol_bottom)))
 
                 prev_time = time
                 prev_tau = tau
