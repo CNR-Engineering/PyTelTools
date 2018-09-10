@@ -11,6 +11,7 @@ The sizes (file, header, frame) are in bytes (8 bits).
 import copy
 import numpy as np
 import os
+from shapely.geometry import LinearRing
 import struct
 
 from pyteltools.conf import settings
@@ -539,6 +540,104 @@ class SerafinHeader:
         self.set_mesh_origin(0, 0)
         self._compute_mesh_coordinates()
 
+    def get_all_edges(self):
+        """Get all edges (pair of nodes)"""
+        edges = np.zeros((3 * len(self.ikle_2d), 2), dtype=np.int)
+        for i, (n1, n2, n3) in enumerate(self.ikle_2d):
+            edges[3 * i, :] = [n1, n2]
+            edges[3 * i + 1, :] = [n2, n3]
+            edges[3 * i + 2, :] = [n3, n1]
+        return edges
+
+    def get_external_edges(self):
+        """Get external edges (pair of nodes)"""
+        edges = self.get_all_edges()
+        # Trick to identify unique pair of nodes (even if node orders might differ) in defining a strange function
+        edges_multi = edges[:, 0] * edges[:, 1] / (edges[:, 0] + edges[:, 1])
+        unique, unique_inverse, unique_counts = np.unique(edges_multi, return_inverse=True, return_counts=True)
+        # A boundary node is connected only once to another node (not twice!)
+        boundary_edges = edges[unique_counts[unique_inverse] == 1]
+        return boundary_edges
+
+    def iter_on_boundaries(self):
+        """
+        Iterate over all boundaries to get the nodes describing them
+        Each element is an ordered list of nodes (1-indexed numbering)
+
+        How boundaries are defined:
+        - the first boundary is the external boundary and then the islands (internal boundaries) are described
+            in an arbitrary order
+        - the external boundary is described counter-clockwise
+        - the islands are described clockwise
+        - the first boundary node should be the node with the minimum value of x+y (corresponds to the bottom left corner)
+        """
+        boundary_edges = self.get_external_edges()
+
+        # Build boundaries by iteration on all boundary edges (for each boundary, from first node until it loops)
+        id_boundary = 1
+        while len(boundary_edges) != 0:
+            boundary_nodes = np.unique(boundary_edges.flatten())  # Node numbering 1-indexed
+            x_plus_y = self.x[boundary_nodes - 1] + self.y[boundary_nodes - 1]
+
+            # current_boundary_nodes, first_node, prev_node and next_node contain 1-indexed node(s)
+            first_node = boundary_nodes[np.argmin(x_plus_y)]
+            logger.debug("Build new boundary from node %i among %i nodes" % (first_node, len(boundary_nodes)))
+            prev_node = copy.deepcopy(first_node)
+            next_node = -1
+
+            # Build list of nodes describing the boundary (/!\ first and last node are explicitly duplicated):
+            current_boundary_nodes = [first_node]
+            while next_node != first_node:
+                try:
+                    index = np.where(boundary_edges == prev_node)[0][0]
+                except IndexError:
+                    raise SerafinRequestError('Unexpected error while determining next boundary node after node %i'
+                                              % prev_node)
+                n1, n2 = boundary_edges[index, :]
+                boundary_edges = np.delete(boundary_edges, index, axis=0)
+                next_node = n1 if n2 == prev_node else n2
+                prev_node = next_node
+                current_boundary_nodes.append(next_node)
+
+            # Determine if boundary is clock-wise
+            if len(current_boundary_nodes) > 2:
+                boundary_geom = LinearRing([(self.x[n - 1], self.y[n - 1]) for n in current_boundary_nodes[:-1]])
+                ccw = boundary_geom.is_ccw
+            else:
+                ccw = True  # arbitrary value (order can not be defined!)
+
+            # Reverse node ordering (if necessary) and remove last duplicated node
+            if id_boundary == 1:  # this is the first boundary (external)
+                if not ccw:
+                    current_boundary_nodes.reverse()
+            else:  # current boundary is an island
+                if ccw:
+                    current_boundary_nodes.reverse()
+            current_boundary_nodes.pop()
+            logger.debug("Boundary %i has %i nodes" % (id_boundary, len(current_boundary_nodes)))
+            yield current_boundary_nodes
+            id_boundary += 1
+
+    def build_ipobo(self):
+        """
+        Build IPOBO array containing 0 values for inner nodes and 1-indexed node number for boundary nodes
+        """
+        ipobo_2d = np.zeros(self.nb_nodes_2d, dtype=np.int64)
+
+        id_boundary_node = 0
+        for boundary_nodes in self.iter_on_boundaries():
+            for n in boundary_nodes:
+                id_boundary_node += 1
+                ipobo_2d[n - 1] = id_boundary_node
+
+        self.ipobo = ipobo_2d
+        if not self.is_2d:
+            shift_ipobo =  np.zeros(self.nb_nodes_2d)
+            shift_ipobo[ipobo_2d > 0] = id_boundary_node
+            for i_plan in range(self.nb_planes):
+                if i_plan > 0:
+                    self.ipobo = np.concatenate((self.ipobo, ipobo_2d + i_plan * shift_ipobo))
+
     def _set_as_2d(self):
         """!
         Beware: nb_nodes_2d has to be consistant
@@ -563,7 +662,7 @@ class SerafinHeader:
         self._compute_mesh_coordinates()
         self.ikle = ikle.flatten()
         self._build_ikle_2d()
-        self.ipobo = np.zeros(self.nb_nodes, dtype=np.int)  #FIXME: compute ipobo
+        self.build_ipobo()
 
     def from_file(self, file, file_size):
         """!
