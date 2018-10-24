@@ -295,15 +295,11 @@ class MxdToPngDialog(QDialog):
             shutil.copyfile(self.mxd_path, tmp_mxd)
 
             # mxd to png
-            cmdn = [python_path, script_name, tmp_mxd, png_name, str(settings.ARCPY_PNG_DPI)]
+            png_path = os.path.join(png_folder, png_name) if self.png_together else os.path.join(dir_path, 'gis', png_name)
+            cmdn = [python_path, script_name, tmp_mxd, png_path, str(settings.ARCPY_PNG_DPI)]
             logger.debug('Running: %s' % ' '.join(cmdn))
             out = subprocess.Popen(cmdn, stdout=subprocess.PIPE)
             (stdout, stderr), returncode = out.communicate(), out.returncode
-
-            # move .png to the specified folder
-            if self.png_together:
-                old_path = os.path.join(dir_path, 'gis', png_name)
-                shutil.move(old_path, png_folder)
 
             # remove .mxd
             try:
