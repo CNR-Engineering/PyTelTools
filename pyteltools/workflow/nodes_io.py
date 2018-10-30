@@ -479,6 +479,9 @@ class WriteSerafinNode(OneInOneOutNode):
         except PermissionError:
             self.fail('Access denied.')
             return
+        except FileNotFoundError:
+            self.fail('File not found.')
+            return
 
         self.progress_bar.setVisible(True)
 
