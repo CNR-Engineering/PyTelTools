@@ -359,50 +359,54 @@ def slf_to_csv(slf_name, slf_header, csv_name, selected_vars, selected_time_indi
                     csv.write('\n')
 
 
-def slf_to_xml(slf_name, slf_header, xml_name, scalar, time_index):
+def slf_to_xml(slf_name, slf_header, xml_name, selected_vars, selected_time_indices):
     """!
-    @brief Write LandXML file from a scalar variable of a Serafin file
+    @brief Write LandXML file from multiple scalar variables and temporal frames of a Serafin file
     @param slf_name <str>: path to the input Serafin file
     @param slf_header <slf.Serafin.SerafinHeader>: input Serafin header
     @param xml_name <str>: output LandXML filename
-    @param scalar <str>: variable to write
-    @param time_index <int>: the index of the frame (0-based)
+    @param selected_vars <[str]>: selected variables
+    @param selected_time_indices <[int]>: selected time indices
     """
-    # fetch scalar variable values
     with Serafin.Read(slf_name, slf_header.language) as input_stream:
         input_stream.header = slf_header
-        scalar_values = input_stream.read_var_in_frame(time_index, scalar)
+        input_stream.get_time()
 
-    # write LandXML
-    with open(xml_name, 'w') as xml:
-        xml.write('<?xml version="1.0" ?>\n')
-        xml.write('<!-- Title: %s -->\n' % slf_header.title.decode(Serafin.SLF_EIT).strip())
-        xml.write('<!-- 3D Coordinates (Northing Easting Elevation) with triangular elements connectivity table -->\n')
-        xml.write('<LandXML version="1.2" xmlns="http://www.landxml.org/schema/LandXML-1.2" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.landxml.org/schema/LandXML-1.2 http://www.landxml.org/schema/LandXML-1.2/LandXML-1.2.xsd">\n')
-        xml.write('  <Units>\n')
-        xml.write('    <Metric linearUnit="meter" areaUnit="squareMeter" volumeUnit="cubicMeter"/>\n')
-        xml.write('  </Units>\n')
-        xml.write('  <Surfaces>\n')
-        xml.write('    <Surface name="%s at frame %i/%i">\n' % (scalar, time_index+1, slf_header.nb_frames))
-        xml.write('      <Definition surfType="TIN">\n')
-        xml.write('        <Pnts>\n')
-        for i, (x, y, z) in enumerate(zip(slf_header.x, slf_header.y, scalar_values)):
-            fmt_values = settings.FMT_COORD + ' ' + settings.FMT_COORD + ' ' + settings.FMT_FLOAT
-            xml.write(('          <P id="{}">' + fmt_values + '</P>\n').format(i+1, y, x, z))
-        xml.write('        </Pnts>\n')
-        xml.write('        <Faces>\n')
-        for i, (a, b, c) in enumerate(slf_header.ikle_2d):
-            xml.write('          <F id="%d">%d %d %d</F>\n' % (i+1, a, b, c))
-        xml.write('        </Faces>\n')
-        xml.write('      </Definition>\n')
-        xml.write('    </Surface>\n')
-        xml.write('  </Surfaces>\n')
-        xml.write('</LandXML>\n')
+        # write LandXML
+        with open(xml_name, 'w') as xml:
+            xml.write('<?xml version="1.0" ?>\n')
+            xml.write('<!-- Title: %s -->\n' % slf_header.title.decode(Serafin.SLF_EIT).strip())
+            xml.write('<!-- 3D Coordinates (Northing Easting Elevation) with triangular elements connectivity table -->\n')
+            xml.write('<LandXML version="1.2" xmlns="http://www.landxml.org/schema/LandXML-1.2" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.landxml.org/schema/LandXML-1.2 http://www.landxml.org/schema/LandXML-1.2/LandXML-1.2.xsd">\n')
+            xml.write('  <Units>\n')
+            xml.write('    <Metric linearUnit="meter" areaUnit="squareMeter" volumeUnit="cubicMeter"/>\n')
+            xml.write('  </Units>\n')
+            xml.write('  <Surfaces>\n')
+            for time_index in selected_time_indices:
+                for scalar in selected_vars:
+                    scalar_values = input_stream.read_var_in_frame(time_index, scalar)
+
+                    xml.write('    <Surface name="%s at frame %i/%i">\n' % (scalar, time_index+1, slf_header.nb_frames))
+                    xml.write('      <Definition surfType="TIN">\n')
+                    xml.write('        <Pnts>\n')
+                    for i, (x, y, z) in enumerate(zip(slf_header.x, slf_header.y, scalar_values)):
+                        fmt_values = settings.FMT_COORD + ' ' + settings.FMT_COORD + ' ' + settings.FMT_FLOAT
+                        xml.write(('          <P id="{}">' + fmt_values + '</P>\n').format(i+1, y, x, z))
+                    xml.write('        </Pnts>\n')
+
+                    xml.write('        <Faces>\n')
+                    for i, (a, b, c) in enumerate(slf_header.ikle_2d):
+                        xml.write('          <F id="%d">%d %d %d</F>\n' % (i+1, a, b, c))
+                    xml.write('        </Faces>\n')
+                    xml.write('      </Definition>\n')
+            xml.write('    </Surface>\n')
+            xml.write('  </Surfaces>\n')
+            xml.write('</LandXML>\n')
 
 
 def slf_to_vtk(is_2d, slf_name, slf_header, vtk_name, scalars, vectors, variable_names, time_index):
     """!
-    @brief Write vtk file from a scalar variable of a Serafin file
+    @brief Write vtk file from a Serafin file
     @param is_2d <bool>: True if the input file is 2D
     @param slf_name <str>: path to the input Serafin file
     @param slf_header <slf.Serafin.SerafinHeader>: input Serafin header

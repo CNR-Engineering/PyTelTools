@@ -884,7 +884,7 @@ class WriteCsvNode(SingleInputNode):
         self.state = Node.READY
 
         self.panel = None
-        self.suffix = '_scalar'
+        self.suffix = '_out'
         self.double_name = False
         self.overwrite = False
         self.in_source_folder = True
@@ -925,8 +925,11 @@ class WriteCsvNode(SingleInputNode):
         if not input_data.header.is_2d:
             self.fail('the input file is not 2D')
             return
-        available_var = [var for var in input_data.selected_vars if var in input_data.header.var_IDs]
-        if len(available_var) == 0:
+        if len(input_data.selected_time_indices) == 0:
+            self.fail('the input data has no frame')
+            return
+        available_vars = [var for var in input_data.selected_vars if var in input_data.header.var_IDs]
+        if len(available_vars) == 0:
             self.fail('no variable available')
             return
 
@@ -956,13 +959,13 @@ class WriteCsvNode(SingleInputNode):
 class WriteLandXMLNode(SingleInputNode):
     def __init__(self, index):
         super().__init__(index)
-        self.in_port.data_type = ('slf geom',)
+        self.in_port.data_type = ('slf',)
         self.category = 'Input/Output'
         self.label = 'Write\nLandXML'
         self.state = Node.READY
 
         self.panel = None
-        self.suffix = '_scalar_layer'
+        self.suffix = '_out'
         self.double_name = False
         self.overwrite = False
         self.in_source_folder = True
@@ -1003,18 +1006,13 @@ class WriteLandXMLNode(SingleInputNode):
         if not input_data.header.is_2d:
             self.fail('the input file is not 2D')
             return
-        if len(input_data.selected_time_indices) != 1:
-            self.fail('the input data has more than one frame')
+        if len(input_data.selected_time_indices) == 0:
+            self.fail('the input data has no frame')
             return
-        available_var = [var for var in input_data.selected_vars if var in input_data.header.var_IDs]
-        if len(available_var) == 0:
+        available_vars = [var for var in input_data.selected_vars if var in input_data.header.var_IDs]
+        if len(available_vars) == 0:
             self.fail('no variable available')
             return
-        elif len(available_var) > 1:
-            self.fail('the input data has more than one variable')
-            return
-        selected_frame = input_data.selected_time_indices[0]
-        selected_var = available_var[0]
 
         filename = process_geom_output_options(input_data.filename, input_data.job_id, '.xml',
                                                self.suffix, self.in_source_folder, self.dir_path, self.double_name)
@@ -1034,7 +1032,8 @@ class WriteLandXMLNode(SingleInputNode):
             self.fail('Access denied.')
             return
 
-        operations.slf_to_xml(input_data.filename, input_data.header, filename, selected_var, selected_frame)
+        operations.slf_to_xml(input_data.filename, input_data.header, filename, input_data.selected_vars,
+                              input_data.selected_time_indices)
 
         self.success()
 

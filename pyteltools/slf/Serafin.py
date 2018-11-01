@@ -879,7 +879,7 @@ class Read(Serafin):
 
     def subset_time(self, start, end, ech):
         """!
-        Get a subset of the time frames list
+        @brief Get a subset of the time frames list
         @param start <float>: starting time (in seconds)
         @param end <float>: ending time (in seconds)
         @param ech <int>: sampling frequency

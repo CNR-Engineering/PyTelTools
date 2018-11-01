@@ -1302,18 +1302,11 @@ def write_landxml(node_id, fid, data, options):
     if not data.header.is_2d:
         return False, node_id, fid, None, fail_message('the input file is not 2D', 'Write LandXML',
                                                        data.job_id)
-    if len(data.selected_time_indices) != 1:
-        return False, node_id, fid, None, fail_message('the input data has more than one frame', 'Write LandXML',
-                                                       data.job_id)
-    available_var = [var for var in data.selected_vars if var in data.header.var_IDs]
-    if len(available_var) == 0:
-        return False, node_id, fid, None, fail_message('no variable available', 'Write LandXML',
-                                                       data.job_id)
-    elif len(available_var) > 1:
-        return False, node_id, fid, None, fail_message('the input data has more than one variable', 'Write LandXML',
-                                                       data.job_id)
-    selected_frame = data.selected_time_indices[0]
-    selected_var = available_var[0]
+    if len(data.selected_time_indices) == 0:
+        return False, node_id, fid, None, fail_message('the input data has no frame', 'Write LandXML', data.job_id)
+    available_vars = [var for var in data.selected_vars if var in data.header.var_IDs]
+    if len(available_vars) == 0:
+        return False, node_id, fid, None, fail_message('no variable available', 'Write LandXML', data.job_id)
 
     suffix, in_source_folder, dir_path, double_name, overwrite = options
     filename = process_geom_output_options(data.filename, data.job_id, '.xml',
@@ -1330,14 +1323,11 @@ def write_landxml(node_id, fid, data, options):
             os.remove(filename)
         except PermissionError:
             pass
-        return False, node_id, fid, None, fail_message('access denied', 'Write LandXM', data.job_id)
+        return False, node_id, fid, None, fail_message('access denied', 'Write LandXML', data.job_id)
 
-    operations.slf_to_xml(data.filename, data.header, filename, selected_var, selected_frame)
+    operations.slf_to_xml(data.filename, data.header, filename, available_vars, data.selected_time_indices)
 
     return True, node_id, fid, None, success_message('Write LandXML', data.job_id)
-
-
-
 
 
 def write_shp(node_id, fid, data, options):
