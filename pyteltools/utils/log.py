@@ -27,3 +27,18 @@ def new_logger(name):
         logger.addHandler(handler)
         logger.setLevel(settings.LOGGING_LEVEL)
     return logger
+
+
+def set_logger_level(level):
+    """
+    Overwrite level of all loggers of PyTelTools (only `outil_carto` is ignored)
+    Useful for external calling without having to modify settings
+    """
+    from pyteltools.geom.util import logger as geom_logger
+    geom_logger.setLevel(level)
+    from pyteltools.slf.util import logger as slf_logger
+    slf_logger.setLevel(level)
+    from pyteltools.utils.cli_base import logger as cli_logger
+    cli_logger.setLevel(level)
+    from pyteltools.workflow.util import logger as wk_logger
+    wk_logger.setLevel(level)
