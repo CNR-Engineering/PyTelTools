@@ -17,7 +17,7 @@ class Polyline:
             self._is_2d = False
 
         self._is_closed = False
-        if coordinates[0] == coordinates[-1]:
+        if tuple(coordinates[0]) == tuple(coordinates[-1]):
             self._is_closed = len(coordinates) > 2  # line with 2 coordinates which are identical can not be a polygon
             if z_array is not None:
                 self._is_closed = z_array[-1] == z_array[0]
@@ -139,7 +139,7 @@ class Polyline:
 
     def linestring_intersection(self, triangle):
         """!
-        @brief (Used in flux calculation) Return the linearString intersection with the triangle
+        @brief (Used in flux calculation) Returns the LinearString intersection with the triangle
         @param triangle <shapely.geometry.Polygon>: A triangle
         @return <bool, [shapely.geometry.LinearString]>: The intersection with the triangle
         """
@@ -194,3 +194,6 @@ class Polyline:
             new_coords.append(second_point)
             new_m.append(second_m)
         return Polyline(new_coords, self.attributes(), m_array=new_m)
+
+    def __repr__(self):
+        return "%sPolyline with %i vertices" % ('Closed ' if self.is_closed() else '', len(self.coords()))

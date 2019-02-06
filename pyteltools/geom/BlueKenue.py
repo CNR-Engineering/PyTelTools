@@ -92,6 +92,7 @@ class Write(BlueKenue):
     """"!
     BlueKenue file writer
     """
+    XYZ_HEADER = ':FileType xyz  ASCII  EnSim 1.0\n'
     I2S_HEADER = ':FileType i2s  ASCII  EnSim 1.0\n'
     I3S_HEADER = ':FileType i3s  ASCII  EnSim 1.0\n'
 
@@ -105,8 +106,10 @@ class Write(BlueKenue):
         else:
             if self.filename.endswith('i2s'):
                 self.file.write(Write.I2S_HEADER)
-            else:
+            elif self.filename.endswith('i3s'):
                 self.file.write(Write.I3S_HEADER)
+            elif self.filename.endswith('xyz'):
+                self.file.write(Write.XYZ_HEADER)
             self.file.write(':EndHeader\n')
 
     def write_lines(self, lines, attributes):

@@ -591,6 +591,7 @@ class SerafinHeader:
                 try:
                     index = np.where(boundary_edges == prev_node)[0][0]
                 except IndexError:
+                    logger.critical(np.where(boundary_edges == prev_node))
                     raise SerafinRequestError('Unexpected error while determining next boundary node after node %i'
                                               % prev_node)
                 n1, n2 = boundary_edges[index, :]

@@ -154,7 +154,7 @@ class FileConverterInputTab(QWidget):
             return False
         logging.debug('Input Shapefile format: %s (type = %d)' % (self.from_type, shape_type))
         if shape_type in (1, 11, 21):
-            self.converter = convert.ShpPointConverter(filename, shape_type)
+            self.converter = convert.ShpPointConverter(filename)
         elif shape_type in (3, 5, 13, 15, 23, 25):
             self.converter = convert.ShpLineConverter(filename, shape_type)
         else:

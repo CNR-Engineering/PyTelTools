@@ -3,7 +3,7 @@ descartes
 matplotlib
 numpy
 PyQt5
-pyshp
+pyshp>=2.0
 pytest
 Rtree
 scipy
