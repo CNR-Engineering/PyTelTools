@@ -156,9 +156,9 @@ class FileConverterInputTab(QWidget):
         if shape_type in (1, 11, 21):
             self.converter = convert.ShpPointConverter(filename)
         elif shape_type in (3, 5, 13, 15, 23, 25):
-            self.converter = convert.ShpLineConverter(filename, shape_type)
+            self.converter = convert.ShpLineConverter(filename)
         else:
-            self.converter = convert.ShpMultiPointConverter(filename, shape_type)
+            self.converter = convert.ShpMultiPointConverter(filename)
         return True
 
     def btnConfigEvent(self):
