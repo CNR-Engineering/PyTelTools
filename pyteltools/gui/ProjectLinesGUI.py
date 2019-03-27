@@ -24,7 +24,7 @@ class WriteCSVProcess(OutputThread):
         self.separator = separator
 
     def write_header(self, output_stream, selected_vars):
-        output_stream.write('Line')
+        output_stream.write('line')
         for header in ['x', 'y', 'distance'] + selected_vars:
             output_stream.write(self.separator)
             output_stream.write(header)
@@ -41,25 +41,23 @@ class WriteCSVProcess(OutputThread):
             var_values.append(input_stream.read_var_in_frame(time_index, var))
 
         iter_pbar = ProgressBarIterator.prepare(self.tick.emit)
-        for id_line in iter_pbar(indices_nonempty):
-            line_interpolator, _ = line_interpolators[id_line]
-            distances = []
-            for x, y, _, __ in line_interpolator:
-                distances.append(reference.project(x, y))
-
-            for (x, y, (i, j, k), interpolator), distance in zip(line_interpolator, distances):
+        for line_id in iter_pbar(indices_nonempty):
+            line_interpolator, _ = line_interpolators[line_id]
+            for (x, y, (i, j, k), interpolator) in line_interpolator:
                 if self.canceled:
                     return
 
-                if distance <= 0 or distance >= max_distance:
+                d = reference.project(x, y)
+                if d <= 0 or d >= max_distance:
                     continue
-                output_stream.write(str(id_line+1))
+
+                output_stream.write(str(line_id+1))
                 output_stream.write(self.separator)
                 output_stream.write(self.fmt_float.format(x))
                 output_stream.write(self.separator)
                 output_stream.write(self.fmt_float.format(y))
                 output_stream.write(self.separator)
-                output_stream.write(self.fmt_float.format(distance))
+                output_stream.write(self.fmt_float.format(d))
 
                 for i_var, var in enumerate(selected_vars):
                     values = var_values[i_var]
@@ -387,7 +385,7 @@ class CSVTab(QWidget):
         self.parent.inDialog()
 
         indices_nonempty = [i for i in range(len(self.input.lines)) if self.input.line_interpolators[i][0]]
-        reference = self.input.lines[int(self.referenceLine.currentText().split()[1]) - 1]
+        reference = self.input.lines[int(self.referenceLine.currentText().split()[1])]
         time_index = int(self.timeSelection.index.text()) - 1
 
         # initialize the progress bar
