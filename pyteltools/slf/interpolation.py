@@ -195,15 +195,12 @@ class MeshInterpolator(Mesh2D):
 
         for u, id_line in enumerate(indices_nonempty):
             line_interpolator, _ = line_interpolators[id_line]
-            distances = []
-            for x, y, _, __ in line_interpolator:
-                distances.append(reference.project(x, y))
 
-            for (x, y, (i, j, k), interpolator), distance in zip(line_interpolator, distances):
-                if distance <= 0 or distance >= max_distance:
+            for x, y, (i, j, k), interpolator in line_interpolator:
+                d = reference.project(x, y)
+                if d <= 0 or d >= max_distance:
                     continue
-                row = [str(id_line+1), fmt_float.format(x), fmt_float.format(y),
-                       fmt_float.format(distance)]
+                row = [str(id_line+1), fmt_float.format(x), fmt_float.format(y), fmt_float.format(d)]
                 for i_var, var in enumerate(selected_vars):
                     values = var_values[i_var]
                     row.append(fmt_float.format(interpolator.dot(values[[i, j, k]])))
