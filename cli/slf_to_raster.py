@@ -27,9 +27,9 @@ def arrays2raster(raster_filename, xy_raster_origin, dx, dy, array_list):
 
     # Set grid and EPSG if necessary
     out_raster.SetGeoTransform((origin_x, dx, 0, origin_y, 0, dy))
-    if args.epsg is not None:
+    if args.epsg is not None:  # EPSG attribution seems buggy
         out_raster_srs = osr.SpatialReference()
-        out_raster_srs.ImportFromEPSG(3945)
+        out_raster_srs.ImportFromEPSG(args.epsg)
         out_raster.SetProjection(out_raster_srs.ExportToWkt())
 
     # Add one band per variable
