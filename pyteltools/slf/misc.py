@@ -309,18 +309,17 @@ def slf_to_shp(slf_name, slf_header, shp_name, variables, time_index):
     key_order = coupled + non_coupled + [mother for mother, _, _ in mothers] \
                         + ['Angle(%s,%s)' % (brother, sister) for brother, sister in angles]
 
-    w = shapefile.Writer(shapefile.POINT)
+    w = shapefile.Writer(shp_name, shapefile.POINT)
     for name in key_order:
         w.field(name, 'N', decimal=4)
 
     for i, (x, y) in enumerate(zip(slf_header.x, slf_header.y)):
-        w.point(x, y, shapeType=shapefile.POINT)
+        w.point(x, y)
 
         val = []
         for var in key_order:
             val.append(values[var][i])
         w.record(*val)
-    w.save(shp_name)
 
 
 def slf_to_csv(slf_name, slf_header, csv_name, selected_vars, selected_time_indices):
