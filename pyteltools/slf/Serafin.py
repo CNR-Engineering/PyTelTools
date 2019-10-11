@@ -622,22 +622,27 @@ class SerafinHeader:
     def build_ipobo(self):
         """
         Build IPOBO array containing 0 values for inner nodes and 1-indexed node number for boundary nodes
+        /!\ This method will probably crash if some nodes are duplicated!
         """
         ipobo_2d = np.zeros(self.nb_nodes_2d, dtype=np.int64)
 
-        id_boundary_node = 0
-        for boundary_nodes in self.iter_on_boundaries():
-            for n in boundary_nodes:
-                id_boundary_node += 1
-                ipobo_2d[n - 1] = id_boundary_node
+        try:
+            id_boundary_node = 0
+            for boundary_nodes in self.iter_on_boundaries():
+                for n in boundary_nodes:
+                    id_boundary_node += 1
+                    ipobo_2d[n - 1] = id_boundary_node
 
-        self.ipobo = ipobo_2d
-        if not self.is_2d:
-            shift_ipobo =  np.zeros(self.nb_nodes_2d)
-            shift_ipobo[ipobo_2d > 0] = id_boundary_node
-            for i_plan in range(self.nb_planes):
-                if i_plan > 0:
-                    self.ipobo = np.concatenate((self.ipobo, ipobo_2d + i_plan * shift_ipobo))
+            self.ipobo = ipobo_2d
+            if not self.is_2d:
+                shift_ipobo = np.zeros(self.nb_nodes_2d)
+                shift_ipobo[ipobo_2d > 0] = id_boundary_node
+                for i_plan in range(self.nb_planes):
+                    if i_plan > 0:
+                        self.ipobo = np.concatenate((self.ipobo, ipobo_2d + i_plan * shift_ipobo))
+        except SerafinRequestError:
+            logger.warning("The IPOBO table could not be built and set to 0. Check if some nodes are superimposed.")
+            self.ipobo = np.zeros(self.nb_nodes, dtype=np.int64)
 
     def _set_as_2d(self):
         """!
@@ -797,7 +802,7 @@ class SerafinHeader:
             name = var_name.decode(encoding=SLF_EIT).strip()
             if name not in var_table:
                 slf_type = '2D' if self.is_2d else '3D'
-                logger.warning('WARNING: The %s variable name "%s" is not known (lang=%s). '
+                logger.warning('The %s variable name "%s" is not known (lang=%s). '
                                'The complete name will be used as ID' % (slf_type, name, self.language))
                 var_id = name
             else:
