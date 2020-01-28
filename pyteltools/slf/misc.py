@@ -303,11 +303,11 @@ def slf_to_shp(slf_name, slf_header, shp_name, variables, time_index):
 
     # compute angles
     for brother, sister in angles:
-        values['Angle(%s,%s)' % (brother, sister)] = np.degrees(np.arctan2(values[sister], values[brother]))
+        values['Angle_%s%s' % (brother, sister)] = np.degrees(np.arctan2(values[sister], values[brother]))
 
     # write shp
     key_order = coupled + non_coupled + [mother for mother, _, _ in mothers] \
-                        + ['Angle(%s,%s)' % (brother, sister) for brother, sister in angles]
+                        + ['Angle_%s%s' % (brother, sister) for brother, sister in angles]
 
     w = shapefile.Writer(shp_name, shapefile.POINT)
     for name in key_order:
