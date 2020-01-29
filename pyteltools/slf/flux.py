@@ -299,7 +299,7 @@ class FluxCalculator:
         self.mesh = None
         self.intersections = []
 
-    def construct_triangles(self, iter_pbar=lambda x: x):
+    def construct_triangles(self, iter_pbar=lambda x, unit: x):
         """!
         Construct triangular elements (index construction)
         @param iter_pbar: iterable progress bar
@@ -330,13 +330,13 @@ class FluxCalculator:
         else:
             return TriangularVectorField.mass_flux(intersections, values[0], values[1], values[2], values[3])
 
-    def run(self, iter_pbar=lambda x: x, fmt_float=settings.FMT_FLOAT):
+    def run(self, iter_pbar=lambda x, unit: x, fmt_float=settings.FMT_FLOAT):
         """!
         Separate the major part of the computation, allowing a GUI override
         @param iter_pbar: iterable progress bar
         """
         result = []
-        for time_index in iter_pbar(self.time_indices):
+        for time_index in iter_pbar(self.time_indices, unit='frames'):
             i_result = [str(self.input_stream.time[time_index])]
             values = []
             for var_ID in self.var_IDs:

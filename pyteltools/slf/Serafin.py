@@ -163,7 +163,7 @@ class SerafinHeader:
         self.nb_nodes_per_elem = -1
         self.nb_nodes_2d = -1
 
-        self.mesh_origin = (0, 0)
+        self.mesh_origin = (0.0, 0.0)
         self.x_stored = None
         self.y_stored = None
         self.x = None
