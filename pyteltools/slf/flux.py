@@ -130,11 +130,11 @@ class TriangularVectorField(Mesh2D):
                     prev_x, prev_y = None, None
                     for x, y in intersection.coords:
                         if prev_x is None:  # the first point doesn't have a normal vector
-                            prev_x, prev_y = x, y
                             line.append(([0, 0], interpolator.get_interpolator_at(x, y)))
                         else:
                             line.append(([prev_y-y, x-prev_x],
                                          interpolator.get_interpolator_at(x, y)))
+                        prev_x, prev_y = x, y
                     intersections[i, j, k].append(line)
         return intersections
 
