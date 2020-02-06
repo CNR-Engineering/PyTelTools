@@ -2,6 +2,7 @@
 <img style="float: right" src="https://github.com/CNR-Engineering/PyTelTools_media/raw/master/icons/PyTelTools_with_text.png" width="256px" />
 
 ![Python package](https://github.com/CNR-Engineering/PyTelTools/workflows/Python%20package/badge.svg)
+
 Tested versions: 3.6 and 3.7.
 
 * [Documentations](#documentations)
