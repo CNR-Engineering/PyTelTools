@@ -779,7 +779,7 @@ class TimeRangeSlider(QSlider):
 
         self.click_offset = new_pos
 
-         # update the tip
+        # update the tip
         if self.active_slider == 0:
             pos_low = self.mapToGlobal(event.pos())
             QToolTip.showText(pos_low, str(self.low()), self)

@@ -82,7 +82,7 @@ def slf_sedi_chain(args):
 
 
 parser = PyTelToolsArgParse(description=__doc__, add_args=['in_slf', 'out_slf', 'shift'])
-help_friction_laws = ', '.join(['%i=%s' %(i, law) for i, law in enumerate(FRICTION_LAWS)])
+help_friction_laws = ', '.join(['%i=%s' % (i, law) for i, law in enumerate(FRICTION_LAWS)])
 parser.add_argument('--friction_law', type=int, help='friction law identifier: %s' % help_friction_laws,
                     choices=range(len(FRICTION_LAWS)), default=STRICKLER_ID)
 parser.add_argument('--Cmud', help='mud concentration (liquid) [kg/m³]', type=float, default=1200)

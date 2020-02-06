@@ -85,7 +85,7 @@ def compute_DMAX(tau):
 
 def compute_COMPONENT_X(scalar, x, y):
     magnitude = np.sqrt(np.power(x, 2) + np.power(y, 2))
-    return np.where(magnitude>0, scalar*x/magnitude, 0)
+    return np.where(magnitude > 0, scalar * x/magnitude, 0)
 
 
 def compute_COMPONENT_Y(scalar, x, y):

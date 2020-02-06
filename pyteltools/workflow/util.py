@@ -2365,7 +2365,7 @@ class MultiSaveProjectLinesDialog(MultiInterpolationPlotDialog):
                     self.time_index, self.current_vars, self.language = self.compute_options
 
     def check_load(self, row, input_data):
-         # check time
+        # check time
         if self.time_index >= len(input_data.time):
             self.fail(row, 1)
             return False

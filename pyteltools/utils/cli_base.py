@@ -72,7 +72,7 @@ class PyTelToolsArgParse(argparse.ArgumentParser):
     @staticmethod
     def _title_group(label):
         """Decorates group title label"""
-        return '~> '+ label
+        return '~> ' + label
 
     def add_argument_group(self, name, *args, **kwargs):
         """Add title group decoration"""

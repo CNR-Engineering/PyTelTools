@@ -17,9 +17,12 @@ from tqdm import tqdm
 from pyteltools.geom import Shapefile
 from pyteltools.slf import Serafin
 from pyteltools.slf.variables import do_calculations_in_frame, get_necessary_equations
-from pyteltools.slf.variable.variables_2d import FRICTION_LAWS, STRICKLER_ID
+from pyteltools.slf.variable.variables_2d import FRICTION_LAWS, get_US_equation, STRICKLER_ID
 from pyteltools.slf.volume import VolumeCalculator
 from pyteltools.utils.cli_base import logger, PyTelToolsArgParse
+
+
+strickler_equation = get_US_equation(STRICKLER_ID)
 
 
 def slf_bottom_friction(args):
@@ -42,8 +45,8 @@ def slf_bottom_friction(args):
         sys.exit(3)
 
     if not polygons:
-            logger.error('The file does not contain any polygon.')
-            sys.exit(1)
+        logger.error('The file does not contain any polygon.')
+        sys.exit(1)
     logger.debug('The file contains {} polygon{}.'.format(len(polygons), 's' if len(polygons) > 1 else ''))
 
     names = ['Polygon %d' % (i + 1) for i in range(len(polygons))]
@@ -127,7 +130,7 @@ def slf_bottom_friction(args):
                 for time_index, time in enumerate(tqdm(resin.time)):
                     values = do_calculations_in_frame(necessary_equations, resin, time_index, out_varIDs,
                                                       resin.header.np_float_type, is_2d=True,
-                                                      us_equation=STRICKLER_EQUATION, ori_values=ori_values)
+                                                      us_equation=strickler_equation, ori_values=ori_values)
                     resout.write_entire_frame(output_header, time, values)
 
                     row = [time]
@@ -143,7 +146,7 @@ parser.add_argument('in_polygons', help='polygons file (*.shp)')
 
 parser.add_argument('--in_strickler_zones', help='strickler zones file (*.shp)')
 parser.add_argument('--in_strickler_attr', help='attribute to read strickler values `--in_stricker_zone`')
-help_friction_laws = ', '.join(['%i=%s' %(i, law) for i, law in enumerate(FRICTION_LAWS)])
+help_friction_laws = ', '.join(['%i=%s' % (i, law) for i, law in enumerate(FRICTION_LAWS)])
 parser.add_argument('--friction_law', type=int, help='friction law identifier: %s' % help_friction_laws,
                     choices=range(len(FRICTION_LAWS)), default=STRICKLER_ID)
 parser.add_group_general(['force', 'verbose'])

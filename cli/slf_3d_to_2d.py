@@ -53,7 +53,7 @@ def slf_3d_to_2d(args):
             elif args.aggregation == 'min':
                 operation_type = operations.MIN
             else:  # args.aggregation == 'mean'
-                 operation_type = operations.MEAN
+                operation_type = operations.MEAN
             selected_vars = [var for var in output_header.iter_on_all_variables()]
             vertical_calculator = operations.VerticalMaxMinMeanCalculator(operation_type, resin, output_header,
                                                                           selected_vars, args.vars)

@@ -36,7 +36,7 @@ class WriteCSVProcess(OutputThread):
         self.write_header(output_stream, selected_vars, indices, points)
 
         nb_selected_vars = len(selected_vars)
-        nb_frames = len(output_time)
+        # nb_frames = len(output_time)
 
         iter_pbar = ProgressBarIterator.prepare(self.tick.emit)
         for index, time in enumerate(iter_pbar(output_time)):

@@ -77,11 +77,12 @@ class Zone:
         polylines = []
 
         attributes = shp.get_numeric_attribute_names(shp_name)
-        try:
-            index_attr = [attr for _, attr in attributes].index(args.attr_to_shift_z)
-        except ValueError:
-            logger.critical('Attribute "%s" is not found.' % args.attr_to_shift_z)
-            sys.exit(1)
+        if args.attr_to_shift_z is not None:
+            try:
+                index_attr = [attr for _, attr in attributes].index(args.attr_to_shift_z)
+            except ValueError:
+                logger.critical('Attribute "%s" is not found.' % args.attr_to_shift_z)
+                sys.exit(1)
 
         for polyline in shp.get_open_polylines(shp_name):
             if not polyline.polyline().is_valid:

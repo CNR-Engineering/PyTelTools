@@ -631,8 +631,8 @@ def write_arrival_duration(input_data, filename):
         elif time_unit == 'day':
             values /= 86400
         elif time_unit == 'percentage':
-            values *= 100 / (input_data.time[input_data.selected_time_indices[-1]]
-                             - input_data.time[input_data.selected_time_indices[0]])
+            values *= 100 / (input_data.time[input_data.selected_time_indices[-1]] -
+                             input_data.time[input_data.selected_time_indices[0]])
 
         with Serafin.Write(filename, input_data.language, True) as resout:
             resout.write_header(output_header)
@@ -876,7 +876,7 @@ def compute_flux(node_id, fid, data, aux_data, options, csv_separator, fmt_float
         return False, node_id, fid, None, fail_message('variable not available', 'Compute Flux', data.job_id)
 
     sections = aux_data.lines
-    section_names = ['Line %d' % (i+1) for i in range(len(sections))]  #FIXME: replace by section identifier
+    section_names = ['Line %d' % (i+1) for i in range(len(sections))]  # FIXME: replace by section identifier
     flux_type = PossibleFluxComputation.get_flux_type(var_IDs)
 
     # process output options

@@ -78,7 +78,7 @@ group_var = parser.add_argument_group('Serafin variables (optional)',
     'See variables abbrevations on https://github.com/CNR-Engineering/PyTelTools/wiki/Notations-of-variables')
 group_var.add_argument('--var2del', nargs='+', help='variable(s) to delete', default=[], metavar=('VA', 'VB'))
 group_var.add_argument('--var2add', nargs='+', help='variable(s) to add', default=[], metavar=('VA', 'VB'))
-help_friction_laws = ', '.join(['%i=%s' %(i, law) for i, law in enumerate(FRICTION_LAWS)])
+help_friction_laws = ', '.join(['%i=%s' % (i, law) for i, law in enumerate(FRICTION_LAWS)])
 group_var.add_argument('--friction_law', type=int, help='friction law identifier: %s' % help_friction_laws,
                        choices=range(len(FRICTION_LAWS)), default=STRICKLER_ID)
 

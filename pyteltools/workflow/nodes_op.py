@@ -15,7 +15,6 @@ from pyteltools.slf.variables import get_available_variables, get_necessary_equa
     new_variables_from_US
 
 from .Node import Node, OneInOneOutNode, TwoInOneOutNode
-from .util import logger
 
 
 class SelectVariablesNode(OneInOneOutNode):

@@ -38,6 +38,7 @@ def build_variables_table():
                 dic['fr'][var_name_fr] = var_id
                 dic['en'][var_name_en] = var_id
 
+
 build_variables_table()
 
 
@@ -622,7 +623,7 @@ class SerafinHeader:
     def build_ipobo(self):
         """
         Build IPOBO array containing 0 values for inner nodes and 1-indexed node number for boundary nodes
-        /!\ This method will probably crash if some nodes are duplicated!
+        Beware: This method will probably crash if some nodes are duplicated!
         """
         ipobo_2d = np.zeros(self.nb_nodes_2d, dtype=np.int64)
 
@@ -923,8 +924,8 @@ class Read(Serafin):
             raise SerafinRequestError('Impossible to read a negative time index!')
         logger.debug('Reading variable %s at frame %i' % (var_ID, time_index))
         pos_var = self._get_var_index(var_ID)
-        self.file.seek(self.header.header_size + time_index * self.header.frame_size
-                       + 8 + self.header.float_size + pos_var * (8 + self.header.float_size * self.header.nb_nodes), 0)
+        self.file.seek(self.header.header_size + time_index * self.header.frame_size + 8 +
+                       self.header.float_size + pos_var * (8 + self.header.float_size * self.header.nb_nodes), 0)
         self.file.read(4)
         return np.array(self.header.unpack_float(self.file.read(self.header.float_size * self.header.nb_nodes),
                                                  self.header.nb_nodes), dtype=self.header.np_float_type)

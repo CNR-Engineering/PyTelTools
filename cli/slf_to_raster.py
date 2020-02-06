@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """
 Convert all variables of a single frame (from a Serafin file) to a tif raster (one band per variable)
-/!\ Output file is overwritten if already present
+Beware: Output file is overwritten if already present
 """
 import gdal
 import matplotlib.tri as mtri
@@ -63,7 +63,7 @@ def slf_to_raster(args):
         # Shift mesh coordinates if necessary
         if args.shift:
             header.transform_mesh([Transformation(0, 1, 1, args.shift[0], args.shift[1], 0)])
-    
+
         # Build output regular grid and matplotlib triangulation of the mesh
         m_xi, m_yi = np.meshgrid(np.arange(header.x.min(), header.x.max(), args.resolution),
                                  np.arange(header.y.min(), header.y.max(), args.resolution))

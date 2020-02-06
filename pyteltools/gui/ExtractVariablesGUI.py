@@ -665,9 +665,8 @@ class SubmitTab(QWidget):
                              ['', 's'][len(output_time_indices) > 1], output_time_indices[0]+1, output_time_indices[-1]+1)
         else:
             start_index, end_index, sampling_frequency, output_time_indices = self.timeSelection.getTime()
-            output_message = 'Writing the output with variables %s between frame %d and %d with sampling frequency %d.' \
+            output_message = 'Writing the output with variables %s between frame %d and %d with sampling frequency %d.'\
                              % (str(output_header.var_IDs), start_index, end_index, sampling_frequency)
-
 
         self.parent.inDialog()
         progressBar = OutputProgressDialog()

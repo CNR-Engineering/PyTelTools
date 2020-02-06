@@ -286,8 +286,8 @@ class WriteSerafinNode(OneInOneOutNode):
             elif time_unit == 'day':
                 values /= 86400
             elif time_unit == 'percentage':
-                values *= 100 / (input_data.time[input_data.selected_time_indices[-1]]
-                                 - input_data.time[input_data.selected_time_indices[0]])
+                values *= 100 / (input_data.time[input_data.selected_time_indices[-1]] -
+                                 input_data.time[input_data.selected_time_indices[0]])
 
             with Serafin.Write(self.filename, input_data.language, True) as output_stream:
                 output_stream.write_header(output_header)

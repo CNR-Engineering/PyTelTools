@@ -651,7 +651,7 @@ class ShpMultiPointConverter(GeomFileConverter):
                     if hasattr(record.shape, 'm'):
                         m = record.shape.m
                     else:
-                        m = [0] * points.shape[0]  #FIXME: default value : 0
+                        m = [0] * points.shape[0]  # FIXME: default value : 0
                     self.m.append(np.array(m))
                     points = np.hstack((points, np.array(z).reshape((points.shape[0], 1))))
                     self.shapes.append(points)
@@ -755,7 +755,7 @@ class ShpMultiPointConverter(GeomFileConverter):
         elif mfield == '0':
             new_m = []
             for points in self.shapes:
-                new_m.append(np.array([0] *len(points)))
+                new_m.append(np.array([0] * len(points)))
             return new_m
         else:
             attribute_index = int(mfield.split(' - ')[0])
