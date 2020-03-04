@@ -358,7 +358,40 @@ def slf_to_csv(slf_name, slf_header, csv_name, selected_vars, selected_time_indi
                     csv.write('\n')
 
 
-def slf_to_xml(slf_name, slf_header, xml_name, selected_vars, selected_time_indices):
+def duration_seconds_to_iso8601(duration_in_seconds):
+    """
+    Converts a duration in seconds to ISO 8601 text format
+    (See ISO format at https://fr.wikipedia.org/wiki/ISO_8601#Dur%C3%A9e)
+    :param duration_in_seconds: float measuring a duration in seconds
+    :return: ISO 8601 text format (e.g. "P0DT0H0M0S". Info: the letter `T` separates days and hours)
+    """
+    txt = 'P'
+
+    # Number of days
+    nb_days = duration_in_seconds // (24 * 3600)
+    txt += '%iDT' % nb_days
+    duration_in_seconds = duration_in_seconds - nb_days * 24 * 3600
+
+    # Number of hours
+    nb_hours = duration_in_seconds // 3600
+    txt += '%iH' % nb_hours
+    duration_in_seconds = duration_in_seconds - nb_hours * 3600
+
+    # Number of minutes
+    nb_minutes = duration_in_seconds // 60
+    txt += '%iM' % nb_minutes
+    duration_in_seconds = duration_in_seconds - nb_minutes * 60
+
+    # Number of seconds
+    if duration_in_seconds == 0.0:
+        txt += '0S'
+    else:
+        txt += '%.2fS' % duration_in_seconds  # truncation after 2 digits
+
+    return txt
+
+
+def slf_to_xml(slf_name, slf_header, xml_name, selected_vars, selected_time_indices, selected_time_seconds):
     """!
     @brief Write LandXML file from multiple scalar variables and temporal frames of a Serafin file
     @param slf_name <str>: path to the input Serafin file
@@ -366,6 +399,7 @@ def slf_to_xml(slf_name, slf_header, xml_name, selected_vars, selected_time_indi
     @param xml_name <str>: output LandXML filename
     @param selected_vars <[str]>: selected variables
     @param selected_time_indices <[int]>: selected time indices
+    @param selected_time_seconds <[float]>:  selected time values in seconds
     """
     with Serafin.Read(slf_name, slf_header.language) as input_stream:
         input_stream.header = slf_header
@@ -381,11 +415,12 @@ def slf_to_xml(slf_name, slf_header, xml_name, selected_vars, selected_time_indi
             xml.write('    <Metric linearUnit="meter" areaUnit="squareMeter" volumeUnit="cubicMeter"/>\n')
             xml.write('  </Units>\n')
             xml.write('  <Surfaces>\n')
-            for time_index in selected_time_indices:
+            for time_index, time in zip(selected_time_indices, selected_time_seconds):
+                time_str = duration_seconds_to_iso8601(time)  # "P0DT0H0M0S"
                 for scalar in selected_vars:
                     scalar_values = input_stream.read_var_in_frame(time_index, scalar)
-
-                    xml.write('    <Surface name="%s at frame %i/%i">\n' % (scalar, time_index+1, slf_header.nb_frames))
+                    xml.write('    <Surface name="%s at frame %i/%i - %s">\n'
+                              % (scalar, time_index+1, slf_header.nb_frames, time_str))
                     xml.write('      <Definition surfType="TIN">\n')
                     xml.write('        <Pnts>\n')
                     for i, (x, y, z) in enumerate(zip(slf_header.x, slf_header.y, scalar_values)):
@@ -398,7 +433,7 @@ def slf_to_xml(slf_name, slf_header, xml_name, selected_vars, selected_time_indi
                         xml.write('          <F id="%d">%d %d %d</F>\n' % (i+1, a, b, c))
                     xml.write('        </Faces>\n')
                     xml.write('      </Definition>\n')
-            xml.write('    </Surface>\n')
+                    xml.write('    </Surface>\n')
             xml.write('  </Surfaces>\n')
             xml.write('</LandXML>\n')
 

@@ -13,8 +13,8 @@ class SerafinData:
         self.index = None
         self.triangles = {}
         self.header = None
-        self.time = []
-        self.time_second = []
+        self.time = []  # <[float]>
+        self.time_second = []  # <[datetime.timedelta]>  FIXME: should be renamed differently!
         self.start_time = None
 
         self.selected_vars = []

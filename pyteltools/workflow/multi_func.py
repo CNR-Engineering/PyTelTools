@@ -1325,7 +1325,8 @@ def write_landxml(node_id, fid, data, options):
             pass
         return False, node_id, fid, None, fail_message('access denied', 'Write LandXML', data.job_id)
 
-    operations.slf_to_xml(data.filename, data.header, filename, available_vars, data.selected_time_indices)
+    operations.slf_to_xml(data.filename, data.header, filename, available_vars,
+                          data.selected_time_indices, data.time)
 
     return True, node_id, fid, None, success_message('Write LandXML', data.job_id)
 

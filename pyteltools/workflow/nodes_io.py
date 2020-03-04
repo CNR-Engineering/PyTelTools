@@ -1033,7 +1033,7 @@ class WriteLandXMLNode(SingleInputNode):
             return
 
         operations.slf_to_xml(input_data.filename, input_data.header, filename, input_data.selected_vars,
-                              input_data.selected_time_indices)
+                              input_data.selected_time_indices, input_data.time)
 
         self.success()
 
