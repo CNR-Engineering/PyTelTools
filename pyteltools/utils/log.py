@@ -5,7 +5,10 @@ from pyteltools.conf import settings
 
 
 # Overwrite some default styles
-has_bold = coloredlogs.CAN_USE_BOLD_FONT
+try:
+    has_bold = coloredlogs.CAN_USE_BOLD_FONT  # coloredlogs<14.0 (old versions)
+except AttributeError:
+    has_bold = True
 LEVEL_STYLES = coloredlogs.DEFAULT_LEVEL_STYLES
 FIELD_STYLES = coloredlogs.DEFAULT_FIELD_STYLES
 FIELD_STYLES['levelname'] = {'color': 'white', 'bold': has_bold}  # Avoid 'black' color for Windows
