@@ -1052,6 +1052,9 @@ class Write(Serafin):
         @param time_to_write <float>: output time (in seconds)
         @param values <numpy 2D-array>: values to write, of dimension (nb_var, nb_nodes)
         """
+        if values.shape != (header.nb_var, header.nb_nodes):
+            raise SerafinValidationError("Shape of values %s is not consistant with SerafinHeader (%i, %i)"
+                                         % (str(values.shape), header.nb_var, header.nb_nodes))
         self.file.write(header.pack_int(header.float_size))
         self.file.write(header.pack_float(time_to_write))
         self.file.write(header.pack_int(header.float_size))
