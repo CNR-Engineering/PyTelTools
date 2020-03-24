@@ -40,7 +40,8 @@ def landxml_to_slf(args):
                         raise RuntimeError("Coordinates are not strictly identical")
 
             for j, face in enumerate(tin.find(PREFIX + 'Faces')):
-                assert int(face.get('id')) == j + 1
+                if 'id' in face.attrib:
+                    assert int(face.get('id')) == j + 1
                 n1, n2, n3 = (int(n) for n in face.text.split())
                 if i == 0:
                     ikle.append((n1, n2, n3))
