@@ -111,7 +111,7 @@ def plot_comp_ADCP_t2d(args):
 
 parser = PyTelToolsArgParse(description=__doc__)
 parser.add_argument("inADCP", help="ADCP (.csv) input filename")
-parser.add_argument("--inT2DCSV", help="List of folder containing (.csv) files")
+parser.add_argument("inT2DCSV", help="List of folder containing (.csv) files")
 parser.add_argument("--Numberdiv", help="Segments number of the line to compute average velocity on a normal grid",
                     default=10)
 parser.add_argument("outGraph", help="Filename of plot (.png)")

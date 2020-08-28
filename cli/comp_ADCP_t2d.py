@@ -91,8 +91,8 @@ parser.add_argument("--inTELEMAC", help="Telemac-2D result files with M (r2d_las
 parser.add_argument("outADCP_GPS", help="GPS ADCP (.shp) output filename")
 parser.add_argument("outADCP", help="ADCP (.csv) output filename")
 parser.add_argument("outT2DCSV", help="CSV output filename")
-parser.add_argument("--inEPSG", help="input EPSG", default=4326)  # WGS-84
-parser.add_argument("--outEPSG", help="output EPSG", default=2154)  # Lambert 93 (France)
+parser.add_argument("--inEPSG", help="input EPSG", type=int, default=4326)  # WGS-84
+parser.add_argument("--outEPSG", help="output EPSG", type=int, default=2154)  # Lambert 93 (France)
 
 
 if __name__ == "__main__":
