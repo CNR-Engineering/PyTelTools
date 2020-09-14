@@ -69,10 +69,10 @@ def slf_sedi_chain(args):
                     dt = time - prev_time
                     mean_tau = (prev_tau + tau)/2
                     if args.Tcd > 0:
-                        bottom += args.Cmud * args.ws * args.C * \
-                                  (1 - np.clip(mean_tau/args.Tcd, a_min=None, a_max=1.)) * dt
+                        bottom += args.ws * args.C * \
+                                  (1 - np.clip(mean_tau/args.Tcd, a_min=None, a_max=1.)) * dt / args.Cmud
                     if args.Tce > 0:
-                        bottom -= args.Cmud * args.M * (np.clip(mean_tau/args.Tce, a_min=1., a_max=None) - 1.) * dt
+                        bottom -= args.M * (np.clip(mean_tau/args.Tce, a_min=1., a_max=None) - 1.) * dt / args.Cmud
 
                 evol_bottom = bottom - initial_bottom
                 resout.write_entire_frame(output_header, time, np.vstack((bottom, evol_bottom)))
