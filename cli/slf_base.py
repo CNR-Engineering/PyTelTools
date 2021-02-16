@@ -67,7 +67,7 @@ def slf_base(args):
                 values = do_calculations_in_frame(necessary_equations, resin, time_index, output_header.var_IDs,
                                                   output_header.np_float_type, is_2d=output_header.is_2d,
                                                   us_equation=us_equation, ori_values={})
-                resout.write_entire_frame(output_header, time, values)
+                resout.write_entire_frame(output_header, time + args.shift_time, values)
 
 
 parser = PyTelToolsArgParse(description=__doc__, add_args=['in_slf', 'out_slf', 'shift'])
@@ -86,6 +86,7 @@ group_temp = parser.add_argument_group('Temporal operations (optional)')
 group_temp.add_argument('--ech', type=int, help='frequency sampling of input', default=1)
 group_temp.add_argument('--start', type=float, help='minimum time (in seconds)', default=-float('inf'))
 group_temp.add_argument('--end', type=float, help='maximum time (in seconds)', default=float('inf'))
+group_temp.add_argument('--shift_time', type=float, help='shift in time (in seconds)', default=0)
 
 parser.add_group_general(['force', 'verbose'])
 
