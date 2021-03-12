@@ -51,8 +51,8 @@ def landxml_to_slf(args):
 
             if i == 0:
                 output_header = Serafin.SerafinHeader(title='Converted from LandXML (written by PyTelTools)')
-                output_header.from_triangulation(np.array(nodes, dtype=np.int),
-                                                 np.array(ikle, dtype=np.int))
+                output_header.from_triangulation(np.array(nodes, dtype=np.int64),
+                                                 np.array(ikle, dtype=np.int64))
                 output_header.add_variable_str(varname, varname, '')
                 resout.write_header(output_header)
 

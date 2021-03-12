@@ -207,7 +207,7 @@ class SerafinHeader:
             self.ikle_2d = self.ikle.reshape(self.nb_elements, self.nb_nodes_per_elem)
         else:
             ikle = self.ikle.reshape(self.nb_elements, self.nb_nodes_per_elem)
-            self.ikle_2d = np.empty([self.nb_elements // (self.nb_planes - 1), 3], dtype=int)
+            self.ikle_2d = np.empty([self.nb_elements // (self.nb_planes - 1), 3], dtype=np.int64)
             nb_lines = self.ikle_2d.shape[0]
             # test the integer division
             if nb_lines * (self.nb_planes - 1) != self.nb_elements:
@@ -373,13 +373,13 @@ class SerafinHeader:
         new_header.nb_nodes_per_elem = 6
 
         ikle_bottom_pattern = np.concatenate((self.ikle_2d, self.ikle_2d + new_header.nb_nodes_2d), axis=1)
-        ikle = np.empty((nb_planes - 1, self.nb_elements, new_header.nb_nodes_per_elem), dtype=int)
+        ikle = np.empty((nb_planes - 1, self.nb_elements, new_header.nb_nodes_per_elem), dtype=np.int64)
         for i in range(nb_planes - 1):
             ikle[i] = ikle_bottom_pattern + i * new_header.nb_nodes_2d
         new_header.ikle = ikle.flatten()
         new_header._build_ikle_2d()
 
-        ipobo = np.empty((nb_planes, new_header.nb_nodes_2d), dtype=int)
+        ipobo = np.empty((nb_planes, new_header.nb_nodes_2d), dtype=np.int64)
         for i in range(nb_planes):
             ipobo[i] = self.ipobo + i * self.ipobo.max()
             ipobo[i][self.ipobo == 0] = 0
@@ -543,7 +543,7 @@ class SerafinHeader:
 
     def get_all_edges(self):
         """Get all edges (pair of nodes)"""
-        edges = np.zeros((3 * len(self.ikle_2d), 2), dtype=np.int)
+        edges = np.zeros((3 * len(self.ikle_2d), 2), dtype=np.int64)
         for i, (n1, n2, n3) in enumerate(self.ikle_2d):
             edges[3 * i, :] = [n1, n2]
             edges[3 * i + 1, :] = [n2, n3]
