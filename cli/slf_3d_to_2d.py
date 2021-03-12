@@ -2,7 +2,6 @@
 """
 Perform a vertical operation on a 3D results file to get 2D
 """
-
 import numpy as np
 import sys
 from tqdm import tqdm

@@ -6,7 +6,6 @@ Outputs:
 * write a SerafinOutput variables : 'W', 'US', 'TAU'
 * write the values in stdout
 """
-
 import csv
 import numpy as np
 from shapefile import ShapefileException

@@ -2,8 +2,9 @@
 """
 Performs multiple operations on a Serafin file:
 - compute and/or remove variables
-- mesh transformations (coordinates)
-- select frames
+- coordinates mesh transformations
+- frames selection
+- shift time series
 """
 
 import sys

@@ -1,11 +1,10 @@
 #!/usr/bin/env python
 """
-Compute volumes within polygons
+Compute volumes (between upper and lower variables) within polygons
 """
-
-from tqdm import tqdm
 from shapefile import ShapefileException
 import sys
+from tqdm import tqdm
 
 from pyteltools.conf import settings
 from pyteltools.geom import BlueKenue, Shapefile
