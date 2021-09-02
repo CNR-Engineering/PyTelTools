@@ -7,7 +7,7 @@ pyshp>=2.0
 pytest
 Rtree
 scipy
-shapely<=1.6
+shapely<1.7.0
 simple-settings
 tqdm
 unittest2
