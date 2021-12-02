@@ -654,11 +654,12 @@ class SerafinHeader:
         self.nb_planes = 0
         self.nb_nodes_per_elem = 3
 
-    def from_triangulation(self, nodes, ikle):
+    def from_triangulation(self, nodes, ikle, ipobo=None):
         """!
         Set to Serafin 2D header from a given triangulation
         @param nodes <numpy 2D-array>: x and y coordinates
         @param ikle <numpy 2D-array>: connectivity table (1-indexed)
+        @param ipobo <numpy 1D-array>: boundary indicator table
         """
         self.nb_nodes = nodes.shape[0]
         self._set_as_2d()
@@ -669,7 +670,10 @@ class SerafinHeader:
         self._compute_mesh_coordinates()
         self.ikle = ikle.flatten()
         self._build_ikle_2d()
-        self.build_ipobo()
+        if ipobo is None:
+            self.build_ipobo()
+        else:
+            self.ipobo = ipobo
 
     def from_file(self, file, file_size):
         """!
