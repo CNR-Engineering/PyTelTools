@@ -657,14 +657,15 @@ class SerafinHeader:
     def from_triangulation(self, nodes, ikle, ipobo=None):
         """!
         Set to Serafin 2D header from a given triangulation
+
         @param nodes <numpy 2D-array>: x and y coordinates
         @param ikle <numpy 2D-array>: connectivity table (1-indexed)
         @param ipobo <numpy 1D-array>: boundary indicator table
         """
+        assert ikle.min() == 1 and ikle.max() == len(nodes)  # check arrays are 1-indexed
         self.nb_nodes = nodes.shape[0]
         self._set_as_2d()
         self.nb_elements = ikle.shape[0]
-        self._set_file_format_and_precision('SERAFIN ')
         self.x_stored = nodes[:, 0]
         self.y_stored = nodes[:, 1]
         self._compute_mesh_coordinates()
@@ -673,6 +674,8 @@ class SerafinHeader:
         if ipobo is None:
             self.build_ipobo()
         else:
+            if ipobo.shape != (len(nodes),):
+                raise SerafinValidationError("IPOBO table is not a 1D-array with length of %i." % len(nodes))
             self.ipobo = ipobo
 
     def from_file(self, file, file_size):
