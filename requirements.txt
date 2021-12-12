@@ -5,7 +5,7 @@ numpy
 PyQt5
 pyshp>=2.0
 pytest
-Rtree
+Rtree=0.9.3
 scipy
 shapely<1.7.0
 simple-settings
