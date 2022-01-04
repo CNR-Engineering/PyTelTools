@@ -75,8 +75,12 @@ def slf_to_raster(args):
             values = resin.read_var_in_frame(args.frame_index, var_ID)
             interp = mtri.LinearTriInterpolator(triang, values)
             data = interp(m_xi, m_yi)[::-1]  # reverse array so the tif looks like the array
+            if args.clip_min is not None or True:
+                with np.errstate(invalid='ignore'):
+                    data = np.where(data < args.clip_min, np.nan, data)
             array_list.append((var_name, data))
-            logger.info("Min and max values for interpolated %s variable: [%f, %f]" % (var_name, data.min(), data.max()))
+            logger.info("Min and max values for interpolated %s variable: [%f, %f]" % (var_name, np.nanmin(data),
+                                                                                       np.nanmax(data)))
 
         # Write data in the raster output file
         arrays2raster(args.out_tif, (header.x.min(), header.y.max()),
@@ -90,6 +94,7 @@ parser.add_argument('--vars', nargs='+', help='variable(s) to extract (by defaul
                     metavar=('VA', 'VB'))
 parser.add_argument('--frame_index', type=int, help='index of the target temporal frame (0-indexed integer)', default=0)
 parser.add_argument('--epsg', type=int, help='EPSG code for output file', default=None)
+parser.add_argument('--clip_min', type=float, help='set to NaN all values below this threshold', default=None)
 parser.add_group_general(['verbose'])
 
 
