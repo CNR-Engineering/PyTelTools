@@ -75,9 +75,9 @@ def slf_to_raster(args):
             values = resin.read_var_in_frame(args.frame_index, var_ID)
             interp = mtri.LinearTriInterpolator(triang, values)
             data = interp(m_xi, m_yi)[::-1]  # reverse array so the tif looks like the array
-            if args.clip_min is not None or True:
+            if args.clip_min is not None:
                 with np.errstate(invalid='ignore'):
-                    data = np.where(data < args.clip_min, np.nan, data)
+                    data = np.where(data <= args.clip_min, np.nan, data)
             array_list.append((var_name, data))
             logger.info("Min and max values for interpolated %s variable: [%f, %f]" % (var_name, np.nanmin(data),
                                                                                        np.nanmax(data)))
