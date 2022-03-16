@@ -481,10 +481,11 @@ class SerafinHeader:
 
     def set_mesh_origin(self, x, y):
         """!
-        @brief: Set mesh origin coordinates
-        @param x <float>: X-coordinate of the origin
-        @param y <float>: Y-coordinate of the origin
+        @brief: Set mesh origin coordinates (/!\ coordinates should be integers!)
+        @param x <int>: X-coordinate of the origin
+        @param y <int>: Y-coordinate of the origin
         """
+        assert isinstance(x, int) and isinstance(y, int)
         self.mesh_origin = (x, y)
         params = list(self.params)
         params[2] = x

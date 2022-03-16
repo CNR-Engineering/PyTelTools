@@ -73,7 +73,7 @@ def slf_base(args):
 
 parser = PyTelToolsArgParse(description=__doc__, add_args=['in_slf', 'out_slf', 'shift'])
 
-parser.add_argument('--set_mesh_origin', type=float, nargs=2, help='Mesh origin coordinates (x, y)', metavar=('X', 'Y'))
+parser.add_argument('--set_mesh_origin', type=int, nargs=2, help='Mesh origin coordinates (x, y)', metavar=('X', 'Y'))
 
 group_var = parser.add_argument_group('Serafin variables (optional)',
     'See variables abbrevations on https://github.com/CNR-Engineering/PyTelTools/wiki/Notations-of-variables')
