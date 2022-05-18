@@ -14,7 +14,10 @@ from pyteltools.slf import Serafin
 from pyteltools.utils.cli_base import logger, PyTelToolsArgParse
 
 
-def arrays2raster(raster_filename, xy_raster_origin, dx, dy, array_list):
+WATER_DEPTH_ID = 'H'
+
+
+def arrays2raster(raster_filename, xy_raster_origin, dx, dy, array_list, epsg=None):
     nb_var = len(array_list)
     nb_rows, nb_cols = array_list[0][1].shape
     logger.info("Regular grid size : %i rows x %i columns" % (nb_rows, nb_cols))
@@ -27,9 +30,9 @@ def arrays2raster(raster_filename, xy_raster_origin, dx, dy, array_list):
 
     # Set grid and EPSG if necessary
     out_raster.SetGeoTransform((origin_x, dx, 0, origin_y, 0, dy))
-    if args.epsg is not None:  # EPSG attribution seems buggy
+    if epsg is not None:  # EPSG attribution seems buggy
         out_raster_srs = osr.SpatialReference()
-        out_raster_srs.ImportFromEPSG(args.epsg)
+        out_raster_srs.ImportFromEPSG(epsg)
         out_raster.SetProjection(out_raster_srs.ExportToWkt())
 
     # Add one band per variable
@@ -69,22 +72,33 @@ def slf_to_raster(args):
                                  np.arange(header.y.min(), header.y.max(), args.resolution))
         triang = mtri.Triangulation(header.x, header.y, triangles=header.ikle_2d - 1)
 
+        # Build mask to clip values where water depth is below Hmin_to_clip
+        if args.Hmin_to_clip is not None:
+            values = resin.read_var_in_frame(args.frame_index, WATER_DEPTH_ID)
+            interp = mtri.LinearTriInterpolator(triang, values)
+            data = interp(m_xi, m_yi)[::-1]  # reverse array so the tif looks like the array
+            with np.errstate(invalid='ignore'):
+                mask = data <= args.Hmin_to_clip
+        else:
+            mask = None
+
         # Build list containing all interpolated variables on the regular grid
         array_list = []
         for i, (var_ID, var_name) in enumerate(zip(var_IDs, var_names)):
             values = resin.read_var_in_frame(args.frame_index, var_ID)
             interp = mtri.LinearTriInterpolator(triang, values)
             data = interp(m_xi, m_yi)[::-1]  # reverse array so the tif looks like the array
-            if args.clip_min is not None:
-                with np.errstate(invalid='ignore'):
-                    data = np.where(data <= args.clip_min, np.nan, data)
+
+            if mask is not None:
+                data = np.where(mask, np.nan, data)
+
             array_list.append((var_name, data))
-            logger.info("Min and max values for interpolated %s variable: [%f, %f]" % (var_name, np.nanmin(data),
-                                                                                       np.nanmax(data)))
+            logger.info("Min and max values for interpolated %s variable: [%f, %f]"
+                        % (var_name, np.nanmin(data), np.nanmax(data)))
 
         # Write data in the raster output file
         arrays2raster(args.out_tif, (header.x.min(), header.y.max()),
-                      args.resolution, -args.resolution, array_list)
+                      args.resolution, -args.resolution, array_list, epsg=args.epsg)
 
 
 parser = PyTelToolsArgParse(description=__doc__, add_args=['in_slf', 'shift'])
@@ -94,7 +108,8 @@ parser.add_argument('--vars', nargs='+', help='variable(s) to extract (by defaul
                     metavar=('VA', 'VB'))
 parser.add_argument('--frame_index', type=int, help='index of the target temporal frame (0-indexed integer)', default=0)
 parser.add_argument('--epsg', type=int, help='EPSG code for output file', default=None)
-parser.add_argument('--clip_min', type=float, help='set to NaN all values below this threshold', default=None)
+parser.add_argument('--Hmin_to_clip', type=float,
+                    help='set to NaN all values where water depth (H) is below this threshold', default=None)
 parser.add_group_general(['verbose'])
 
 
