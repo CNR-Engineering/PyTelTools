@@ -3,7 +3,7 @@
 
 ![Python package](https://github.com/CNR-Engineering/PyTelTools/workflows/Python%20package/badge.svg)
 
-Tested versions: 3.6, 3.7, 3.8, 3.9, 3.10 et 3.11.
+Tested versions: 3.7, 3.8, 3.9, 3.10 et 3.11.
 
 * [Documentations](#documentations)
 * [Installation and requirements](#installation-and-requirements)
