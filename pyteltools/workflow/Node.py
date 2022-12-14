@@ -277,7 +277,7 @@ class Node(QGraphicsItem):
             if nb_processed > five_percent:
                 nb_processed = 0
                 current_percent += 5
-                self.progress_bar.setValue(current_percent)
+                self.progress_bar.setValue(int(current_percent))
                 QApplication.processEvents()
 
         self.progress_bar.setValue(0)

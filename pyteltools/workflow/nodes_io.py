@@ -148,7 +148,7 @@ class WriteSerafinNode(OneInOneOutNode):
                                                       ori_values={})
                     output_stream.write_entire_frame(output_header, input_data.time[time_index], values)
 
-                    self.progress_bar.setValue(100 * (i+1) / len(input_data.selected_time_indices))
+                    self.progress_bar.setValue(int(100 * (i+1) / len(input_data.selected_time_indices)))
                     QApplication.processEvents()
         self.success('Output saved to {}.'.format(self.filename))
         return True
@@ -190,7 +190,7 @@ class WriteSerafinNode(OneInOneOutNode):
                 if has_vector:
                     vector_calculator.max_min_mean_in_frame(time_index)
 
-                self.progress_bar.setValue(100 * (i+1) / len(input_data.selected_time_indices))
+                self.progress_bar.setValue(int(100 * (i+1) / len(input_data.selected_time_indices)))
                 QApplication.processEvents()
 
             if has_scalar and not has_vector:
@@ -231,7 +231,7 @@ class WriteSerafinNode(OneInOneOutNode):
             for i, time_index in enumerate(input_data.selected_time_indicies[1:]):
                 calculator.synch_max_in_frame(time_index)
 
-                self.progress_bar.setValue(100 * (i+1) / nb_frames)
+                self.progress_bar.setValue(int(100 * (i+1) / nb_frames))
                 QApplication.processEvents()
 
             values = calculator.finishing_up()
@@ -271,7 +271,7 @@ class WriteSerafinNode(OneInOneOutNode):
                 for calculator in calculators:
                     calculator.arrival_duration_in_frame(index)
 
-                self.progress_bar.setValue(100 * (i+1) / len(input_data.selected_time_indices))
+                self.progress_bar.setValue(int(100 * (i+1) / len(input_data.selected_time_indices)))
                 QApplication.processEvents()
 
             values = np.empty((2*len(conditions), input_data.header.nb_nodes))
@@ -375,7 +375,7 @@ class WriteSerafinNode(OneInOneOutNode):
                         out_stream.write_entire_frame(output_header,
                                                       calculator.first_in.time[first_time_index], values)
 
-                        self.progress_bar.setValue(100 * (i+1) / len(common_frames))
+                        self.progress_bar.setValue(int(100 * (i+1) / len(common_frames)))
                         QApplication.processEvents()
 
         self.success('Output saved to {}.\nThe two files has {} common variables and {} common frames.\n'
@@ -406,7 +406,7 @@ class WriteSerafinNode(OneInOneOutNode):
                                  values.shape[1] // input_stream.header.nb_planes)
                     values_at_layer = values.reshape(new_shape)[:, input_data.metadata['layer_selection'] - 1, :]
                     output_stream.write_entire_frame(output_header, input_data.time[time_index], values_at_layer)
-                    self.progress_bar.setValue(100 * (i+1) / len(input_data.selected_time_indices))
+                    self.progress_bar.setValue(int(100 * (i+1) / len(input_data.selected_time_indices)))
                     QApplication.processEvents()
         self.success('Output saved to {}.'.format(self.filename))
         return True
@@ -440,7 +440,7 @@ class WriteSerafinNode(OneInOneOutNode):
                 for i, time_index in enumerate(input_data.selected_time_indices):
                     vars_2d = vertical_calculator.max_min_mean_in_frame(time_index)
                     output_stream.write_entire_frame(output_header, input_data.time[time_index], vars_2d)
-                    self.progress_bar.setValue(100 * (i+1) / len(input_data.selected_time_indices))
+                    self.progress_bar.setValue(int(100 * (i+1) / len(input_data.selected_time_indices)))
                     QApplication.processEvents()
         self.success('Output saved to {}.'.format(self.filename))
         return True

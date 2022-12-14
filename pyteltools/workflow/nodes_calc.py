@@ -544,7 +544,7 @@ class ComputeVolumeNode(TwoInOneOutNode):
                         i_result.append(fmt_float.format(volume))
                 self.data.add_row(i_result)
 
-                self.progress_bar.setValue(100 * (i+1) / len(calculator.time_indices))
+                self.progress_bar.setValue(int(100 * (i+1) / len(calculator.time_indices)))
                 QApplication.processEvents()
 
     def is_valid_csv(self):
@@ -810,7 +810,7 @@ class ComputeFluxNode(TwoInOneOutNode):
                     i_result.append(fmt_float.format(flux))
                 self.data.add_row(i_result)
 
-                self.progress_bar.setValue(100 * (i+1) / len(calculator.time_indices))
+                self.progress_bar.setValue(int(100 * (i+1) / len(calculator.time_indices)))
                 QApplication.processEvents()
 
     def is_valid_csv(self):
@@ -968,7 +968,7 @@ class InterpolateOnPointsNode(TwoInOneOutNode):
                         row.append(fmt_float.format(interpolator.dot(var_values[index_var][[i, j, k]])))
 
                 self.data.add_row(row)
-                self.progress_bar.setValue(100 * (index+1) / nb_frames)
+                self.progress_bar.setValue(int(100 * (index+1) / nb_frames))
                 QApplication.processEvents()
 
     def is_valid_csv(self, points, selected_vars):
@@ -1123,7 +1123,7 @@ class InterpolateAlongLinesNode(DoubleInputNode):
                                                                       indices_nonempty,
                                                                       line_interpolators, fmt_float):
                 self.data.add_row(row)
-                self.progress_bar.setValue(100 * (v+1+u*nb_frames) * inv_steps)
+                self.progress_bar.setValue(int(100 * (v+1+u*nb_frames) * inv_steps))
                 QApplication.processEvents()
         return True, '%s line%s the mesh continuously.' % (nb_nonempty, 's intersect'
                                                            if nb_nonempty > 1 else ' intersects')
@@ -1358,7 +1358,7 @@ class ProjectLinesNode(DoubleInputNode):
             for u, row in MeshInterpolator.project_lines(input_stream, selected_vars, time_index, indices_nonempty,
                                                          max_distance, reference, line_interpolators, fmt_float):
                 self.data.add_row(row)
-                self.progress_bar.setValue(100 * (u+1) / nb_lines)
+                self.progress_bar.setValue(int(100 * (u+1) / nb_lines))
                 QApplication.processEvents()
 
         self.data.write(filename, self.scene().csv_separator)

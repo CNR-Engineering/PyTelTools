@@ -829,7 +829,7 @@ class TransformationMap(QWidget):
                     p2 = self.rectangles[j].center()
                     painter.drawLine(p1, p2)
                     painter.setBrush(self.blueBrush)
-                    painter.drawEllipse(QPoint((p1.x()+p2.x())/2, (p1.y()+p2.y())/2),
+                    painter.drawEllipse(QPoint(int((p1.x()+p2.x())/2), int((p1.y()+p2.y())/2)),
                                         self.circleRadius, self.circleRadius)
                     painter.setBrush(self.blackBrush)
 

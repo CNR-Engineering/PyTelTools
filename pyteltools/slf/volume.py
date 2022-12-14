@@ -64,8 +64,9 @@ class TruncatedTriangularPrisms(Mesh2D):
                 is_intersected, intersection = polygon.polygon_intersection(t)
                 if is_intersected:
                     centroid = intersection.centroid
-                    interpolator = Interpolator(t).get_interpolator_at(centroid.x, centroid.y)
-                    triangle_polygon_intersection[i, j, k] = (intersection.area, interpolator)
+                    if not centroid.is_empty:
+                        interpolator = Interpolator(t).get_interpolator_at(centroid.x, centroid.y)
+                        triangle_polygon_intersection[i, j, k] = (intersection.area, interpolator)
         return weight / 3.0, triangle_polygon_intersection
 
     def polygon_intersection_all(self, polygon):
@@ -92,9 +93,10 @@ class TruncatedTriangularPrisms(Mesh2D):
                     vertices = tuple(map(np.array, list(t.exterior.coords)[:-1]))
                     area = t.area
                     centroid = intersection.centroid
-                    interpolator = Interpolator(t).get_interpolator_at(centroid.x, centroid.y)
-                    triangle_polygon_net_intersection[i, j, k] = (intersection.area, interpolator)
-                    triangle_polygon_intersection[i, j, k] = (vertices, area, intersection)
+                    if not centroid.is_empty:
+                        interpolator = Interpolator(t).get_interpolator_at(centroid.x, centroid.y)
+                        triangle_polygon_net_intersection[i, j, k] = (intersection.area, interpolator)
+                        triangle_polygon_intersection[i, j, k] = (vertices, area, intersection)
         return weight / 3.0, triangle_polygon_net_intersection, triangles, triangle_polygon_intersection
 
     @staticmethod
@@ -168,6 +170,8 @@ class TruncatedTriangularPrisms(Mesh2D):
                 if not is_intersected:
                     return 0
                 centroid = intersection.centroid
+                if centroid.is_empty:
+                    return 0
                 height = Interpolator(new_triangle).get_interpolator_at(centroid.x, centroid.y).dot(np.array([z_top, 0, 0]))
                 return intersection.area * height
         else:  # negative tetrahedron
