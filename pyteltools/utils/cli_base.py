@@ -11,7 +11,7 @@ import os.path
 import sys
 
 from pyteltools.conf import settings
-from .log import new_logger
+from pyteltools.utils.log import new_logger
 
 
 LINE_WIDTH = 80

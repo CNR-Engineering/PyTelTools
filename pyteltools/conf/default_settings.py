@@ -20,7 +20,7 @@ COLOR_LOGS = True
 NCSIZE = cpu_count()
 
 # Path to ArGIS Python executable (for `outil_carto.py`)
-PY_ARCGIS = 'C:\\Python27\\ArcGIS10.7\\python.exe'
+PY_ARCGIS = 'C:\\Python27\\ArcGIS10.8\\python.exe'
 
 # ~> SERAFIN
 

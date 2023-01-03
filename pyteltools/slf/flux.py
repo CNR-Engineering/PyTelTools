@@ -44,7 +44,7 @@ class PossibleFluxComputation:
         # Add specific solid fluxes for each sediment classes
         for name in self.var_names:
             str_name = name.decode(SLF_EIT).strip()
-            if set(['U', 'V', 'H']).issubset(self.var_IDs):
+            if {'U', 'V', 'H'}.issubset(self.var_IDs):
                 if 'TRACEUR' in str_name or 'TRACER' in str_name:
                     yield 'Solid flux (kg/s): (U, V, H, %s)' % str_name
             if 'QS CLASS' in str_name:
