@@ -572,6 +572,7 @@ def write_synch_max(input_data, filename):
     selected_vars = [var for var in input_data.selected_vars if var in input_data.header.var_IDs]
     output_header = input_data.header.copy()
     output_header.empty_variables()
+    output_header.add_variable_str(operations.SYNCHMAX_TIME_VARNAME, operations.SYNCHMAX_TIME_VARNAME, "S")
     for var_ID in selected_vars:
         var_name, var_unit = input_data.selected_vars_names[var_ID]
         output_header.add_variable(var_ID, var_name, var_unit)
@@ -582,7 +583,7 @@ def write_synch_max(input_data, filename):
         input_stream.header = input_data.header
         input_stream.time = input_data.time
 
-        calculator = operations.SynchMaxCalculator(input_stream, selected_vars, input_data.selected_time_indicies,
+        calculator = operations.SynchMaxCalculator(input_stream, selected_vars, input_data.selected_time_indices,
                                                    input_data.metadata['var'])
         calculator.run()
         values = calculator.finishing_up()
@@ -1415,7 +1416,7 @@ FUNCTIONS = {'Select Variables': select_variables, 'Add Rouse': add_rouse, 'Sele
              'Select Single Frame': select_single_frame,
              'Select First Frame': select_first_frame, 'Select Last Frame': select_last_frame,
              'Select Single Layer': select_single_layer, 'Vertical Aggregation': vertical_aggregation,
-             'Max': compute_max, 'Min': compute_min, 'Mean': compute_mean,
+             'Max': compute_max, 'Min': compute_min, 'Mean': compute_mean, 'SynchMax': synch_max,
              'Convert to Single Precision': convert_to_single, 'Compute Arrival Duration': arrival_duration,
              'Load 2D Polygons': read_polygons, 'Load 2D Open Polylines': read_polylines, 'Load 2D Points': read_points,
              'Write Serafin': write_slf, 'Compute Volume': compute_volume, 'Compute Flux': compute_flux,

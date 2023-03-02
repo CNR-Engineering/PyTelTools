@@ -214,21 +214,22 @@ class WriteSerafinNode(OneInOneOutNode):
         selected_vars = [var for var in input_data.selected_vars if var in input_data.header.var_IDs]
         output_header = input_data.header.copy()
         output_header.empty_variables()
+        output_header.add_variable_str(operations.SYNCHMAX_TIME_VARNAME, operations.SYNCHMAX_TIME_VARNAME, "S")
         for var_ID in selected_vars:
             var_name, var_unit = input_data.selected_vars_names[var_ID]
             output_header.add_variable(var_ID, var_name, var_unit)
         if input_data.to_single:
             output_header.to_single_precision()
 
-        nb_frames = len(input_data.selected_time_indicies)
+        nb_frames = len(input_data.selected_time_indices)
         with Serafin.Read(input_data.filename, input_data.language) as input_stream:
             input_stream.header = input_data.header
             input_stream.time = input_data.time
 
-            calculator = operations.SynchMaxCalculator(input_stream, selected_vars, input_data.selected_time_indicies,
+            calculator = operations.SynchMaxCalculator(input_stream, selected_vars, input_data.selected_time_indices,
                                                        input_data.metadata['var'])
 
-            for i, time_index in enumerate(input_data.selected_time_indicies[1:]):
+            for i, time_index in enumerate(input_data.selected_time_indices[1:]):
                 calculator.synch_max_in_frame(time_index)
 
                 self.progress_bar.setValue(int(100 * (i+1) / nb_frames))
@@ -457,21 +458,22 @@ class WriteSerafinNode(OneInOneOutNode):
                                                self.suffix, self.in_source_folder, self.dir_path, self.double_name)
         if not self.overwrite:
             if os.path.exists(self.filename):
-                try:
-                    with open(self.filename, 'r'):
-                        pass
-                except PermissionError:
-                    self.fail('Access denied when reloading existing file.')
-                    return
+                if os.stat(self.filename).st_size > 0:  # avoid error: `struct.error: unpack requires a buffer of 4 bytes`
+                    try:
+                        with open(self.filename, 'r'):
+                            pass
+                    except PermissionError:
+                        self.fail('Access denied when reloading existing file.')
+                        return
 
-                try:
-                    self.data = SerafinData(input_data.job_id, self.filename, input_data.language)
-                    self.data.read()
-                except (Serafin.SerafinRequestError, Serafin.SerafinValidationError) as e:
-                    self.fail(e.message)
+                    try:
+                        self.data = SerafinData(input_data.job_id, self.filename, input_data.language)
+                        self.data.read()
+                    except (Serafin.SerafinRequestError, Serafin.SerafinValidationError) as e:
+                        self.fail(e.message)
+                        return
+                    self.success('Reload existing file.')
                     return
-                self.success('Reload existing file.')
-                return
 
         try:
             with open(self.filename, 'w'):

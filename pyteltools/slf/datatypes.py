@@ -26,8 +26,9 @@ class SerafinData:
 
         self.operator = None
         self.metadata = {}
-        # * select single layer: 'layer_selection': an integer
-        # * vertical aggregation: 'vertical_operator': 'Min', 'Max' or 'Mean'
+        # * Select single layer: 'layer_selection': an integer
+        # * SynchMax: 'var': a string (variable identifier)
+        # * Vertical aggregation: 'vertical_operator': 'Min', 'Max' or 'Mean'
 
     def read(self):
         try:

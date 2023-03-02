@@ -87,6 +87,7 @@ class SynchMaxThread(OutputThread):
         super().__init__()
         self.time_indices = time_indices
         self.nb_frames = len(time_indices)
+        selected_vars = [var_ID for var_ID, _, _ in selected_vars]
         self.calculator = operations.SynchMaxCalculator(input_stream, selected_vars, time_indices, var)
 
     def run(self):
@@ -790,8 +791,8 @@ class SynchMaxTab(QWidget):
     def _initVarTables(self):
         self.firstTable.fill(self.data.header)
         self.secondTable.insertRow(0)
-        self.secondTable.setItem(0, 0, QTableWidgetItem('MAX TIME'))
-        self.secondTable.setItem(0, 1, QTableWidgetItem('MAX TIME'))
+        self.secondTable.setItem(0, 0, QTableWidgetItem(operations.SYNCHMAX_TIME_VARNAME))
+        self.secondTable.setItem(0, 1, QTableWidgetItem(operations.SYNCHMAX_TIME_VARNAME))
         self.secondTable.setItem(0, 2, QTableWidgetItem('S'))
         for j in range(3):
             self.secondTable.item(0, j).setFlags(Qt.NoItemFlags)
