@@ -211,13 +211,13 @@ class WriteSerafinNode(OneInOneOutNode):
         @brief Write Serafin with `SynchMax` operator
         @param input_data <slf.datatypes.SerafinData>: input SerafinData stream
         """
-        selected_vars = [var for var in input_data.selected_vars if var in input_data.header.var_IDs]
+        selected_vars = input_data.selected_vars
         output_header = input_data.header.copy()
         output_header.empty_variables()
-        output_header.add_variable_str(operations.SYNCHMAX_TIME_VARNAME, operations.SYNCHMAX_TIME_VARNAME, "S")
         for var_ID in selected_vars:
             var_name, var_unit = input_data.selected_vars_names[var_ID]
             output_header.add_variable(var_ID, var_name, var_unit)
+        output_header.add_variable_str(operations.SYNCHMAX_TIME_VARNAME, operations.SYNCHMAX_TIME_VARNAME, "S")
         if input_data.to_single:
             output_header.to_single_precision()
 
@@ -227,7 +227,7 @@ class WriteSerafinNode(OneInOneOutNode):
             input_stream.time = input_data.time
 
             calculator = operations.SynchMaxCalculator(input_stream, selected_vars, input_data.selected_time_indices,
-                                                       input_data.metadata['var'])
+                                                       input_data.metadata['var'], input_data.us_equation)
 
             for i, time_index in enumerate(input_data.selected_time_indices[1:]):
                 calculator.synch_max_in_frame(time_index)

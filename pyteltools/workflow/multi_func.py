@@ -397,9 +397,9 @@ def synch_max(node_id, fid, data, options):
         return False, node_id, fid, None, fail_message('the input file has only one frame', 'SynchMax', data.job_id)
 
     var = options[0]
-    available_vars = [var for var in data.selected_vars if var in data.header.var_IDs]
+    available_vars = data.selected_vars
     if var not in available_vars:
-        return False, node_id, fid, None, fail_message('variable not available', 'SynchMax', data.job_id)
+        return False, node_id, fid, None, fail_message('variable `%s` not available' % var, 'SynchMax', data.job_id)
     new_data = data.copy()
     new_data.operator = operations.SYNCH_MAX
     new_data.metadata = {'var': var}
@@ -569,13 +569,13 @@ def write_max_min_mean(input_data, filename):
 
 
 def write_synch_max(input_data, filename):
-    selected_vars = [var for var in input_data.selected_vars if var in input_data.header.var_IDs]
+    selected_vars = input_data.selected_vars
     output_header = input_data.header.copy()
     output_header.empty_variables()
-    output_header.add_variable_str(operations.SYNCHMAX_TIME_VARNAME, operations.SYNCHMAX_TIME_VARNAME, "S")
     for var_ID in selected_vars:
         var_name, var_unit = input_data.selected_vars_names[var_ID]
         output_header.add_variable(var_ID, var_name, var_unit)
+    output_header.add_variable_str(operations.SYNCHMAX_TIME_VARNAME, operations.SYNCHMAX_TIME_VARNAME, "S")
     if input_data.to_single:
         output_header.to_single_precision()
 
@@ -584,7 +584,7 @@ def write_synch_max(input_data, filename):
         input_stream.time = input_data.time
 
         calculator = operations.SynchMaxCalculator(input_stream, selected_vars, input_data.selected_time_indices,
-                                                   input_data.metadata['var'])
+                                                   input_data.metadata['var'], input_data.us_equation)
         calculator.run()
         values = calculator.finishing_up()
 

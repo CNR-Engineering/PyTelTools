@@ -1098,7 +1098,7 @@ class SynchMaxNode(OneInOneOutNode):
     def get_option_panel(self):
         self.var_box = QComboBox()
         self.var_box.setFixedHeight(30)
-        available_vars = [var for var in self.in_data.selected_vars if var in self.in_data.header.var_IDs]
+        available_vars = self.in_data.selected_vars
         for var in available_vars:
             self.var_box.addItem(var)
         if self.var:
@@ -1125,7 +1125,7 @@ class SynchMaxNode(OneInOneOutNode):
         elif self.in_data.operator is not None:
             self.state = Node.NOT_CONFIGURED
         elif self.var:
-            available_vars = [var for var in self.in_data.selected_vars if var in self.in_data.header.var_IDs]
+            available_vars = self.in_data.selected_vars
             if self.var in available_vars:
                 self.state = Node.READY
             else:

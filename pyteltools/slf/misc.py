@@ -10,7 +10,8 @@ from pyteltools.conf import settings
 
 from . import Serafin
 from .util import logger
-from .variables import do_calculation, get_available_variables, get_necessary_equations
+from .variables import do_calculations_in_frame, get_available_variables, get_necessary_equations
+from .variable.variables_utils import do_calculation
 
 
 # constants
@@ -965,46 +966,44 @@ class SynchMaxCalculator:
     """!
     Compute multiple synchronized maxima with respect to a reference variable
     """
-    def __init__(self, input_stream, selected_vars, time_indices, ref_var):
+    def __init__(self, input_stream, selected_vars, time_indices, ref_var, us_equation):
         self.input_stream = input_stream
         self.selected_vars = selected_vars
         self.time_indices = time_indices
-        self.ref_var = ref_var
-
-        self.read_ref = False
-        if ref_var not in selected_vars:
-            self.read_ref = True
+        self.us_equation = us_equation
+        self.index_ref_var = selected_vars.index(ref_var)
         self.nb_nodes = input_stream.header.nb_nodes
-        self.current_values = {SYNCHMAX_TIME_VARNAME:
-                               np.ones((self.nb_nodes,)) * self.input_stream.time[time_indices[0]]}
 
-        for var in selected_vars:
-            self.current_values[var] = self.input_stream.read_var_in_frame(time_indices[0], var)
-        if self.read_ref:
-            self.current_values[ref_var] = self.input_stream.read_var_in_frame(time_indices[0], ref_var)
+        self.necessary_equations = get_necessary_equations(input_stream.header.var_IDs, selected_vars,
+                                                           is_2d=input_stream.header.is_2d,
+                                                           us_equation=self.us_equation)
+
+        # Initialize with first frame
+        time_index = time_indices[0]
+        current_values = do_calculations_in_frame(self.necessary_equations, self.input_stream, time_index,
+                                                  self.selected_vars, self.input_stream.header.np_float_type,
+                                                  is_2d=self.input_stream.header.is_2d,
+                                                  us_equation=self.us_equation, ori_values={})
+        self.current_time_series = np.ones((self.nb_nodes,)) * self.input_stream.time[time_index]
+        self.current_values = current_values
 
     def synch_max_in_frame(self, time_index):
-        values = {}
-        for var in self.selected_vars:
-            values[var] = self.input_stream.read_var_in_frame(time_index, var)
-        if self.read_ref:
-            values[self.ref_var] = self.input_stream.read_var_in_frame(time_index, self.ref_var)
+        # Read results
+        current_values = do_calculations_in_frame(self.necessary_equations, self.input_stream, time_index,
+                                                  self.selected_vars, self.input_stream.header.np_float_type,
+                                                  is_2d=self.input_stream.header.is_2d,
+                                                  us_equation=self.us_equation, ori_values={})
+        current_time_series = np.ones((self.nb_nodes,)) * self.input_stream.time[time_index]
+        current_values_ref = current_values[self.index_ref_var, :]
 
-        flags = values[self.ref_var] > self.current_values[self.ref_var]
-        for var in self.selected_vars:
-            self.current_values[var] = np.where(flags, values[var], self.current_values[var])
-        self.current_values[self.ref_var] = np.where(flags, values[self.ref_var], self.current_values[self.ref_var])
-
-        time_value = self.input_stream.time[time_index]
-        self.current_values[SYNCHMAX_TIME_VARNAME] = np.where(flags, time_value,
-                                                              self.current_values[SYNCHMAX_TIME_VARNAME])
+        # Update necessary data
+        prev_values_ref = self.current_values[self.index_ref_var, :]
+        flags = current_values_ref > prev_values_ref
+        self.current_values = np.where(flags, current_values, self.current_values)
+        self.current_time_series = np.where(flags, current_time_series, self.current_time_series)
 
     def finishing_up(self):
-        values = np.empty((len(self.selected_vars)+1, self.nb_nodes))
-        values[0, :] = self.current_values[SYNCHMAX_TIME_VARNAME]
-        for i, var in enumerate(self.selected_vars):
-            values[i+1, :] = self.current_values[var]
-        return values
+        return np.vstack((self.current_values, self.current_time_series))
 
     def run(self):
         for time_index in self.time_indices[1:]:

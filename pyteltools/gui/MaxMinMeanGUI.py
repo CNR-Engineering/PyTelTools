@@ -88,7 +88,7 @@ class SynchMaxThread(OutputThread):
         self.time_indices = time_indices
         self.nb_frames = len(time_indices)
         selected_vars = [var_ID for var_ID, _, _ in selected_vars]
-        self.calculator = operations.SynchMaxCalculator(input_stream, selected_vars, time_indices, var)
+        self.calculator = operations.SynchMaxCalculator(input_stream, selected_vars, time_indices, var, None)
 
     def run(self):
         iter_pbar = ProgressBarIterator.prepare(self.tick.emit)
