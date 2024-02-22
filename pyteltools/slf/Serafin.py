@@ -935,8 +935,35 @@ class Read(Serafin):
         self.file.seek(self.header.header_size + time_index * self.header.frame_size + 8 +
                        self.header.float_size + pos_var * (8 + self.header.float_size * self.header.nb_nodes), 0)
         self.file.read(4)
-        return np.array(self.header.unpack_float(self.file.read(self.header.float_size * self.header.nb_nodes),
-                                                 self.header.nb_nodes), dtype=self.header.np_float_type)
+        return np.array(self.header.unpack_float(
+            self.file.read(self.header.float_size * self.header.nb_nodes), self.header.nb_nodes),
+            dtype=self.header.np_float_type
+        )
+
+    def read_vars_in_frame(self, time_index, var_IDs=None):
+        """!
+        @brief Read multiple variables in a frame
+        @param time_index <int>: the index of the frame (0-based)
+        @param var_IDs <[str]>: list of variable IDs (if not present, all variables are considered)
+        @return <numpy 2D-array>: values of the variables with shape (number of variables, number of 2D nodes)
+        """
+        if var_IDs is None:
+            var_IDs = self.header.var_IDs
+        if time_index < 0:
+            raise SerafinRequestError('Impossible to read a negative time index!')
+        logger.debug('Reading variables %s at frame %i' % (var_IDs, time_index))
+
+        res = np.empty((len(var_IDs), self.header.nb_nodes))
+        for i, var_ID in enumerate(var_IDs):
+            pos_var = self._get_var_index(var_ID)
+            self.file.seek(self.header.header_size + time_index * self.header.frame_size + 8 +
+                           self.header.float_size + pos_var * (8 + self.header.float_size * self.header.nb_nodes), 0)
+            self.file.read(4)
+            res[i, :] = np.array(self.header.unpack_float(
+                self.file.read(self.header.float_size * self.header.nb_nodes), self.header.nb_nodes),
+                dtype=self.header.np_float_type
+            )
+        return res
 
     def read_var_in_frame_as_3d(self, time_index, var_ID):
         """!
@@ -949,6 +976,21 @@ class Read(Serafin):
             raise SerafinRequestError('Reading values as 3D is only possible in 3D!')
         new_shape = (self.header.nb_planes, self.header.nb_nodes_2d)
         return self.read_var_in_frame(time_index, var_ID).reshape(new_shape)
+
+    def read_vars_in_frame_as_3d(self, time_index, var_IDs=None):
+        """!
+        @brief Read multiple variables in a 3D frame
+        @param time_index <int>: the index of the frame (0-based)
+        @param var_IDs <[str]>: list of variable IDs (if not present, all variables are considered)
+        @return <numpy 3D-array>: values of the variables with shape
+            (number of variables, planes number, number of 2D nodes)
+        """
+        if self.header.is_2d:
+            raise SerafinRequestError('Reading values as 3D is only possible in 3D!')
+        if var_IDs is None:
+            var_IDs = self.header.var_IDs
+        new_shape = (len(var_IDs), self.header.nb_planes, self.header.nb_nodes_2d)
+        return self.read_vars_in_frame(time_index, var_IDs).reshape(new_shape)
 
     def read_var_in_frame_at_layer(self, time_index, var_ID, iplan):
         """!

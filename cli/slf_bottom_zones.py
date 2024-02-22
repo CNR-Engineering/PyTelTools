@@ -138,9 +138,7 @@ def bottom(args):
             pos_B = output_header.var_IDs.index('B')
 
             for time_index, time in enumerate(resin.time):
-                var = np.empty((output_header.nb_var, output_header.nb_nodes), dtype=output_header.np_float_type)
-                for i, var_ID in enumerate(output_header.var_IDs):
-                    var[i, :] = resin.read_var_in_frame(time_index, var_ID)
+                var = resin.read_vars_in_frame(time_index)
 
                 # Replace bottom locally
                 nmodif = 0
