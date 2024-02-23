@@ -7,6 +7,7 @@ Performs multiple operations on a Serafin file:
 - shift time series
 """
 
+from pyproj import Transformer
 import sys
 from tqdm import tqdm
 
@@ -24,12 +25,21 @@ def slf_base(args):
         resin.get_time()
 
         output_header = resin.header.copy()
-        # Shift mesh coordinates if necessary
+        # Shift and transform mesh coordinates (change EPSG) if necessary
         if args.shift:
             output_header.transform_mesh([Transformation(0, 1, 1, args.shift[0], args.shift[1], 0)])
+        if args.epsg_mesh_transformation:
+            old_x, old_y = output_header.x, output_header.y
+            new_x, new_y = Transformer.from_crs("EPSG:%i" % args.epsg_mesh_transformation[0],
+                                                "EPSG:%i" % args.epsg_mesh_transformation[1]).transform(old_x, old_y)
+            output_header.x_stored = new_x
+            output_header.y_stored = new_y
+
         # Set mesh origin coordinates
         if args.set_mesh_origin:
             output_header.set_mesh_origin(args.set_mesh_origin[0], args.set_mesh_origin[1])
+        else:
+            output_header.set_mesh_origin(0, 0)
 
         # Toggle output file endianness if necessary
         if args.toggle_endianness:
@@ -74,6 +84,8 @@ def slf_base(args):
 parser = PyTelToolsArgParse(description=__doc__, add_args=['in_slf', 'out_slf', 'shift'])
 
 parser.add_argument('--set_mesh_origin', type=int, nargs=2, help='Mesh origin coordinates (x, y)', metavar=('X', 'Y'))
+parser.add_argument('--epsg_mesh_transformation', type=int, nargs=2,
+                    help='Mesh transformation from IN_EPSG to OUT_EPSG (with pyproj)', metavar=('IN_EPSG', 'OUT_EPSG'))
 
 group_var = parser.add_argument_group('Serafin variables (optional)',
     'See variables abbrevations on https://github.com/CNR-Engineering/PyTelTools/wiki/Notations-of-variables')

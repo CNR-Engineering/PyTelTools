@@ -2,6 +2,7 @@ coloredlogs
 descartes
 matplotlib
 numpy
+pyproj
 PyQt5
 pyshp>=2.0
 pytest
