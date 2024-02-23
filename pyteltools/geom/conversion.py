@@ -787,7 +787,7 @@ class ShpMultiPointConverter(GeomFileConverter):
     def to_multim(self, new_shapes, new_m, to_file, shape_type):
         w = self._to_multi_init(to_file, shape_type)
         for points, points_m, attributes in zip(new_shapes, new_m, self.attributes):
-            m = np.array(points_m, dtype=np.float).reshape(points.shape[0], 1)
+            m = np.array(points_m, dtype=float).reshape(points.shape[0], 1)
             if points.shape[1] == 3:
                 points = np.delete(points, 2, 1)  # remove Z array
             coords = np.hstack((points, m))
@@ -797,7 +797,7 @@ class ShpMultiPointConverter(GeomFileConverter):
     def to_multiz(self, new_shapes, new_m, to_file, shape_type):
         w = self._to_multi_init(to_file, shape_type)
         for points, points_m, attributes in zip(new_shapes, new_m, self.attributes):
-            m = np.array(points_m, dtype=np.float).reshape(points.shape[0], 1)
+            m = np.array(points_m, dtype=float).reshape(points.shape[0], 1)
             coords = np.hstack((points, m))
             w.multipointz(list(map(tuple, coords)))
             w.record(*attributes)

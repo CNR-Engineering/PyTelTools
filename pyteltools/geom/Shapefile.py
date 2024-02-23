@@ -142,7 +142,7 @@ def write_shp_lines(output_filename, shape_type, lines, attribute_name):
         if 10 < shape_type < 20 and poly.is_2d():
             coords = np.hstack((coords, np.zeros((poly.nb_points(), 1))))
         if shape_type > 10:
-            m = np.array(poly.m, dtype=np.float).reshape(coords.shape[0], 1)
+            m = np.array(poly.m, dtype=float).reshape(coords.shape[0], 1)
             coords = np.hstack((coords, m))
         if shape_type == shapefile.POLYLINE:
             w.line([list(map(tuple, coords))])
