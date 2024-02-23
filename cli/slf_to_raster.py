@@ -3,10 +3,9 @@
 Convert all variables of a single frame (from a Serafin file) to a tif raster (one band per variable)
 Beware: Output file is overwritten if already present
 """
-import gdal
+from osgeo import gdal, osr
 import matplotlib.tri as mtri
 import numpy as np
-import osr
 import sys
 
 from pyteltools.geom.transformation import Transformation
