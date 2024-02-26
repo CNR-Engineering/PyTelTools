@@ -969,7 +969,7 @@ class Read(Serafin):
             raise SerafinRequestError('Impossible to read a negative time index!')
         logger.debug('Reading variables %s at frame %i' % (var_IDs, time_index))
 
-        res = np.empty((len(var_IDs), self.header.nb_nodes))
+        res = np.empty((len(var_IDs), self.header.nb_nodes), dtype=self.header.np_float_type)
         for i, var_ID in enumerate(var_IDs):
             pos_var = self._get_var_index(var_ID)
             self._seek_to_frame(time_index, pos_var)
