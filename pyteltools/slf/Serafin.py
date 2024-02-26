@@ -988,6 +988,7 @@ class Read(Serafin):
         for i in range(len(self.header.var_IDs)):
             self.file.read(4)
             res[i, :] = self.unpack_array(self.header.float_size * self.header.nb_nodes, self.header.np_type)
+            self.file.read(4)
         return res
 
     def read_var_in_frame_as_3d(self, time_index, var_ID):
