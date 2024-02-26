@@ -977,6 +977,19 @@ class Read(Serafin):
             res[i, :] = self.unpack_array(self.header.float_size * self.header.nb_nodes, self.header.np_type)
         return res
 
+    def read_all_vars_in_frame(self, time_index):
+        """!
+        @brief Read all variables in a frame
+        @param time_index <int>: the index of the frame (0-based)
+        @return <numpy 2D-array>: values of the variables with shape (number of variables, number of 2D nodes)
+        """
+        self._seek_to_frame(time_index)
+        res = np.empty((len(self.header.var_IDs), self.header.nb_nodes), dtype=self.header.np_float_type)
+        for i in range(len(self.header.var_IDs)):
+            self.file.read(4)
+            res[i, :] = self.unpack_array(self.header.float_size * self.header.nb_nodes, self.header.np_type)
+        return res
+
     def read_var_in_frame_as_3d(self, time_index, var_ID):
         """!
         @brief Read a single variable in a 3D frame
