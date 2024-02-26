@@ -1120,12 +1120,12 @@ class Write(Serafin):
 
         # X coordinates
         self.file.write(header.pack_int(header.float_size * header.nb_nodes))
-        self.file.write(np.array(header.x_stored, dtype=header.np_type))
+        self.file.write(np.array(header.x_stored, dtype=header.np_type).tobytes())
         self.file.write(header.pack_int(header.float_size * header.nb_nodes))
 
         # Y coordinates
         self.file.write(header.pack_int(header.float_size * header.nb_nodes))
-        self.file.write(np.array(header.y_stored, dtype=header.np_type))
+        self.file.write(np.array(header.y_stored, dtype=header.np_type).tobytes())
         self.file.write(header.pack_int(header.float_size * header.nb_nodes))
 
     def write_entire_frame(self, header, time_to_write, values):
@@ -1144,5 +1144,5 @@ class Write(Serafin):
 
         for i in range(header.nb_var):
             self.file.write(header.pack_int(header.float_size * header.nb_nodes))
-            self.file.write(np.array(values[i, :], dtype=header.np_type))
+            self.file.write(np.array(values[i, :], dtype=header.np_type).tobytes())
             self.file.write(header.pack_int(header.float_size * header.nb_nodes))
