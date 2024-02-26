@@ -173,6 +173,10 @@ class SerafinHeader:
         self.ikle_2d = None
         self.ipobo = None
 
+    @property
+    def np_type(self):
+        return np.dtype(self.np_float_type).newbyteorder(self.endian)
+
     def _check_dim(self):
         # verify data consistence and determine 2D or 3D
         if self.is_2d:
@@ -769,23 +773,25 @@ class SerafinHeader:
         # IKLE
         file.read(4)
         nb_ikle_values = self.nb_elements * self.nb_nodes_per_elem
-        self.ikle = np.array(self.unpack_int(file.read(4 * nb_ikle_values), nb_ikle_values))
+        self.ikle = np.frombuffer(file.read(4 * nb_ikle_values),
+                                  dtype=np.dtype(np.int32).newbyteorder(self.endian))
         file.read(4)
 
         # IPOBO
         file.read(4)
-        self.ipobo = np.array(self.unpack_int(file.read(4 * self.nb_nodes), self.nb_nodes))
+        self.ipobo = np.frombuffer(file.read(4 * self.nb_nodes),
+                                   dtype=np.dtype(np.int32).newbyteorder(self.endian))
         file.read(4)
 
         # x coordinates
         file.read(4)
         coord_size = self.nb_nodes * self.float_size
-        self.x_stored = np.array(self.unpack_float(file.read(coord_size), self.nb_nodes), dtype=self.np_float_type)
+        self.x_stored = np.frombuffer(file.read(coord_size), dtype=self.np_type)
         file.read(4)
 
         # y coordinates
         file.read(4)
-        self.y_stored = np.array(self.unpack_float(file.read(coord_size), self.nb_nodes), dtype=self.np_float_type)
+        self.y_stored = np.frombuffer(file.read(coord_size), dtype=self.np_type)
         file.read(4)
 
         self._compute_mesh_coordinates()
@@ -871,6 +877,14 @@ class Read(Serafin):
         self.file_size = os.path.getsize(self.filename)
         logger.info('Reading the input file: "%s" of size %d bytes' % (filename, self.file_size))
 
+    def unpack_array(self, size, np_type):
+        """!
+        @brief Interpret the buffer file as a 1-dimensional array
+        @param size <int>: size (number of values * number of bytes)
+        @param np_type <np.dtypes.Float32DType>: numpy type format (`>f4` for example)
+        """
+        return np.frombuffer(self.file.read(size), dtype=np_type)
+
     def read_header(self):
         """!
         @brief Read the file header and check the file consistency
@@ -921,6 +935,12 @@ class Read(Serafin):
             raise SerafinRequestError('Variable ID %s not found' % var_ID)
         return index
 
+    def _seek_to_frame(self, time_index, pos_var=0):
+        return self.file.seek(
+            self.header.header_size + time_index * self.header.frame_size + 8 +
+            self.header.float_size + pos_var * (8 + self.header.float_size * self.header.nb_nodes), 0
+        )
+
     def read_var_in_frame(self, time_index, var_ID):
         """!
         @brief Read a single variable in a frame
@@ -932,13 +952,9 @@ class Read(Serafin):
             raise SerafinRequestError('Impossible to read a negative time index!')
         logger.debug('Reading variable %s at frame %i' % (var_ID, time_index))
         pos_var = self._get_var_index(var_ID)
-        self.file.seek(self.header.header_size + time_index * self.header.frame_size + 8 +
-                       self.header.float_size + pos_var * (8 + self.header.float_size * self.header.nb_nodes), 0)
+        self._seek_to_frame(time_index, pos_var)
         self.file.read(4)
-        return np.array(self.header.unpack_float(
-            self.file.read(self.header.float_size * self.header.nb_nodes), self.header.nb_nodes),
-            dtype=self.header.np_float_type
-        )
+        return self.unpack_array(self.header.float_size * self.header.nb_nodes, self.header.np_type)
 
     def read_vars_in_frame(self, time_index, var_IDs=None):
         """!
@@ -956,13 +972,9 @@ class Read(Serafin):
         res = np.empty((len(var_IDs), self.header.nb_nodes))
         for i, var_ID in enumerate(var_IDs):
             pos_var = self._get_var_index(var_ID)
-            self.file.seek(self.header.header_size + time_index * self.header.frame_size + 8 +
-                           self.header.float_size + pos_var * (8 + self.header.float_size * self.header.nb_nodes), 0)
+            self._seek_to_frame(time_index, pos_var)
             self.file.read(4)
-            res[i, :] = np.array(self.header.unpack_float(
-                self.file.read(self.header.float_size * self.header.nb_nodes), self.header.nb_nodes),
-                dtype=self.header.np_float_type
-            )
+            res[i, :] = self.unpack_array(self.header.float_size * self.header.nb_nodes, self.header.np_type)
         return res
 
     def read_var_in_frame_as_3d(self, time_index, var_ID):
