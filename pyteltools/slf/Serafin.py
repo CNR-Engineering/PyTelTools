@@ -977,19 +977,26 @@ class Read(Serafin):
             res[i, :] = self.unpack_array(self.header.float_size * self.header.nb_nodes, self.header.np_type)
         return res
 
-    def read_all_vars_in_frame(self, time_index):
+    def iter_on_all_frames(self):
         """!
-        @brief Read all variables in a frame
-        @param time_index <int>: the index of the frame (0-based)
-        @return <numpy 2D-array>: values of the variables with shape (number of variables, number of 2D nodes)
+        @brief iterate over all frames with time and values
+        @return <(float, numpy 2D-array)>: tuple with time and values of the variables with shape
+            (number of variables, number of 2D nodes)
         """
-        self._seek_to_frame(time_index)
-        res = np.empty((len(self.header.var_IDs), self.header.nb_nodes), dtype=self.header.np_float_type)
-        for i in range(len(self.header.var_IDs)):
+        self.file.seek(self.header.header_size, 0)
+
+        res = np.empty((self.header.nb_var, self.header.nb_nodes), dtype=self.header.np_float_type)
+        for time_index in range(self.header.nb_frames):
             self.file.read(4)
-            res[i, :] = self.unpack_array(self.header.float_size * self.header.nb_nodes, self.header.np_type)
+            time = self.header.unpack_float(self.file.read(self.header.float_size), 1)[0]
             self.file.read(4)
-        return res
+
+            for i in range(self.header.nb_var):
+                self.file.read(4)
+                res[i, :] = self.unpack_array(self.header.float_size * self.header.nb_nodes, self.header.np_type)
+                self.file.read(4)
+
+            yield time, res
 
     def read_var_in_frame_as_3d(self, time_index, var_ID):
         """!
