@@ -195,10 +195,10 @@ class SerafinHeader:
         If file format is not recognized, the file is expected to be simple precision
         """
         self.file_format = bytes(file_format, SLF_EIT).ljust(8)
-        if file_format in ('SERAFIND', '       D'):
+        if file_format in ('SERAFIND', 'SELAFIND', '       D'):
             self._set_as_double_precision()
         else:
-            if file_format not in ('SERAFIN ', 'SERAFINS', 'SERAPHIN'):
+            if file_format not in ('SERAFIN ', 'SERAFINS', 'SELAFIN ', 'SERAPHIN'):
                 logger.warning('Format "%s" is unknown and is forced to "SERAFIN "' % file_format)
                 self.file_format = bytes('SERAFIN', SLF_EIT).ljust(8)
             self._set_as_single_precision()
