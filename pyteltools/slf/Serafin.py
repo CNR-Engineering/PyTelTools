@@ -206,6 +206,20 @@ class SerafinHeader:
     def _set_has_knolg(self):
         self.has_knolg = (self.params[7] != 0 or self.params[8] != 0)
 
+    def build_params(self):
+        self.params = (
+            1,
+            0,
+            self.mesh_origin[0],
+            self.mesh_origin[0],
+            0,
+            0,
+            self.nb_planes,
+            self.nb_elements,
+            0,
+            0 if self.date is None else 1
+        )
+
     def _build_ikle_2d(self):
         if self.is_2d:
             self.ikle_2d = self.ikle.reshape(self.nb_elements, self.nb_nodes_per_elem)
