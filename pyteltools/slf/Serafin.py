@@ -842,7 +842,7 @@ class SerafinHeader:
 
         # A valid IPOBO should not be equal to zero array
         if not np.any(self.ipobo):
-          logger.warning('The IPOBO array seems corrumpted. It will be rebuild.')
+          logger.warning('The IPOBO array seems corrupted. It will be rebuild.')
           self.build_ipobo()
 
         logger.debug('Finished reading the header')
