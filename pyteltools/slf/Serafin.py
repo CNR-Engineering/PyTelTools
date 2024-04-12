@@ -795,6 +795,9 @@ class SerafinHeader:
         file.read(4)
         self.ipobo = np.frombuffer(file.read(4 * self.nb_nodes),
                                    dtype=np.dtype(np.int32).newbyteorder(self.endian))
+        # A valid IPOBO should not be equal to zero array
+        if not np.any(self.ipobo):
+            logger.warning('The IPOBO array seems corrupted (zeros array). Try to rebuild it with `build_ipobo()`.')
         file.read(4)
 
         # x coordinates
