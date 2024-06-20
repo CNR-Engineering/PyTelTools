@@ -164,7 +164,7 @@ class SerafinHeader:
         self.nb_nodes_per_elem = -1
         self.nb_nodes_2d = -1
 
-        self.mesh_origin = (0.0, 0.0)
+        self.mesh_origin = (0, 0)
         self.x_stored = None
         self.y_stored = None
         self.x = None
@@ -211,7 +211,7 @@ class SerafinHeader:
             1,
             0,
             self.mesh_origin[0],
-            self.mesh_origin[0],
+            self.mesh_origin[1],
             0,
             0,
             self.nb_planes,
@@ -690,6 +690,7 @@ class SerafinHeader:
         self._compute_mesh_coordinates()
         self.ikle = ikle.flatten()
         self._build_ikle_2d()
+        self.build_params()
         if ipobo is None:
             self.build_ipobo()
         else:
