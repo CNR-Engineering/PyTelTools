@@ -215,7 +215,7 @@ class SerafinHeader:
             0,
             0,
             self.nb_planes,
-            self.nb_elements,
+            0,
             0,
             0 if self.date is None else 1
         )
