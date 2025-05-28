@@ -124,7 +124,7 @@ class SerafinHeader:
         [shape = nb_nodes]
     """
 
-    def __init__(self, title="", format_type="SERAFIN ", lang=LANG, endian=">"):
+    def __init__(self, title="", format_type="SERAFIN ", lang=settings.LANG, endian=">"):
         """
         @param title <str>: title of the simulation
         @param format_type <str>:
