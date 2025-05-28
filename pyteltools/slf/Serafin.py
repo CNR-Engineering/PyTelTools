@@ -7,11 +7,9 @@ Handles Serafin file with:
 
 The sizes (file, header, frame) are in bytes (8 bits).
 """
-
 import copy
 import numpy as np
 import os
-from shapely.geometry import LinearRing
 import struct
 
 from pyteltools.conf import settings
@@ -22,21 +20,23 @@ from .util import logger
 
 
 # Encoding Information Type (EIT) for Serafin title, variable names and units
-SLF_EIT = 'iso-8859-1'
+SLF_EIT = "iso-8859-1"
 
 
-VARIABLES_ID_2D, VARIABLES_ID_3D = {'fr': {}, 'en': {}}, {'fr': {}, 'en': {}}
+VARIABLES_ID_2D, VARIABLES_ID_3D = {"fr": {}, "en": {}}, {"fr": {}, "en": {}}
 
 
 def build_variables_table():
     base_folder = os.path.dirname(os.path.realpath(__file__))
-    for dic, name in zip([VARIABLES_ID_2D, VARIABLES_ID_3D], ['Serafin_var2D.csv', 'Serafin_var3D.csv']):
-        with open(os.path.join(base_folder, 'data', name), 'r') as f:
+    for dic, name in zip(
+        [VARIABLES_ID_2D, VARIABLES_ID_3D], ["Serafin_var2D.csv", "Serafin_var3D.csv"]
+    ):
+        with open(os.path.join(base_folder, "data", name), "r") as f:
             f.readline()  # header
             for line in f.readlines():
-                var_id, var_name_fr, var_name_en, _ = line.rstrip().split(';')
-                dic['fr'][var_name_fr] = var_id
-                dic['en'][var_name_en] = var_id
+                var_id, var_name_fr, var_name_en, _ = line.rstrip().split(";")
+                dic["fr"][var_name_fr] = var_id
+                dic["en"][var_name_en] = var_id
 
 
 build_variables_table()
@@ -46,26 +46,28 @@ class SerafinValidationError(Exception):
     """!
     @brief Custom exception for Serafin file content check
     """
+
     def __init__(self, message):
         """!
         @param message <str>: error message description
         """
         super().__init__(message)
         self.message = message
-        logger.error('SERAFIN VALIDATION ERROR: %s' % message)
+        logger.error("SERAFIN VALIDATION ERROR: %s" % message)
 
 
 class SerafinRequestError(Exception):
     """!
     @brief Custom exception for requesting invalid values from Serafin object
     """
+
     def __init__(self, message):
         """!
         @param message <str>: error message description
         """
         super().__init__(message)
         self.message = message
-        logger.error('SERAFIN REQUEST ERROR: %s' % message)
+        logger.error("SERAFIN REQUEST ERROR: %s" % message)
 
 
 class SerafinHeader:
@@ -110,7 +112,7 @@ class SerafinHeader:
     - nb_nodes_per_elem <int>: number of nodes per element (= 3 in 2D and 6 in 3D)
     - nb_nodes_2d <int>: number of 2D nodes (equals to `nb_nodes` in 2D)
 
-    - mesh_origin <(float, float)>: x and y shift to apply to written coordinates (set by `set_mesh_origin`)
+    - mesh_origin <(int, int)>: x and y shift to apply to written coordinates (set by `set_mesh_origin`)
     - x_stored <numpy.1D-array>: east written coordinates [shape = nb_nodes]
     - y_stored <numpy.1D-array>: north written coordinates [shape = nb_nodes]
     - x <numpy.1D-array>: east coordinates [shape = nb_nodes] (set by `_compute_mesh_coordinates`)
@@ -121,7 +123,8 @@ class SerafinHeader:
     - ipobo <numpy.1D-array>: array with 0 values for inner nodes and 1-indexed node number for boundary nodes
         [shape = nb_nodes]
     """
-    def __init__(self, title='', format_type='SERAFIN ', lang=settings.LANG, endian='>'):
+
+    def __init__(self, title="", format_type="SERAFIN ", lang=LANG, endian=">"):
         """
         @param title <str>: title of the simulation
         @param format_type <str>:
@@ -131,18 +134,20 @@ class SerafinHeader:
         self.header_size = -1
         self.frame_size = -1
 
-        self.float_type = ''
+        self.float_type = ""
         self.float_size = -1
         self.np_float_type = None
 
         self.endian = endian
 
         self.title = bytes(title, SLF_EIT).ljust(72)
-        self.file_format = b''.ljust(8)
+        self.file_format = b"".ljust(8)
         self._set_file_format_and_precision(format_type)
 
-        if lang not in ('fr', 'en'):
-            raise SerafinRequestError('Language (for Serafin variables) %s is not implemented' % lang)
+        if lang not in ("fr", "en"):
+            raise SerafinRequestError(
+                "Language (for Serafin variables) %s is not implemented" % lang
+            )
         self.language = lang
 
         self.is_2d = True
@@ -180,13 +185,15 @@ class SerafinHeader:
     def _check_dim(self):
         # verify data consistence and determine 2D or 3D
         if self.is_2d:
-            if self.nb_nodes_per_elem != 3:
-                raise SerafinValidationError('Unknown mesh type')
+            if self.nb_nodes_per_elem not in (1, 3):
+                raise SerafinValidationError("Unknown mesh type")
         else:
             if self.nb_nodes_per_elem != 6:
-                raise SerafinValidationError('The number of nodes per element is not equal to 6')
+                raise SerafinValidationError(
+                    "The number of nodes per element is not equal to 6"
+                )
             if self.nb_planes < 2:
-                raise SerafinValidationError('The number of planes is less than 2')
+                raise SerafinValidationError("The number of planes is less than 2")
 
     def _set_file_format_and_precision(self, file_format):
         """!
@@ -195,16 +202,30 @@ class SerafinHeader:
         If file format is not recognized, the file is expected to be simple precision
         """
         self.file_format = bytes(file_format, SLF_EIT).ljust(8)
-        if file_format in ('SERAFIND', 'SELAFIND', '       D'):
+        if file_format in ("SERAFIND", "SELAFIND", "       D"):
             self._set_as_double_precision()
         else:
-            if file_format not in ('SERAFIN ', 'SERAFINS', 'SELAFIN ', 'SERAPHIN'):
-                logger.warning('Format "%s" is unknown and is forced to "SERAFIN "' % file_format)
-                self.file_format = bytes('SERAFIN', SLF_EIT).ljust(8)
+            if file_format not in ("SERAFIN ", "SERAFINS", "SELAFIN ", "SERAPHIN"):
+                logger.warning(
+                    'Format "%s" is unknown and is forced to "SERAFIN "' % file_format
+                )
+                self.file_format = bytes("SERAFIN", SLF_EIT).ljust(8)
             self._set_as_single_precision()
 
     def _set_has_knolg(self):
-        self.has_knolg = (self.params[7] != 0 or self.params[8] != 0)
+        self.has_knolg = self.params[7] != 0 or self.params[8] != 0
+
+    def compute_ikle(self, nb_planes, nb_nodes_per_elem):
+        ikle_bottom_pattern = np.concatenate(
+            (self.ikle_2d, self.ikle_2d + self.nb_nodes_2d), axis=1
+        )
+        ikle = np.empty(
+            (nb_planes - 1, self.nb_elements // (nb_planes - 1), nb_nodes_per_elem),
+            dtype=np.int64,
+        )
+        for i in range(nb_planes - 1):
+            ikle[i] = ikle_bottom_pattern + i * self.nb_nodes_2d
+        return ikle.flatten()
 
     def build_params(self):
         self.params = (
@@ -217,7 +238,7 @@ class SerafinHeader:
             self.nb_planes,
             0,
             0,
-            0 if self.date is None else 1
+            0 if self.date is None else 1,
         )
 
     def _build_ikle_2d(self):
@@ -225,23 +246,27 @@ class SerafinHeader:
             self.ikle_2d = self.ikle.reshape(self.nb_elements, self.nb_nodes_per_elem)
         else:
             ikle = self.ikle.reshape(self.nb_elements, self.nb_nodes_per_elem)
-            self.ikle_2d = np.empty([self.nb_elements // (self.nb_planes - 1), 3], dtype=np.int64)
+            self.ikle_2d = np.empty(
+                [self.nb_elements // (self.nb_planes - 1), 3], dtype=np.int64
+            )
             nb_lines = self.ikle_2d.shape[0]
             # test the integer division
             if nb_lines * (self.nb_planes - 1) != self.nb_elements:
-                raise SerafinValidationError('The number of elements is not divisible by (number of planes - 1)')
+                raise SerafinValidationError(
+                    "The number of elements is not divisible by (number of planes - 1)"
+                )
             for i in range(nb_lines):
                 self.ikle_2d[i] = ikle[i, [0, 1, 2]]
 
     def _set_as_single_precision(self):
         """Set Serafin as single precision"""
-        self.float_type = 'f'
+        self.float_type = "f"
         self.float_size = 4
         self.np_float_type = np.float32
 
     def _set_as_double_precision(self):
         """Set Serafin as double precision"""
-        self.float_type = 'd'
+        self.float_type = "d"
         self.float_size = 8
         self.np_float_type = np.float64
 
@@ -252,7 +277,7 @@ class SerafinHeader:
         @param nb <int>: number of consecutive integers
         @return <(int)>
         """
-        fmt = self.endian + str(nb) + 'i'
+        fmt = self.endian + str(nb) + "i"
         return struct.unpack(fmt, bytes2unpack)
 
     def unpack_float(self, bytes2unpack, nb=1):
@@ -272,7 +297,7 @@ class SerafinHeader:
         @param nb <int>: number of integer values
         @return <bytes>
         """
-        fmt = self.endian + str(nb) + 'i'
+        fmt = self.endian + str(nb) + "i"
         return struct.pack(fmt, *args)
 
     def pack_float(self, *args, nb=1):
@@ -287,11 +312,13 @@ class SerafinHeader:
 
     def toggle_endianness(self):
         """Toggle original endianness (between big or little endian)"""
-        if self.endian == '>':
-            self.endian = '<'
+        if self.endian == ">":
+            self.endian = "<"
         else:
-            self.endian = '>'
-        logger.debug('Toggle endianness to %s' % ('big' if self.endian == '>' else 'litte'))
+            self.endian = ">"
+        logger.debug(
+            "Toggle endianness to %s" % ("big" if self.endian == ">" else "litte")
+        )
 
     def _compute_mesh_coordinates(self):
         """Compute mesh coordinates from origin"""
@@ -306,26 +333,44 @@ class SerafinHeader:
         """Set header size"""
         nb_ikle_values = self.nb_elements * self.nb_nodes_per_elem
         coord_size = self.nb_nodes * self.float_size
-        self.header_size = (80 + 8) + (8 + 8) + (self.nb_var * (8 + 32)) \
-                                    + (40 + 8) + (self.params[-1] * ((6 * 4) + 8)) + (16 + 8) \
-                                    + (nb_ikle_values * 4 + 8) + (self.nb_nodes * 4 + 8) + 2 * (coord_size + 8)
+        self.header_size = (
+            (80 + 8)
+            + (8 + 8)
+            + (self.nb_var * (8 + 32))
+            + (40 + 8)
+            + (self.params[-1] * ((6 * 4) + 8))
+            + (16 + 8)
+            + (nb_ikle_values * 4 + 8)
+            + (self.nb_nodes * 4 + 8)
+            + 2 * (coord_size + 8)
+        )
 
     def _set_frame_size(self):
         """Set frame size (all variable values for one time step)"""
-        self.frame_size = 8 + self.float_size + (self.nb_var * (8 + self.nb_nodes * self.float_size))
+        self.frame_size = (
+            8 + self.float_size + (self.nb_var * (8 + self.nb_nodes * self.float_size))
+        )
 
     def _expected_file_size(self):
         """Returns expected file size"""
         return self.header_size + self.nb_frames * self.frame_size
 
     def summary(self):
-        template = 'The file is of type {} {}. It has {} variable{}{},\n' \
-                   'on {} nodes and {} elements for {} time frame{}.'
-        return template.format(self.file_format.decode(SLF_EIT),
-                               {True: '2D', False: '3D'}[self.is_2d], self.nb_var,
-                               ['', 's'][self.nb_var > 1], '' if self.is_2d else ', %d layers' % self.nb_planes,
-                               self.nb_nodes, self.nb_elements, self.nb_frames,
-                               ['', 's'][self.nb_frames > 1])
+        template = (
+            "The file is of type {} {}. It has {} variable{}{},\n"
+            "on {} nodes and {} elements for {} time frame{}."
+        )
+        return template.format(
+            self.file_format.decode(SLF_EIT),
+            {True: "2D", False: "3D"}[self.is_2d],
+            self.nb_var,
+            ["", "s"][self.nb_var > 1],
+            "" if self.is_2d else ", %d layers" % self.nb_planes,
+            self.nb_nodes,
+            self.nb_elements,
+            self.nb_frames,
+            ["", "s"][self.nb_frames > 1],
+        )
 
     def copy(self):
         """Returns a deep copy of the current instance"""
@@ -337,7 +382,9 @@ class SerafinHeader:
         @return <slf.Serafin.SerafinHeader>: output Serafin header
         """
         if self.is_2d:
-            raise SerafinRequestError('Cannot convert header to a 2D equivalent because the input is not 3D')
+            raise SerafinRequestError(
+                "Cannot convert header to a 2D equivalent because the input is not 3D"
+            )
 
         ori_params = self.params
         nb_planes = self.nb_planes
@@ -349,15 +396,18 @@ class SerafinHeader:
         new_params[6] = new_header.nb_planes
         new_header.params = tuple(new_params)
         new_header.is_2d = True
-        new_header.nb_elements //= (nb_planes - 1)
+        new_header.nb_elements //= nb_planes - 1
         new_header.nb_nodes //= nb_planes
         new_header.nb_nodes_per_elem = 3
         new_header.nb_nodes_2d = new_header.nb_nodes
         npd = new_header.nb_nodes_per_elem
-        new_header.ikle = np.take(self.ikle, [2*npd*i+j for i in range(new_header.nb_elements) for j in range(3)])
-        new_header.ipobo = self.ipobo[:self.nb_nodes_2d]
-        new_header.x_stored = self.x_stored[:self.nb_nodes_2d]
-        new_header.y_stored = self.y_stored[:self.nb_nodes_2d]
+        new_header.ikle = np.take(
+            self.ikle,
+            [2 * npd * i + j for i in range(new_header.nb_elements) for j in range(3)],
+        )
+        new_header.ipobo = self.ipobo[: self.nb_nodes_2d]
+        new_header.x_stored = self.x_stored[: self.nb_nodes_2d]
+        new_header.y_stored = self.y_stored[: self.nb_nodes_2d]
         new_header._compute_mesh_coordinates()
 
         # Update sizes
@@ -374,9 +424,11 @@ class SerafinHeader:
         @return <slf.Serafin.SerafinHeader>: output Serafin header
         """
         if not self.is_2d:
-            raise SerafinRequestError('Cannot convert header to a 3D equivalent because the input is not 2D')
+            raise SerafinRequestError(
+                "Cannot convert header to a 3D equivalent because the input is not 2D"
+            )
         if nb_planes < 2:
-            raise SerafinRequestError('A 3D file has to contain at least 2 planes')
+            raise SerafinRequestError("A 3D file has to contain at least 2 planes")
         ori_params = self.params
         new_header = self.copy()
 
@@ -386,12 +438,17 @@ class SerafinHeader:
         new_params[6] = new_header.nb_planes
         new_header.params = tuple(new_params)
         new_header.is_2d = False
-        new_header.nb_elements *= (nb_planes - 1)
+        new_header.nb_elements *= nb_planes - 1
         new_header.nb_nodes *= nb_planes
         new_header.nb_nodes_per_elem = 6
 
-        ikle_bottom_pattern = np.concatenate((self.ikle_2d, self.ikle_2d + new_header.nb_nodes_2d), axis=1)
-        ikle = np.empty((nb_planes - 1, self.nb_elements, new_header.nb_nodes_per_elem), dtype=np.int64)
+        ikle_bottom_pattern = np.concatenate(
+            (self.ikle_2d, self.ikle_2d + new_header.nb_nodes_2d), axis=1
+        )
+        ikle = np.empty(
+            (nb_planes - 1, self.nb_elements, new_header.nb_nodes_per_elem),
+            dtype=np.int64,
+        )
         for i in range(nb_planes - 1):
             ikle[i] = ikle_bottom_pattern + i * new_header.nb_nodes_2d
         new_header.ikle = ikle.flatten()
@@ -431,9 +488,14 @@ class SerafinHeader:
         @return: bool
         """
         # Speedup in comparing by increasing complexity
-        if self.nb_nodes_2d != other.nb_nodes_2d or self.nb_elements != other.nb_elements:
+        if (
+            self.nb_nodes_2d != other.nb_nodes_2d
+            or self.nb_elements != other.nb_elements
+        ):
             return False
-        elif np.all(self.x_stored != other.x_stored) or np.all(self.y_stored != other.y_stored):
+        elif np.all(self.x_stored != other.x_stored) or np.all(
+            self.y_stored != other.y_stored
+        ):
             return False
         elif np.all(self.ikle != other.ikle) or np.all(self.ipobo != other.ipobo):
             return False
@@ -441,13 +503,22 @@ class SerafinHeader:
             return True
 
     def is_double_precision(self):
-        return self.float_type == 'd'
+        return self.float_type == "d"
 
     def to_single_precision(self):
-        self.file_format = bytes('SERAFIN', SLF_EIT).ljust(8)
-        self.float_type = 'f'
+        self.file_format = bytes("SERAFIN", SLF_EIT).ljust(8)
+        self.float_type = "f"
         self.float_size = 4
         self.np_float_type = np.float32
+        self._set_frame_size()
+        self._set_header_size()
+        self.file_size = self._expected_file_size()
+
+    def to_double_precision(self):
+        self.file_format = bytes("SERAFIND", SLF_EIT).ljust(8)
+        self.float_type = "d"
+        self.float_size = 8
+        self.np_float_type = np.float64
         self._set_frame_size()
         self._set_header_size()
         self.file_size = self._expected_file_size()
@@ -494,12 +565,14 @@ class SerafinHeader:
                 var_name = VARIABLES_3D[var_ID].name(self.language)
                 var_unit = VARIABLES_3D[var_ID].unit()
         except KeyError:
-            raise SerafinRequestError('The variable "%s" is not known (lang=%s)' % (var_ID, self.language))
+            raise SerafinRequestError(
+                'The variable "%s" is not known (lang=%s)' % (var_ID, self.language)
+            )
         self.add_variable_str(var_ID, var_name, var_unit)
 
     def set_mesh_origin(self, x, y):
         """!
-        @brief: Set mesh origin coordinates (/!\ coordinates should be integers!)
+        @brief: Set mesh origin coordinates (Beware: coordinates should be integers!)
         @param x <int>: X-coordinate of the origin
         @param y <int>: Y-coordinate of the origin
         """
@@ -524,7 +597,9 @@ class SerafinHeader:
         Iterate on variables
         @return <str, bytes, bytes>: variable ID, name and unit
         """
-        for var_ID, var_name, var_unit in zip(self.var_IDs, self.var_names, self.var_units):
+        for var_ID, var_name, var_unit in zip(
+            self.var_IDs, self.var_names, self.var_units
+        ):
             yield var_ID, var_name, var_unit
 
     def transform_mesh_copy(self, transformations):
@@ -560,6 +635,16 @@ class SerafinHeader:
         self.set_mesh_origin(0, 0)
         self._compute_mesh_coordinates()
 
+    def is_ccw(self, vertices):
+        """!
+        @brief return True if the boundary is counter-clockwise (only in 2D)
+        @param vertices <[float]>: list of coordinates
+        """
+        v = np.array(vertices)
+        x = v[:, 0]
+        y = v[:, 1]
+        return np.dot(x, np.roll(y, 1)) - np.dot(y, np.roll(x, 1)) < 0
+
     def get_all_edges(self):
         """Get all edges (pair of nodes)"""
         edges = np.zeros((3 * len(self.ikle_2d), 2), dtype=np.int64)
@@ -574,7 +659,9 @@ class SerafinHeader:
         edges = self.get_all_edges()
         # Trick to identify unique pair of nodes (even if node orders might differ) in defining a strange function
         edges_multi = edges[:, 0] * edges[:, 1] / (edges[:, 0] + edges[:, 1])
-        unique, unique_inverse, unique_counts = np.unique(edges_multi, return_inverse=True, return_counts=True)
+        unique, unique_inverse, unique_counts = np.unique(
+            edges_multi, return_inverse=True, return_counts=True
+        )
         # A boundary node is connected only once to another node (not twice!)
         boundary_edges = edges[unique_counts[unique_inverse] == 1]
         return boundary_edges
@@ -596,12 +683,17 @@ class SerafinHeader:
         # Build boundaries by iteration on all boundary edges (for each boundary, from first node until it loops)
         id_boundary = 1
         while len(boundary_edges) != 0:
-            boundary_nodes = np.unique(boundary_edges.flatten())  # Node numbering 1-indexed
+            boundary_nodes = np.unique(
+                boundary_edges.flatten()
+            )  # Node numbering 1-indexed
             x_plus_y = self.x[boundary_nodes - 1] + self.y[boundary_nodes - 1]
 
             # current_boundary_nodes, first_node, prev_node and next_node contain 1-indexed node(s)
             first_node = boundary_nodes[np.argmin(x_plus_y)]
-            logger.debug("Build new boundary from node %i among %i nodes" % (first_node, len(boundary_nodes)))
+            logger.debug(
+                "Build new boundary from node %i among %i nodes"
+                % (first_node, len(boundary_nodes))
+            )
             prev_node = copy.deepcopy(first_node)
             next_node = -1
 
@@ -612,8 +704,10 @@ class SerafinHeader:
                     index = np.where(boundary_edges == prev_node)[0][0]
                 except IndexError:
                     logger.critical(np.where(boundary_edges == prev_node))
-                    raise SerafinRequestError('Unexpected error while determining next boundary node after node %i'
-                                              % prev_node)
+                    raise SerafinRequestError(
+                        "Unexpected error while determining next boundary node after node %i"
+                        % prev_node
+                    )
                 n1, n2 = boundary_edges[index, :]
                 boundary_edges = np.delete(boundary_edges, index, axis=0)
                 next_node = n1 if n2 == prev_node else n2
@@ -622,8 +716,11 @@ class SerafinHeader:
 
             # Determine if boundary is clock-wise
             if len(current_boundary_nodes) > 2:
-                boundary_geom = LinearRing([(self.x[n - 1], self.y[n - 1]) for n in current_boundary_nodes[:-1]])
-                ccw = boundary_geom.is_ccw
+                boundary_geom = [
+                    (self.x[n - 1], self.y[n - 1]) for n in current_boundary_nodes[:-1]
+                ]
+
+                ccw = self.is_ccw(boundary_geom)
             else:
                 ccw = True  # arbitrary value (order can not be defined!)
 
@@ -635,7 +732,9 @@ class SerafinHeader:
                 if ccw:
                     current_boundary_nodes.reverse()
             current_boundary_nodes.pop()
-            logger.debug("Boundary %i has %i nodes" % (id_boundary, len(current_boundary_nodes)))
+            logger.debug(
+                "Boundary %i has %i nodes" % (id_boundary, len(current_boundary_nodes))
+            )
             yield current_boundary_nodes
             id_boundary += 1
 
@@ -659,9 +758,13 @@ class SerafinHeader:
                 shift_ipobo[ipobo_2d > 0] = id_boundary_node
                 for i_plan in range(self.nb_planes):
                     if i_plan > 0:
-                        self.ipobo = np.concatenate((self.ipobo, ipobo_2d + i_plan * shift_ipobo))
+                        self.ipobo = np.concatenate(
+                            (self.ipobo, ipobo_2d + i_plan * shift_ipobo)
+                        )
         except SerafinRequestError:
-            logger.warning("The IPOBO table could not be built and set to 0. Check if some nodes are superimposed.")
+            logger.warning(
+                "The IPOBO table could not be built and set to 0. Check if some nodes are superimposed."
+            )
             self.ipobo = np.zeros(self.nb_nodes, dtype=np.int64)
 
     def _set_as_2d(self):
@@ -681,7 +784,9 @@ class SerafinHeader:
         @param ikle <numpy 2D-array>: connectivity table (1-indexed)
         @param ipobo <numpy 1D-array>: boundary indicator table
         """
-        assert ikle.min() == 1 and ikle.max() == len(nodes)  # check arrays are 1-indexed
+        assert ikle.min() == 1 and ikle.max() == len(
+            nodes
+        )  # check arrays are 1-indexed
         self.nb_nodes = nodes.shape[0]
         self._set_as_2d()
         self.nb_elements = ikle.shape[0]
@@ -695,7 +800,9 @@ class SerafinHeader:
             self.build_ipobo()
         else:
             if ipobo.shape != (len(nodes),):
-                raise SerafinValidationError("IPOBO table is not a 1D-array with length of %i." % len(nodes))
+                raise SerafinValidationError(
+                    "IPOBO table is not a 1D-array with length of %i." % len(nodes)
+                )
             self.ipobo = ipobo
 
     def from_file(self, file, file_size):
@@ -706,17 +813,17 @@ class SerafinHeader:
         """
         # Check if file is empty (usefull if re-runs after a crash)
         if self.file_size == 0:
-            raise SerafinValidationError('File is empty (file size is equal to 0)')
+            raise SerafinValidationError("File is empty (file size is equal to 0)")
         self.file_size = file_size
 
         # Determine binary file endianness from first integer
         first_int_block = file.read(4)
-        if struct.unpack('>i', first_int_block)[0] == 80:
-            self.endian = '>'
-        elif struct.unpack('<i', first_int_block)[0] == 80:
-            self.endian = '<'
+        if struct.unpack(">i", first_int_block)[0] == 80:
+            self.endian = ">"
+        elif struct.unpack("<i", first_int_block)[0] == 80:
+            self.endian = "<"
         else:
-            raise SerafinValidationError('File endianness could not be determined')
+            raise SerafinValidationError("File endianness could not be determined")
         logger.debug('File is determined to be %s endian' % ('big' if self.endian == '>' else 'litte'))
 
         # Read title
@@ -728,7 +835,7 @@ class SerafinHeader:
             data_format = file_format.decode(SLF_EIT)
             logger.debug('The file type is: "%s"' % data_format)
         except UnicodeDecodeError:
-            raise SerafinValidationError('File type is unreadable: %s' % file_format)
+            raise SerafinValidationError("File type is unreadable: %s" % file_format)
         self._set_file_format_and_precision(data_format)
 
         # Read the number of linear and quadratic variables
@@ -738,7 +845,9 @@ class SerafinHeader:
         logger.debug('The file has %d variables' % self.nb_var)
         file.read(4)
         if self.nb_var_quadratic != 0:
-            raise SerafinValidationError('The number of quadratic variables is not equal to zero')
+            raise SerafinValidationError(
+                "The number of quadratic variables is not equal to zero"
+            )
 
         # Read variable names and units
         for _ in range(self.nb_var):
@@ -754,7 +863,7 @@ class SerafinHeader:
         self.mesh_origin = self.params[2], self.params[3]
         self.nb_planes = self.params[6]
 
-        self.is_2d = (self.nb_planes == 0)
+        self.is_2d = self.nb_planes == 0
 
         if self.params[-1] == 1:
             # Read 6 integers which correspond to simulation starting date
@@ -773,7 +882,7 @@ class SerafinHeader:
         self.nb_nodes_per_elem = self.unpack_int(file.read(4), 1)[0]
         test_value = self.unpack_int(file.read(4), 1)[0]
         if test_value != 1:
-            raise SerafinValidationError('The magic number is not equal to one')
+            raise SerafinValidationError("The magic number is not equal to one")
         file.read(4)
 
         self._check_dim()
@@ -788,17 +897,21 @@ class SerafinHeader:
         # IKLE
         file.read(4)
         nb_ikle_values = self.nb_elements * self.nb_nodes_per_elem
-        self.ikle = np.frombuffer(file.read(4 * nb_ikle_values),
-                                  dtype=np.dtype(np.int32).newbyteorder(self.endian))
+        self.ikle = np.frombuffer(
+            file.read(4 * nb_ikle_values),
+            dtype=np.dtype(np.int32).newbyteorder(self.endian),
+        )
         file.read(4)
 
         # IPOBO
         file.read(4)
-        self.ipobo = np.frombuffer(file.read(4 * self.nb_nodes),
-                                   dtype=np.dtype(np.int32).newbyteorder(self.endian))
+        self.ipobo = np.frombuffer(
+            file.read(4 * self.nb_nodes),
+            dtype=np.dtype(np.int32).newbyteorder(self.endian),
+        )
         # A valid IPOBO should not be equal to zero array
         if not np.any(self.ipobo):
-            logger.warning('The IPOBO array seems corrupted (zeros array). Try to rebuild it with `build_ipobo()`.')
+            logger.warning("The IPOBO array seems corrupted (zeros array). Try to rebuild it with `build_ipobo()`.")
         file.read(4)
 
         # x coordinates
@@ -826,15 +939,21 @@ class SerafinHeader:
         # A difference of only one byte is tolerated.
         # Indeed some old files may contain an ending \x0A character (Linux line feed)
         if diff_size != 0 and diff_size != 1:
-            raise SerafinValidationError('Something wrong with the file size (header and frames). '
-                                         'File is probably corrupted, difference of %i bytes' % diff_size)
+            raise SerafinValidationError(
+                "Something wrong with the file size (header and frames). "
+                "File is probably corrupted, difference of %i bytes" % diff_size
+            )
 
         # Deduce variable IDs from names
-        var_table = VARIABLES_ID_2D[self.language] if self.is_2d else VARIABLES_ID_3D[self.language]
+        var_table = (
+            VARIABLES_ID_2D[self.language]
+            if self.is_2d
+            else VARIABLES_ID_3D[self.language]
+        )
         for var_name in self.var_names:
             name = var_name.decode(encoding=SLF_EIT).strip()
             if name not in var_table:
-                slf_type = '2D' if self.is_2d else '3D'
+                slf_type = "2D" if self.is_2d else "3D"
                 logger.warning('The %s variable name "%s" is not known (lang=%s). '
                                'The complete name will be used as ID' % (slf_type, name, self.language))
                 var_id = name
@@ -859,6 +978,7 @@ class Serafin:
     - filename <str>: path to file
     - file_size <int>: size of file
     """
+
     def __init__(self, filename, mode, language):
         self.language = language
         self.mode = mode
@@ -884,12 +1004,13 @@ class Read(Serafin):
     - header <SerafinHeader>: Serafin header
     - time <[float]>: time series in seconds
     """
+
     def __init__(self, filename, language):
         """!
         @param filename <str>: path to input Serafin file
         @param language <str>: Serafin variable name language ('fr' or 'en')
         """
-        super().__init__(filename, 'rb', language)
+        super().__init__(filename, "rb", language)
         self.header = None
         self.time = []
         self.file_size = os.path.getsize(self.filename)
@@ -915,12 +1036,15 @@ class Read(Serafin):
         @brief Read the time in the Serafin file
         """
         if self.header is None:
-            raise SerafinRequestError('Cannot read time without any header (forgot read_header ?)')
-        logger.debug('Reading the time series from the file')
+            raise SerafinRequestError(
+                "Cannot read time without any header (forgot read_header ?)"
+            )
         self.file.seek(self.header.header_size, 0)
         for _ in range(self.header.nb_frames):
             self.file.read(4)
-            self.time.append(self.header.unpack_float(self.file.read(self.header.float_size), 1)[0])
+            self.time.append(
+                self.header.unpack_float(self.file.read(self.header.float_size), 1)[0]
+            )
             self.file.read(4)
             self.file.seek(self.header.frame_size - 8 - self.header.float_size, 1)
 
@@ -946,17 +1070,23 @@ class Read(Serafin):
         @return index <int> the index of the frame (0-based)
         """
         if self.header is None:
-            raise SerafinRequestError('Cannot extract variable from empty list (forgot read_header ?)')
+            raise SerafinRequestError(
+                "Cannot extract variable from empty list (forgot read_header ?)"
+            )
         try:
             index = self.header.var_IDs.index(var_ID)
         except ValueError:
-            raise SerafinRequestError('Variable ID %s not found' % var_ID)
+            raise SerafinRequestError("Variable ID %s not found" % var_ID)
         return index
 
     def _seek_to_frame(self, time_index, pos_var=0):
         return self.file.seek(
-            self.header.header_size + time_index * self.header.frame_size + 8 +
-            self.header.float_size + pos_var * (8 + self.header.float_size * self.header.nb_nodes), 0
+            self.header.header_size
+            + time_index * self.header.frame_size
+            + 8
+            + self.header.float_size
+            + pos_var * (8 + self.header.float_size * self.header.nb_nodes),
+            0,
         )
 
     def read_var_in_frame(self, time_index, var_ID):
@@ -967,12 +1097,14 @@ class Read(Serafin):
         @return <numpy 1D-array>: values of the variables, of length equal to the number of nodes
         """
         if time_index < 0:
-            raise SerafinRequestError('Impossible to read a negative time index!')
+            raise SerafinRequestError("Impossible to read a negative time index!")
         logger.debug('Reading variable %s at frame %i' % (var_ID, time_index))
         pos_var = self._get_var_index(var_ID)
         self._seek_to_frame(time_index, pos_var)
         self.file.read(4)
-        return self.unpack_array(self.header.float_size * self.header.nb_nodes, self.header.np_type)
+        return self.unpack_array(
+            self.header.float_size * self.header.nb_nodes, self.header.np_type
+        )
 
     def read_vars_in_frame(self, time_index, var_IDs=None):
         """!
@@ -984,15 +1116,19 @@ class Read(Serafin):
         if var_IDs is None:
             var_IDs = self.header.var_IDs
         if time_index < 0:
-            raise SerafinRequestError('Impossible to read a negative time index!')
+            raise SerafinRequestError("Impossible to read a negative time index!")
         logger.debug('Reading variables %s at frame %i' % (var_IDs, time_index))
 
-        res = np.empty((len(var_IDs), self.header.nb_nodes), dtype=self.header.np_float_type)
+        res = np.empty(
+            (len(var_IDs), self.header.nb_nodes), dtype=self.header.np_float_type
+        )
         for i, var_ID in enumerate(var_IDs):
             pos_var = self._get_var_index(var_ID)
             self._seek_to_frame(time_index, pos_var)
             self.file.read(4)
-            res[i, :] = self.unpack_array(self.header.float_size * self.header.nb_nodes, self.header.np_type)
+            res[i, :] = self.unpack_array(
+                self.header.float_size * self.header.nb_nodes, self.header.np_type
+            )
         return res
 
     def iter_on_all_frames(self):
@@ -1003,15 +1139,21 @@ class Read(Serafin):
         """
         self.file.seek(self.header.header_size, 0)
 
-        res = np.empty((self.header.nb_var, self.header.nb_nodes), dtype=self.header.np_float_type)
+        res = np.empty(
+            (self.header.nb_var, self.header.nb_nodes), dtype=self.header.np_float_type
+        )
         for time_index in range(self.header.nb_frames):
             self.file.read(4)
-            time = self.header.unpack_float(self.file.read(self.header.float_size), 1)[0]
+            time = self.header.unpack_float(self.file.read(self.header.float_size), 1)[
+                0
+            ]
             self.file.read(4)
 
             for i in range(self.header.nb_var):
                 self.file.read(4)
-                res[i, :] = self.unpack_array(self.header.float_size * self.header.nb_nodes, self.header.np_type)
+                res[i, :] = self.unpack_array(
+                    self.header.float_size * self.header.nb_nodes, self.header.np_type
+                )
                 self.file.read(4)
 
             yield time, res
@@ -1024,7 +1166,7 @@ class Read(Serafin):
         @return <numpy 2D-array>: values of the variables with shape (planes number, number of 2D nodes)
         """
         if self.header.is_2d:
-            raise SerafinRequestError('Reading values as 3D is only possible in 3D!')
+            raise SerafinRequestError("Reading values as 3D is only possible in 3D!")
         new_shape = (self.header.nb_planes, self.header.nb_nodes_2d)
         return self.read_var_in_frame(time_index, var_ID).reshape(new_shape)
 
@@ -1037,7 +1179,7 @@ class Read(Serafin):
             (number of variables, planes number, number of 2D nodes)
         """
         if self.header.is_2d:
-            raise SerafinRequestError('Reading values as 3D is only possible in 3D!')
+            raise SerafinRequestError("Reading values as 3D is only possible in 3D!")
         if var_IDs is None:
             var_IDs = self.header.var_IDs
         new_shape = (len(var_IDs), self.header.nb_planes, self.header.nb_nodes_2d)
@@ -1052,9 +1194,13 @@ class Read(Serafin):
         @return <numpy 1D-array>: values of the variables, of length equal to the number of nodes
         """
         if self.header.is_2d:
-            raise SerafinRequestError('Extracting values at a specific layer is only possible in 3D!')
+            raise SerafinRequestError(
+                "Extracting values at a specific layer is only possible in 3D!"
+            )
         if iplan < 1 or iplan > self.header.nb_planes:
-            raise SerafinRequestError('Layer %i is not inside [1, %i]' % (iplan, self.header.nb_planes))
+            raise SerafinRequestError(
+                "Layer %i is not inside [1, %i]" % (iplan, self.header.nb_planes)
+            )
         return self.read_var_in_frame_as_3d(time_index, var_ID)[iplan + 1]
 
 
@@ -1064,13 +1210,14 @@ class Write(Serafin):
 
     (No additional attributes)
     """
+
     def __init__(self, filename, language, overwrite=False):
         """!
         @param filename <str>: path to output Serafin file
         @param language <str>: Serafin variable name language ('fr' or 'en')
         @param overwrite <bool>: overwrite if file already exists
         """
-        mode = 'wb' if overwrite else 'xb'
+        mode = "wb" if overwrite else "xb"
         super().__init__(filename, mode, language)
         logger.info('Writing the output file: "%s"' % filename)
 
@@ -1078,16 +1225,22 @@ class Write(Serafin):
         try:
             return Serafin.__enter__(self)
         except FileExistsError:
-            raise SerafinRequestError('Cannot overwrite existing file')
+            raise SerafinRequestError("Cannot overwrite existing file")
 
     def write_header(self, header):
         """!
         @brief Write Serafin header from attributes
         """
-        logger.debug('Writing header with %i nodes, %i elements %s and %i variable %s' %
-                     (header.nb_nodes, header.nb_elements,
-                      '' if header.is_2d else ', %i layers' % header.nb_planes,
-                      header.nb_var, ['', 's'][header.nb_var > 1]))
+        logger.debug(
+            "Writing header with %i nodes, %i elements %s and %i variable %s"
+            % (
+                header.nb_nodes,
+                header.nb_elements,
+                "" if header.is_2d else ", %i layers" % header.nb_planes,
+                header.nb_var,
+                ["", "s"][header.nb_var > 1],
+            )
+        )
 
         # Title and file type
         self.file.write(header.pack_int(80))
@@ -1128,12 +1281,16 @@ class Write(Serafin):
         # IKLE
         nb_ikle_values = header.nb_elements * header.nb_nodes_per_elem
         self.file.write(header.pack_int(4 * nb_ikle_values))
-        self.file.write(np.array(header.ikle, dtype=np.dtype(np.int32).newbyteorder(header.endian)))
+        self.file.write(
+            np.array(header.ikle, dtype=np.dtype(np.int32).newbyteorder(header.endian))
+        )
         self.file.write(header.pack_int(4 * nb_ikle_values))
 
         # IPOBO
         self.file.write(header.pack_int(4 * header.nb_nodes))
-        self.file.write(np.array(header.ipobo, dtype=np.dtype(np.int32).newbyteorder(header.endian)))
+        self.file.write(
+            np.array(header.ipobo, dtype=np.dtype(np.int32).newbyteorder(header.endian))
+        )
         self.file.write(header.pack_int(4 * header.nb_nodes))
 
         # X coordinates
@@ -1154,8 +1311,10 @@ class Write(Serafin):
         @param values <numpy 2D-array>: values to write, of dimension (nb_var, nb_nodes)
         """
         if values.shape != (header.nb_var, header.nb_nodes):
-            raise SerafinValidationError("Shape of values %s is not consistant with SerafinHeader (%i, %i)"
-                                         % (str(values.shape), header.nb_var, header.nb_nodes))
+            raise SerafinValidationError(
+                "Shape of values %s is not consistant with SerafinHeader (%i, %i)"
+                % (str(values.shape), header.nb_var, header.nb_nodes)
+            )
         self.file.write(header.pack_int(header.float_size))
         self.file.write(header.pack_float(time_to_write))
         self.file.write(header.pack_int(header.float_size))
